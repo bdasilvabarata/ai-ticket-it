@@ -1,0 +1,41 @@
+# Dependencias
+node_modules/
+
+# Builds y salidas
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Expo / React Native
+mobile/.expo/
+mobile/web-build/
+mobile/ios/
+mobile/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Variables de entorno (se versiona solo .env.example)
+.env
+.env.*
+!.env.example
+
+# Binarios de mongodb-memory-server
+.cache/
+
+# Logs
+npm-debug.log*
+*.log
+
+# SO / editores
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Configuración local de Claude Code
+.claude/settings.local.json
