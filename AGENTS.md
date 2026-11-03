@@ -33,7 +33,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 - `mobile/` — Expo + Expo Router. Todo `fetch` vive en `mobile/src/api/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.
 
-> La estructura de `backend/`, `mobile/` y `shared/` la crea la feature 001 (base técnica).
+> `backend/` y `shared/` los crea la feature 001 (base backend); `mobile/`, la 002 (base mobile).
 
 ## Comandos
 

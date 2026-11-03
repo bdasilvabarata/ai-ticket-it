@@ -11,48 +11,59 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 
 | # | Feature | Casos de uso | Prioridad | Depende de | Estado |
 |---|---|---|---|---|---|
-| 001 | **Base técnica**: monorepo, backend en capas con middlewares y error handler, Mongo en memoria + seed, app Expo con navegación, cliente HTTP y selector de usuario | — | P0 | — | pendiente |
-| 002 | **Crear evento** con tipos de entrada (precio y cupo) y catálogo de categorías | UC-04 | P1 | 001 | pendiente |
-| 003 | **Explorar eventos**: búsqueda textual, filtro por categoría, detalle del evento y ordenamiento por precio, fecha y puntaje del organizador | UC-03, UC-11 | P1 | 001 (usa eventos del seed) | pendiente |
-| 004 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 001, 003 (detalle del evento) | pendiente |
-| 005 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 004 | pendiente |
-| 006 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 002, 004 | pendiente |
-| 007 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 005 | pendiente |
-| 008 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 005, 006 | pendiente |
-| 009 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 003 | UC-09, UC-10 | P3 | 006 | pendiente |
-| 010 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 003 | pendiente |
+| 001 | **Base backend**: monorepo, servidor en capas con middlewares y error handler, Mongo en memoria + seed, recurso Usuarios de referencia, tipos compartidos | — | P0 | — | spec |
+| 002 | **Base mobile**: app Expo con navegación, cliente HTTP y selector de usuario | — | P0 | 001 (contrato de usuarios) | pendiente |
+| 003 | **Crear evento** con tipos de entrada (precio y cupo) y catálogo de categorías | UC-04 | P1 | 001, 002 | pendiente |
+| 004 | **Explorar eventos**: búsqueda textual, filtro por categoría, detalle del evento y ordenamiento por precio, fecha y puntaje del organizador | UC-03, UC-11 | P1 | 001, 002 (usa eventos del seed) | pendiente |
+| 005 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (detalle del evento) | pendiente |
+| 006 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 005 | pendiente |
+| 007 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 003, 005 | pendiente |
+| 008 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 006 | pendiente |
+| 009 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 006, 007 | pendiente |
+| 010 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 004 | UC-09, UC-10 | P3 | 007 | pendiente |
+| 011 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 004 | pendiente |
 
 ## Grafo de dependencias
 
 ```mermaid
 graph LR
-  F001[001 Base técnica] --> F002[002 Crear evento]
-  F001 --> F003[003 Explorar eventos]
-  F003 --> F004[004 Comprar entradas]
-  F004 --> F005[005 Mis compras]
-  F002 --> F006[006 Compras de un evento]
-  F004 --> F006
-  F005 --> F007[007 Cancelar compra]
-  F005 --> F008[008 Chat]
-  F006 --> F008
-  F006 --> F009[009 Reseñas]
-  F009 -. puntaje .-> F003
-  F003 --> F010[010 Favoritos]
+  F001[001 Base backend] --> F002[002 Base mobile]
+  F001 --> F003[003 Crear evento]
+  F002 --> F003
+  F001 --> F004[004 Explorar eventos]
+  F002 --> F004
+  F004 --> F005[005 Comprar entradas]
+  F005 --> F006[006 Mis compras]
+  F003 --> F007[007 Compras de un evento]
+  F005 --> F007
+  F006 --> F008[008 Cancelar compra]
+  F006 --> F009[009 Chat]
+  F007 --> F009
+  F007 --> F010[010 Reseñas]
+  F010 -. puntaje .-> F004
+  F004 --> F011[011 Favoritos]
 ```
 
 ## Oportunidades de paralelismo
 
-- Con **001** integrada, **002** y **003** avanzan en paralelo: 003 trabaja con eventos del seed.
-- **003** ordena por puntaje del organizador antes de que exista **009**: el puntaje sale `null`
-  (sin reseñas) y esos eventos van al final. Cuando 009 se integre, el orden se completa solo.
-- Con **004** integrada, **005**, **006** y **007** pueden avanzar a la vez; **008** necesita
-  las pantallas de 005 y 006, pero su backend puede hacerse contra el contrato antes.
+- Con el **contrato de usuarios de 001** definido (`specs/001-base-backend/contracts/`), **002**
+  puede arrancar antes de que 001 se integre.
+- Con **001** integrada, el backend de **003** y **004** avanza en paralelo con **002**; sus
+  pantallas se suman cuando 002 se integre. 004 trabaja con eventos del seed.
+- **004** ordena por puntaje del organizador antes de que exista **010**: el puntaje sale `null`
+  (sin reseñas) y esos eventos van al final. Cuando 010 se integre, el orden se completa solo.
+- Con **005** integrada, **006**, **007** y **008** pueden avanzar a la vez; **009** necesita
+  las pantallas de 006 y 007, pero su backend puede hacerse contra el contrato antes.
 
 ## Decisiones abiertas (a resolver en el `clarify` de cada feature)
 
-- 004: ¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?
-- 006: ¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
+- 002: la dirección del servidor debería tomarse por defecto del host de Expo (la IP de la PC),
+  con `EXPO_PUBLIC_API_URL` solo para pisarla. Si el servidor no responde al abrir la app,
+  conservar el usuario recordado; descartarlo solo si el servidor responde que no existe.
+  ¿Versión de Expo SDK alineada con la de Expo Go del celular?
+- 005: ¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?
+- 007: ¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
   evento)? ¿con qué dato la identifica?
-- 007: ¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
+- 008: ¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
   organizador? ¿hay plazo mínimo antes del evento?
-- 009: ¿se puede editar o borrar una reseña?
+- 010: ¿se puede editar o borrar una reseña?

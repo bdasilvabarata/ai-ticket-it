@@ -29,4 +29,4 @@ Consigna y casos de uso: [`docs/consigna/consigna.md`](docs/consigna/consigna.md
 
 ## Para arrancar
 
-Las instrucciones de instalación y ejecución se completan con la feature 001 (base técnica).
+Las instrucciones de instalación y ejecución se completan con las features 001 (base backend) y 002 (base mobile).

@@ -238,7 +238,7 @@ Si una feature queda bloqueada por otra que no está integrada:
 ### Commits
 
 Conventional Commits en español, con el scope de la feature:
-`docs(003-explorar-eventos): spec y clarificaciones`, `feat(004-comprar-entradas): ...`,
+`docs(004-explorar-eventos): spec y clarificaciones`, `feat(005-comprar-entradas): ...`,
 `test(...)`, `fix(...)`, `chore(...)`. Commits chicos, uno por tarea o grupo coherente de
 tareas.
 
@@ -252,4 +252,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 1.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-02
+**Version**: 1.0.1 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
