@@ -34,9 +34,10 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
 
 ### Reglas de Dominio (invariantes)
 
-- **Cupo**: las entradas vendidas de un tipo son la suma de las cantidades de sus compras en
-  estado `PENDIENTE`, `CONFIRMADA` o `UTILIZADA`. Disponibles = cupo − vendidas. Una compra
-  NO PUEDE dejar disponibles por debajo de 0, ni siquiera ante compras concurrentes.
+- **Cupo**: el cupo de un tipo de entrada es la cantidad de entradas **disponibles**. Se
+  establece al crear el tipo (por ejemplo, 300) y disminuye en la cantidad de cada compra que
+  se registra. Una compra NO PUEDE dejar el cupo por debajo de 0, ni siquiera ante compras
+  concurrentes.
 - **Total**: lo calcula el servidor como `precio × cantidad` al momento de comprar. El cliente
   nunca envía precios ni totales.
 - **Estados de una compra** — solo estas transiciones son válidas:
@@ -252,4 +253,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 1.0.1 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
+**Version**: 1.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
