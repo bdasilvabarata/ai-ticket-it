@@ -32,6 +32,7 @@ capas; y el modelo de persistencia de Categoria, Evento y TipoEntrada que usa el
 - Q: ¿Con qué código HTTP se responde un cuerpo JSON demasiado grande? → A: 413 con el formato único de error y un código propio (`CUERPO_DEMASIADO_GRANDE`); el límite en bytes lo fija el plan.
 - Q: ¿En qué orden se devuelve el listado de usuarios? → A: Alfabético por apellido y luego por nombre.
 - Q: ¿La cantidad de eventos que organiza un usuario incluye los ya realizados? → A: Sí, cuenta todos los eventos que organiza, pasados y futuros.
+- Revisión del plan: el comando de carga de datos de ejemplo es destructivo → exige confirmación explícita y, sin ella, no modifica nada (FR-007). Los datos de ejemplo de una base real envejecen → el README lo advierte (FR-024).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -77,7 +78,8 @@ dispositivo de la red: responde y devuelve los usuarios precargados.
    **Then** se conecta a esa base en lugar de crear una en memoria y no carga datos de ejemplo
    automáticamente.
 6. **Given** una base de datos real configurada, **When** el desarrollador ejecuta el comando
-   de carga de datos de ejemplo, **Then** las colecciones del seed (categorías, usuarios y
+   de carga de datos de ejemplo confirmando explícitamente que acepta vaciar la base, **Then**
+   las colecciones del seed (categorías, usuarios y
    eventos) quedan con exactamente los datos de ejemplo, descartando lo que tuvieran antes, y
    ejecutarlo de nuevo no genera duplicados.
 
@@ -172,6 +174,11 @@ de lint y comprobar que el comando correspondiente falla.
   requiera).
 - Un endpoint público recibe un encabezado de usuario inválido → lo ignora y responde
   normalmente (la identificación solo se exige donde se requiere).
+- El comando de carga de datos de ejemplo se ejecuta sin la confirmación explícita → no borra
+  nada, informa a qué base apunta y cómo confirmar, y termina con código de error.
+- Los datos de ejemplo cargados en una base real conservan las fechas calculadas el día de la
+  carga, así que con el tiempo los eventos futuros pasan a ser pasados → el README lo advierte
+  y recomienda volver a ejecutar la carga antes de una demo.
 - Cuerpo JSON que supera el límite de tamaño → 413 con el formato de error único y el código
   `CUERPO_DEMASIADO_GRANDE` (el límite en bytes lo fija el plan).
 
@@ -200,8 +207,9 @@ de lint y comprobar que el comando correspondiente falla.
   y NO DEBE cargar datos de ejemplo automáticamente.
 - **FR-007**: DEBE existir un comando para cargar los datos de ejemplo en la base configurada,
   idempotente: vacía las colecciones que maneja el seed (categorías, usuarios y eventos) y
-  carga los datos de ejemplo; todo otro dato de esas colecciones se pierde. El README DEBE
-  advertirlo.
+  carga los datos de ejemplo; todo otro dato de esas colecciones se pierde. Por ser
+  destructivo, DEBE exigir una confirmación explícita (sin ella no modifica nada) e informar a
+  qué base apunta. El README DEBE advertirlo.
 - **FR-008**: Los datos de ejemplo DEBEN tener identificadores fijos entre arranques y fechas
   de eventos relativas al día de arranque.
 - **FR-009**: Los datos de ejemplo DEBEN incluir como mínimo:
@@ -260,7 +268,8 @@ de lint y comprobar que el comando correspondiente falla.
 
 - **FR-024**: El README y `AGENTS.md` DEBEN documentar los requisitos previos, cómo instalar,
   arrancar el servidor (en memoria y con base real), cargar los datos de ejemplo, consultarlo
-  desde otro dispositivo (incluido el firewall) y correr tests, lint y verificación de tipos.
+  desde otro dispositivo (incluido el firewall) y correr tests, lint y verificación de tipos;
+  y DEBEN advertir que los datos de ejemplo de una base real envejecen (ver Edge Cases).
 - **FR-025**: Los endpoints de esta feature DEBEN quedar documentados en
   `specs/001-base-backend/contracts/`.
 
