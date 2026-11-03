@@ -61,6 +61,8 @@ graph LR
   con `EXPO_PUBLIC_API_URL` solo para pisarla. Si el servidor no responde al abrir la app,
   conservar el usuario recordado; descartarlo solo si el servidor responde que no existe.
   ¿Versión de Expo SDK alineada con la de Expo Go del celular?
+  `shared` exporta TypeScript sin compilar (decisión R2 de 001): Metro lo resuelve, pero
+  jest-expo necesita configurar `transformIgnorePatterns` para transformar `@ai-ticket-it/shared`.
 - 005: ¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?
 - 007: ¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
   evento)? ¿con qué dato la identifica?
