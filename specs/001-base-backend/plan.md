@@ -49,7 +49,7 @@ del binario; sin build a JavaScript; cuerpo ≤ 100 kB
 | I. Spec-Driven | Spec clarificada (4 decisiones); este plan → tasks → implement | ✅ |
 | II. Test-First | TDD; `tests/domain/` (orden, datos de ejemplo, tipos compartidos) sin base; `tests/api/` con supertest y Mongo en memoria por suite | ✅ |
 | III. Capas | `routes → controllers → services → repositories → domain`; regla de lint que impide importar Express/Mongoose/IO en `domain/`; controllers sin `try/catch` (Express 5 propaga rechazos) | ✅ |
-| IV. Mongo en memoria | Memoria por defecto, `MONGO_URI` opcional, mismo código; seed al arrancar en memoria; tests con instancia propia. Cupo atómico sin transacciones: contador `vendidas` en `TipoEntrada` + `$inc` condicional sobre un solo documento (R15) | ✅ |
+| IV. Mongo en memoria | Memoria por defecto, `MONGO_URI` opcional, mismo código; seed al arrancar en memoria; tests con instancia propia. Cupo atómico sin transacciones: `cupo` es un contador decreciente en `TipoEntrada`, descontado con `$inc` condicional sobre un solo documento (R15, constitución v1.1.0) | ✅ |
 | V. Contrato de API | `/api`, JSON, plural kebab-case, `id` string, formato único de error; contrato en `contracts/api.md`. 413 es un refinamiento registrado en la spec (clarificación 2), no una contradicción | ✅ |
 | VI. Identidad simulada | `requerirUsuario` lee `X-Usuario-Id`; vistas explícitas (`UsuarioVista`) | ✅ |
 | VII. Mobile | Fuera de alcance (002) | N/A |
@@ -57,7 +57,7 @@ del binario; sin build a JavaScript; cuerpo ≤ 100 kB
 | IX. Calidad | `strict`; ESLint prohíbe `any`, `@ts-ignore` sin descripción y `eslint-disable` sin justificación; `test`, `lint` y `typecheck` en la raíz; sin dependencias de más (logger y carga de `.env` nativos) | ✅ |
 
 **Post-design re-check (Phase 1)**: sin violaciones. Revisión 2026-11-03: se corrige la
-justificación de atomicidad (R5 → R15: contador `vendidas`), precios enteros, protección
+justificación de atomicidad (R5 → R15: `cupo` como contador decreciente), precios enteros, protección
 `--forzar` del seed y lectura de `.env` independiente del directorio de trabajo. Dos carpetas no figuran en el árbol de
 capas del principio III: `seed/` y `scripts/`. No son capas nuevas, sino datos de ejemplo y
 el punto de entrada de un comando. Ninguna capa de producto depende de ellas, y `seed/`

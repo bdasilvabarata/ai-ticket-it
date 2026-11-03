@@ -234,25 +234,30 @@ registro de npm el 2026-11-03.
 ## R15. Cupo atómico y precios enteros
 
 - **Decision**:
-  - `TipoEntrada` persiste un contador **`vendidas`** (entero, `min: 0`, default `0`), que es
-    la suma de las cantidades de sus compras en `PENDIENTE`, `CONFIRMADA` o `UTILIZADA`
-    (definición de la constitución, desnormalizada). Disponibles = `cupo − vendidas`.
-  - Comprar (005) reserva con **una sola actualización condicional sobre el documento del
-    evento**: filtro por `_id` del evento y `tiposEntrada._id`, con
-    `$expr: cupo − vendidas ≥ cantidad`, y `$inc: { "tiposEntrada.$.vendidas": cantidad }`.
-    Si no modifica nada → `409 CUPO_INSUFICIENTE`. Después inserta la compra; si el insert
-    falla, compensa con el `$inc` inverso.
-  - Cancelar (008) devuelve el cupo con un `$inc` negativo junto con el cambio de estado
+  - `TipoEntrada.cupo` es un **contador decreciente de entradas disponibles** (entero,
+    `min: 0`). Se carga con la cantidad inicial (ej.: 300) y no hay un campo aparte de
+    vendidas (constitución v1.1.0).
+  - Comprar (005) descuenta con **una sola actualización condicional sobre el documento del
+    evento**: `updateOne({ _id: eventoId, tiposEntrada: { $elemMatch: { _id: tipoId, cupo:
+    { $gte: cantidad } } } }, { $inc: { "tiposEntrada.$.cupo": -cantidad } })`. Si no
+    modifica nada → `409 CUPO_INSUFICIENTE`. Como la condición `cupo ≥ cantidad` y el
+    descuento ocurren en la misma operación atómica, el cupo nunca queda por debajo de 0, ni
+    con compras concurrentes. Después inserta la compra; si el insert falla, compensa con
+    `$inc: +cantidad`.
+  - Cancelar (008) devuelve las entradas con `$inc: +cantidad` junto con el cambio de estado
     (compensando si falla).
-  - En esta feature el seed carga `vendidas: 0` y no hay endpoints que lo modifiquen.
+  - En esta feature el seed carga el cupo inicial de cada tipo y no hay endpoints que lo
+    modifiquen.
   - `precio` es un **entero de pesos** (`min: 0`, validado como entero). `total = precio ×
     cantidad` es exacto, sin errores de punto flotante.
 - **Rationale**: el principio IV exige que descontar cupo sea atómico. Contar las compras de
   otra colección no lo es sin transacciones (dos compras simultáneas leen el mismo
-  disponible). El contador en el mismo documento lo hace atómico sobre una instancia
-  standalone. La 001 es dueña del modelo (FR-012), así que el campo se define acá aunque lo
-  use 005.
-- **Alternatives considered**: transacciones con replica set (ver R5); calcular disponibles
-  sumando compras en cada lectura (no atómico); precios en centavos (las entradas en pesos no
+  disponible). Un único contador en el mismo documento lo hace atómico sobre una instancia
+  standalone, y con `cupo` decreciente alcanza un solo campo: "quedan disponibles" (UC-02) se
+  lee directo. La capacidad original, si alguna feature la necesitara, se deriva como
+  `cupo + Σ cantidades de compras activas`.
+- **Alternatives considered**: contador `vendidas` con `cupo` fijo (redundante: es la misma
+  información con dos campos; descartado en la revisión del plan); transacciones con replica
+  set (ver R5); calcular disponibles sumando compras en cada lectura (no atómico); precios en centavos (las entradas en pesos no
   usan centavos; si alguna vez hicieran falta, se migra a centavos enteros con el mismo
   criterio).

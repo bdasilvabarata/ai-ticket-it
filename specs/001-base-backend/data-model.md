@@ -73,11 +73,11 @@ propio para que las compras (005) lo referencien.
 | `nombre` | `string` | `String`, requerido, trim | único dentro del evento (lo valida 003) |
 | `descripcion` | `string` | `String`, default `""` | |
 | `precio` | `number` | `Number`, requerido, **entero**, `min: 0` | pesos argentinos enteros (R15) |
-| `cupo` | `number` | `Number`, requerido, entero, `min: 1` | total del tipo |
-| `vendidas` | `number` | `Number`, requerido, entero, `min: 0`, default `0` | contador desnormalizado de entradas en compras `PENDIENTE`/`CONFIRMADA`/`UTILIZADA`; 0 en el seed; lo mueven 005 y 008 con `$inc` condicional (R15) |
+| `cupo` | `number` | `Number`, requerido, entero, `min: 0` | **entradas disponibles**: se carga con la cantidad inicial (al crear el tipo, ≥ 1, lo valida 003) y decrece con cada compra; nunca menor que 0 |
 
-**Disponibles** = `cupo − vendidas`, nunca negativo: la reserva de 005 es una única
-actualización condicional sobre el documento del evento (atómica sin transacciones). Ver
+**Cupo como contador decreciente**: comprar (005) descuenta `cantidad` con una única
+actualización condicional (`cupo ≥ cantidad` + `$inc` negativo) sobre el documento del evento,
+atómica sin transacciones; cancelar (008) la devuelve. Ver
 [research.md R15](./research.md#r15-cupo-atómico-y-precios-enteros).
 
 ## EstadoCompra (solo tipo compartido)
@@ -107,8 +107,8 @@ Códigos de esta feature: ver [contracts/api.md](./contracts/api.md#errores).
 ceros + 4 dígitos de tipo + 2 de número (por ejemplo, usuario 1 = `000000000000000000000101`).
 Las fechas son "día de `ahora` en Buenos Aires + N días, a la hora indicada" salvo el evento
 próximo, que va a `ahora + 24 h` redondeado a la hora. En una base real, las fechas quedan
-fijas al día en que se corrió `npm run seed -- --forzar` y envejecen. Todos los tipos de
-entrada se cargan con `vendidas: 0`.
+fijas al día en que se corrió `npm run seed -- --forzar` y envejecen. El cupo de cada tipo de
+entrada es su cantidad inicial (no hay compras en el seed).
 
 **Usuarios** (`…0001xx`)
 
