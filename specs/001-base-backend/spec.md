@@ -24,6 +24,15 @@ capas; y el modelo de persistencia de Categoria, Evento y TipoEntrada que usa el
 **No incluye**: la app móvil (feature 002), endpoints de eventos o categorías (features 003 y
 004), compras, mensajes y reseñas.
 
+## Clarifications
+
+### Session 2026-11-03
+
+- Q: Al cargar los datos de ejemplo en una base real, ¿qué pasa con los datos existentes? → A: Se vacían las colecciones que maneja el seed (categorías, usuarios, eventos) y se cargan los datos de ejemplo; el resto de esas colecciones se pierde.
+- Q: ¿Con qué código HTTP se responde un cuerpo JSON demasiado grande? → A: 413 con el formato único de error y un código propio (`CUERPO_DEMASIADO_GRANDE`); el límite en bytes lo fija el plan.
+- Q: ¿En qué orden se devuelve el listado de usuarios? → A: Alfabético por apellido y luego por nombre.
+- Q: ¿La cantidad de eventos que organiza un usuario incluye los ya realizados? → A: Sí, cuenta todos los eventos que organiza, pasados y futuros.
+
 ## User Scenarios & Testing *(mandatory)*
 
 Los actores de esta feature son:
@@ -68,8 +77,9 @@ dispositivo de la red: responde y devuelve los usuarios precargados.
    **Then** se conecta a esa base en lugar de crear una en memoria y no carga datos de ejemplo
    automáticamente.
 6. **Given** una base de datos real configurada, **When** el desarrollador ejecuta el comando
-   de carga de datos de ejemplo, **Then** la base queda con exactamente los datos de ejemplo,
-   y ejecutarlo de nuevo no genera duplicados.
+   de carga de datos de ejemplo, **Then** las colecciones del seed (categorías, usuarios y
+   eventos) quedan con exactamente los datos de ejemplo, descartando lo que tuvieran antes, y
+   ejecutarlo de nuevo no genera duplicados.
 
 ---
 
@@ -94,7 +104,7 @@ verificar código y formato de cada respuesta.
 
 1. **Given** el servidor con datos de ejemplo, **When** se pide el listado de usuarios sin
    indicar usuario, **Then** devuelve todos los usuarios con identificador, nombre, apellido y
-   cantidad de eventos que organiza.
+   cantidad de eventos que organiza, ordenados alfabéticamente por apellido y luego por nombre.
 2. **Given** un usuario existente, **When** se lo pide por su identificador, **Then** devuelve
    su vista con los mismos campos.
 3. **Given** un identificador con formato válido que no corresponde a ningún usuario, **When**
@@ -162,7 +172,8 @@ de lint y comprobar que el comando correspondiente falla.
   requiera).
 - Un endpoint público recibe un encabezado de usuario inválido → lo ignora y responde
   normalmente (la identificación solo se exige donde se requiere).
-- Cuerpo JSON demasiado grande → 400 o 413 con el formato de error único (a fijar en el plan).
+- Cuerpo JSON que supera el límite de tamaño → 413 con el formato de error único y el código
+  `CUERPO_DEMASIADO_GRANDE` (el límite en bytes lo fija el plan).
 
 ## Requirements *(mandatory)*
 
@@ -188,7 +199,9 @@ de lint y comprobar que el comando correspondiente falla.
 - **FR-006**: Si se configura la dirección de una base de datos real, el servidor DEBE usarla
   y NO DEBE cargar datos de ejemplo automáticamente.
 - **FR-007**: DEBE existir un comando para cargar los datos de ejemplo en la base configurada,
-  idempotente (reemplaza los datos de ejemplo sin duplicarlos).
+  idempotente: vacía las colecciones que maneja el seed (categorías, usuarios y eventos) y
+  carga los datos de ejemplo; todo otro dato de esas colecciones se pierde. El README DEBE
+  advertirlo.
 - **FR-008**: Los datos de ejemplo DEBEN tener identificadores fijos entre arranques y fechas
   de eventos relativas al día de arranque.
 - **FR-009**: Los datos de ejemplo DEBEN incluir como mínimo:
@@ -216,7 +229,8 @@ de lint y comprobar que el comando correspondiente falla.
   informe que está operativo y el tipo de almacenamiento.
 - **FR-014**: El servidor DEBE exponer, sin requerir usuario, el listado de usuarios y la
   consulta de un usuario por identificador, con identificador, nombre, apellido y cantidad de
-  eventos que organiza.
+  eventos que organiza (todos, pasados y futuros). El listado DEBE devolverse ordenado
+  alfabéticamente por apellido y luego por nombre.
 - **FR-015**: El servidor DEBE exponer la consulta del usuario actual, que requiere usuario.
 
 **Comportamiento transversal**
@@ -230,7 +244,8 @@ de lint y comprobar que el comando correspondiente falla.
   formado e inexistente es recurso inexistente (404).
 - **FR-018**: Todos los errores DEBEN responderse con el formato único de la constitución
   (`codigo`, `mensaje` en español y `detalles` opcionales) y los códigos HTTP que esta define,
-  incluido un cuerpo que no es JSON válido (400).
+  incluido un cuerpo que no es JSON válido (400). Como refinamiento del contrato, un cuerpo
+  que supera el límite de tamaño responde 413 con el código `CUERPO_DEMASIADO_GRANDE`.
 - **FR-019**: Los errores inesperados DEBEN responder 500 sin exponer trazas ni detalles
   internos, y registrarse completos en el servidor.
 - **FR-020**: Las rutas inexistentes bajo la API DEBEN responder 404 con el formato único.
@@ -253,7 +268,7 @@ de lint y comprobar que el comando correspondiente falla.
 
 - **Usuario**: persona que usa el sistema; nombre, apellido y eventos favoritos (vacío en el
   seed). Es comprador u organizador según su relación con cada recurso; su vista expone cuántos
-  eventos organiza.
+  eventos organiza, contando todos (pasados y futuros).
 - **Categoria**: catálogo precargado de tipos de evento; nombre y descripción.
 - **Evento**: lo publica un usuario (organizador); nombre, descripción, categoría, fecha y
   hora, multimedia (direcciones de imágenes) y uno o más tipos de entrada. En esta feature solo
@@ -273,8 +288,8 @@ de lint y comprobar que el comando correspondiente falla.
   README.
 - **SC-003**: El 100 % de los casos de error definidos (ruta inexistente, usuario ausente o
   inválido, identificador mal formado, recurso inexistente, entrada inválida, cuerpo mal
-  formado, error inesperado) responde con el formato único y el código correspondiente,
-  verificado por pruebas automatizadas.
+  formado, cuerpo demasiado grande, error inesperado) responde con el formato único y el
+  código correspondiente, verificado por pruebas automatizadas.
 - **SC-004**: Tests, lint y verificación de tipos terminan en verde desde la raíz con una sola
   ejecución de cada comando, y las pruebas del servidor corren en menos de 1 minuto.
 - **SC-005**: Reiniciar el servidor en memoria 3 veces seguidas deja siempre exactamente los
