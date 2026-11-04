@@ -509,7 +509,7 @@ un cambio incompatible en `EstadoCompra` hace fallar el typecheck del backend.
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T064 [P] Actualizar `README.md` (FR-024): requisitos previos (Node ≥ 22.12, npm ≥ 10,
+- [X] T064 [P] Actualizar `README.md` (FR-024): requisitos previos (Node ≥ 22.12, npm ≥ 10,
   internet la primera vez para descargar MongoDB ~100 MB); instalar (`npm install`); arrancar en
   memoria (`npm start`, `npm run dev`); usar una base real (`backend/.env` desde
   `backend/.env.example` con `MONGO_URI`); cargar datos de ejemplo con
@@ -519,14 +519,14 @@ un cambio incompatible en `EstadoCompra` hace fallar el typecheck del backend.
   dispositivo con la dirección `Red` y paso a paso del Firewall de Windows Defender (permitir
   Node.js en redes privadas, red Wi-Fi marcada como privada); y `npm test`, `npm run lint`,
   `npm run typecheck` (aclarando que los tests no leen `backend/.env`).
-- [ ] T065 [P] Completar la sección "Comandos" de `AGENTS.md` con la tabla de comandos de
+- [X] T065 [P] Completar la sección "Comandos" de `AGENTS.md` con la tabla de comandos de
   contracts/api.md, la nota de que `npm run seed` exige `--forzar` y `MONGO_URI`, y el
   recordatorio de correr `npm test`, `npm run lint` y `npm run typecheck` antes de cerrar una
   tarea (FR-024).
-- [ ] T066 Revisar que `specs/001-base-backend/contracts/api.md` coincide con lo implementado
+- [X] T066 Revisar que `specs/001-base-backend/contracts/api.md` coincide con lo implementado
   (rutas, códigos, mensajes, salida de arranque); si algo cambió, actualizar el contrato
   (FR-025).
-- [ ] T067 Validar `specs/001-base-backend/quickstart.md` de punta a punta, incluidas §5 (con un
+- [X] T067 Validar `specs/001-base-backend/quickstart.md` de punta a punta, incluidas §5 (con un
   MongoDB real: `npm run seed` sin `--forzar` sale con 1 sin borrar; con `--forzar` dos veces
   no duplica; `npm start` informa "MongoDB externo"; una `MONGO_URI` inaccesible termina en
   ~5 s con mensaje y código ≠ 0) y §6 (segundo `npm start` → "El puerto 3000 ya está en uso").

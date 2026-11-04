@@ -37,5 +37,17 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 
 ## Comandos
 
-Se completan en la feature 001. Antes de dar una tarea por terminada:
-`npm test`, `npm run lint` y `npm run typecheck`.
+Desde la raíz del repo:
+
+| Comando | Efecto |
+|---|---|
+| `npm install` | instala todos los workspaces (`backend`, `shared`) |
+| `npm start` | arranca el servidor (MongoDB en memoria + seed, o `MONGO_URI` de `backend/.env`) |
+| `npm run dev` | igual, recargando ante cambios |
+| `npm run seed -- --forzar` | **vacía** `categorias`, `usuarios` y `eventos` de la base de `MONGO_URI` y carga los datos de ejemplo |
+| `npm run seed` (sin `--forzar`) | no modifica nada: muestra la base de destino y termina con código 1 |
+| `npm test` · `npm run lint` · `npm run typecheck` | calidad, en todos los paquetes |
+
+`npm run seed` exige `MONGO_URI` **y** el flag `--forzar`; sin alguno de los dos no toca la base.
+
+Antes de dar una tarea por terminada: `npm test`, `npm run lint` y `npm run typecheck` en verde.

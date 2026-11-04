@@ -111,6 +111,7 @@ backend/
 │   │   ├── env.ts           # loadEnvFile (ruta desde import.meta.dirname; no en test) + parsearEnv
 │   │   ├── db.ts            # conectarBase(uri?, { timeoutMs }) / desconectarBase(): memoria o MONGO_URI
 │   │   ├── fallas-arranque.ts # ErrorArranque + mensajeFallaArranque(error, puerto), puro
+│   │   ├── destino-mongo.ts # host/base de una URI sin credenciales, puro (lo usan db.ts y seed-opciones.ts)
 │   │   ├── direcciones.ts   # IPv4 locales para el mensaje de arranque
 │   │   └── logger.ts
 │   ├── routes/

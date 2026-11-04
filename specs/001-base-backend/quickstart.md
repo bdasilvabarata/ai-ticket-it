@@ -8,7 +8,7 @@ están en [contracts/api.md](./contracts/api.md); los datos de ejemplo, en
 
 - Node ≥ 22.12 y npm ≥ 10 (`node -v`, `npm -v`).
 - Internet en la **primera** ejecución: mongodb-memory-server descarga el binario de MongoDB
-  (~100 MB) a su caché y después funciona sin red.
+  (~590 MB en Windows) a su caché y después funciona sin red.
 - Para el acceso desde otro dispositivo: PC y dispositivo en la misma red Wi-Fi.
 
 ## 1. Instalar y arrancar (US1, SC-001)
