@@ -1,0 +1,28 @@
+{
+  "name": "ai-ticket-it",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "backend",
+    "shared"
+  ],
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "start": "npm run start -w backend",
+    "dev": "npm run dev -w backend",
+    "seed": "npm run seed -w backend --",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "devDependencies": {
+    "@eslint-community/eslint-plugin-eslint-comments": "^4.8.1",
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.14.0",
+    "globals": "^17.14.0",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.1"
+  }
+}

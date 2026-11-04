@@ -45,7 +45,7 @@ el backend: cada test se escribe primero, **se lo ve fallar** y recién entonces
 
 **Purpose**: monorepo, paquetes, TypeScript, lint y Vitest configurados.
 
-- [ ] T001 Crear `package.json` en la raíz: `"private": true`, `"type": "module"`,
+- [X] T001 Crear `package.json` en la raíz: `"private": true`, `"type": "module"`,
   `"workspaces": ["backend", "shared"]`, `"engines": { "node": ">=22.12" }`. Scripts:
   `start` = `npm run start -w backend`, `dev` = `npm run dev -w backend`,
   `seed` = `npm run seed -w backend --` (para que `npm run seed -- --forzar` llegue al script),
@@ -53,15 +53,15 @@ el backend: cada test se escribe primero, **se lo ve fallar** y recién entonces
   `typecheck` = `npm run typecheck --workspaces --if-present`. devDependencies:
   `typescript` `~6.0`, `eslint` `^10`, `@eslint/js`, `typescript-eslint` `^8`,
   `@eslint-community/eslint-plugin-eslint-comments`, `globals` (R1, R14).
-- [ ] T002 Crear `tsconfig.base.json` en la raíz con `strict: true`, `target: "ES2023"`,
+- [X] T002 Crear `tsconfig.base.json` en la raíz con `strict: true`, `target: "ES2023"`,
   `module: "ESNext"`, `moduleResolution: "Bundler"`, `noEmit: true`,
   `verbatimModuleSyntax: true`, `esModuleInterop: true`, `skipLibCheck: true`,
   `isolatedModules: true`, `resolveJsonModule: true` (R2).
-- [ ] T003 [P] Crear `shared/package.json` (`"name": "@ai-ticket-it/shared"`, `"private": true`,
+- [X] T003 [P] Crear `shared/package.json` (`"name": "@ai-ticket-it/shared"`, `"private": true`,
   `"type": "module"`, `"exports": { ".": "./src/index.ts" }`, `"types": "./src/index.ts"`,
   script `typecheck` = `tsc --noEmit`, sin paso de build) y `shared/tsconfig.json` que extiende
   `../tsconfig.base.json` e incluye `src/**/*.ts` (R2).
-- [ ] T004 [P] Crear `backend/package.json` (`"type": "module"`, `"private": true`).
+- [X] T004 [P] Crear `backend/package.json` (`"type": "module"`, `"private": true`).
   dependencies: `express` `^5.3`, `mongoose` `^9`, `zod` `^4`, `mongodb-memory-server` `^11`,
   `@ai-ticket-it/shared` `"*"`. devDependencies: `tsx` `^4`, `vitest` `^5`, `supertest` `^7`,
   `@types/express` `^5` (los de Express 4 tipan distinto los handlers async y `req.query`),
@@ -71,13 +71,13 @@ el backend: cada test se escribe primero, **se lo ve fallar** y recién entonces
   `../tsconfig.base.json`, con `types: ["node"]` e `include: ["src/**/*.ts", "tests/**/*.ts",
   "vitest.config.ts"]` (R3, R13: incluir `tests/` hace que un cambio en `shared` rompa el
   typecheck del backend).
-- [ ] T005 [P] Crear `backend/vitest.config.ts` con `test.environment: "node"`,
+- [X] T005 [P] Crear `backend/vitest.config.ts` con `test.environment: "node"`,
   `test.include: ["tests/**/*.test.ts"]`, `test.hookTimeout: 60000` (primera descarga del
   binario de MongoDB), `test.testTimeout: 10000` y `test.env: { NODE_ENV: "test" }` (R13).
   `NODE_ENV` se fija explícitamente porque Vitest solo lo pone en `test` si no viene definido:
   con un `NODE_ENV=development` en la terminal, los tests leerían `backend/.env` y el logger
   no quedaría en `silent` (R4).
-- [ ] T006 [P] Crear `eslint.config.js` (flat config) en la raíz: ignora `node_modules/` y
+- [X] T006 [P] Crear `eslint.config.js` (flat config) en la raíz: ignora `node_modules/` y
   `**/dist/`; aplica `@eslint/js` recommended y `typescript-eslint` recommended a `**/*.ts`;
   globals de Node; reglas `@typescript-eslint/no-explicit-any: "error"`,
   `@typescript-eslint/ban-ts-comment` con `ts-ignore: "allow-with-description"` y
@@ -87,12 +87,12 @@ el backend: cada test se escribe primero, **se lo ve fallar** y recién entonces
   `mongodb`, `node:fs`, `fs`, `node:fs/promises`, `node:http`, `http`, `node:net`, `net`,
   `node:child_process`, `child_process`, `node:os`, `os` con mensaje
   "domain/ es puro: sin Express, Mongoose ni IO (principio III)" (R14).
-- [ ] T007 [P] Crear `backend/.env.example` con `PORT=3000`, `HOST=0.0.0.0`, `# MONGO_URI=`
+- [X] T007 [P] Crear `backend/.env.example` con `PORT=3000`, `HOST=0.0.0.0`, `# MONGO_URI=`
   (comentada, con un ejemplo `mongodb://localhost:27017/ai-ticket-it`) y `LOG_LEVEL=info`, cada
   una con un comentario de una línea en español; el de `LOG_LEVEL` aclara que en los tests es
   siempre `silent` (FR-004, R4). Verificar que `.gitignore` ignora `.env`, `node_modules/` y la
   caché de binarios de mongodb-memory-server; agregar lo que falte.
-- [ ] T008 Ejecutar `npm install` en la raíz y verificar que `node_modules/@ai-ticket-it/shared`
+- [X] T008 Ejecutar `npm install` en la raíz y verificar que `node_modules/@ai-ticket-it/shared`
   es un enlace al workspace `shared/` y que se generó un único `package-lock.json` en la raíz.
 
 ---
