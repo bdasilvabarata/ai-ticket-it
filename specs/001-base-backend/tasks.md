@@ -363,12 +363,12 @@ inválido con el formato único, y registro de cada pedido.
 
 > Escribirlos primero y verlos fallar antes de implementar.
 
-- [ ] T044 [P] [US2] Escribir `backend/tests/domain/usuario.test.ts` sobre
+- [X] T044 [P] [US2] Escribir `backend/tests/domain/usuario.test.ts` sobre
   `compararPorApellidoYNombre` (clarificación 3, R12): ordena por apellido y luego por nombre;
   "Álvarez" queda antes que "Benítez" y "alvarez" empata con "Álvarez" en el apellido (sin
   distinguir mayúsculas ni tildes); con igual apellido decide el nombre; no muta el arreglo si
   se usa con `toSorted`.
-- [ ] T045 [P] [US2] Escribir `backend/tests/api/usuarios.test.ts` (usa el helper de T028,
+- [X] T045 [P] [US2] Escribir `backend/tests/api/usuarios.test.ts` (usa el helper de T028,
   `supertest(crearApp({ almacenamiento: "memoria" }))`), contra contracts/api.md:
   - `GET /api/usuarios` → 200 con los 5 usuarios en orden Álvarez, Benítez, Castro, Fernández,
     Gómez y `cantidadEventosOrganizados` 3, 3, 2, 0, 0; cada elemento tiene **exactamente** las
@@ -384,7 +384,7 @@ inválido con el formato único, y registro de cada pedido.
     `0000000000000000000009ff` → 401 `USUARIO_NO_IDENTIFICADO` en los cuatro casos.
   - `GET /api/usuarios` con `X-Usuario-Id: abc` → 200 (público, ignora el encabezado).
   - Todo cuerpo de error cumple `ErrorApi`: `error.codigo` y `error.mensaje` strings no vacíos.
-- [ ] T046 [P] [US2] Escribir `backend/tests/api/errores.test.ts` (usa el helper de T028),
+- [X] T046 [P] [US2] Escribir `backend/tests/api/errores.test.ts` (usa el helper de T028),
   contra contracts/api.md "Errores":
   - `GET /api/no-existe` → 404 `RUTA_NO_ENCONTRADA`; `DELETE /api/salud` → 404
     `RUTA_NO_ENCONTRADA`.
@@ -400,13 +400,13 @@ inválido con el formato único, y registro de cada pedido.
 
 ### Implementation for User Story 2
 
-- [ ] T047 [US2] Agregar `compararPorApellidoYNombre(a, b)` a `backend/src/domain/usuario.ts`
+- [X] T047 [US2] Agregar `compararPorApellidoYNombre(a, b)` a `backend/src/domain/usuario.ts`
   usando un `Intl.Collator("es", { sensitivity: "base" })` a nivel de módulo: compara
   `apellido` y, si empatan, `nombre`. Hace pasar T044.
-- [ ] T048 [P] [US2] Crear `backend/src/routes/schemas/comunes.ts` con `idSchema` (zod: string
+- [X] T048 [P] [US2] Crear `backend/src/routes/schemas/comunes.ts` con `idSchema` (zod: string
   de exactamente 24 caracteres hexadecimales, mensaje "Debe ser un identificador válido.") y la
   función `esIdValido(valor: string): boolean` que lo reutiliza (R7).
-- [ ] T049 [P] [US2] Crear `backend/src/middlewares/validar.ts` (FR-017, R7):
+- [X] T049 [P] [US2] Crear `backend/src/middlewares/validar.ts` (FR-017, R7):
   - `validar({ params?, query?, body? })` recibe esquemas zod, parsea cada parte presente de
     `req` con `safeParse`, junta todos los problemas como
     `{ campo: "<parte>.<ruta.con.puntos>", mensaje }` y lanza `EntradaInvalidaError(detalles)`
@@ -416,12 +416,12 @@ inválido con el formato único, y registro de cada pedido.
     devuelve `esquema.parse(req.validado?.[parte])`, con el comentario "re-parsea lo ya
     validado para recuperar el tipo sin casts; si falla, es un error de programación (ruta sin
     `validar`) → 500".
-- [ ] T050 [P] [US2] Crear `backend/src/middlewares/registrar-pedido.ts`: toma
+- [X] T050 [P] [US2] Crear `backend/src/middlewares/registrar-pedido.ts`: toma
   `process.hrtime.bigint()` al entrar y en `res.on("finish")` llama a
   `logger.info("<MÉTODO> <req.originalUrl> <status> <ms con 1 decimal>ms")` (FR-021, R11).
-- [ ] T051 [P] [US2] Crear `backend/src/middlewares/ruta-no-encontrada.ts`: lanza
+- [X] T051 [P] [US2] Crear `backend/src/middlewares/ruta-no-encontrada.ts`: lanza
   `NoEncontradoError("RUTA_NO_ENCONTRADA", "No existe la ruta <MÉTODO> <ruta>.")` (FR-020).
-- [ ] T052 [P] [US2] Crear `backend/src/middlewares/manejar-errores.ts` (error handler de 4
+- [X] T052 [P] [US2] Crear `backend/src/middlewares/manejar-errores.ts` (error handler de 4
   argumentos, respuesta tipada como `ErrorApi` de `shared`) (FR-018, FR-019, R9):
   `ErrorAplicacion` → su `status` y `{ error: { codigo, mensaje, detalles? } }` (sin
   `detalles` si no hay); error con `type === "entity.parse.failed"` → 400 `JSON_INVALIDO`
@@ -429,40 +429,40 @@ inválido con el formato único, y registro de cada pedido.
   `CUERPO_DEMASIADO_GRANDE` "El cuerpo del pedido supera el máximo de 100 kB."; cualquier otro
   → `logger.error(...)` con el error completo y 500 `ERROR_INTERNO` "Ocurrió un error
   inesperado." sin trazas. Si `res.headersSent`, delega en `next(error)`.
-- [ ] T053 [US2] Cablear en `backend/src/app.ts` (depende de T050–T052): `registrarPedido`
+- [X] T053 [US2] Cablear en `backend/src/app.ts` (depende de T050–T052): `registrarPedido`
   **antes** de `express.json` (para registrar también los 400/413 del parser), después el
   router `/api`, luego `rutaNoEncontrada` y por último `manejarErrores`.
-- [ ] T054 [P] [US2] Crear `backend/src/repositories/usuario.repository.ts` como objeto
+- [X] T054 [P] [US2] Crear `backend/src/repositories/usuario.repository.ts` como objeto
   `usuarioRepository` con `listar(): Promise<Usuario[]>` y `buscarPorId(id): Promise<Usuario |
   null>`, ambos con `.lean()` y `aDominio()` (`_id` → `id`, `favoritos` → `string[]`).
-- [ ] T055 [P] [US2] Crear `backend/src/repositories/evento.repository.ts` como objeto
+- [X] T055 [P] [US2] Crear `backend/src/repositories/evento.repository.ts` como objeto
   `eventoRepository` con `contarPorOrganizador(ids: string[]): Promise<Map<string, number>>`
   usando **una** agregación (`$match` por `organizador: { $in }` + `$group` por organizador);
   los ids sin eventos no aparecen (el service usa 0). Los ids se convierten con
   `new Types.ObjectId(id)` antes del `$match`, y la clave del `Map` vuelve a string:
   `aggregate()` **no** aplica el casteo del esquema y con strings no matchearía nada (R12). Cuenta todos los eventos, pasados y
   futuros (clarificación 4). Comentario: lo amplían 003/004.
-- [ ] T056 [US2] Crear `backend/src/services/usuario.service.ts` como objeto `usuarioService`
+- [X] T056 [US2] Crear `backend/src/services/usuario.service.ts` como objeto `usuarioService`
   (exportado como objeto para poder espiarlo, R13) con: `listar(): Promise<UsuarioVista[]>`
   (trae usuarios, cuenta eventos en una sola llamada, ordena con
   `toSorted(compararPorApellidoYNombre)` y mapea con una función explícita `aVista(usuario,
   cantidad)`, nunca `{ ...usuario }`); `obtenerVista(id): Promise<UsuarioVista>` (lanza
   `NoEncontradoError("USUARIO_NO_ENCONTRADO", "No existe el usuario.")` si no existe); y
   `buscarPorId(id): Promise<Usuario | null>` (dominio, para el middleware).
-- [ ] T057 [US2] Crear `backend/src/middlewares/requerir-usuario.ts` (FR-016, R8):
+- [X] T057 [US2] Crear `backend/src/middlewares/requerir-usuario.ts` (FR-016, R8):
   - `requerirUsuario` lee `req.get("X-Usuario-Id")` y recorta espacios; si falta, está vacío,
     `!esIdValido(...)` o `usuarioService.buscarPorId` devuelve `null` → lanza
     `UsuarioNoIdentificadoError`; si no, deja el usuario en `req.usuario`.
   - `usuarioActual(req): Usuario` devuelve `req.usuario` o lanza `UsuarioNoIdentificadoError`
     si falta.
-- [ ] T058 [P] [US2] Crear `backend/src/routes/usuarios.schemas.ts` con
+- [X] T058 [P] [US2] Crear `backend/src/routes/usuarios.schemas.ts` con
   `export const usuarioPorIdSchema = { params: z.object({ id: idSchema }) }`.
-- [ ] T059 [US2] Crear `backend/src/controllers/usuario.controller.ts` (handlers `async`, sin
+- [X] T059 [US2] Crear `backend/src/controllers/usuario.controller.ts` (handlers `async`, sin
   `try/catch`, respuestas tipadas con `UsuarioVista` de `shared`, **sin `as` ni `!`**):
   `listar` → 200 con `usuarioService.listar()`; `obtenerPorId` → responde
   `usuarioService.obtenerVista(leerValidado(req, "params", usuarioPorIdSchema.params).id)`;
   `obtenerActual` → responde `usuarioService.obtenerVista(usuarioActual(req).id)`.
-- [ ] T060 [US2] Crear `backend/src/routes/usuarios.routes.ts` en este orden: `GET /` →
+- [X] T060 [US2] Crear `backend/src/routes/usuarios.routes.ts` en este orden: `GET /` →
   `listar`; `GET /actual` → `requerirUsuario`, `obtenerActual` (declarada **antes** que `/:id`);
   `GET /:id` → `validar(usuarioPorIdSchema)`, `obtenerPorId`. Montarlo en `/usuarios` dentro de
   `crearRouterApi()` en `backend/src/routes/index.ts`. Hace pasar T045 y T046.
