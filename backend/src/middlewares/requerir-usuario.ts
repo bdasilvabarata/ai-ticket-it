@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import type { Usuario } from "../domain/usuario";
 import { UsuarioNoIdentificadoError } from "../errors/index";
-import { esIdValido } from "../routes/schemas/comunes";
+import { esIdValido } from "./esquemas-comunes";
 import { usuarioService } from "../services/usuario.service";
 
 /**

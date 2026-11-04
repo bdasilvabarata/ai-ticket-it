@@ -11,8 +11,11 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 - ¿Está en `specs/NNN-slug/contracts/`? Si no, agregalo primero.
 
 ## Dónde va cada cosa (principio III)
-- `backend/src/routes/` — método + path, middlewares (`usuarioActual`, `validar(schema)`) y controller.
-- `backend/src/controllers/` — lee `req`, llama al service, arma la response. Sin reglas, sin try/catch.
+- `backend/src/routes/` — método + path, middlewares (`requerirUsuario`, `<validacion>.middleware`) y controller.
+- `backend/src/controllers/<recurso>.schemas.ts` — `crearValidacion({ params?, query?, body? })` con zod;
+  esquemas comunes (`idSchema`) en `middlewares/esquemas-comunes.ts`.
+- `backend/src/controllers/` — lee la entrada con `<validacion>.leer(req, "body")` (ya transformada y
+  tipada), llama al service, arma la response. Sin reglas, sin try/catch.
 - `backend/src/services/` — el caso de uso: permisos, orquestación, errores de `errors/`.
 - `backend/src/repositories/` — Mongoose. Devuelve objetos de dominio planos con `id` string.
 - `backend/src/domain/` — reglas puras (cupo, transiciones de estado, días restantes...).
@@ -21,7 +24,9 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 ## Contrato (principio V)
 - Bajo `/api`, JSON, recursos en plural y kebab-case.
 - Nunca `_id` ni `__v` en la respuesta; vista explícita, no `{ ...doc }`.
-- Errores: `{ "error": { "codigo", "mensaje", "detalles"? } }` vía error handler.
+- Errores: `{ "error": { "codigo", "mensaje", "detalles"? } }` vía error handler. Los errores de
+  Mongo (validación, cast, duplicado 11000 → 409 `RECURSO_DUPLICADO`) los traduce
+  `repositories/errores-persistencia.ts`; si el caso merece un código propio, lanzalo desde el service.
 
 ## Invariantes que no se negocian
 - Cupo nunca negativo, con actualización atómica.

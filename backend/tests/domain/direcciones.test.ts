@@ -26,14 +26,17 @@ function ipv6(address: string): NetworkInterfaceInfo {
 }
 
 describe("direccionesDeRed", () => {
-  it("devuelve solo las IPv4 no internas, sin duplicados", () => {
+  it("devuelve las IPv4 no internas con el nombre de su interfaz, sin duplicados", () => {
     expect(
       direccionesDeRed({
         lo: [ipv4("127.0.0.1", true)],
         "Wi-Fi": [ipv6("fe80::1"), ipv4("192.168.0.23")],
         Ethernet: [ipv4("10.0.0.5"), ipv4("192.168.0.23")],
       }),
-    ).toEqual(["192.168.0.23", "10.0.0.5"]);
+    ).toEqual([
+      { direccion: "192.168.0.23", interfaz: "Wi-Fi" },
+      { direccion: "10.0.0.5", interfaz: "Ethernet" },
+    ]);
   });
 
   it("devuelve un arreglo vacío sin interfaces", () => {

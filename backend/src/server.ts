@@ -24,7 +24,9 @@ async function arrancar(): Promise<void> {
   // console.log y no el logger: el arranque se ve aunque LOG_LEVEL=silent.
   console.log("AI Ticket It API escuchando");
   console.log(`  Local: http://localhost:${env.PORT}/api`);
-  for (const ip of direccionesDeRed()) console.log(`  Red:   http://${ip}:${env.PORT}/api`);
+  for (const { direccion, interfaz } of direccionesDeRed()) {
+    console.log(`  Red:   http://${direccion}:${env.PORT}/api (${interfaz})`);
+  }
   console.log(
     almacenamiento === "memoria"
       ? "Almacenamiento: MongoDB en memoria con datos de ejemplo"

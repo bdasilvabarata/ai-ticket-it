@@ -623,3 +623,15 @@ Task: "eventoRepository.contarPorOrganizador en backend/src/repositories/evento.
 - Commit por tarea o grupo coherente, con scope `001-base-backend`.
 - Si aparece algo no especificado durante la implementación, se actualiza la spec (o sus
   clarificaciones) antes de seguir (principio I).
+
+## Ajustes posteriores a la implementación (revisión)
+
+- [X] R1 `crearValidacion` reemplaza `validar` + `leerValidado`: `leer` devuelve el valor ya
+  transformado sin re-validarlo (con esquemas que transforman, la re-validación daba 500).
+  Test: `backend/tests/api/validar.test.ts`.
+- [X] R2 `repositories/errores-persistencia.ts` traduce `ValidationError`/`CastError` → 400 y
+  duplicado `11000` → 409 `RECURSO_DUPLICADO`; el error handler lo usa antes del 500. Test:
+  `backend/tests/api/errores-persistencia.test.ts`. Contrato actualizado.
+- [X] R3 `idSchema` pasa a `middlewares/esquemas-comunes.ts` y la validación de usuarios a
+  `controllers/usuario.schemas.ts`: ningún middleware ni controller importa de `routes/`.
+- [X] R4 La salida de arranque muestra el nombre de la interfaz de cada dirección `Red`.

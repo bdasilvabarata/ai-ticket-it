@@ -112,21 +112,21 @@ backend/
 │   │   ├── db.ts            # conectarBase(uri?, { timeoutMs }) / desconectarBase(): memoria o MONGO_URI
 │   │   ├── fallas-arranque.ts # ErrorArranque + mensajeFallaArranque(error, puerto), puro
 │   │   ├── destino-mongo.ts # host/base de una URI sin credenciales, puro (lo usan db.ts y seed-opciones.ts)
-│   │   ├── direcciones.ts   # IPv4 locales para el mensaje de arranque
+│   │   ├── direcciones.ts   # IPv4 locales + nombre de interfaz para el mensaje de arranque
 │   │   └── logger.ts
 │   ├── routes/
 │   │   ├── index.ts         # router /api
 │   │   ├── salud.routes.ts
-│   │   ├── usuarios.routes.ts
-│   │   ├── usuarios.schemas.ts
-│   │   └── schemas/comunes.ts   # idSchema
+│   │   └── usuarios.routes.ts
 │   ├── controllers/
 │   │   ├── salud.controller.ts
-│   │   └── usuario.controller.ts
+│   │   ├── usuario.controller.ts
+│   │   └── usuario.schemas.ts   # usuarioPorId = crearValidacion(...)
 │   ├── services/
 │   │   └── usuario.service.ts
 │   ├── repositories/
 │   │   ├── models/          # usuario.model.ts, categoria.model.ts, evento.model.ts
+│   │   ├── errores-persistencia.ts  # Mongo/Mongoose → ErrorAplicacion
 │   │   ├── usuario.repository.ts
 │   │   └── evento.repository.ts  # contarPorOrganizador (lo amplían 003/004)
 │   ├── domain/
@@ -135,6 +135,7 @@ backend/
 │   │   └── evento.ts        # Evento + TipoEntrada
 │   ├── middlewares/
 │   │   ├── requerir-usuario.ts
+│   │   ├── esquemas-comunes.ts  # idSchema, esIdValido
 │   │   ├── validar.ts
 │   │   ├── registrar-pedido.ts
 │   │   ├── ruta-no-encontrada.ts
@@ -148,7 +149,7 @@ backend/
 │   │   ├── seed-opciones.ts # planificarSeed + ejecutarSeed(deps), testeables sin base
 │   │   └── seed.ts          # npm run seed -- --forzar (requiere MONGO_URI); solo cablea
 │   └── types/
-│       └── express.d.ts     # req.usuario, req.validado
+│       └── express.d.ts     # req.usuario, app.locals.almacenamiento
 └── tests/
     ├── domain/
     │   ├── usuario.test.ts          # orden por apellido y nombre (tildes, mayúsculas)
@@ -165,6 +166,8 @@ backend/
         ├── salud.test.ts
         ├── usuarios.test.ts         # listado, por id, actual, 400/401/404
         ├── errores.test.ts          # 404 de ruta, JSON inválido, 413, 500, registro de pedidos
+        ├── errores-persistencia.test.ts  # ValidationError/CastError → 400, 11000 → 409
+        ├── validar.test.ts          # valores transformados, detalles por parte, leer sin validar → 500
         └── seed.test.ts             # cargarSeed idempotente y destructivo
 ```
 
@@ -180,5 +183,5 @@ ya cubre `.env` y la caché de binarios.
 | Desviación | Por qué hace falta | Alternativa más simple descartada porque |
 |---|---|---|
 | Carpetas `seed/` y `scripts/` fuera del árbol de capas | El seed es dato de ejemplo con una función pura testeable y un comando propio (FR-007) | Meterlo en `repositories/` mezclaría datos de demo con acceso a datos de producto; en `config/` no corresponde |
-| Carpeta `types/` (declaración de `req.usuario` / `req.validado`) | Tipar lo que dejan los middlewares sin `any` (principio IX) | Castear en cada controller repite código y esconde errores |
+| Carpeta `types/` (declaración de `req.usuario` y `app.locals`) | Tipar lo que dejan los middlewares sin `any` (principio IX) | Castear en cada controller repite código y esconde errores |
 | Clases `SinPermisoError` y `ConflictoError` sin uso en esta feature | La constitución fija 403/409 y las usan 005–010 | Agregarlas después obligaría a tocar el error handler en cada feature |

@@ -41,7 +41,8 @@ inválido, con `campo` = `params.<x>`, `query.<x>` o `body.<ruta.del.campo>`.
 | 403 | `SIN_PERMISO` | reservado: lo usan las features con permisos sobre recursos |
 | 404 | `RUTA_NO_ENCONTRADA` | método + ruta inexistentes |
 | 404 | `<RECURSO>_NO_ENCONTRADO` | id bien formado que no existe (en esta feature: `USUARIO_NO_ENCONTRADO`) |
-| 409 | (lo define cada feature) | reservado: conflictos de estado o de cupo |
+| 409 | `RECURSO_DUPLICADO` | genérico: un dato que debe ser único ya existe (las features pueden usar códigos más específicos) |
+| 409 | (lo define cada feature) | conflictos de estado o de cupo |
 | 413 | `CUERPO_DEMASIADO_GRANDE` | el cuerpo supera 100 kB |
 | 500 | `ERROR_INTERNO` | error inesperado; mensaje genérico "Ocurrió un error inesperado.", sin trazas |
 
@@ -130,6 +131,6 @@ Salida de arranque (ejemplo):
 ```text
 AI Ticket It API escuchando
   Local: http://localhost:3000/api
-  Red:   http://192.168.0.23:3000/api
+  Red:   http://192.168.0.23:3000/api (Wi-Fi)
 Almacenamiento: MongoDB en memoria con datos de ejemplo
 ```

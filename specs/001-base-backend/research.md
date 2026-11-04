@@ -114,17 +114,28 @@ registro de npm el 2026-11-03.
 
 ## R7. Validación de entrada
 
-- **Decision**: middleware `validar({ params?, query?, body? })` con esquemas zod. Si alguno
-  falla, lanza `EntradaInvalidaError` con `detalles: [{ campo, mensaje }]`, donde `campo` es
-  la ruta del valor (`params.id`, `body.precio`, `query.categoria`). Los valores ya parseados
-  quedan en `req.validado` (tipado por declaración de módulo), porque en Express 5 `req.query`
-  es un getter de solo lectura. Esquemas reutilizables en `routes/schemas/comunes.ts`
-  (`idSchema`: 24 caracteres hex). Los esquemas de cada recurso viven junto a su ruta
-  (`routes/usuarios.schemas.ts`).
-- **Rationale**: FR-017 pide validación declarativa por endpoint y un detalle por campo; los
-  esquemas quedan en la capa `routes/` que la constitución ya define, sin crear otra.
+- **Decision**: `crearValidacion({ params?, query?, body? })` (en `middlewares/validar.ts`)
+  recibe esquemas zod y devuelve `{ middleware, leer }`:
+  - `middleware` valida las partes presentes; si alguna falla, lanza `EntradaInvalidaError`
+    con `detalles: [{ campo, mensaje }]` de todas las partes, donde `campo` es la ruta del
+    valor (`params.id`, `body.precio`, `query.categoria`).
+  - `leer(req, parte)` devuelve el valor **ya validado y transformado**, tipado como la salida
+    del esquema (`z.output`). Los valores se guardan en un `WeakMap` propio de cada validación
+    (no en `req`), así `leer` solo devuelve lo que produjeron esos esquemas, sin volver a
+    validar. Leer sin haber pasado por el middleware es un error de programación → 500.
+  - Esquemas reutilizables en `middlewares/esquemas-comunes.ts` (`idSchema`: 24 caracteres hex,
+    `esIdValido`). Las validaciones de cada recurso viven junto a sus controllers
+    (`controllers/usuario.schemas.ts`): las rutas montan `.middleware` y los controllers usan
+    `.leer`, y las dependencias siguen hacia abajo (routes → controllers → middlewares).
+- **Rationale**: FR-017 pide validación declarativa por endpoint y un detalle por campo. La
+  primera versión guardaba lo parseado en `req.validado` y lo re-validaba al leerlo para
+  recuperar el tipo: se rompía con esquemas que transforman (texto → `Date` responde 500 a un
+  pedido válido). Además, los esquemas en `routes/` obligaban a controllers y middlewares a
+  importar de la capa de rutas (revisión de la implementación).
 - **Alternatives considered**: validar en el controller (viola el principio III); mutar
-  `req.query` (no es posible en Express 5).
+  `req.query` (no es posible en Express 5); `req.validado` + re-validación (descartada, ver
+  rationale); `req.validado` + cast en cada controller (casts repartidos y sin garantía de que
+  el esquema leído sea el que validó).
 
 ## R8. Identificación del usuario
 
@@ -154,6 +165,12 @@ registro de npm el 2026-11-03.
   - `ErrorAplicacion` → su status y cuerpo.
   - Error de `express.json()` con `type === "entity.parse.failed"` → 400 `JSON_INVALIDO`.
   - `type === "entity.too.large"` → 413 `CUERPO_DEMASIADO_GRANDE` (clarificación 2).
+  - Errores de Mongo/Mongoose, traducidos por `traducirErrorPersistencia`
+    (`repositories/errores-persistencia.ts`, la única capa que conoce Mongoose):
+    `ValidationError` → 400 `ENTRADA_INVALIDA` con un detalle por campo (ruta completa, ej.
+    `tiposEntrada.0.precio`; mensajes en español), `CastError` → 400 `ENTRADA_INVALIDA`, clave
+    única duplicada (`11000`) → 409 `RECURSO_DUPLICADO`, sin filtrar el detalle de Mongo. Es una
+    red de seguridad: zod filtra antes y cada feature puede lanzar errores más específicos.
   - Cualquier otro → 500 `ERROR_INTERNO`, "Ocurrió un error inesperado", y el error completo
     (con stack) al log.
   El 404 de rutas inexistentes es un middleware previo que lanza `RUTA_NO_ENCONTRADA`.

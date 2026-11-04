@@ -50,7 +50,7 @@ direcciones:
 ```text
 AI Ticket It API escuchando
   Local: http://localhost:3000/api
-  Red:   http://192.168.0.23:3000/api
+  Red:   http://192.168.0.23:3000/api (Wi-Fi)
 Almacenamiento: MongoDB en memoria con datos de ejemplo
 ```
 
@@ -92,8 +92,11 @@ En una base real las fechas de los eventos quedan fijas al día de la carga y en
      **Permitir otra aplicación…** y elegí `node.exe`) y marcá **Privada**.
    - En **Configuración → Red e Internet → Wi-Fi → (tu red)**, verificá que el perfil sea
      **Red privada**.
-   - Si la PC tiene adaptadores virtuales (VirtualBox, WSL, VPN), puede imprimir varias
-     direcciones `Red`: usá la de la red Wi-Fi.
+   - Si la PC tiene adaptadores virtuales (VirtualBox, WSL, VPN), imprime varias direcciones
+     `Red`, cada una con el nombre de su interfaz entre paréntesis: usá la de `(Wi-Fi)`.
+   - En redes institucionales (facultad, trabajo) suele estar bloqueada la comunicación entre
+     dispositivos. Si el celular no llega aunque el firewall esté bien, compartí internet
+     desde el celular, conectá la PC a ese hotspot y usá la nueva dirección `Red`.
 
 ### Calidad
 
