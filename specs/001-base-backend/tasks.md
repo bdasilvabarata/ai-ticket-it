@@ -190,7 +190,7 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
 
 > Escribirlos primero y verlos fallar antes de implementar.
 
-- [ ] T023 [P] [US1] Escribir `backend/tests/domain/datos-ejemplo.test.ts` sobre
+- [X] T023 [P] [US1] Escribir `backend/tests/domain/datos-ejemplo.test.ts` sobre
   `crearDatosEjemplo(ahora)` con un `ahora` fijo (FR-008, FR-009, data-model "Datos de
   ejemplo"): ≥ 5 categorías (son 6); ≥ 4 usuarios con ≥ 2 que organizan y ≥ 1 que no organiza
   (son 5: 101–103 organizan 3, 3 y 2; 104 y 105 ninguno); ≥ 8 eventos de ≥ 2 organizadores y
@@ -201,30 +201,30 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   `…0003xx` eventos, `…0004xx` tipos); dos llamadas con el mismo `ahora` devuelven los mismos
   ids y datos; con `ahora` desplazado 7 días las fechas se desplazan 7 días; todo
   `organizadorId` y `categoriaId` referencia un id existente; los `favoritos` están vacíos.
-- [ ] T024 [P] [US1] Escribir `backend/tests/domain/seed-opciones.test.ts` sobre
+- [X] T024 [P] [US1] Escribir `backend/tests/domain/seed-opciones.test.ts` sobre
   `planificarSeed(argv, mongoUri)` (R6): sin `mongoUri` → `{ accion: "abortar" }` con mensaje
   que explica que hace falta `MONGO_URI`; con `mongoUri` y sin `--forzar` → `"abortar"` con un
   mensaje que incluye host y nombre de la base, nombra `categorias`, `usuarios` y `eventos` y
   explica `npm run seed -- --forzar`; el mensaje **no** contiene usuario ni contraseña de una
   URI `mongodb+srv://usr:clave@cluster0.x.mongodb.net/ticket`; con `--forzar` →
   `{ accion: "cargar", destino }`.
-- [ ] T025 [P] [US1] Ampliar `backend/tests/domain/seed-opciones.test.ts` con `ejecutarSeed(deps)`,
+- [X] T025 [P] [US1] Ampliar `backend/tests/domain/seed-opciones.test.ts` con `ejecutarSeed(deps)`,
   donde `deps = { argv, mongoUri, conectar, cargar, desconectar, escribir, escribirError }` y
   todas las funciones son `vi.fn()`: sin `--forzar` o sin `mongoUri` → devuelve `1` y **no**
   llama a `conectar`, `cargar` ni `desconectar`, y `escribirError` recibe el mensaje; con
   `--forzar` → llama en orden a `conectar(mongoUri)`, `cargar()` y `desconectar()` y devuelve
   `0`; si `cargar` rechaza → igual llama a `desconectar`, devuelve `1` y avisa por
   `escribirError` (FR-007: sin confirmación no modifica nada).
-- [ ] T026 [P] [US1] Escribir `backend/tests/domain/direcciones.test.ts` sobre
+- [X] T026 [P] [US1] Escribir `backend/tests/domain/direcciones.test.ts` sobre
   `direccionesDeRed(interfaces)` (recibe un objeto con la forma de `os.networkInterfaces()`):
   devuelve solo las IPv4 no internas (descarta `127.0.0.1`, IPv6 y `internal: true`), sin
   duplicados; con un objeto vacío devuelve `[]`.
-- [ ] T027 [P] [US1] Escribir `backend/tests/domain/fallas-arranque.test.ts` sobre
+- [X] T027 [P] [US1] Escribir `backend/tests/domain/fallas-arranque.test.ts` sobre
   `mensajeFallaArranque(error: unknown, puerto: number)` (FR-011): un error con
   `code: "EADDRINUSE"` → "El puerto 3000 ya está en uso"; un `ErrorArranque` → su propio
   mensaje; cualquier otro `Error` → "No se pudo arrancar el servidor: <message>"; un valor que
   no es `Error` (por ejemplo, un string) no rompe la función.
-- [ ] T028 [US1] Crear `backend/tests/api/helpers/base-de-prueba.ts` con
+- [X] T028 [US1] Crear `backend/tests/api/helpers/base-de-prueba.ts` con
   `usarBaseDePrueba(opciones: { sembrar?: boolean } = {})` (`sembrar` default `true`) que
   registra: `beforeAll` → crea su propio `MongoMemoryServer` y `mongoose.connect(uri)`;
   `beforeEach` → si `sembrar`, `cargarSeed()`; si no, vacía todas las colecciones;
@@ -232,7 +232,7 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   `await import("../../../src/seed/cargar-seed")` **dentro** del `beforeEach` y solo si
   `sembrar`: así un test con `{ sembrar: false }` no depende de que exista el seed (evita el
   ciclo T029 → T033 → T035). Cada archivo de `tests/api/` lo llama una vez (R13).
-- [ ] T029 [P] [US1] Escribir `backend/tests/api/modelos.test.ts` (usa T028 con
+- [X] T029 [P] [US1] Escribir `backend/tests/api/modelos.test.ts` (usa T028 con
   `usarBaseDePrueba({ sembrar: false })`, porque los modelos se prueban antes de que exista el
   seed; antes de los casos, `await CategoriaModel.init()` para que exista el índice único):
   `EventoModel.create(...)` con un evento válido funciona y variantes con `precio: 1.5`,
@@ -241,18 +241,18 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   cada tipo de entrada tiene `_id` propio; crear dos categorías con `nombre: "Música"` (la
   segunda es el duplicado; ambas creadas en el test) falla con código `11000`; `UsuarioModel.create` sin `nombre` falla y con
   `nombre: "  Ana  "` guarda `"Ana"` (FR-012, data-model).
-- [ ] T030 [P] [US1] Escribir `backend/tests/api/seed.test.ts` (usa T028): después de
+- [X] T030 [P] [US1] Escribir `backend/tests/api/seed.test.ts` (usa T028): después de
   `cargarSeed()` las colecciones `categorias`, `usuarios` y `eventos` tienen exactamente 6, 5 y
   8 documentos con los ids de `crearDatosEjemplo`; correrlo dos veces seguidas no duplica nada;
   un usuario y una categoría extra insertados a mano antes de `cargarSeed()` desaparecen
   (clarificación 1); los documentos no tienen `__v`.
-- [ ] T031 [P] [US1] Escribir `backend/tests/api/salud.test.ts` (usa T028):
+- [X] T031 [P] [US1] Escribir `backend/tests/api/salud.test.ts` (usa T028):
   `GET /api/salud` contra `supertest(crearApp({ almacenamiento: "memoria" }))` responde 200
   `{ estado: "ok", almacenamiento: "memoria" }` con `Content-Type` JSON; con
   `almacenamiento: "externo"` responde `"externo"`; con un `X-Usuario-Id` inválido responde
   igual 200 (endpoint público, edge case); la respuesta **no** incluye el encabezado
   `X-Powered-By`.
-- [ ] T032 [P] [US1] Escribir `backend/tests/api/db.test.ts` (no usa el helper: maneja su
+- [X] T032 [P] [US1] Escribir `backend/tests/api/db.test.ts` (no usa el helper: maneja su
   propia conexión y llama a `desconectarBase()` en `afterEach`) (FR-005, FR-006, FR-011):
   `conectarBase("mongodb://usr:clave@127.0.0.1:1/x", { timeoutMs: 500 })` rechaza con un
   `ErrorArranque` cuyo mensaje contiene "No se pudo conectar a MONGO_URI" y "127.0.0.1" y **no**
@@ -264,7 +264,7 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
 
 ### Implementation for User Story 1
 
-- [ ] T033 [US1] Crear los modelos de Mongoose en `backend/src/repositories/models/` con
+- [X] T033 [US1] Crear los modelos de Mongoose en `backend/src/repositories/models/` con
   `versionKey: false` y colección explícita (depende de T019 y T029):
   - `usuario.model.ts` → colección `usuarios`: `nombre` "`String`, requerido, trim",
     `apellido` "`String`, requerido, trim", `favoritos` "`[ObjectId]`, ref `Evento`, default
@@ -280,7 +280,7 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
     **entero**, `min: 0`", `cupo` "`Number`, requerido, entero, `min: 0`" (enteros con
     validador `Number.isInteger`). Índices `{ organizador: 1 }` y `{ categoria: 1 }`.
   Hace pasar T029.
-- [ ] T034 [P] [US1] Implementar `backend/src/seed/datos-ejemplo.ts`: función pura
+- [X] T034 [P] [US1] Implementar `backend/src/seed/datos-ejemplo.ts`: función pura
   `crearDatosEjemplo(ahora: Date): { categorias: Categoria[]; usuarios: Usuario[]; eventos:
   Evento[] }` con exactamente los datos de la tabla de data-model.md "Datos de ejemplo": ids
   "18 ceros + 4 dígitos de tipo + 2 de número" (usuario 1 = `000000000000000000000101`, tipos
@@ -292,28 +292,28 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   local indicada (Argentina es UTC−3 sin horario de verano); el evento 01 va a `ahora + 24 h`
   redondeado a la hora. Cada evento con 1 o 2 URLs `https://picsum.photos/seed/<slug>/800/450`.
   Sin IO. Hace pasar T023.
-- [ ] T035 [US1] Implementar `backend/src/seed/cargar-seed.ts`: `cargarSeed(ahora = new Date())`
+- [X] T035 [US1] Implementar `backend/src/seed/cargar-seed.ts`: `cargarSeed(ahora = new Date())`
   hace `deleteMany({})` en los modelos de usuarios, categorías y eventos y luego `insertMany`
   con lo de `crearDatosEjemplo(ahora)`, mapeando `id` → `_id`, `categoriaId` → `categoria` y
   `organizadorId` → `organizador` (ObjectId). Hace pasar T030.
-- [ ] T036 [P] [US1] Implementar `backend/src/scripts/seed-opciones.ts` (sin importar `env` ni
+- [X] T036 [P] [US1] Implementar `backend/src/scripts/seed-opciones.ts` (sin importar `env` ni
   Mongoose): función pura `planificarSeed(argv: string[], mongoUri: string | undefined)` que
   devuelve `{ accion: "abortar"; mensaje: string } | { accion: "cargar"; destino: string }`,
   donde `destino` es `host/base` extraído con `new URL()` sin credenciales; y
   `ejecutarSeed(deps): Promise<number>` que usa `planificarSeed`, solo conecta/carga/desconecta
   si la acción es `"cargar"`, informa cuántas categorías, usuarios y eventos cargó, desconecta
   también si falla la carga (`finally`) y devuelve el código de salida. Hace pasar T024 y T025.
-- [ ] T037 [US1] Implementar `backend/src/scripts/seed.ts` (comando `npm run seed`), sin lógica
+- [X] T037 [US1] Implementar `backend/src/scripts/seed.ts` (comando `npm run seed`), sin lógica
   propia: `process.exitCode = await ejecutarSeed({ argv: process.argv.slice(2), mongoUri:
   env.MONGO_URI, conectar: (uri) => mongoose.connect(uri, { serverSelectionTimeoutMS: 5000 }),
   cargar: () => cargarSeed(), desconectar: () => mongoose.disconnect(), escribir: console.log,
   escribirError: console.error })` (FR-007).
-- [ ] T038 [P] [US1] Implementar `backend/src/config/direcciones.ts`: `direccionesDeRed(
+- [X] T038 [P] [US1] Implementar `backend/src/config/direcciones.ts`: `direccionesDeRed(
   interfaces = os.networkInterfaces())` según T026. Hace pasar T026.
-- [ ] T039 [P] [US1] Implementar `backend/src/config/fallas-arranque.ts`: clase
+- [X] T039 [P] [US1] Implementar `backend/src/config/fallas-arranque.ts`: clase
   `ErrorArranque extends Error` (no es un `ErrorAplicacion`: no es HTTP) y
   `mensajeFallaArranque(error, puerto)` según T027. Hace pasar T027.
-- [ ] T040 [US1] Implementar `backend/src/config/db.ts` (R5, depende de T039):
+- [X] T040 [US1] Implementar `backend/src/config/db.ts` (R5, depende de T039):
   `conectarBase(mongoUri: string | undefined = env.MONGO_URI, opciones: { timeoutMs?: number }
   = {}): Promise<{ almacenamiento: Almacenamiento }>` (`timeoutMs` default `5000`). Con
   `mongoUri` conecta con `serverSelectionTimeoutMS: timeoutMs` y devuelve `"externo"`; sin ella
@@ -324,11 +324,11 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   internet para descargarlo". **Nunca** cae a memoria si hay `mongoUri`.
   `desconectarBase()` cierra Mongoose y detiene el servidor en memoria si existe. Hace pasar
   T032.
-- [ ] T041 [US1] Implementar `backend/src/controllers/salud.controller.ts` (`obtenerSalud(req,
+- [X] T041 [US1] Implementar `backend/src/controllers/salud.controller.ts` (`obtenerSalud(req,
   res)` responde `SaludVista` con `req.app.locals.almacenamiento`) y
   `backend/src/routes/salud.routes.ts` (`GET /` → controller), y montarlo en `/salud` dentro de
   `crearRouterApi()` en `backend/src/routes/index.ts`. Hace pasar T031.
-- [ ] T042 [US1] Implementar `backend/src/server.ts` (R5, FR-005, FR-006, FR-010, FR-011):
+- [X] T042 [US1] Implementar `backend/src/server.ts` (R5, FR-005, FR-006, FR-010, FR-011):
   `conectarBase()` → si `"memoria"`, `cargarSeed()` → `crearApp({ almacenamiento })` →
   `app.listen(env.PORT, env.HOST)` → imprime con `console.log` (no con el logger, para que se
   vea aunque `LOG_LEVEL=silent`) "AI Ticket It API escuchando", `Local: http://localhost:<PORT>/api`,
