@@ -483,7 +483,7 @@ un cambio incompatible en `EstadoCompra` hace fallar el typecheck del backend.
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T061 [P] [US3] Escribir `backend/tests/domain/tipos-compartidos.test.ts` (US3-2, R13):
+- [X] T061 [P] [US3] Escribir `backend/tests/domain/tipos-compartidos.test.ts` (US3-2, R13):
   importa `EstadoCompra` de `@ai-ticket-it/shared`; `expect(Object.values(EstadoCompra))`
   igual a `["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]`, y
   `expectTypeOf<EstadoCompra>().toEqualTypeOf<"PENDIENTE" | "CONFIRMADA" | "UTILIZADA" |
@@ -492,14 +492,14 @@ un cambio incompatible en `EstadoCompra` hace fallar el typecheck del backend.
 
 ### Implementation for User Story 3
 
-- [ ] T062 [US3] Comprobación negativa, revirtiendo cada cambio después (quickstart §7):
+- [X] T062 [US3] Comprobación negativa, revirtiendo cada cambio después (quickstart §7):
   agregar `const x: any = 1` en `backend/src/app.ts` → `npm run lint` falla; agregar
   `import mongoose from "mongoose"` en `backend/src/domain/usuario.ts` → `npm run lint` falla
   con el mensaje de `no-restricted-imports`; agregar `// eslint-disable-next-line` sin
   descripción → `npm run lint` falla; renombrar `REEMBOLSADA` en
   `shared/src/estado-compra.ts` → `npm run typecheck` falla en el backend. Ajustar
   `eslint.config.js` o `backend/tsconfig.json` si alguna no falla.
-- [ ] T063 [US3] Correr `npm test`, `npm run lint` y `npm run typecheck` desde la raíz:
+- [X] T063 [US3] Correr `npm test`, `npm run lint` y `npm run typecheck` desde la raíz:
   los tres en verde, `typecheck` recorre `backend` y `shared`, y la suite del backend tarda
   menos de 1 minuto con el binario ya descargado (SC-004). Corregir lo que falle.
 
