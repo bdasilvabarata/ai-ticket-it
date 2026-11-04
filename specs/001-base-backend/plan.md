@@ -107,8 +107,10 @@ backend/
 │   ├── server.ts            # arranque: env → base → seed → listen → direcciones; señales
 │   ├── app.ts               # crearApp(): json, registro, rutas, 404, error handler (sin listen)
 │   ├── config/
-│   │   ├── env.ts           # loadEnvFile (ruta desde import.meta.dirname) + zod
-│   │   ├── db.ts            # conectarBase() / desconectarBase(): memoria o MONGO_URI
+│   │   ├── env-esquema.ts   # parsearEnv(fuente): esquema zod, puro
+│   │   ├── env.ts           # loadEnvFile (ruta desde import.meta.dirname; no en test) + parsearEnv
+│   │   ├── db.ts            # conectarBase(uri?, { timeoutMs }) / desconectarBase(): memoria o MONGO_URI
+│   │   ├── fallas-arranque.ts # ErrorArranque + mensajeFallaArranque(error, puerto), puro
 │   │   ├── direcciones.ts   # IPv4 locales para el mensaje de arranque
 │   │   └── logger.ts
 │   ├── routes/
@@ -142,20 +144,27 @@ backend/
 │   │   ├── datos-ejemplo.ts # crearDatosEjemplo(ahora), puro
 │   │   └── cargar-seed.ts   # vacía y carga
 │   ├── scripts/
-│   │   └── seed.ts          # npm run seed -- --forzar (requiere MONGO_URI)
+│   │   ├── seed-opciones.ts # planificarSeed + ejecutarSeed(deps), testeables sin base
+│   │   └── seed.ts          # npm run seed -- --forzar (requiere MONGO_URI); solo cablea
 │   └── types/
 │       └── express.d.ts     # req.usuario, req.validado
 └── tests/
     ├── domain/
     │   ├── usuario.test.ts          # orden por apellido y nombre (tildes, mayúsculas)
     │   ├── datos-ejemplo.test.ts    # mínimos de FR-009, ids fijos, fechas relativas
+    │   ├── env.test.ts              # defaults, validación, silent en test
+    │   ├── seed-opciones.test.ts    # --forzar, destino sin credenciales, no conecta sin confirmar
+    │   ├── direcciones.test.ts      # IPv4 no internas
+    │   ├── fallas-arranque.test.ts  # mensajes de EADDRINUSE y ErrorArranque
     │   └── tipos-compartidos.test.ts
     └── api/
         ├── helpers/base-de-prueba.ts
+        ├── modelos.test.ts          # validadores de precio, cupo, tiposEntrada, únicos
+        ├── db.test.ts               # MONGO_URI inaccesible sin caer a memoria; falta de binario
         ├── salud.test.ts
         ├── usuarios.test.ts         # listado, por id, actual, 400/401/404
         ├── errores.test.ts          # 404 de ruta, JSON inválido, 413, 500, registro de pedidos
-        └── seed.test.ts             # cargarSeed idempotente y destructivo; sin --forzar no borra
+        └── seed.test.ts             # cargarSeed idempotente y destructivo
 ```
 
 Además se actualizan `README.md` y `AGENTS.md` (sección Comandos, FR-024) y `.gitignore`

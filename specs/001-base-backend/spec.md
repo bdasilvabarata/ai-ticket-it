@@ -33,6 +33,7 @@ capas; y el modelo de persistencia de Categoria, Evento y TipoEntrada que usa el
 - Q: ¿En qué orden se devuelve el listado de usuarios? → A: Alfabético por apellido y luego por nombre.
 - Q: ¿La cantidad de eventos que organiza un usuario incluye los ya realizados? → A: Sí, cuenta todos los eventos que organiza, pasados y futuros.
 - Revisión del plan: el comando de carga de datos de ejemplo es destructivo → exige confirmación explícita y, sin ella, no modifica nada (FR-007). Los datos de ejemplo de una base real envejecen → el README lo advierte (FR-024).
+- Revisión de tareas: la prueba independiente de US1 se verifica con el estado del servicio y los tests del seed; el listado de usuarios queda en US2.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -57,8 +58,10 @@ desde el primer arranque y accesible desde otro dispositivo de la misma red.
 todas las features del backlog dependen de esto.
 
 **Independent Test**: en un clon limpio, ejecutar la instalación y el arranque, y consultar el
-estado del servicio y el listado de usuarios desde la misma computadora y desde otro
-dispositivo de la red: responde y devuelve los usuarios precargados.
+estado del servicio desde la misma computadora y desde otro dispositivo de la red: responde y
+reporta almacenamiento en memoria; las pruebas automatizadas verifican que la base quedó
+cargada con los datos de ejemplo. (El listado de usuarios precargados se verifica al completar
+US2.)
 
 **Acceptance Scenarios**:
 

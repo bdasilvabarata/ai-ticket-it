@@ -43,13 +43,16 @@ registro de npm el 2026-11-03.
 ## R4. Configuración de entorno
 
 - **Decision**: `config/env.ts` llama a `process.loadEnvFile(ruta)` si existe `backend/.env`
-  (nativo de Node, sin `dotenv`) y valida `process.env` con zod. La `ruta` se resuelve desde
+  (nativo de Node, sin `dotenv`) y valida `process.env` con zod. El esquema vive aparte, en
+  `config/env-esquema.ts` (`parsearEnv`, puro y testeable sin efectos al importarse). Con
+  `NODE_ENV=test` no se lee `backend/.env` y el nivel de log es siempre `silent`: los tests no
+  dependen de la configuración local. La `ruta` se resuelve desde
   la ubicación del módulo (`path.resolve(import.meta.dirname, "../../.env")`), **nunca** desde
   `process.cwd()`: así funciona igual si el comando se lanza desde la raíz o desde `backend/`.
   Además, los scripts de la raíz delegan en el workspace (`npm run <x> -w backend`).
   Variables:
   `PORT` (default `3000`), `HOST` (default `0.0.0.0`), `MONGO_URI` (opcional),
-  `LOG_LEVEL` (`info` | `silent`; `silent` por defecto cuando `NODE_ENV=test`).
+  `LOG_LEVEL` (`info` | `silent`; siempre `silent` cuando `NODE_ENV=test`).
   Se versiona `backend/.env.example`.
 - **Rationale**: cero dependencias nuevas y error claro al arrancar si una variable tiene un
   valor inválido. `HOST=0.0.0.0` cumple FR-010 (atiende pedidos de la red local).
@@ -58,12 +61,14 @@ registro de npm el 2026-11-03.
 
 ## R5. Conexión a la base y arranque
 
-- **Decision**: `config/db.ts` expone `conectarBase()`: si hay `MONGO_URI` se conecta con
+- **Decision**: `config/db.ts` expone `conectarBase(mongoUri = env.MONGO_URI, { timeoutMs })`
+  (parámetros inyectables para testear las fallas): si hay URI se conecta con
   `serverSelectionTimeoutMS: 5000` y devuelve `almacenamiento: "externo"`; si no, crea un
   `MongoMemoryServer` **standalone**, se conecta y devuelve `"memoria"`. `server.ts`
   orquesta: env → base → (seed si es memoria) → `listen` → imprime direcciones (`localhost`
   y cada IPv4 no interna de `os.networkInterfaces()`) y almacenamiento.
-  Fallas de arranque → mensaje en español en `stderr` y `process.exit(1)`:
+  Fallas de arranque → `ErrorArranque` con mensaje en español (armado por la función pura
+  `mensajeFallaArranque` de `config/fallas-arranque.ts`) en `stderr` y `process.exit(1)`:
   - `EADDRINUSE` en `listen` → "El puerto N ya está en uso".
   - Timeout de selección de servidor → "No se pudo conectar a MONGO_URI".
   - Error al crear el servidor en memoria (sin red y sin binario en caché) → "No se pudo
@@ -95,7 +100,9 @@ registro de npm el 2026-11-03.
     `cargarSeed()` y se desconecta. **Protección**: sin el flag `--forzar`
     (`npm run seed -- --forzar`) no borra nada: imprime host y nombre de la base (sin
     credenciales), explica que vaciará `categorias`, `usuarios` y `eventos`, y termina con
-    código 1. El parseo del flag es una función pura testeada.
+    código 1. El parseo del flag (`planificarSeed`) y la orquestación con dependencias
+    inyectadas (`ejecutarSeed`) viven en `scripts/seed-opciones.ts` y se testean sin base;
+    `scripts/seed.ts` solo los cablea.
   - En una base real las fechas quedan fijas al día de la carga y envejecen; el README
     recomienda volver a correr el seed antes de una demo (edge case de la spec).
 - **Rationale**: separar los datos (puros) de la carga permite testear los mínimos de FR-009
@@ -188,6 +195,10 @@ registro de npm el 2026-11-03.
   - `cantidadEventosOrganizados`: el repository de eventos expone
     `contarPorOrganizador(ids)` (una agregación `$group` por organizador) para que listar no
     sea N+1. Cuenta todos los eventos, pasados y futuros (clarificación 4).
+  - **`aggregate()` no castea**: a diferencia de `find`, `findById` o `insertMany`, Mongoose no
+    aplica el esquema a los pipelines, así que los ids string se convierten a
+    `Types.ObjectId` antes del `$match` (si no, no matchean y todo cuenta 0). Aplica a toda
+    agregación de las features siguientes.
   - Orden (clarificación 3): función pura `compararPorApellidoYNombre` en
     `domain/usuario.ts`, con `Intl.Collator("es", { sensitivity: "base" })`, para que
     "Álvarez" quede antes que "Benítez" y el orden no dependa de la collation de Mongo.
