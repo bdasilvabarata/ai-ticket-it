@@ -104,21 +104,21 @@ app sobre los que se apoyan todas las historias.
 
 **⚠️ CRITICAL**: ninguna historia empieza hasta terminar esta fase.
 
-- [ ] T009 [P] Crear `shared/src/estado-compra.ts`: `export const EstadoCompra = { PENDIENTE:
+- [X] T009 [P] Crear `shared/src/estado-compra.ts`: `export const EstadoCompra = { PENDIENTE:
   "PENDIENTE", CONFIRMADA: "CONFIRMADA", UTILIZADA: "UTILIZADA", CANCELADA: "CANCELADA",
   REEMBOLSADA: "REEMBOLSADA" } as const;` y `export type EstadoCompra = (typeof
   EstadoCompra)[keyof typeof EstadoCompra];` (FR-003, data-model "EstadoCompra").
-- [ ] T010 [P] Crear `shared/src/errores.ts` con `interface DetalleError { campo: string;
+- [X] T010 [P] Crear `shared/src/errores.ts` con `interface DetalleError { campo: string;
   mensaje: string }` e `interface ErrorApi { error: { codigo: string; mensaje: string;
   detalles?: DetalleError[] } }` (contracts/api.md "Tipos").
-- [ ] T011 [P] Crear `shared/src/salud.ts` con `type Almacenamiento = "memoria" | "externo"` e
+- [X] T011 [P] Crear `shared/src/salud.ts` con `type Almacenamiento = "memoria" | "externo"` e
   `interface SaludVista { estado: "ok"; almacenamiento: Almacenamiento }`.
-- [ ] T012 [P] Crear `shared/src/usuario.ts` con `interface UsuarioVista { id: string; nombre:
+- [X] T012 [P] Crear `shared/src/usuario.ts` con `interface UsuarioVista { id: string; nombre:
   string; apellido: string; cantidadEventosOrganizados: number }` (comentario: cuenta todos
   sus eventos, pasados y futuros).
-- [ ] T013 Crear `shared/src/index.ts` que reexporta todo lo de T009–T012 (valores con
+- [X] T013 Crear `shared/src/index.ts` que reexporta todo lo de T009–T012 (valores con
   `export`, tipos con `export type`).
-- [ ] T014 Crear `backend/src/errors/index.ts` (depende de T013): clase base
+- [X] T014 Crear `backend/src/errors/index.ts` (depende de T013): clase base
   `ErrorAplicacion extends Error` con `status: number`, `codigo: string`, `mensaje: string`,
   `detalles?: DetalleError[]` (tipo de `@ai-ticket-it/shared`), y subclases con sus defaults
   (R9): `EntradaInvalidaError` (400, `ENTRADA_INVALIDA`, "Los datos enviados no son válidos.",
@@ -126,29 +126,29 @@ app sobre los que se apoyan todas las historias.
   "Tenés que indicar un usuario válido."), `SinPermisoError` (403, `SIN_PERMISO`),
   `NoEncontradoError` (404, recibe `codigo` y `mensaje`, por ejemplo `USUARIO_NO_ENCONTRADO`),
   `ConflictoError` (409, recibe `codigo` y `mensaje`).
-- [ ] T015 [P] Escribir `backend/tests/domain/env.test.ts` (debe fallar) sobre
+- [X] T015 [P] Escribir `backend/tests/domain/env.test.ts` (debe fallar) sobre
   `parsearEnv(fuente)`, importada de `backend/src/config/env-esquema.ts` (no de `env.ts`, que
   tiene efectos al importarse): con un objeto vacío devuelve `PORT 3000`, `HOST "0.0.0.0"`,
   `MONGO_URI undefined` y `LOG_LEVEL "info"`; con `NODE_ENV: "test"` y sin `LOG_LEVEL` devuelve
   `"silent"`; con `{ NODE_ENV: "test", LOG_LEVEL: "info" }` devuelve `"silent"` (en test es
   siempre `silent`); con `PORT: "abc"` o `LOG_LEVEL: "debug"` lanza un error cuyo mensaje
   nombra la variable; `MONGO_URI: ""` se trata como ausente.
-- [ ] T016 Implementar `backend/src/config/env-esquema.ts` (puro, sin IO): `parsearEnv(fuente)`
+- [X] T016 Implementar `backend/src/config/env-esquema.ts` (puro, sin IO): `parsearEnv(fuente)`
   con un esquema zod — `PORT` entero 1–65535 default 3000 con coerción, `HOST` default
   `"0.0.0.0"`, `MONGO_URI` opcional con `""` → `undefined`, `LOG_LEVEL` `"info" | "silent"`
   default `"info"` — y, si `fuente.NODE_ENV === "test"`, `LOG_LEVEL` es `"silent"` aunque venga
   otro valor. Un valor inválido lanza un error en español con el nombre de la variable (R4).
   Hace pasar T015.
-- [ ] T017 Implementar `backend/src/config/env.ts` (depende de T016): si
+- [X] T017 Implementar `backend/src/config/env.ts` (depende de T016): si
   `process.env.NODE_ENV !== "test"` y existe el archivo
   `path.resolve(import.meta.dirname, "../../.env")`, llama a `process.loadEnvFile(ruta)`
   (**nunca** resolver desde `process.cwd()`); después `export const env =
   parsearEnv(process.env)`. Así los tests no dependen del `.env` local (R4).
-- [ ] T018 Crear `backend/src/config/logger.ts` (depende de T017): objeto `logger` con
+- [X] T018 Crear `backend/src/config/logger.ts` (depende de T017): objeto `logger` con
   `info(mensaje)` y `error(mensaje, error?)` que escriben con `console.log` / `console.error`, y
   no escriben nada cuando `env.LOG_LEVEL === "silent"`. Exportado como objeto para que los
   tests puedan espiarlo con `vi.spyOn` (R11).
-- [ ] T019 [P] Crear los tipos de dominio puros (data-model.md): `backend/src/domain/usuario.ts`
+- [X] T019 [P] Crear los tipos de dominio puros (data-model.md): `backend/src/domain/usuario.ts`
   (`interface Usuario { id: string; nombre: string; apellido: string; favoritos: string[] }`),
   `backend/src/domain/categoria.ts` (`interface Categoria { id: string; nombre: string;
   descripcion: string }`) y `backend/src/domain/evento.ts` (`interface TipoEntrada { id:
@@ -156,13 +156,13 @@ app sobre los que se apoyan todas las historias.
   "precio: pesos enteros ≥ 0; cupo: entradas disponibles, entero ≥ 0, decrece con cada compra";
   `interface Evento { id: string; nombre: string; descripcion: string; categoriaId: string;
   fechaHora: Date; multimedia: string[]; organizadorId: string; tiposEntrada: TipoEntrada[] }`).
-- [ ] T020 [P] Crear `backend/src/types/express.d.ts`: declaración de módulo de
+- [X] T020 [P] Crear `backend/src/types/express.d.ts`: declaración de módulo de
   `express-serve-static-core` que agrega a `Request` `usuario?: Usuario` (de
   `domain/usuario.ts`) y `validado?: { params?: unknown; query?: unknown; body?: unknown }`
   (R7, R8), sin `any`.
-- [ ] T021 Crear `backend/src/routes/index.ts` que exporta `crearRouterApi()` devolviendo un
+- [X] T021 Crear `backend/src/routes/index.ts` que exporta `crearRouterApi()` devolviendo un
   `express.Router()` vacío (las historias le montan sus rutas).
-- [ ] T022 Crear `backend/src/app.ts` con `crearApp(opciones: { almacenamiento:
+- [X] T022 Crear `backend/src/app.ts` con `crearApp(opciones: { almacenamiento:
   Almacenamiento })` (tipo de `shared`): crea la app de Express, guarda
   `app.locals.almacenamiento`, desactiva el encabezado `X-Powered-By`
   (`app.disable("x-powered-by")`, para no anunciar el framework en la red), aplica
