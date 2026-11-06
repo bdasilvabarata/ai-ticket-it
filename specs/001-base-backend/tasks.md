@@ -337,7 +337,7 @@ El listado de usuarios precargados se verifica al completar US2 (clarificación 
   Ante cualquier falla de arranque (incluido el evento `error` del servidor HTTP, por ejemplo
   `EADDRINUSE`) → `console.error(mensajeFallaArranque(error, env.PORT))`, `desconectarBase()` y
   `process.exit(1)`. `SIGINT`/`SIGTERM` cierran el servidor HTTP y llaman a `desconectarBase()`.
-- [ ] T043 [US1] Verificar a mano US1 con `npm start` desde la raíz: salida de arranque como en
+- [X] T043 [US1] Verificar a mano US1 con `npm start` desde la raíz: salida de arranque como en
   contracts/api.md, `curl http://localhost:3000/api/salud`, consulta desde el celular a la
   dirección `Red`, y tres reinicios con los mismos datos (quickstart §1–§3, SC-005).
 
@@ -635,3 +635,32 @@ Task: "eventoRepository.contarPorOrganizador en backend/src/repositories/evento.
 - [X] R3 `idSchema` pasa a `middlewares/esquemas-comunes.ts` y la validación de usuarios a
   `controllers/usuario.schemas.ts`: ningún middleware ni controller importa de `routes/`.
 - [X] R4 La salida de arranque muestra el nombre de la interfaz de cada dirección `Red`.
+
+## Refactor estructural (revisión contra `ddso-utn/ejercicio-megasuper-2026`, constitución v1.2.0)
+
+- [X] S1 Inyección de dependencias: clases `UsuarioRepository`/`EventoRepository` (implementan
+  `domain/repositorios.ts`), `UsuarioService({ usuarios, eventos })`, `UsuarioController`,
+  `SaludController(almacenamiento)`, `crearRequerirUsuario(buscador)` y rutas como fábricas;
+  `app.ts` como composition root con `repositorios?` inyectables (R16). Test nuevo:
+  `tests/services/usuario.service.test.ts`; errores y errores-persistencia inyectan un
+  repositorio que falla en lugar de `vi.spyOn`.
+- [X] S2 Dominio con comportamiento: clases `Usuario`, `Categoria`, `Evento`
+  (`tuPrecioEstaEntre`) y `TipoEntrada` (`hayCupoPara`) con invariantes; repositories y seed
+  construyen instancias (R17). Tests: `tests/domain/evento.test.ts`, `usuario.test.ts`,
+  `datos-ejemplo.test.ts`.
+- [X] S3 `registrarError` separado de `manejarErrores`, clasificación común en
+  `traducir-error.ts`; `JsonInvalidoError` y `CuerpoDemasiadoGrandeError`; carpeta
+  `validations/` (R18). Test: los 4xx no se registran como error inesperado.
+- [X] S4 OpenAPI en `/api/docs` (Swagger UI) y `/api/docs/openapi.json`, colección de Postman
+  (R19). Test: `tests/api/docs.test.ts`.
+
+## Refactor estructural (revisión contra `ddso-utn/2026-2c-lu-sa-grupo-1`, constitución v1.3.0)
+
+- [X] G1 Errores de dominio sin HTTP: `domain/errores.ts` (`DatosInvalidosError`,
+  `ReglaDeNegocioError`), traducción en `traducir-error.ts` (400 / 409) y regla de lint que
+  impide importar `errors/` desde `domain/` (R20). Tests: `tests/domain/errores.test.ts` y
+  casos nuevos en `tests/api/errores.test.ts`.
+- [X] G2 Repositorios en memoria en `tests/fakes/`, test de contrato
+  `tests/api/repositorios.contrato.test.ts` y convención de nombres (`obtenerVista` →
+  `obtener`, `#obtenerOFallar`) documentada en AGENTS.md y en la skill `nuevo-endpoint` (R21).
+- [X] G3 Prettier (`format`, `format:check`) y CI en `.github/workflows/ci.yml` (R22).

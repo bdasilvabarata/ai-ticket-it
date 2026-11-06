@@ -1,7 +1,9 @@
 import { Router } from "express";
-import { obtenerSalud } from "../controllers/salud.controller";
+import type { SaludController } from "../controllers/salud.controller";
 
-export const saludRouter = Router();
-
-// Público.
-saludRouter.get("/", obtenerSalud);
+export function crearSaludRouter(controller: SaludController): Router {
+  const router = Router();
+  // Público.
+  router.get("/", controller.obtener);
+  return router;
+}

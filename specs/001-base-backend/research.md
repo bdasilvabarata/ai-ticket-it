@@ -289,3 +289,118 @@ registro de npm el 2026-11-03.
   set (ver R5); calcular disponibles sumando compras en cada lectura (no atómico); precios en centavos (las entradas en pesos no
   usan centavos; si alguna vez hicieran falta, se migra a centavos enteros con el mismo
   criterio).
+
+## R16. Inyección de dependencias y composition root
+
+- **Decision**: controllers, services y repositories son **clases** que reciben sus
+  colaboradores por constructor: `new UsuarioService({ usuarios, eventos })`,
+  `new UsuarioController(usuarioService)`, `crearRequerirUsuario(usuarioService)`. Los services
+  dependen de interfaces (`domain/repositorios.ts`), que implementan las clases de
+  `repositories/` y, en los tests, objetos falsos. `app.ts` es el **composition root**:
+  `crearApp({ almacenamiento, repositorios? })` instancia todo y las rutas son fábricas que
+  reciben sus controllers. Los métodos de controller son propiedades flecha para pasarlos a
+  las rutas sin perder `this`.
+- **Rationale**: tomado de `ddso-utn/ejercicio-megasuper-2026` (clase6: `buildTestApp` con
+  repositorio simulado; rama ODM: `app.js` que conecta repository → service → controller).
+  Antes, los módulos exportaban objetos globales y los tests los reemplazaban con
+  `vi.spyOn`: las dependencias quedaban ocultas y no se podía probar un service sin Mongo.
+  Ahora `tests/services/` prueba casos de uso con repositorios falsos, y los tests de API
+  inyectan un repositorio que falla para el 500 o el 409.
+- **Alternatives considered**: la clase `Server` con `setController/getController` de la rama
+  ODM (más indirección de la que el TP necesita); un contenedor de DI (dependencia extra).
+
+## R17. Dominio con comportamiento
+
+- **Decision**: `Usuario`, `Categoria`, `Evento` y `TipoEntrada` son clases con propiedades
+  `readonly` que validan sus invariantes en el constructor (`domain/invariantes.ts` junta las
+  violaciones y lanza `EntradaInvalidaError` con un detalle por campo) y exponen las
+  operaciones del diagrama de la consigna: `TipoEntrada.hayCupoPara(cantidad)` (entero
+  positivo ≤ cupo) y `Evento.tuPrecioEstaEntre(min, max)` (algún tipo con precio en el rango,
+  inclusive). Los repositories mapean cada documento a una instancia (`new Usuario(...)`) y el
+  seed construye instancias, así las invariantes validan también los datos de ejemplo.
+- **Rationale**: megasuper modela `Producto` con validaciones y `precioFinal()`, y la consigna
+  es un diagrama de clases con métodos: el comportamiento vive con los datos. `domain/` puede
+  usar `errors/` (sin IO), como el `Producto` de megasuper usa `UnprocessableEntityError`.
+- **Alternatives considered**: `schema.loadClass(Clase)` de la rama ODM (los repositories
+  devolverían documentos de Mongoose y la persistencia se filtraría a los services: viola el
+  principio III); interfaces + funciones sueltas (la versión anterior: dominio anémico).
+
+## R18. Registro y respuesta de errores separados; `validations/`
+
+- **Decision**: la cadena final es `rutaNoEncontrada → registrarError → manejarErrores`.
+  Ambos middlewares de error clasifican con `aErrorAplicacion(error)`
+  (`middlewares/traducir-error.ts`: errores propios, del parser JSON —ahora
+  `JsonInvalidoError` y `CuerpoDemasiadoGrandeError`— y de Mongo). `registrarError` registra
+  completos solo los inesperados; `manejarErrores` solo responde. Los esquemas zod y
+  `crearValidacion` viven en `validations/` (como `errors/`); las rutas montan
+  `usuarioPorId.middleware` y los controllers leen con `usuarioPorId.leer`.
+- **Rationale**: megasuper encadena `errorLogger` y `errorHandler` (una responsabilidad cada
+  uno) y separa `validations/` del resto. Se mantiene nuestro formato `ErrorApi` (código y
+  detalles, fijado por la constitución) en lugar de `{ status, message, timestamp }`.
+- **Alternatives considered**: registrar también los 4xx en el logger de errores (ya aparecen
+  en el registro de pedidos con su status); `validate(schema)` que reemplaza `req.body` (en
+  Express 5 `req.query` es de solo lectura: no alcanza para params y query).
+
+## R19. Documentación OpenAPI y colección de Postman
+
+- **Decision**: `src/docs/openapi.json` (OpenAPI 3.0) servida con `swagger-ui-express` en
+  `/api/docs` y cruda en `/api/docs/openapi.json` (se importa en Postman). Además,
+  `src/docs/ai-ticket-it.postman_collection.json` con pedidos de ejemplo y de error, y las
+  variables `baseUrl` y `usuarioId`. `tests/api/docs.test.ts` verifica que cada ruta de la
+  especificación y de la colección exista en el servidor.
+- **Rationale**: megasuper sirve Swagger en `/api-docs` y versiona su colección de Postman;
+  sirve para la demo del video y para desarrollar la app (002) contra la API. Se monta bajo
+  `/api` para respetar el principio V. El test evita que la documentación quede vieja.
+- **Alternatives considered**: generar la especificación desde los esquemas zod
+  (dependencia extra, poco valor con 4 endpoints); YAML (requiere un parser más).
+
+## R20. Errores de dominio sin HTTP
+
+- **Decision**: `domain/errores.ts` define `ErrorDeDominio` y dos subclases sin status:
+  `DatosInvalidosError(detalles)` (invariantes de una entidad) y
+  `ReglaDeNegocioError(codigo, mensaje)` (una regla impide la operación). `Invariantes` lanza
+  `DatosInvalidosError`. `aErrorAplicacion` los traduce: `DatosInvalidosError` →
+  `400 ENTRADA_INVALIDA` con los detalles; `ReglaDeNegocioError` → `409` con su código. Un
+  patrón de `no-restricted-imports` impide que `domain/` importe `errors/`. Reemplaza la
+  excepción de la v1.2.0 ("domain/ puede usar errors/").
+- **Rationale**: tomado de `ddso-utn/2026-2c-lu-sa-grupo-1` (`domain/errors/DomainErrors.js`
+  con `DomainValidationError`/`DomainRuleError`, separados de `errors/ApplicationErrors.js`, y
+  el error handler que decide el status). Las features que vienen (cupo, transiciones de
+  estado, cancelación) son reglas de dominio: el dominio dice *qué* pasó y la capa HTTP decide
+  *cómo* se responde.
+- **Alternatives considered**: el 422 de ese repo para `DomainValidationError` (la
+  constitución fija 400/409 y la app ya maneja `ENTRADA_INVALIDA`); seguir usando
+  `ErrorAplicacion` en el dominio (lo ata a HTTP).
+
+## R21. Repositorios en memoria reutilizables, test de contrato y nombres uniformes
+
+- **Decision**: `tests/fakes/` tiene `RepositorioUsuariosEnMemoria` y
+  `RepositorioEventosEnMemoria`, que implementan las interfaces de `domain/repositorios.ts` con
+  estado **por instancia** (se construyen con las entidades del caso). Los tests de services
+  los usan en lugar de objetos `vi.fn` armados en cada test.
+  `tests/api/repositorios.contrato.test.ts` corre los mismos casos contra los repositorios de
+  Mongo (con el seed) y contra los falsos (con `crearDatosEjemplo`). Convención de nombres en
+  AGENTS.md: repositories `listar`/`buscarPorId`/`guardar`/`eliminarPorId`/`contarPor…`;
+  services `listar`/`obtener`/`crear`/`actualizar`/`eliminar` y un único `#obtenerOFallar`
+  (`obtenerVista` pasó a `obtener`).
+- **Rationale**: ese repo tiene `tests/fakes/` para todos sus repositorios y unificó nombres
+  ("mismos nombres de métodos en todos los repositorios", "buscar por id o tirar 404 en un
+  solo lugar por servicio"). Sus fakes usan estado `static` compartido entre tests (obliga a
+  `deleteAll()`); acá es por instancia. El test de contrato (que ese repo no tiene) evita que
+  un falso se desvíe del comportamiento real sin que nadie lo note.
+- **Alternatives considered**: mocks `vi.fn` por test (se repiten al crecer las entidades);
+  solo tests contra Mongo (más lentos y sin aislar el caso de uso).
+
+## R22. Prettier y CI
+
+- **Decision**: Prettier 3 con `printWidth: 110` (el ancho del código existente: era el que
+  menos cambios producía), comillas dobles y comas finales; `.prettierignore` excluye `*.md`
+  (specs y constitución tienen saltos de línea a mano), `.specify/` y `.claude/`. Scripts
+  `format` y `format:check`. `.github/workflows/ci.yml` corre `format:check`, `lint`,
+  `typecheck` y `test` en Node 22 (el mínimo de `engines`) en cada PR y push a `development`
+  y `main`, con caché de `node_modules/.cache/mongodb-memory-server`.
+- **Rationale**: ese repo usa Prettier con `format:check` y GitHub Actions. En nuestro flujo
+  (`feature/* → development` por PR) el CI es la verificación automática de que los cuatro
+  comandos del principio IX están en verde antes de integrar.
+- **Alternatives considered**: reglas de estilo de ESLint (deprecadas en favor de un
+  formateador); deploy automático como el de ese repo (la consigna pide ejecución local).

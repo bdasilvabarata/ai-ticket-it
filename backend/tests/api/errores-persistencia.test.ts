@@ -1,19 +1,15 @@
 import request from "supertest";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
 import { ConflictoError, EntradaInvalidaError } from "../../src/errors/index";
 import { traducirErrorPersistencia } from "../../src/repositories/errores-persistencia";
 import { CategoriaModel } from "../../src/repositories/models/categoria.model";
 import { EventoModel } from "../../src/repositories/models/evento.model";
 import { UsuarioModel } from "../../src/repositories/models/usuario.model";
-import { usuarioService } from "../../src/services/usuario.service";
+import type { RepositorioUsuarios } from "../../src/domain/repositorios";
 import { usarBaseDePrueba } from "./helpers/base-de-prueba";
 
 usarBaseDePrueba();
-
-afterEach(() => {
-  vi.restoreAllMocks();
-});
 
 /** Ejecuta la operación y devuelve el error real que lanzó Mongo o Mongoose. */
 async function capturar(operacion: () => Promise<unknown>): Promise<unknown> {
@@ -68,8 +64,13 @@ describe("traducirErrorPersistencia", () => {
 
 describe("error handler con errores de persistencia", () => {
   it("responde 409 sin filtrar el detalle interno de Mongo", async () => {
-    vi.spyOn(usuarioService, "listar").mockRejectedValue(await errorDuplicado());
-    const respuesta = await request(crearApp({ almacenamiento: "memoria" })).get("/api/usuarios");
+    const duplicado = await errorDuplicado();
+    const usuarios: RepositorioUsuarios = {
+      listar: () => Promise.reject(duplicado),
+      buscarPorId: () => Promise.reject(duplicado),
+    };
+    const app = crearApp({ almacenamiento: "memoria", repositorios: { usuarios } });
+    const respuesta = await request(app).get("/api/usuarios");
     expect(respuesta.status).toBe(409);
     expect(respuesta.body.error.codigo).toBe("RECURSO_DUPLICADO");
     expect(respuesta.text).not.toContain("E11000");

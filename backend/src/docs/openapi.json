@@ -1,0 +1,187 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "AI Ticket It API",
+    "version": "0.1.0",
+    "description": "API de la plataforma de venta de entradas. La identificación es simulada: los endpoints que requieren usuario leen el encabezado `X-Usuario-Id` (ver constitución, principio VI). Todo error responde con el formato `ErrorApi`."
+  },
+  "servers": [{ "url": "/api", "description": "Mismo servidor que sirve esta documentación" }],
+  "tags": [
+    { "name": "Salud", "description": "Estado del servicio" },
+    { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" }
+  ],
+  "paths": {
+    "/salud": {
+      "get": {
+        "tags": ["Salud"],
+        "summary": "Estado del servicio (público)",
+        "responses": {
+          "200": {
+            "description": "Operativo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/SaludVista" },
+                "example": { "estado": "ok", "almacenamiento": "memoria" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usuarios": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Listado de usuarios (público)",
+        "description": "Ordenado alfabéticamente por apellido y luego por nombre.",
+        "responses": {
+          "200": {
+            "description": "Usuarios",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/UsuarioVista" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/usuarios/actual": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Usuario actual (requiere usuario)",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "El usuario de `X-Usuario-Id`",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsuarioVista" } } }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
+    "/usuarios/{id}": {
+      "get": {
+        "tags": ["Usuarios"],
+        "summary": "Usuario por id (público)",
+        "parameters": [{ "$ref": "#/components/parameters/Id" }],
+        "responses": {
+          "200": {
+            "description": "El usuario",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsuarioVista" } } }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "404": { "$ref": "#/components/responses/NoEncontrado" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "usuarioSimulado": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Usuario-Id",
+        "description": "Id de un usuario precargado, por ejemplo `000000000000000000000101` (Lucía Álvarez)."
+      }
+    },
+    "parameters": {
+      "Id": {
+        "name": "id",
+        "in": "path",
+        "required": true,
+        "description": "Identificador de 24 caracteres hexadecimales",
+        "schema": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$", "example": "000000000000000000000101" }
+      }
+    },
+    "schemas": {
+      "SaludVista": {
+        "type": "object",
+        "required": ["estado", "almacenamiento"],
+        "properties": {
+          "estado": { "type": "string", "enum": ["ok"] },
+          "almacenamiento": { "type": "string", "enum": ["memoria", "externo"] }
+        }
+      },
+      "UsuarioVista": {
+        "type": "object",
+        "required": ["id", "nombre", "apellido", "cantidadEventosOrganizados"],
+        "properties": {
+          "id": { "type": "string", "example": "000000000000000000000101" },
+          "nombre": { "type": "string", "example": "Lucía" },
+          "apellido": { "type": "string", "example": "Álvarez" },
+          "cantidadEventosOrganizados": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Todos sus eventos, pasados y futuros",
+            "example": 3
+          }
+        }
+      },
+      "ErrorApi": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["codigo", "mensaje"],
+            "properties": {
+              "codigo": { "type": "string", "description": "Legible por máquina, MAYÚSCULAS_CON_GUION_BAJO" },
+              "mensaje": { "type": "string", "description": "En español, para mostrar" },
+              "detalles": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["campo", "mensaje"],
+                  "properties": {
+                    "campo": { "type": "string", "example": "params.id" },
+                    "mensaje": { "type": "string", "example": "Debe ser un identificador válido." }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "responses": {
+      "EntradaInvalida": {
+        "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorApi" },
+            "example": {
+              "error": {
+                "codigo": "ENTRADA_INVALIDA",
+                "mensaje": "Los datos enviados no son válidos.",
+                "detalles": [{ "campo": "params.id", "mensaje": "Debe ser un identificador válido." }]
+              }
+            }
+          }
+        }
+      },
+      "UsuarioNoIdentificado": {
+        "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorApi" },
+            "example": {
+              "error": {
+                "codigo": "USUARIO_NO_IDENTIFICADO",
+                "mensaje": "Tenés que indicar un usuario válido."
+              }
+            }
+          }
+        }
+      },
+      "NoEncontrado": {
+        "description": "Recurso inexistente (`<RECURSO>_NO_ENCONTRADO`)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorApi" },
+            "example": { "error": { "codigo": "USUARIO_NO_ENCONTRADO", "mensaje": "No existe el usuario." } }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { crearDatosEjemplo } from "../../src/seed/datos-ejemplo";
+import { Categoria } from "../../src/domain/categoria";
+import { Evento, TipoEntrada } from "../../src/domain/evento";
+import { Usuario } from "../../src/domain/usuario";
 
 const HORA = 60 * 60 * 1000;
 const DIA = 24 * HORA;
@@ -113,5 +116,15 @@ describe("crearDatosEjemplo", () => {
 
   it("deja los favoritos vacíos", () => {
     for (const usuario of usuarios) expect(usuario.favoritos).toEqual([]);
+  });
+
+  it("construye entidades de dominio, así sus invariantes validan los datos de ejemplo", () => {
+    const { categorias, usuarios, eventos } = crearDatosEjemplo(new Date("2026-11-06T15:00:00Z"));
+    for (const categoria of categorias) expect(categoria).toBeInstanceOf(Categoria);
+    for (const usuario of usuarios) expect(usuario).toBeInstanceOf(Usuario);
+    for (const evento of eventos) {
+      expect(evento).toBeInstanceOf(Evento);
+      for (const tipo of evento.tiposEntrada) expect(tipo).toBeInstanceOf(TipoEntrada);
+    }
   });
 });

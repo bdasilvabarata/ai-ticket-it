@@ -35,14 +35,14 @@ inválido, con `campo` = `params.<x>`, `query.<x>` o `body.<ruta.del.campo>`.
 
 | Status | `codigo` | Cuándo |
 |---|---|---|
-| 400 | `ENTRADA_INVALIDA` | parámetros de ruta, de consulta o cuerpo que no cumplen el esquema (incluye id mal formado) |
+| 400 | `ENTRADA_INVALIDA` | parámetros de ruta, de consulta o cuerpo que no cumplen el esquema (incluye id mal formado), o una entidad de dominio que no cumple sus invariantes (`DatosInvalidosError`) |
 | 400 | `JSON_INVALIDO` | el cuerpo no es JSON válido |
 | 401 | `USUARIO_NO_IDENTIFICADO` | endpoint que requiere usuario sin uno válido |
 | 403 | `SIN_PERMISO` | reservado: lo usan las features con permisos sobre recursos |
 | 404 | `RUTA_NO_ENCONTRADA` | método + ruta inexistentes |
 | 404 | `<RECURSO>_NO_ENCONTRADO` | id bien formado que no existe (en esta feature: `USUARIO_NO_ENCONTRADO`) |
 | 409 | `RECURSO_DUPLICADO` | genérico: un dato que debe ser único ya existe (las features pueden usar códigos más específicos) |
-| 409 | (lo define cada feature) | conflictos de estado o de cupo |
+| 409 | (código de la regla) | una `ReglaDeNegocioError` del dominio: conflictos de estado o de cupo (ej.: `CUPO_INSUFICIENTE`) |
 | 413 | `CUERPO_DEMASIADO_GRANDE` | el cuerpo supera 100 kB |
 | 500 | `ERROR_INTERNO` | error inesperado; mensaje genérico "Ocurrió un error inesperado.", sin trazas |
 
@@ -112,6 +112,12 @@ Lo usa la app para validar el usuario recordado al abrirse.
 | `200` | `UsuarioVista` |
 | `400` | `ENTRADA_INVALIDA`, `detalles: [{ "campo": "params.id", ... }]` si `id` no tiene 24 hex |
 | `404` | `USUARIO_NO_ENCONTRADO` si el id es válido y no existe |
+
+### `GET /api/docs` — documentación *(pública)*
+
+Swagger UI con la especificación OpenAPI. `GET /api/docs/openapi.json` devuelve la
+especificación cruda (para importarla en Postman). Colección de ejemplo con casos de error:
+`backend/src/docs/ai-ticket-it.postman_collection.json`.
 
 ## Comandos (contrato para el desarrollador)
 

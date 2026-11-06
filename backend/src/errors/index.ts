@@ -51,3 +51,17 @@ export class ConflictoError extends ErrorAplicacion {
     super(409, codigo, mensaje);
   }
 }
+
+/** 400: el cuerpo del pedido no es JSON válido. */
+export class JsonInvalidoError extends ErrorAplicacion {
+  constructor() {
+    super(400, "JSON_INVALIDO", "El cuerpo del pedido no es JSON válido.");
+  }
+}
+
+/** 413: el cuerpo del pedido supera el límite de tamaño. */
+export class CuerpoDemasiadoGrandeError extends ErrorAplicacion {
+  constructor() {
+    super(413, "CUERPO_DEMASIADO_GRANDE", "El cuerpo del pedido supera el máximo de 100 kB.");
+  }
+}

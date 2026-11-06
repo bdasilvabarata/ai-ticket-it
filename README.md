@@ -54,8 +54,11 @@ AI Ticket It API escuchando
 Almacenamiento: MongoDB en memoria con datos de ejemplo
 ```
 
-Probalo con `curl http://localhost:3000/api/salud`. Los endpoints y el formato de errores
-están en [`specs/001-base-backend/contracts/api.md`](specs/001-base-backend/contracts/api.md).
+Probalo con `curl http://localhost:3000/api/salud`. La documentación navegable de la API
+(Swagger) está en **http://localhost:3000/api/docs**; para Postman, importá
+`backend/src/docs/ai-ticket-it.postman_collection.json` o la especificación
+`http://localhost:3000/api/docs/openapi.json`. El contrato y el formato de errores están en
+[`specs/001-base-backend/contracts/api.md`](specs/001-base-backend/contracts/api.md).
 
 > La primera vez, corré `npm start` antes que `npm test`: así la descarga del binario no
 > compite con el tiempo límite de los tests.
@@ -85,7 +88,12 @@ En una base real las fechas de los eventos quedan fijas al día de la carga y en
 1. PC y celular en la **misma red Wi-Fi**.
 2. Usá la dirección `Red` que imprime `npm start` (por ejemplo,
    `http://192.168.0.23:3000/api/salud`).
-3. Si desde la PC responde y desde el celular no, en Windows:
+3. Abrí la dirección en **Firefox**, escribiéndola completa con `http://`. Chrome y Samsung
+   Internet la cambian solos a `https://` (modo "usar siempre conexiones seguras") y fallan
+   sin avisar, porque el servidor local no tiene HTTPS.
+4. Si cambiás de red (por ejemplo, al hotspot del celular), reiniciá el servidor: las
+   direcciones `Red` se calculan al arrancar.
+5. Si desde la PC responde y desde el celular no, en Windows:
    - Abrí **Seguridad de Windows → Firewall y protección de red → Permitir una aplicación a
      través del firewall**.
    - Tocá **Cambiar la configuración**, buscá **Node.js JavaScript Runtime** (o
@@ -104,7 +112,11 @@ En una base real las fechas de los eventos quedan fijas al día de la carga y en
 npm test          # Vitest en todos los paquetes (cada suite levanta su propio MongoDB en memoria)
 npm run lint      # ESLint: sin any, sin ts-ignore ni eslint-disable sin descripción, domain/ puro
 npm run typecheck # tsc --noEmit en backend y shared
+npm run format    # Prettier (format:check solo verifica)
 ```
+
+El CI de GitHub Actions (`.github/workflows/ci.yml`) corre `format:check`, `lint`,
+`typecheck` y `test` en cada PR a `development` y `main`.
 
 Los tests **no** leen `backend/.env`: siempre usan su propia base en memoria y el registro
 en silencio.

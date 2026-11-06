@@ -12,9 +12,7 @@ describe("mensajeFallaArranque", () => {
   });
 
   it("envuelve cualquier otro Error", () => {
-    expect(mensajeFallaArranque(new Error("boom"), 3000)).toBe(
-      "No se pudo arrancar el servidor: boom",
-    );
+    expect(mensajeFallaArranque(new Error("boom"), 3000)).toBe("No se pudo arrancar el servidor: boom");
   });
 
   it("no rompe con un valor que no es Error", () => {

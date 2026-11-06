@@ -45,18 +45,16 @@ describe("EventoModel", () => {
     ["sin categoría", { ...eventoValido(), categoria: undefined }],
     ["sin organizador", { ...eventoValido(), organizador: undefined }],
   ])("rechaza un evento con %s", async (_caso, evento) => {
-    await expect(EventoModel.create(evento)).rejects.toBeInstanceOf(
-      mongoose.Error.ValidationError,
-    );
+    await expect(EventoModel.create(evento)).rejects.toBeInstanceOf(mongoose.Error.ValidationError);
   });
 });
 
 describe("CategoriaModel", () => {
   it("no admite dos categorías con el mismo nombre", async () => {
     await CategoriaModel.create({ nombre: "Música", descripcion: "Primera" });
-    await expect(
-      CategoriaModel.create({ nombre: "Música", descripcion: "Duplicada" }),
-    ).rejects.toMatchObject({ code: 11000 });
+    await expect(CategoriaModel.create({ nombre: "Música", descripcion: "Duplicada" })).rejects.toMatchObject(
+      { code: 11000 },
+    );
   });
 });
 

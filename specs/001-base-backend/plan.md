@@ -83,92 +83,75 @@ specs/001-base-backend/
 
 ### Source Code (repository root)
 
+> Revisión 2026-11-06 (constitución v1.2.0): estructura alineada con `ddso-utn/ejercicio-megasuper-2026`
+> — inyección de dependencias con composition root, dominio con comportamiento, registro y respuesta
+> de errores separados, `validations/` propia y documentación OpenAPI. Ver research R16–R19.
+
 ```text
 package.json                 # workspaces ["backend", "shared"]; scripts start/dev/seed/test/lint/typecheck
 tsconfig.base.json           # strict, ESNext, Bundler, noEmit
 eslint.config.js             # flat config para todo el repo
 
-shared/
-├── package.json             # @ai-ticket-it/shared, exports ./src/index.ts
-├── tsconfig.json
-└── src/
-    ├── index.ts
-    ├── estado-compra.ts     # EstadoCompra
-    ├── errores.ts           # ErrorApi, DetalleError
-    ├── salud.ts             # SaludVista, Almacenamiento
-    └── usuario.ts           # UsuarioVista
+shared/src/                  # @ai-ticket-it/shared: EstadoCompra, ErrorApi, SaludVista, UsuarioVista
 
 backend/
-├── package.json
-├── tsconfig.json            # incluye src/ y tests/
-├── vitest.config.ts
-├── .env.example             # PORT, HOST, MONGO_URI, LOG_LEVEL
+├── package.json · tsconfig.json · vitest.config.ts · .env.example
 ├── src/
 │   ├── server.ts            # arranque: env → base → seed → listen → direcciones; señales
-│   ├── app.ts               # crearApp(): json, registro, rutas, 404, error handler (sin listen)
-│   ├── config/
-│   │   ├── env-esquema.ts   # parsearEnv(fuente): esquema zod, puro
-│   │   ├── env.ts           # loadEnvFile (ruta desde import.meta.dirname; no en test) + parsearEnv
-│   │   ├── db.ts            # conectarBase(uri?, { timeoutMs }) / desconectarBase(): memoria o MONGO_URI
-│   │   ├── fallas-arranque.ts # ErrorArranque + mensajeFallaArranque(error, puerto), puro
-│   │   ├── destino-mongo.ts # host/base de una URI sin credenciales, puro (lo usan db.ts y seed-opciones.ts)
-│   │   ├── direcciones.ts   # IPv4 locales + nombre de interfaz para el mensaje de arranque
-│   │   └── logger.ts
+│   ├── app.ts               # COMPOSITION ROOT: crearApp({ almacenamiento, repositorios? })
+│   │                        #   instancia repositories → services → controllers → routes
+│   ├── config/              # env-esquema, env, db, destino-mongo, fallas-arranque, direcciones, logger
 │   ├── routes/
-│   │   ├── index.ts         # router /api
-│   │   ├── salud.routes.ts
-│   │   └── usuarios.routes.ts
-│   ├── controllers/
-│   │   ├── salud.controller.ts
-│   │   ├── usuario.controller.ts
-│   │   └── usuario.schemas.ts   # usuarioPorId = crearValidacion(...)
+│   │   ├── index.ts         # crearRouterApi(controllers, requerirUsuario)
+│   │   ├── salud.routes.ts  # crearSaludRouter(controller)
+│   │   ├── usuarios.routes.ts   # crearUsuariosRouter(controller, requerirUsuario)
+│   │   └── docs.routes.ts   # /api/docs: Swagger UI + openapi.json
+│   ├── controllers/         # clases con métodos flecha; reciben su service por constructor
+│   │   ├── salud.controller.ts  # SaludController(almacenamiento)
+│   │   └── usuario.controller.ts
 │   ├── services/
-│   │   └── usuario.service.ts
-│   ├── repositories/
+│   │   └── usuario.service.ts   # UsuarioService({ usuarios, eventos }) — depende de interfaces
+│   ├── repositories/        # clases que implementan las interfaces de domain/repositorios.ts
 │   │   ├── models/          # usuario.model.ts, categoria.model.ts, evento.model.ts
-│   │   ├── errores-persistencia.ts  # Mongo/Mongoose → ErrorAplicacion
-│   │   ├── usuario.repository.ts
-│   │   └── evento.repository.ts  # contarPorOrganizador (lo amplían 003/004)
-│   ├── domain/
-│   │   ├── usuario.ts       # tipo + compararPorApellidoYNombre
-│   │   ├── categoria.ts
-│   │   └── evento.ts        # Evento + TipoEntrada
+│   │   ├── usuario.repository.ts   # mapea documentos → entidades de dominio (sin loadClass)
+│   │   ├── evento.repository.ts    # contarPorOrganizador (lo amplían 003/004)
+│   │   └── errores-persistencia.ts # Mongo/Mongoose → ErrorAplicacion
+│   ├── domain/              # entidades con comportamiento, sin IO
+│   │   ├── usuario.ts       # class Usuario + compararPorApellidoYNombre
+│   │   ├── categoria.ts     # class Categoria
+│   │   ├── evento.ts        # class Evento (tuPrecioEstaEntre) + class TipoEntrada (hayCupoPara)
+│   │   ├── errores.ts       # DatosInvalidosError, ReglaDeNegocioError (sin HTTP)
+│   │   ├── invariantes.ts   # junta violaciones → DatosInvalidosError con detalles
+│   │   └── repositorios.ts  # interfaces RepositorioUsuarios, RepositorioEventos (puertos)
+│   ├── validations/
+│   │   ├── validacion.ts    # crearValidacion({ params?, query?, body? }) → { middleware, leer }
+│   │   ├── comunes.ts       # idSchema, esIdValido
+│   │   └── usuario.validation.ts   # usuarioPorId
 │   ├── middlewares/
-│   │   ├── requerir-usuario.ts
-│   │   ├── esquemas-comunes.ts  # idSchema, esIdValido
-│   │   ├── validar.ts
+│   │   ├── requerir-usuario.ts     # crearRequerirUsuario(buscador) + usuarioActual(req)
 │   │   ├── registrar-pedido.ts
 │   │   ├── ruta-no-encontrada.ts
-│   │   └── manejar-errores.ts
-│   ├── errors/
-│   │   └── index.ts         # ErrorAplicacion y subclases 400/401/403/404/409
-│   ├── seed/
-│   │   ├── datos-ejemplo.ts # crearDatosEjemplo(ahora), puro
-│   │   └── cargar-seed.ts   # vacía y carga
-│   ├── scripts/
-│   │   ├── seed-opciones.ts # planificarSeed + ejecutarSeed(deps), testeables sin base
-│   │   └── seed.ts          # npm run seed -- --forzar (requiere MONGO_URI); solo cablea
-│   └── types/
-│       └── express.d.ts     # req.usuario, app.locals.almacenamiento
+│   │   ├── traducir-error.ts       # aErrorAplicacion(error): propios, de dominio, parser, Mongo
+│   │   ├── registrar-error.ts      # registra los inesperados (con stack)
+│   │   └── manejar-errores.ts      # responde con ErrorApi
+│   ├── errors/index.ts      # ErrorAplicacion y subclases 400/401/403/404/409/413
+│   ├── docs/
+│   │   ├── openapi.json     # especificación OpenAPI 3 (servida en /api/docs)
+│   │   └── ai-ticket-it.postman_collection.json
+│   ├── seed/                # datos-ejemplo.ts (entidades de dominio, puro) · cargar-seed.ts
+│   ├── scripts/             # seed-opciones.ts (testeable) · seed.ts (cablea)
+│   └── types/express.d.ts   # req.usuario
 └── tests/
-    ├── domain/
-    │   ├── usuario.test.ts          # orden por apellido y nombre (tildes, mayúsculas)
-    │   ├── datos-ejemplo.test.ts    # mínimos de FR-009, ids fijos, fechas relativas
-    │   ├── env.test.ts              # defaults, validación, silent en test
-    │   ├── seed-opciones.test.ts    # --forzar, destino sin credenciales, no conecta sin confirmar
-    │   ├── direcciones.test.ts      # IPv4 no internas
-    │   ├── fallas-arranque.test.ts  # mensajes de EADDRINUSE y ErrorArranque
-    │   └── tipos-compartidos.test.ts
-    └── api/
-        ├── helpers/base-de-prueba.ts
-        ├── modelos.test.ts          # validadores de precio, cupo, tiposEntrada, únicos
-        ├── db.test.ts               # MONGO_URI inaccesible sin caer a memoria; falta de binario
-        ├── salud.test.ts
-        ├── usuarios.test.ts         # listado, por id, actual, 400/401/404
-        ├── errores.test.ts          # 404 de ruta, JSON inválido, 413, 500, registro de pedidos
-        ├── errores-persistencia.test.ts  # ValidationError/CastError → 400, 11000 → 409
-        ├── validar.test.ts          # valores transformados, detalles por parte, leer sin validar → 500
-        └── seed.test.ts             # cargarSeed idempotente y destructivo
+    ├── domain/              # entidades (usuario, evento), datos de ejemplo, env, seed-opciones,
+    │                        # direcciones, fallas-arranque, tipos compartidos — sin base
+    ├── fakes/               # repositorios en memoria (estado por instancia)
+    ├── services/            # usuario.service.test.ts — con los fakes, sin base
+    └── api/                 # supertest + Mongo en memoria por suite: salud, usuarios, errores,
+                             # errores-persistencia, validacion, modelos, seed, db, docs y
+                             # repositorios.contrato (fakes y Mongo cumplen el mismo contrato)
+
+.prettierrc.json · .prettierignore   # Prettier (printWidth 110; no formatea Markdown)
+.github/workflows/ci.yml             # CI: format:check, lint, typecheck y test en cada PR
 ```
 
 Además se actualizan `README.md` y `AGENTS.md` (sección Comandos, FR-024) y `.gitignore`
@@ -183,5 +166,7 @@ ya cubre `.env` y la caché de binarios.
 | Desviación | Por qué hace falta | Alternativa más simple descartada porque |
 |---|---|---|
 | Carpetas `seed/` y `scripts/` fuera del árbol de capas | El seed es dato de ejemplo con una función pura testeable y un comando propio (FR-007) | Meterlo en `repositories/` mezclaría datos de demo con acceso a datos de producto; en `config/` no corresponde |
-| Carpeta `types/` (declaración de `req.usuario` y `app.locals`) | Tipar lo que dejan los middlewares sin `any` (principio IX) | Castear en cada controller repite código y esconde errores |
-| Clases `SinPermisoError` y `ConflictoError` sin uso en esta feature | La constitución fija 403/409 y las usan 005–010 | Agregarlas después obligaría a tocar el error handler en cada feature |
+| Carpeta `types/` (declaración de `req.usuario`) | Tipar lo que dejan los middlewares sin `any` (principio IX) | Castear en cada controller repite código y esconde errores |
+| Clase `SinPermisoError` sin uso en esta feature | La constitución fija 403/409 y las usan 005–010 | Agregarlas después obligaría a tocar el error handler en cada feature |
+| `domain/repositorios.ts` (interfaces) e inyección por constructor | Probar services sin base con repositorios falsos y armar todo en un solo lugar (R16) | Objetos globales espiados con `vi.spyOn`: dependencias ocultas en los imports y sin tests de services aislados |
+| Swagger UI (`swagger-ui-express`) | Documentación navegable para la demo y para desarrollar la app (R19) | Solo el contrato en Markdown: no se prueba desde el navegador ni se importa en Postman |

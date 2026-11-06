@@ -34,9 +34,7 @@ describe("GET /api/usuarios", () => {
       respuesta.body.map((u: { cantidadEventosOrganizados: number }) => u.cantidadEventosOrganizados),
     ).toEqual([3, 3, 2, 0, 0]);
     for (const usuario of respuesta.body) {
-      expect(Object.keys(usuario).sort()).toEqual(
-        ["apellido", "cantidadEventosOrganizados", "id", "nombre"],
-      );
+      expect(Object.keys(usuario).sort()).toEqual(["apellido", "cantidadEventosOrganizados", "id", "nombre"]);
       expect(typeof usuario.id).toBe("string");
     }
   });
@@ -83,9 +81,7 @@ describe("GET /api/usuarios/:id", () => {
     const respuesta = await request(app).get("/api/usuarios/123");
     expect(respuesta.status).toBe(400);
     esperarErrorApi(respuesta.body, "ENTRADA_INVALIDA");
-    expect(respuesta.body.error.detalles).toEqual([
-      { campo: "params.id", mensaje: expect.any(String) },
-    ]);
+    expect(respuesta.body.error.detalles).toEqual([{ campo: "params.id", mensaje: expect.any(String) }]);
   });
 });
 

@@ -19,11 +19,7 @@ const oid = (id: string) => new Types.ObjectId(id);
 export async function cargarSeed(ahora: Date = new Date()): Promise<ResumenSeed> {
   const { categorias, usuarios, eventos } = crearDatosEjemplo(ahora);
 
-  await Promise.all([
-    UsuarioModel.deleteMany({}),
-    CategoriaModel.deleteMany({}),
-    EventoModel.deleteMany({}),
-  ]);
+  await Promise.all([UsuarioModel.deleteMany({}), CategoriaModel.deleteMany({}), EventoModel.deleteMany({})]);
 
   await CategoriaModel.insertMany(
     categorias.map((categoria) => ({
@@ -47,7 +43,7 @@ export async function cargarSeed(ahora: Date = new Date()): Promise<ResumenSeed>
       descripcion: evento.descripcion,
       categoria: oid(evento.categoriaId),
       fechaHora: evento.fechaHora,
-      multimedia: evento.multimedia,
+      multimedia: [...evento.multimedia],
       organizador: oid(evento.organizadorId),
       tiposEntrada: evento.tiposEntrada.map((tipo) => ({
         _id: oid(tipo.id),

@@ -35,8 +35,7 @@ export async function conectarBase(
     servidorMemoria = await MongoMemoryServer.create();
   } catch (error) {
     throw new ErrorArranque(
-      "No se pudo preparar MongoDB en memoria; la primera ejecución necesita internet para " +
-        "descargarlo.",
+      "No se pudo preparar MongoDB en memoria; la primera ejecución necesita internet para " + "descargarlo.",
       { cause: error },
     );
   }

@@ -6,8 +6,12 @@ introducen 005 y 010.
 
 Convenciones (principios III, V y VIII):
 
-- En `domain/` las entidades son tipos TypeScript planos con `id: string` y referencias como
-  `string`. Mongoose (`_id`, `ObjectId`, documentos) existe solo en `repositories/`.
+- En `domain/` las entidades son **clases con comportamiento** (R17): propiedades `readonly`,
+  `id: string` y referencias como `string`; validan sus invariantes al construirse
+  (`DatosInvalidosError` de `domain/errores.ts`, con un detalle por campo). Mongoose (`_id`, `ObjectId`, documentos)
+  existe solo en `repositories/`.
+- Operaciones del diagrama de la consigna: `TipoEntrada.hayCupoPara(cantidad)` y
+  `Evento.tuPrecioEstaEntre(min, max)`.
 - Los repositories convierten con `aDominio()` y siempre consultan con `.lean()`.
 - Colecciones en plural, en español: `usuarios`, `categorias`, `eventos`.
 - Los modelos usan `versionKey: false`, así no se persiste `__v`.

@@ -51,6 +51,13 @@ export default tseslint.config(
             name,
             message: "domain/ es puro: sin Express, Mongoose ni IO (principio III)",
           })),
+          patterns: [
+            {
+              group: ["**/errors/**", "**/errors/index"],
+              message:
+                "domain/ no conoce HTTP: lanzá DatosInvalidosError o ReglaDeNegocioError de domain/errores (principio III)",
+            },
+          ],
         },
       ],
     },

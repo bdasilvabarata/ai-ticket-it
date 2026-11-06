@@ -1,6 +1,6 @@
-import type { Categoria } from "../domain/categoria";
-import type { Evento, TipoEntrada } from "../domain/evento";
-import type { Usuario } from "../domain/usuario";
+import { Categoria, type DatosCategoria } from "../domain/categoria";
+import { Evento, TipoEntrada, type DatosEvento, type DatosTipoEntrada } from "../domain/evento";
+import { Usuario, type DatosUsuario } from "../domain/usuario";
 
 export interface DatosEjemplo {
   categorias: Categoria[];
@@ -41,12 +41,15 @@ function fechaLocal(ahora: Date, dias: number, hora: number): Date {
 
 const imagen = (slug: string) => `https://picsum.photos/seed/${slug}/800/450`;
 
-type TipoSinId = Omit<TipoEntrada, "id">;
-type EventoSinIds = Omit<Evento, "id" | "tiposEntrada"> & { tiposEntrada: TipoSinId[] };
+type TipoSinId = Omit<DatosTipoEntrada, "id">;
+type EventoSinIds = Omit<DatosEvento, "id" | "tiposEntrada"> & { tiposEntrada: TipoSinId[] };
 
-/** Datos de ejemplo deterministas (data-model.md, "Datos de ejemplo"). Puro: sin IO. */
+/**
+ * Datos de ejemplo deterministas (data-model.md, "Datos de ejemplo"). Puro: sin IO.
+ * Devuelve entidades de dominio: sus invariantes validan los propios datos de ejemplo.
+ */
 export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
-  const categorias: Categoria[] = [
+  const datosCategorias: DatosCategoria[] = [
     { id: categoriaId(1), nombre: "Música", descripcion: "Recitales, conciertos y shows en vivo." },
     { id: categoriaId(2), nombre: "Teatro", descripcion: "Obras de teatro, musicales y danza." },
     { id: categoriaId(3), nombre: "Deportes", descripcion: "Partidos, carreras y competencias." },
@@ -55,7 +58,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     { id: categoriaId(6), nombre: "Stand-up", descripcion: "Comedia y monólogos en vivo." },
   ];
 
-  const usuarios: Usuario[] = [
+  const datosUsuarios: DatosUsuario[] = [
     { id: usuarioId(1), nombre: "Lucía", apellido: "Álvarez", favoritos: [] },
     { id: usuarioId(2), nombre: "Martín", apellido: "Benítez", favoritos: [] },
     { id: usuarioId(3), nombre: "Sofía", apellido: "Castro", favoritos: [] },
@@ -76,9 +79,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       fechaHora: proximo,
       multimedia: [imagen("noche-de-rock")],
       organizadorId: lucia,
-      tiposEntrada: [
-        { nombre: "General", descripcion: "Acceso al campo.", precio: 15000, cupo: 200 },
-      ],
+      tiposEntrada: [{ nombre: "General", descripcion: "Acceso al campo.", precio: 15000, cupo: 200 }],
     },
     {
       nombre: "Hamlet, versión contemporánea",
@@ -140,9 +141,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       fechaHora: fechaLocal(ahora, -3, 22),
       multimedia: [imagen("noche-de-risas")],
       organizadorId: sofia,
-      tiposEntrada: [
-        { nombre: "General", descripcion: "Ubicación libre.", precio: 12000, cupo: 80 },
-      ],
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 12000, cupo: 80 }],
     },
     {
       nombre: "Jazz en el Patio",
@@ -151,9 +150,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       fechaHora: fechaLocal(ahora, -10, 21),
       multimedia: [imagen("jazz-patio")],
       organizadorId: martin,
-      tiposEntrada: [
-        { nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 60 },
-      ],
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 60 }],
     },
     {
       nombre: "Maratón Ciudad 10K",
@@ -169,11 +166,20 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   ];
 
   let numeroTipo = 0;
-  const eventos: Evento[] = eventosSinIds.map((evento, indice) => ({
-    ...evento,
-    id: eventoId(indice + 1),
-    tiposEntrada: evento.tiposEntrada.map((tipo) => ({ id: idFijo("0004", ++numeroTipo), ...tipo })),
-  }));
+  const eventos = eventosSinIds.map(
+    (evento, indice) =>
+      new Evento({
+        ...evento,
+        id: eventoId(indice + 1),
+        tiposEntrada: evento.tiposEntrada.map(
+          (tipo) => new TipoEntrada({ id: idFijo("0004", ++numeroTipo), ...tipo }),
+        ),
+      }),
+  );
 
-  return { categorias, usuarios, eventos };
+  return {
+    categorias: datosCategorias.map((datos) => new Categoria(datos)),
+    usuarios: datosUsuarios.map((datos) => new Usuario(datos)),
+    eventos,
+  };
 }

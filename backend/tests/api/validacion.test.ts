@@ -3,7 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { manejarErrores } from "../../src/middlewares/manejar-errores";
-import { crearValidacion } from "../../src/middlewares/validar";
+import { crearValidacion } from "../../src/validations/validacion";
 
 // App mínima, sin base: prueba el middleware de validación y su lectura tipada.
 const porFecha = crearValidacion({

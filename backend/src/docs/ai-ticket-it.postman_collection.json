@@ -1,0 +1,55 @@
+{
+  "info": {
+    "name": "AI Ticket It API",
+    "description": "Pedidos de ejemplo, incluidos los casos de error. Variables: `baseUrl` (cambiala por la dirección `Red` para probar desde otro dispositivo) y `usuarioId` (Lucía Álvarez). La especificación completa está en {{baseUrl}}/docs.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api" },
+    { "key": "usuarioId", "value": "000000000000000000000101" }
+  ],
+  "item": [
+    {
+      "name": "Salud",
+      "item": [
+        {
+          "name": "Estado del servicio",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/salud" } }
+        }
+      ]
+    },
+    {
+      "name": "Usuarios",
+      "item": [
+        {
+          "name": "Listado (ordenado por apellido)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios" } }
+        },
+        {
+          "name": "Por id",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/{{usuarioId}}" } }
+        },
+        {
+          "name": "Por id mal formado → 400 ENTRADA_INVALIDA",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/123" } }
+        },
+        {
+          "name": "Por id inexistente → 404 USUARIO_NO_ENCONTRADO",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/0000000000000000000009ff" } }
+        },
+        {
+          "name": "Usuario actual",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual" }
+          }
+        },
+        {
+          "name": "Usuario actual sin encabezado → 401 USUARIO_NO_IDENTIFICADO",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/actual" } }
+        }
+      ]
+    }
+  ]
+}

@@ -81,7 +81,10 @@ registro de ese criterio y el contexto que guía a la IA.
 
 - Backend: TDD estricto — el test se escribe primero, se lo ve fallar, se implementa y se
   refactoriza.
-  - `backend/tests/domain/` — reglas puras, sin base de datos.
+  - `backend/tests/domain/` — entidades y reglas puras, sin base de datos.
+  - `backend/tests/services/` — casos de uso con repositorios falsos inyectados, sin base.
+    Los falsos viven en `backend/tests/fakes/` (en memoria, con estado por instancia) y un
+    test de contrato verifica que se comportan igual que los repositorios de Mongo.
   - `backend/tests/api/` — endpoints con supertest contra la app de Express (sin levantar
     puerto) y una base MongoDB en memoria aislada por suite.
 - Mobile: tests de la lógica de presentación (formateos, mapeo de estados, días restantes) y
@@ -102,20 +105,37 @@ backend/src/
   routes/        ← declara endpoints y encadena middlewares + controller
   controllers/   ← HTTP: toma la request ya validada, llama al service, arma la response
   services/      ← casos de uso: orquesta repositories y domain, verifica permisos
-  repositories/  ← único acceso a datos (Mongoose); devuelve objetos de dominio planos
-  domain/        ← entidades y reglas de negocio puras
-  middlewares/   ← identificación de usuario, validación, logging, 404, error handler
+  repositories/  ← único acceso a datos (Mongoose); devuelve entidades de dominio
+  domain/        ← entidades con comportamiento y reglas de negocio puras
+  middlewares/   ← identificación de usuario, logging, 404, registro y respuesta de errores
+  validations/   ← esquemas de entrada (zod) y su middleware de validación
   errors/        ← errores de aplicación tipados
   config/        ← entorno y conexión a la base
+  docs/          ← especificación OpenAPI de la API
+  app.ts         ← composition root: instancia y conecta repositories → services → controllers
 ```
 
-- `domain/` NO DEBE importar Express, Mongoose ni nada con IO.
+- `domain/` NO DEBE importar Express, Mongoose, `errors/` ni nada con IO. Lanza **errores de
+  dominio** semánticos, sin conocimiento de HTTP (`domain/errores.ts`): `DatosInvalidosError`
+  (una entidad no cumple sus invariantes; un detalle por campo) y `ReglaDeNegocioError` (una
+  regla del dominio impide la operación, con su código; por ejemplo `CUPO_INSUFICIENTE`). La
+  traducción a HTTP es responsabilidad del error handler: `400 ENTRADA_INVALIDA` y `409` con
+  el código de la regla, respectivamente.
+- Las entidades de `domain/` son **clases con comportamiento** que protegen sus invariantes al
+  construirse y exponen las operaciones del modelo de la consigna (por ejemplo,
+  `TipoEntrada.hayCupoPara(cantidad)`, `Evento.tuPrecioEstaEntre(min, max)`).
+- **Inyección de dependencias**: controllers, services y repositories son clases que reciben
+  sus colaboradores por constructor. Los services dependen de interfaces de repositorio, no de
+  Mongoose. Solo el composition root instancia y conecta las piezas; ningún módulo usa
+  instancias globales de otra capa.
 - Los controllers NO DEBEN contener reglas de negocio ni acceder a repositories.
 - Mongoose (modelos, `_id`, `ObjectId`, documentos) NO DEBE filtrarse por encima de
-  `repositories/`.
+  `repositories/`: los repositories mapean cada documento a una entidad de dominio (no se usa
+  `schema.loadClass`, que devolvería documentos de Mongoose a las capas superiores).
 - Los controllers NO usan `try/catch` para responder errores: los services lanzan errores de
-  `errors/` y el **error handler** centralizado los traduce a HTTP.
-- La validación de forma de la entrada vive en un middleware de validación con esquemas;
+  `errors/`; un middleware **registra** los errores y el **error handler** centralizado los
+  traduce a HTTP (dos responsabilidades, dos middlewares).
+- La validación de forma de la entrada vive en `validations/` (esquemas y su middleware);
   las reglas de negocio viven en `domain/` y `services/`.
 
 **Rationale**: la lógica se testea sin servidor ni base, y cada capa tiene una sola razón
@@ -147,7 +167,9 @@ una base real sin reescribir código.
     recurso existente · `404` recurso inexistente · `409` conflicto de estado o de cupo ·
     `500` error inesperado (sin stack ni detalles internos en la respuesta).
 - Toda entrada DEBE validarse en el servidor, aunque la app ya la haya validado.
-- Cada feature documenta sus endpoints en `specs/NNN-slug/contracts/`.
+- Cada feature documenta sus endpoints en `specs/NNN-slug/contracts/` y en la especificación
+  OpenAPI de `backend/src/docs/`, servida en `/api/docs` (Swagger UI); un test verifica que
+  la especificación cubre las rutas implementadas.
 
 **Rationale**: un contrato predecible permite desarrollar backend y mobile en paralelo
 contra el contrato, y que la app muestre mensajes de error útiles.
@@ -193,8 +215,9 @@ y desalineaciones.
 ### IX. Calidad de Código (NON-NEGOTIABLE)
 
 - TypeScript en modo `strict` en todos los paquetes.
-- `npm test`, `npm run lint` y `npm run typecheck` DEBEN pasar antes de cerrar una tarea y
-  antes de abrir un PR.
+- `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` (Prettier) DEBEN
+  pasar antes de cerrar una tarea y antes de abrir un PR. El CI de GitHub Actions los corre en
+  cada PR a `development` y `main`.
 - Prohibido `any` explícito, `@ts-ignore` o `eslint-disable` sin un comentario que lo
   justifique.
 - Simplicidad primero: no se agrega una abstracción, dependencia o capa que la spec no
@@ -209,7 +232,7 @@ y desalineaciones.
 | Persistencia | MongoDB — mongodb-memory-server por defecto, `MONGO_URI` opcional |
 | Mobile | Expo (SDK estable vigente) · Expo Router · TypeScript |
 | Tests | Vitest + supertest (backend) · Jest + React Native Testing Library (mobile) |
-| Calidad | ESLint · `tsc --noEmit` |
+| Calidad | ESLint · `tsc --noEmit` · Prettier · GitHub Actions (CI) |
 
 - Solo herramientas y servicios gratuitos (requisito de la consigna).
 - Secretos y URLs locales en `.env` (no versionado); se versiona `.env.example`.
@@ -253,4 +276,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
+**Version**: 1.3.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-06
