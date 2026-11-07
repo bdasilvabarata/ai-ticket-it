@@ -10,16 +10,17 @@
 
 **Casos de uso**: ninguno directo (P0, habilita a todas las demás features del backlog).
 
-> El stack (gestor de paquetes, frameworks, base de datos, librerías de test) ya está fijado
+> El stack (gestor de paquetes, frameworks, persistencia, librerías de test) ya está fijado
 > por la constitución ("Stack y Restricciones Técnicas"). Esta spec describe **qué** debe
 > ofrecer la base del servidor y **por qué**; el **cómo** queda para el plan.
 
 ## Alcance
 
-**Incluye**: el paquete del servidor y el de tipos compartidos; arranque con almacenamiento en
-memoria y datos de ejemplo; comportamiento transversal (identificación de usuario, validación,
-registro de pedidos, 404, error handler); el recurso Usuarios como referencia completa de las
-capas; y el modelo de persistencia de Categoria, Evento y TipoEntrada que usa el seed.
+**Incluye**: el paquete del servidor y el de tipos compartidos; arranque con los datos en
+memoria y los datos de ejemplo cargados; comportamiento transversal (identificación de usuario,
+validación, registro de pedidos, 404, error handler); el recurso Usuarios como referencia
+completa de las capas; y las entidades y repositorios en memoria de Categoria, Evento y
+TipoEntrada que usa el seed.
 
 **No incluye**: la app móvil (feature 002), endpoints de eventos o categorías (features 003 y
 004), compras, mensajes y reseñas.
@@ -28,12 +29,19 @@ capas; y el modelo de persistencia de Categoria, Evento y TipoEntrada que usa el
 
 ### Session 2026-11-03
 
-- Q: Al cargar los datos de ejemplo en una base real, ¿qué pasa con los datos existentes? → A: Se vacían las colecciones que maneja el seed (categorías, usuarios, eventos) y se cargan los datos de ejemplo; el resto de esas colecciones se pierde.
+- ~~Q: Al cargar los datos de ejemplo en una base real, ¿qué pasa con los datos existentes?~~ → Reemplazada por la sesión 2026-11-07 (ya no hay base real).
 - Q: ¿Con qué código HTTP se responde un cuerpo JSON demasiado grande? → A: 413 con el formato único de error y un código propio (`CUERPO_DEMASIADO_GRANDE`); el límite en bytes lo fija el plan.
 - Q: ¿En qué orden se devuelve el listado de usuarios? → A: Alfabético por apellido y luego por nombre.
 - Q: ¿La cantidad de eventos que organiza un usuario incluye los ya realizados? → A: Sí, cuenta todos los eventos que organiza, pasados y futuros.
-- Revisión del plan: el comando de carga de datos de ejemplo es destructivo → exige confirmación explícita y, sin ella, no modifica nada (FR-007). Los datos de ejemplo de una base real envejecen → el README lo advierte (FR-024).
+- ~~Revisión del plan: el comando de carga de datos de ejemplo es destructivo (FR-007); los datos de una base real envejecen (FR-024).~~ → Reemplazada por la sesión 2026-11-07 (sin base real ni comando de carga).
 - Revisión de tareas: la prueba independiente de US1 se verifica con el estado del servicio y los tests del seed; el listado de usuarios queda en US2.
+
+### Session 2026-11-07 — persistencia en memoria pura (constitución v2.0.0)
+
+- Q: ¿Se mantiene MongoDB (en memoria o real) como persistencia? → A: No. La consigna pide "un mecanismo de persistencia en memoria": los datos se guardan en repositorios en memoria, sin base de datos ni bibliotecas que la imiten. Se eliminan el modo de base real (FR-006), el comando de carga de datos (FR-007) y los casos borde asociados.
+- Q: ¿Qué identificadores usan las entidades? → A: UUID v4 generado en el servidor para lo que crean los usuarios; ids legibles y fijos para los datos de ejemplo (`usuario-lucia`, `evento-noche-de-rock`), estables entre arranques.
+- Q: ¿El estado del servicio sigue informando el tipo de almacenamiento? → A: No: hay un único tipo. Responde solo que está operativo.
+- Q: ¿Cómo se protege el cupo ante compras simultáneas sin una base de datos? → A: Con la regla de "cupo atómico" de la constitución: verificar y descontar en un mismo tramo síncrono, sin `await` en el medio.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -49,8 +57,8 @@ Los actores de esta feature son:
 ### User Story 1 - Arrancar el servidor con datos de ejemplo (Priority: P1)
 
 Desde un clon limpio del repositorio, el desarrollador instala las dependencias con un único
-comando en la raíz y levanta el servidor con otro. Sin instalar ni configurar ninguna base de
-datos, el servidor arranca, crea su almacenamiento en memoria y lo carga con datos de ejemplo
+comando en la raíz y levanta el servidor con otro. Sin instalar ni configurar nada más, el
+servidor arranca con sus datos en memoria y carga los datos de ejemplo
 (categorías, usuarios y eventos con tipos de entrada), de modo que el sistema es demostrable
 desde el primer arranque y accesible desde otro dispositivo de la misma red.
 
@@ -58,33 +66,26 @@ desde el primer arranque y accesible desde otro dispositivo de la misma red.
 todas las features del backlog dependen de esto.
 
 **Independent Test**: en un clon limpio, ejecutar la instalación y el arranque, y consultar el
-estado del servicio desde la misma computadora y desde otro dispositivo de la red: responde y
-reporta almacenamiento en memoria; las pruebas automatizadas verifican que la base quedó
-cargada con los datos de ejemplo. (El listado de usuarios precargados se verifica al completar
+estado del servicio desde la misma computadora y desde otro dispositivo de la red: responde
+que está operativo; las pruebas automatizadas verifican que los repositorios quedaron cargados
+con los datos de ejemplo. (El listado de usuarios precargados se verifica al completar
 US2.)
 
 **Acceptance Scenarios**:
 
-1. **Given** un clon limpio sin base de datos instalada, **When** el desarrollador instala y
-   arranca el servidor sin configurar nada, **Then** el servidor queda escuchando, informa en
-   su salida las direcciones donde atiende (local y de red) y que usa almacenamiento en memoria
-   con datos de ejemplo.
+1. **Given** un clon limpio, **When** el desarrollador instala y arranca el servidor sin
+   configurar nada, **Then** el servidor queda escuchando e informa en su salida las
+   direcciones donde atiende (local y de red) y que cargó los datos de ejemplo.
 2. **Given** el servidor recién arrancado, **When** se consulta el estado del servicio,
-   **Then** responde que está operativo e indica el tipo de almacenamiento en uso.
+   **Then** responde que está operativo.
 3. **Given** el servidor recién arrancado, **When** otro dispositivo de la misma red local
    consulta el estado del servicio usando la dirección de red informada, **Then** recibe la
    respuesta.
-4. **Given** el servidor detenido y vuelto a arrancar en memoria, **When** se consultan los
-   datos, **Then** se encuentran los mismos datos de ejemplo iniciales, con los mismos
+4. **Given** el servidor detenido y vuelto a arrancar, **When** se consultan los datos,
+   **Then** se encuentran los mismos datos de ejemplo iniciales, con los mismos
    identificadores, sin duplicados ni restos de la ejecución anterior.
-5. **Given** la dirección de una base de datos real configurada, **When** el servidor arranca,
-   **Then** se conecta a esa base en lugar de crear una en memoria y no carga datos de ejemplo
-   automáticamente.
-6. **Given** una base de datos real configurada, **When** el desarrollador ejecuta el comando
-   de carga de datos de ejemplo confirmando explícitamente que acepta vaciar la base, **Then**
-   las colecciones del seed (categorías, usuarios y
-   eventos) quedan con exactamente los datos de ejemplo, descartando lo que tuvieran antes, y
-   ejecutarlo de nuevo no genera duplicados.
+5. *(Eliminado — persistencia en memoria pura, ver clarificación 2026-11-07.)*
+6. *(Eliminado — persistencia en memoria pura, ver clarificación 2026-11-07.)*
 
 ---
 
@@ -112,7 +113,7 @@ verificar código y formato de cada respuesta.
    cantidad de eventos que organiza, ordenados alfabéticamente por apellido y luego por nombre.
 2. **Given** un usuario existente, **When** se lo pide por su identificador, **Then** devuelve
    su vista con los mismos campos.
-3. **Given** un identificador con formato válido que no corresponde a ningún usuario, **When**
+3. **Given** un identificador con formato válido (UUID o id legible) que no corresponde a ningún usuario, **When**
    se lo pide, **Then** responde 404 con el formato de error único.
 4. **Given** un identificador con formato inválido en la ruta, **When** se lo pide, **Then**
    responde 400 con el formato de error único y un detalle sobre ese parámetro.
@@ -130,7 +131,7 @@ verificar código y formato de cada respuesta.
 10. **Given** cualquier pedido, **When** se completa, **Then** el servidor registra método,
     ruta, código de respuesta y duración.
 11. **Given** cualquier recurso devuelto por la API, **When** se inspecciona, **Then** su
-    identificador es un campo `id` de tipo texto y no aparecen campos internos de la base.
+    identificador es un campo `id` de tipo texto y no aparecen campos internos del almacenamiento.
 
 ---
 
@@ -155,11 +156,11 @@ de lint y comprobar que el comando correspondiente falla.
 2. **Given** un tipo compartido (por ejemplo, el estado de una compra), **When** el servidor
    lo usa, **Then** lo toma de la definición compartida y un cambio incompatible en ella rompe
    la verificación de tipos del servidor.
-3. **Given** las pruebas automatizadas del servidor, **When** se ejecutan, **Then** cada suite
-   usa su propio almacenamiento aislado y no depende de un servidor corriendo ni de los datos
-   de otra suite.
+3. **Given** las pruebas automatizadas del servidor, **When** se ejecutan, **Then** cada test
+   usa sus propios repositorios y no depende de un servidor corriendo ni de los datos de otro
+   test.
 4. **Given** las reglas puras del dominio, **When** se prueban, **Then** sus pruebas no
-   necesitan base de datos.
+   necesitan la app ni los repositorios.
 
 ---
 
@@ -167,21 +168,12 @@ de lint y comprobar que el comando correspondiente falla.
 
 - El puerto configurado ya está en uso → el servidor no arranca y lo informa con un mensaje
   claro (no queda colgado).
-- La base de datos real configurada no es accesible → el servidor no arranca y lo informa; no
-  cae silenciosamente a la base en memoria.
-- Primer arranque sin conexión a internet y sin el motor de base en memoria descargado → el
-  servidor termina con un mensaje que explica que falta la descarga inicial.
 - El firewall del sistema operativo bloquea el puerto para otros dispositivos → el README
   explica cómo habilitarlo; el servidor sigue respondiendo localmente.
 - Encabezado de usuario presente pero vacío → se trata como "sin usuario" (401 donde se
   requiera).
 - Un endpoint público recibe un encabezado de usuario inválido → lo ignora y responde
   normalmente (la identificación solo se exige donde se requiere).
-- El comando de carga de datos de ejemplo se ejecuta sin la confirmación explícita → no borra
-  nada, informa a qué base apunta y cómo confirmar, y termina con código de error.
-- Los datos de ejemplo cargados en una base real conservan las fechas calculadas el día de la
-  carga, así que con el tiempo los eventos futuros pasan a ser pasados → el README lo advierte
-  y recomienda volver a ejecutar la carga antes de una demo.
 - Cuerpo JSON que supera el límite de tamaño → 413 con el formato de error único y el código
   `CUERPO_DEMASIADO_GRANDE` (el límite en bytes lo fija el plan).
 
@@ -204,17 +196,13 @@ de lint y comprobar que el comando correspondiente falla.
 
 **Arranque y datos**
 
-- **FR-005**: Sin configuración, el servidor DEBE usar almacenamiento en memoria y cargar al
-  arrancar los datos de ejemplo.
-- **FR-006**: Si se configura la dirección de una base de datos real, el servidor DEBE usarla
-  y NO DEBE cargar datos de ejemplo automáticamente.
-- **FR-007**: DEBE existir un comando para cargar los datos de ejemplo en la base configurada,
-  idempotente: vacía las colecciones que maneja el seed (categorías, usuarios y eventos) y
-  carga los datos de ejemplo; todo otro dato de esas colecciones se pierde. Por ser
-  destructivo, DEBE exigir una confirmación explícita (sin ella no modifica nada) e informar a
-  qué base apunta. El README DEBE advertirlo.
-- **FR-008**: Los datos de ejemplo DEBEN tener identificadores fijos entre arranques y fechas
-  de eventos relativas al día de arranque.
+- **FR-005**: El servidor DEBE guardar sus datos en memoria (sin base de datos) y cargar al
+  arrancar los datos de ejemplo; al reiniciarse vuelve exactamente a ellos.
+- **FR-006**: *(Eliminado — persistencia en memoria pura, ver clarificación 2026-11-07.)*
+- **FR-007**: *(Eliminado — persistencia en memoria pura, ver clarificación 2026-11-07.)*
+- **FR-008**: Los datos de ejemplo DEBEN tener identificadores legibles y fijos entre arranques
+  (por ejemplo, `usuario-lucia`) y fechas de eventos relativas al día de arranque. Las entidades
+  que creen los usuarios (features siguientes) usan UUID.
 - **FR-009**: Los datos de ejemplo DEBEN incluir como mínimo:
   - al menos 5 categorías;
   - al menos 4 usuarios: al menos 2 que organicen eventos y al menos 1 que no organice ninguno;
@@ -226,18 +214,17 @@ de lint y comprobar que el comando correspondiente falla.
     - al menos 1 tipo de entrada con cupo de 3 o menos;
     - precios que difieran en al menos un orden de magnitud entre el más barato y el más caro.
 - **FR-010**: El servidor DEBE atender pedidos tanto locales como de otros dispositivos de la
-  red local, y DEBE informar al arrancar sus direcciones local y de red y el tipo de
-  almacenamiento en uso.
-- **FR-011**: Si no puede arrancar (puerto ocupado, base inaccesible, motor en memoria no
-  disponible), el servidor DEBE terminar con un mensaje claro y un código de salida de error.
-- **FR-012**: La base DEBE dejar definido el modelo de persistencia de Categoria, Evento y
-  TipoEntrada usado por los datos de ejemplo; las features de eventos agregan casos de uso
-  sobre ese modelo sin redefinirlo.
+  red local, y DEBE informar al arrancar sus direcciones local y de red.
+- **FR-011**: Si no puede arrancar (por ejemplo, puerto ocupado), el servidor DEBE terminar con
+  un mensaje claro y un código de salida de error.
+- **FR-012**: La base DEBE dejar definidas las entidades y los repositorios en memoria de
+  Categoria, Evento y TipoEntrada usados por los datos de ejemplo; las features de eventos
+  agregan casos de uso sobre ellos sin redefinirlos.
 
 **Endpoints**
 
 - **FR-013**: El servidor DEBE exponer un endpoint de estado del servicio, público, que
-  informe que está operativo y el tipo de almacenamiento.
+  informe que está operativo.
 - **FR-014**: El servidor DEBE exponer, sin requerir usuario, el listado de usuarios y la
   consulta de un usuario por identificador, con identificador, nombre, apellido y cantidad de
   eventos que organiza (todos, pasados y futuros). El listado DEBE devolverse ordenado
@@ -263,16 +250,15 @@ de lint y comprobar que el comando correspondiente falla.
 - **FR-021**: El servidor DEBE registrar cada pedido con método, ruta, código de respuesta y
   duración; durante las pruebas automatizadas ese registro no debe ensuciar la salida.
 - **FR-022**: Los recursos expuestos DEBEN identificarse con un campo `id` de texto y NO DEBEN
-  exponer campos internos de la base de datos.
+  exponer campos internos del almacenamiento.
 - **FR-023**: El recurso Usuarios DEBE recorrer todas las capas de la constitución (principio
   III) para servir de referencia a las features siguientes.
 
 **Documentación**
 
 - **FR-024**: El README y `AGENTS.md` DEBEN documentar los requisitos previos, cómo instalar,
-  arrancar el servidor (en memoria y con base real), cargar los datos de ejemplo, consultarlo
-  desde otro dispositivo (incluido el firewall) y correr tests, lint y verificación de tipos;
-  y DEBEN advertir que los datos de ejemplo de una base real envejecen (ver Edge Cases).
+  arrancar el servidor, consultarlo desde otro dispositivo (incluido el firewall) y correr
+  tests, lint y verificación de tipos, y aclarar que los datos se pierden al detenerlo.
 - **FR-025**: Los endpoints de esta feature DEBEN quedar documentados en
   `specs/001-base-backend/contracts/`.
 
@@ -284,7 +270,7 @@ de lint y comprobar que el comando correspondiente falla.
 - **Categoria**: catálogo precargado de tipos de evento; nombre y descripción.
 - **Evento**: lo publica un usuario (organizador); nombre, descripción, categoría, fecha y
   hora, multimedia (direcciones de imágenes) y uno o más tipos de entrada. En esta feature solo
-  se persiste para el seed; sus endpoints llegan en las features 003 y 004.
+  existe en los datos de ejemplo; sus endpoints llegan en las features 003 y 004.
 - **TipoEntrada**: parte de un evento; nombre, descripción, precio y cupo.
 - **Error de API**: respuesta de error con código legible por máquina, mensaje en español y
   detalles opcionales (por ejemplo, un detalle por campo inválido).
@@ -293,9 +279,9 @@ de lint y comprobar que el comando correspondiente falla.
 
 ### Measurable Outcomes
 
-- **SC-001**: Desde un clon limpio, con los requisitos previos documentados y el motor en
-  memoria ya descargado, una persona deja el servidor funcionando con datos de ejemplo en menos
-  de 5 minutos ejecutando no más de 2 comandos.
+- **SC-001**: Desde un clon limpio, con los requisitos previos documentados, una persona deja
+  el servidor funcionando con datos de ejemplo en menos de 5 minutos ejecutando no más de 2
+  comandos.
 - **SC-002**: Un dispositivo de la misma red obtiene respuesta del servidor siguiendo solo el
   README.
 - **SC-003**: El 100 % de los casos de error definidos (ruta inexistente, usuario ausente o
@@ -304,14 +290,14 @@ de lint y comprobar que el comando correspondiente falla.
   código correspondiente, verificado por pruebas automatizadas.
 - **SC-004**: Tests, lint y verificación de tipos terminan en verde desde la raíz con una sola
   ejecución de cada comando, y las pruebas del servidor corren en menos de 1 minuto.
-- **SC-005**: Reiniciar el servidor en memoria 3 veces seguidas deja siempre exactamente los
-  mismos datos de ejemplo con los mismos identificadores.
+- **SC-005**: Reiniciar el servidor 3 veces seguidas deja siempre exactamente los mismos
+  datos de ejemplo con los mismos identificadores.
 
 ## Assumptions
 
 - El stack es el fijado por la constitución; esta spec no lo reabre.
-- La primera ejecución descarga el motor de base de datos en memoria (requiere internet una
-  vez); el README lo indica como paso de preparación.
+- Los datos se pierden al detener el servidor: es lo esperado con persistencia en memoria
+  (consigna) y lo que hace que cada arranque sea demostrable con los datos de ejemplo.
 - El seed de esta feature carga solo categorías, usuarios y eventos con tipos de entrada. Las
   compras, mensajes y reseñas de ejemplo los agrega cada feature que introduce esas entidades,
   extendiendo el mismo seed.

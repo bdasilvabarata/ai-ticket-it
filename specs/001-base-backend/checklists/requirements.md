@@ -45,3 +45,7 @@
 - Decisiones a confirmar en `/speckit-clarify`: id mal formado en la ruta → 400 (FR-017);
   cuerpo demasiado grande → 400 o 413.
 - Validación: 2 iteraciones, todos los ítems pasan.
+- Iteración 3 (2026-11-07): persistencia en memoria pura (constitución v2.0.0). Se eliminan
+  FR-006 y FR-007 (se conserva la numeración, marcados como eliminados), US1 escenarios 5 y 6 y
+  los casos borde de base real; FR-008 fija ids legibles para el seed y UUID para lo nuevo;
+  FR-013 deja de informar el tipo de almacenamiento. Validación: todos los ítems pasan.
