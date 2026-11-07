@@ -6,6 +6,8 @@ registro de npm el 2026-11-03.
 
 ## R1. Versiones del stack
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: se quitan Mongoose y mongodb-memory-server.
+
 - **Decision**: Node ≥ 22.12 (se desarrolla con 24) · Express 5.3 · Mongoose 9 · zod 4 ·
   mongodb-memory-server 11 (binario MongoDB 8.2 por defecto) · Vitest 5 · supertest 7 ·
   TypeScript **6.0.x** · ESLint 10 + typescript-eslint 8 · tsx 4.
@@ -42,6 +44,8 @@ registro de npm el 2026-11-03.
 
 ## R4. Configuración de entorno
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: se elimina `MONGO_URI`; quedan `PORT`, `HOST` y `LOG_LEVEL`.
+
 - **Decision**: `config/env.ts` llama a `process.loadEnvFile(ruta)` si existe `backend/.env`
   (nativo de Node, sin `dotenv`) y valida `process.env` con zod. El esquema vive aparte, en
   `config/env-esquema.ts` (`parsearEnv`, puro y testeable sin efectos al importarse). Con
@@ -60,6 +64,8 @@ registro de npm el 2026-11-03.
   si el archivo no existe).
 
 ## R5. Conexión a la base y arranque
+
+> **Reemplazada (2026-11-07) por R23**: no hay base que conectar. `server.ts` arma la app con los repositorios de ejemplo y escucha; la única falla de arranque contemplada es el puerto ocupado.
 
 - **Decision**: `config/db.ts` expone `conectarBase(mongoUri = env.MONGO_URI, { timeoutMs })`
   (parámetros inyectables para testear las fallas): si hay URI se conecta con
@@ -83,6 +89,8 @@ registro de npm el 2026-11-03.
   futura necesita transacciones de verdad, cambia solo `config/db.ts`.
 
 ## R6. Datos de ejemplo (seed)
+
+> **Parcialmente reemplazada (2026-11-07, R23)**: `crearDatosEjemplo(ahora)` sigue igual (con ids legibles); `cargarSeed`, `npm run seed`, `--forzar` y el aviso de fechas que envejecen se eliminan.
 
 - **Decision**:
   - `seed/datos-ejemplo.ts`: función **pura** `crearDatosEjemplo(ahora: Date)` que devuelve
@@ -151,6 +159,8 @@ registro de npm el 2026-11-03.
 
 ## R9. Errores y error handler
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: se elimina la traducción de errores de Mongo (`RECURSO_DUPLICADO`).
+
 - **Decision**: `errors/` define `ErrorAplicacion` (`status`, `codigo`, `mensaje`,
   `detalles?`) y subclases:
   | Clase | HTTP | `codigo` por defecto |
@@ -204,6 +214,8 @@ registro de npm el 2026-11-03.
 
 ## R12. Vistas, ids y orden del listado de usuarios
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: sin `.lean()`, `aDominio()` ni agregaciones; el orden por apellido y nombre sigue igual.
+
 - **Decision**:
   - Los repositories usan `.lean()` y una función `aDominio()` por entidad que convierte
     `_id`/`ObjectId` en `id: string` y descarta `__v`; nunca devuelven documentos.
@@ -224,6 +236,8 @@ registro de npm el 2026-11-03.
   pero la regla no queda en `domain/` ni se testea sin base).
 
 ## R13. Tests
+
+> **Reemplazada (2026-11-07) por R23**: los tests de API arman la app con repositorios nuevos por test; no hay base ni helper de base.
 
 - **Decision**: `backend/vitest.config.ts` con `environment: "node"`, `hookTimeout: 60000`
   (primera descarga del binario) y `testTimeout` corto. Cada archivo de `tests/api/` usa el
@@ -260,6 +274,8 @@ registro de npm el 2026-11-03.
   más lentas y no aportan a estos requisitos.
 
 ## R15. Cupo atómico y precios enteros
+
+> **Parcialmente reemplazada (2026-11-07, R23)**: los precios enteros y el cupo decreciente siguen; el `$inc` condicional se reemplaza por la regla de cupo atómico (tramo síncrono sin `await`).
 
 - **Decision**:
   - `TipoEntrada.cupo` es un **contador decreciente de entradas disponibles** (entero,
@@ -327,6 +343,8 @@ registro de npm el 2026-11-03.
 
 ## R18. Registro y respuesta de errores separados; `validations/`
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: `aErrorAplicacion` ya no traduce errores de Mongo.
+
 - **Decision**: la cadena final es `rutaNoEncontrada → registrarError → manejarErrores`.
   Ambos middlewares de error clasifican con `aErrorAplicacion(error)`
   (`middlewares/traducir-error.ts`: errores propios, del parser JSON —ahora
@@ -374,6 +392,8 @@ registro de npm el 2026-11-03.
 
 ## R21. Repositorios en memoria reutilizables, test de contrato y nombres uniformes
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: los repositorios en memoria pasan a ser los de producción (`src/repositories/`); desaparecen `tests/fakes/` y el test de contrato. La convención de nombres sigue.
+
 - **Decision**: `tests/fakes/` tiene `RepositorioUsuariosEnMemoria` y
   `RepositorioEventosEnMemoria`, que implementan las interfaces de `domain/repositorios.ts` con
   estado **por instancia** (se construyen con las entidades del caso). Los tests de services
@@ -393,6 +413,8 @@ registro de npm el 2026-11-03.
 
 ## R22. Prettier y CI
 
+> **Parcialmente reemplazada (2026-11-07, R23)**: el CI ya no necesita caché del binario de MongoDB.
+
 - **Decision**: Prettier 3 con `printWidth: 110` (el ancho del código existente: era el que
   menos cambios producía), comillas dobles y comas finales; `.prettierignore` excluye `*.md`
   (specs y constitución tienen saltos de línea a mano), `.specify/` y `.claude/`. Scripts
@@ -404,3 +426,37 @@ registro de npm el 2026-11-03.
   comandos del principio IX están en verde antes de integrar.
 - **Alternatives considered**: reglas de estilo de ESLint (deprecadas en favor de un
   formateador); deploy automático como el de ese repo (la consigna pide ejecución local).
+
+## R23. Persistencia en memoria pura
+
+- **Decision**: se reemplaza MongoDB (mongodb-memory-server por defecto y `MONGO_URI`
+  opcional) por **repositorios en memoria**: clases en `repositories/` que implementan las
+  interfaces de `domain/repositorios.ts` guardando entidades en un `Map` privado y que se
+  construyen con sus entidades iniciales (`UsuarioRepository`, `CategoriaRepository`,
+  `EventoRepository`). `seed/repositorios-de-ejemplo.ts → crearRepositoriosDeEjemplo(ahora)`
+  crea repositorios nuevos con los datos de ejemplo; `crearApp({ repositorios? })` los usa por
+  defecto y permite reemplazar cualquiera (tests). Ids: UUID v4 para lo que crean los usuarios
+  e ids legibles `<tipo>-<slug>` para los datos de ejemplo; `idSchema` acepta ambos.
+  `/api/salud` responde `{ estado: "ok" }`. Atomicidad: regla de **cupo atómico** de la
+  constitución (verificar y modificar en un mismo tramo síncrono, sin `await`).
+  Se eliminan: `config/db.ts`, `config/destino-mongo.ts`, `ErrorArranque`, los modelos,
+  `errores-persistencia.ts`, `seed/cargar-seed.ts`, `scripts/` (comando seed), `MONGO_URI`,
+  las dependencias `mongoose` y `mongodb-memory-server`, `tests/fakes/`, el test de contrato,
+  el helper de base de prueba y los tests de modelos, db y seed.
+- **Rationale**: la consigna pide "un mecanismo de persistencia en memoria" y da indicios de
+  que la solución esperada no imita una base de datos (por ejemplo, `tuPrecioEstaEntre` en el
+  diagrama sugiere filtrar en objetos). mongodb-memory-server es una herramienta de testing,
+  no una persistencia natural para producción; además trajo costos propios: descarga de
+  ~590 MB, trampas de Mongoose (`aggregate` sin casteo, rutas de error en subdocumentos,
+  `CastError`), capa de mapeo por entidad, ids de 24 hex en el contrato, sin transacciones, y
+  el modo `MONGO_URI` con seed destructivo, `--forzar` y fechas que envejecen. Gracias a la
+  inyección de dependencias (R16) y a las interfaces de repositorio, services, dominio,
+  controllers y rutas no cambian: solo cambia la implementación de los repositorios, que ya
+  existía como falso de tests (R21). Node ejecuta un tramo síncrono por vez, así que el cupo
+  es atómico sin mecanismos extra si no hay `await` entre verificar y descontar.
+- **Alternatives considered**: mantener Mongo sin el modo externo (seguía la descarga, Mongoose
+  y la falta de transacciones); replica set en memoria para tener transacciones (más lento y
+  más infraestructura de testing); SQLite (otra tecnología a mitad del TP, y se aleja de "en
+  memoria"); repositorios en memoria **y** Mongo intercambiables (duplicaría cada repositorio
+  sin que la consigna lo pida; las interfaces dejan esa puerta abierta si alguna vez hace
+  falta).
