@@ -47,7 +47,7 @@ export default tseslint.config(
         {
           paths: modulosConIo.map((name) => ({
             name,
-            message: "domain/ es puro: sin Express, Mongoose ni IO (principio III)",
+            message: "domain/ es puro: sin Express ni IO (principio III)",
           })),
           patterns: [
             {

@@ -20,8 +20,9 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
   Sin reglas, sin try/catch.
 - `backend/src/services/` — clase con el caso de uso: permisos, orquestación, errores de `errors/`. Recibe
   **interfaces** de repositorio (`domain/repositorios.ts`) por constructor.
-- `backend/src/repositories/` — clase que implementa la interfaz; Mongoose solo acá. Mapea cada documento a
-  una entidad de dominio (`new Evento(...)`), nunca `loadClass` ni documentos.
+- `backend/src/repositories/` — repositorio **en memoria** (`Map` privado) que implementa la interfaz; recibe y
+  devuelve entidades de dominio y nunca expone el `Map`. Si la operación verifica y modifica (cupo, estado),
+  hacelo sin `await` en el medio (constitución, "Cupo atómico").
 - `backend/src/domain/` — clases con comportamiento e invariantes (`hayCupoPara`, transiciones de estado,
   días restantes...). Sin IO y sin `errors/`: lanzá `DatosInvalidosError` (→ 400) o
   `ReglaDeNegocioError("CODIGO", "mensaje")` (→ 409) de `domain/errores.ts`.
@@ -34,18 +35,19 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 - Repository: `listar`, `buscarPorId` (null si no existe), `buscarPor<Criterio>`, `contarPor<Criterio>`,
   `guardar`, `eliminarPorId`.
 - Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `#obtenerOFallar(id)`.
-- Si agregás un método al repository, agregalo también al falso de `tests/fakes/` y un caso al test de
-  contrato (`tests/api/repositorios.contrato.test.ts`).
+- Si agregás un método al repository, agregá su test en `tests/repositories/`.
+- Ids: `crypto.randomUUID()` para lo que se crea; ids legibles `<tipo>-<slug>` solo en los datos de ejemplo.
+  Validá ids con `idSchema` (`validations/comunes.ts`).
 
 ## Contrato (principio V)
 - Bajo `/api`, JSON, recursos en plural y kebab-case.
-- Nunca `_id` ni `__v` en la respuesta; vista explícita, no `{ ...doc }`.
-- Errores: `{ "error": { "codigo", "mensaje", "detalles"? } }` vía error handler. Los errores de
-  Mongo (validación, cast, duplicado 11000 → 409 `RECURSO_DUPLICADO`) los traduce
-  `repositories/errores-persistencia.ts`; si el caso merece un código propio, lanzalo desde el service.
+- Vista explícita en la respuesta (campos elegidos), nunca la entidad completa con `{ ...entidad }`.
+- Errores: `{ "error": { "codigo", "mensaje", "detalles"? } }` vía error handler. Una regla del dominio
+  (`ReglaDeNegocioError`) responde 409 con su código; si el caso merece un código propio, lanzalo desde el
+  dominio o el service.
 
 ## Invariantes que no se negocian
-- Cupo nunca negativo, con actualización atómica.
+- Cupo nunca negativo, con actualización atómica (verificar y descontar sin `await` en el medio).
 - Total calculado en el servidor.
 - Transiciones de estado solo las de la constitución, con `CambioEstadoCompra`.
 

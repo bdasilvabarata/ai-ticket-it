@@ -23,7 +23,7 @@ Consigna y casos de uso: [`docs/consigna/consigna.md`](docs/consigna/consigna.md
 | Capa | Tecnología |
 |---|---|
 | Backend | Node + Express 5 + TypeScript, en capas (routes → controllers → services → repositories → domain) |
-| Persistencia | MongoDB con Mongoose — en memoria (mongodb-memory-server) por defecto |
+| Persistencia | En memoria: repositorios con `Map`, sin base de datos (lo pide la consigna) |
 | Mobile | React Native con Expo + Expo Router |
 | Tests | Vitest + supertest · Jest + React Native Testing Library |
 
@@ -32,9 +32,7 @@ Consigna y casos de uso: [`docs/consigna/consigna.md`](docs/consigna/consigna.md
 ### Requisitos previos
 
 - **Node ≥ 22.12** y **npm ≥ 10** (`node -v`, `npm -v`).
-- **Internet la primera vez**: mongodb-memory-server descarga el binario de MongoDB a
-  `node_modules/.cache/` (en Windows son ~590 MB). Después funciona sin red. Si borrás
-  `node_modules/`, se vuelve a descargar.
+- No hace falta instalar ninguna base de datos: los datos viven en memoria.
 
 ### Instalar y arrancar
 
@@ -43,15 +41,16 @@ npm install
 npm start        # o npm run dev para recargar ante cambios
 ```
 
-Sin configuración, el servidor usa **MongoDB en memoria** y carga los datos de ejemplo
-(5 usuarios, 6 categorías y 8 eventos, siempre con los mismos ids). La salida muestra las
-direcciones:
+El servidor guarda sus datos **en memoria** y arranca siempre con los datos de ejemplo
+(5 usuarios, 6 categorías y 8 eventos, con ids legibles como `usuario-lucia` o
+`evento-noche-de-rock`). Todo lo que se cree se pierde al detenerlo, y cada arranque vuelve a
+los mismos datos. La salida muestra las direcciones:
 
 ```text
 AI Ticket It API escuchando
   Local: http://localhost:3000/api
   Red:   http://192.168.0.23:3000/api (Wi-Fi)
-Almacenamiento: MongoDB en memoria con datos de ejemplo
+Datos de ejemplo cargados en memoria (se pierden al detener el servidor)
 ```
 
 Probalo con `curl http://localhost:3000/api/salud`. La documentación navegable de la API
@@ -59,29 +58,6 @@ Probalo con `curl http://localhost:3000/api/salud`. La documentación navegable 
 `backend/src/docs/ai-ticket-it.postman_collection.json` o la especificación
 `http://localhost:3000/api/docs/openapi.json`. El contrato y el formato de errores están en
 [`specs/001-base-backend/contracts/api.md`](specs/001-base-backend/contracts/api.md).
-
-> La primera vez, corré `npm start` antes que `npm test`: así la descarga del binario no
-> compite con el tiempo límite de los tests.
-
-### Usar una base MongoDB real
-
-Copiá `backend/.env.example` a `backend/.env` y definí `MONGO_URI` (por ejemplo, una base
-local o un cluster gratuito de Atlas). Con `MONGO_URI`, `npm start` **no** carga datos solo
-y, si la base no responde, termina en ~5 s con un mensaje claro (nunca cae a memoria).
-
-Para cargar los datos de ejemplo en esa base:
-
-```bash
-npm run seed -- --forzar
-```
-
-> ⚠️ **Es destructivo**: vacía las colecciones `categorias`, `usuarios` y `eventos` de la
-> base de `MONGO_URI` antes de cargar. Sin `--forzar` no modifica nada: muestra la base de
-> destino, explica qué borraría y termina con código 1.
-
-En una base real las fechas de los eventos quedan fijas al día de la carga y envejecen
-(los "próximos" pasan a ser pasados). Antes de una demo, volvé a correr
-`npm run seed -- --forzar`.
 
 ### Consultar desde otro dispositivo (el celular con la app)
 
@@ -109,7 +85,7 @@ En una base real las fechas de los eventos quedan fijas al día de la carga y en
 ### Calidad
 
 ```bash
-npm test          # Vitest en todos los paquetes (cada suite levanta su propio MongoDB en memoria)
+npm test          # Vitest en todos los paquetes (cada test usa sus propios repositorios)
 npm run lint      # ESLint: sin any, sin ts-ignore ni eslint-disable sin descripción, domain/ puro
 npm run typecheck # tsc --noEmit en backend y shared
 npm run format    # Prettier (format:check solo verifica)

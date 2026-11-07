@@ -699,7 +699,7 @@ Task: "eventoRepository.contarPorOrganizador en backend/src/repositories/evento.
 ### F5. Documentación de uso y cierre
 
 - [X] M10 OpenAPI y colección de Postman con ids legibles y `SaludVista` sin almacenamiento.
-- [ ] M11 README, AGENTS.md y skill `nuevo-endpoint` sin MongoDB; backlog (decisiones abiertas
+- [X] M11 README, AGENTS.md y skill `nuevo-endpoint` sin MongoDB; backlog (decisiones abiertas
   que mencionaban Mongo).
-- [ ] M12 `npm test`, `lint`, `typecheck` y `format:check` en verde; prueba manual de
+- [X] M12 `npm test`, `lint`, `typecheck` y `format:check` en verde; prueba manual de
   quickstart §1–§4 y §6.
