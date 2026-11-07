@@ -12,7 +12,6 @@
   "scripts": {
     "start": "npm run start -w backend",
     "dev": "npm run dev -w backend",
-    "seed": "npm run seed -w backend --",
     "test": "npm run test --workspaces --if-present",
     "lint": "eslint .",
     "typecheck": "npm run typecheck --workspaces --if-present",

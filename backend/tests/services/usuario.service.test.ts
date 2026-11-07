@@ -3,11 +3,11 @@ import { Evento, TipoEntrada } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
 import { NoEncontradoError } from "../../src/errors/index";
 import { UsuarioService } from "../../src/services/usuario.service";
-import { RepositorioEventosEnMemoria } from "../fakes/repositorio-eventos";
-import { RepositorioUsuariosEnMemoria } from "../fakes/repositorio-usuarios";
+import { EventoRepository } from "../../src/repositories/evento.repository";
+import { UsuarioRepository } from "../../src/repositories/usuario.repository";
 
-// Sin base de datos: el service recibe los repositorios en memoria de tests/fakes/
-// (verificados contra Mongo por tests/api/repositorios.contrato.test.ts).
+// Sin servidor: el service recibe los repositorios en memoria de producción, construidos con
+// las entidades de cada caso.
 const lucia = new Usuario({ id: "u1", nombre: "Lucía", apellido: "Álvarez", favoritos: [] });
 const martin = new Usuario({ id: "u2", nombre: "Martín", apellido: "Benítez", favoritos: [] });
 const diego = new Usuario({ id: "u3", nombre: "Diego", apellido: "Fernández", favoritos: [] });
@@ -30,9 +30,9 @@ function eventoDe(organizadorId: string): Evento {
 }
 
 function crearService(usuarios: Usuario[], eventos: Evento[] = []) {
-  const repositorioEventos = new RepositorioEventosEnMemoria(eventos);
+  const repositorioEventos = new EventoRepository(eventos);
   const service = new UsuarioService({
-    usuarios: new RepositorioUsuariosEnMemoria(usuarios),
+    usuarios: new UsuarioRepository(usuarios),
     eventos: repositorioEventos,
   });
   return { service, repositorioEventos };

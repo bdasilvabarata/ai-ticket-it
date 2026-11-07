@@ -1,20 +1,33 @@
-import { Types } from "mongoose";
+import type { Evento } from "../domain/evento";
 import type { RepositorioEventos } from "../domain/repositorios";
-import { EventoModel } from "./models/evento.model";
 
-// Lo amplían 003 (crear) y 004 (explorar).
+/**
+ * Eventos en memoria, con sus tipos de entrada adentro (constitución, principio IV). Lo amplían
+ * 003 (crear) y 004 (explorar). Las operaciones que toquen el cupo deben cumplir la regla de
+ * cupo atómico: verificar y guardar sin `await` en el medio.
+ */
 export class EventoRepository implements RepositorioEventos {
-  constructor(private readonly modelo = EventoModel) {}
+  readonly #eventos: Map<string, Evento>;
 
-  /**
-   * Cantidad de eventos (pasados y futuros) por organizador, en una sola agregación.
-   * `aggregate()` no castea con el esquema: los ids se convierten a ObjectId antes del `$match`.
-   */
+  constructor(eventos: Evento[] = []) {
+    this.#eventos = new Map(eventos.map((evento) => [evento.id, evento]));
+  }
+
+  async listar(): Promise<Evento[]> {
+    return [...this.#eventos.values()];
+  }
+
+  async buscarPorId(id: string): Promise<Evento | null> {
+    return this.#eventos.get(id) ?? null;
+  }
+
   async contarPorOrganizador(ids: string[]): Promise<Map<string, number>> {
-    const resultado = await this.modelo.aggregate<{ _id: Types.ObjectId; cantidad: number }>([
-      { $match: { organizador: { $in: ids.map((id) => new Types.ObjectId(id)) } } },
-      { $group: { _id: "$organizador", cantidad: { $sum: 1 } } },
-    ]);
-    return new Map(resultado.map((fila) => [fila._id.toString(), fila.cantidad]));
+    const buscados = new Set(ids);
+    const cantidades = new Map<string, number>();
+    for (const { organizadorId } of this.#eventos.values()) {
+      if (buscados.has(organizadorId))
+        cantidades.set(organizadorId, (cantidades.get(organizadorId) ?? 0) + 1);
+    }
+    return cantidades;
   }
 }

@@ -3,12 +3,9 @@ import path from "node:path";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
-import { usarBaseDePrueba } from "./helpers/base-de-prueba";
 
-usarBaseDePrueba();
-
-const app = crearApp({ almacenamiento: "memoria" });
-const ID_DE_EJEMPLO = "000000000000000000000101";
+const app = crearApp();
+const ID_DE_EJEMPLO = "usuario-lucia";
 const METODOS = ["get", "post", "put", "patch", "delete"] as const;
 type Metodo = (typeof METODOS)[number];
 

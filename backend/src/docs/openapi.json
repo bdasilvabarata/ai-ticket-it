@@ -21,7 +21,7 @@
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/SaludVista" },
-                "example": { "estado": "ok", "almacenamiento": "memoria" }
+                "example": { "estado": "ok" }
               }
             }
           }
@@ -81,7 +81,7 @@
         "type": "apiKey",
         "in": "header",
         "name": "X-Usuario-Id",
-        "description": "Id de un usuario precargado, por ejemplo `000000000000000000000101` (Lucía Álvarez)."
+        "description": "Id de un usuario precargado, por ejemplo `usuario-lucia` (Lucía Álvarez)."
       }
     },
     "parameters": {
@@ -89,24 +89,23 @@
         "name": "id",
         "in": "path",
         "required": true,
-        "description": "Identificador de 24 caracteres hexadecimales",
-        "schema": { "type": "string", "pattern": "^[0-9a-fA-F]{24}$", "example": "000000000000000000000101" }
+        "description": "UUID (lo que crean los usuarios) o id legible `<tipo>-<slug>` (datos de ejemplo)",
+        "schema": { "type": "string", "example": "usuario-lucia" }
       }
     },
     "schemas": {
       "SaludVista": {
         "type": "object",
-        "required": ["estado", "almacenamiento"],
+        "required": ["estado"],
         "properties": {
-          "estado": { "type": "string", "enum": ["ok"] },
-          "almacenamiento": { "type": "string", "enum": ["memoria", "externo"] }
+          "estado": { "type": "string", "enum": ["ok"] }
         }
       },
       "UsuarioVista": {
         "type": "object",
         "required": ["id", "nombre", "apellido", "cantidadEventosOrganizados"],
         "properties": {
-          "id": { "type": "string", "example": "000000000000000000000101" },
+          "id": { "type": "string", "example": "usuario-lucia" },
           "nombre": { "type": "string", "example": "Lucía" },
           "apellido": { "type": "string", "example": "Álvarez" },
           "cantidadEventosOrganizados": {

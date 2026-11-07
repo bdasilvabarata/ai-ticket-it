@@ -3,6 +3,7 @@ import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { manejarErrores } from "../../src/middlewares/manejar-errores";
+import { esIdValido } from "../../src/validations/comunes";
 import { crearValidacion } from "../../src/validations/validacion";
 
 // App mínima, sin base: prueba el middleware de validación y su lectura tipada.
@@ -45,5 +46,34 @@ describe("crearValidacion", () => {
     const respuesta = await request(app).get("/sin-validar?texto=hola");
     expect(respuesta.status).toBe(500);
     expect(respuesta.body.error.codigo).toBe("ERROR_INTERNO");
+  });
+});
+
+describe("idSchema", () => {
+  it("acepta UUID v4 (lo nuevo) e ids legibles <tipo>-<slug> (datos de ejemplo)", () => {
+    for (const id of [
+      "3f2b8c1e-9d4a-4c6b-8e2f-1a2b3c4d5e6f",
+      "usuario-lucia",
+      "evento-noche-de-rock",
+      "tipo-festival-sonidos-del-sur-backstage",
+      "evento-maraton-10k",
+    ]) {
+      expect(esIdValido(id), id).toBe(true);
+    }
+  });
+
+  it("rechaza lo que no es UUID ni <tipo>-<slug>", () => {
+    for (const id of [
+      "",
+      "123",
+      "actual",
+      "Usuario-Lucia",
+      "usuario-",
+      "-lucia",
+      "usuario lucia",
+      "0".repeat(24),
+    ]) {
+      expect(esIdValido(id), JSON.stringify(id)).toBe(false);
+    }
   });
 });

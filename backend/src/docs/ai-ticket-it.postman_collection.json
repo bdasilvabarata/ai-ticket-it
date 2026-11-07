@@ -6,7 +6,7 @@
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000/api" },
-    { "key": "usuarioId", "value": "000000000000000000000101" }
+    { "key": "usuarioId", "value": "usuario-lucia" }
   ],
   "item": [
     {
@@ -35,7 +35,7 @@
         },
         {
           "name": "Por id inexistente → 404 USUARIO_NO_ENCONTRADO",
-          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/0000000000000000000009ff" } }
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/usuario-inexistente" } }
         },
         {
           "name": "Usuario actual",

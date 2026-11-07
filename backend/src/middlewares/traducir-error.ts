@@ -6,8 +6,6 @@ import {
   ErrorAplicacion,
   JsonInvalidoError,
 } from "../errors/index";
-// Conocer los errores de Mongo es asunto de repositories/: así Mongoose no se filtra acá.
-import { traducirErrorPersistencia } from "../repositories/errores-persistencia";
 
 /** Tipo que `express.json()` pone en sus errores (`entity.parse.failed`, `entity.too.large`). */
 function tipoDeErrorDelParser(error: unknown): string | undefined {
@@ -19,8 +17,8 @@ function tipoDeErrorDelParser(error: unknown): string | undefined {
 
 /**
  * Lleva cualquier error **esperado** a un `ErrorAplicacion`: de aplicación, de dominio
- * (DatosInvalidos → 400 ENTRADA_INVALIDA, ReglaDeNegocio → 409 con su código), del parser de
- * JSON o de Mongo. Devuelve `undefined` si es inesperado: ese se registra completo y responde 500.
+ * (DatosInvalidos → 400 ENTRADA_INVALIDA, ReglaDeNegocio → 409 con su código) o del parser
+ * de JSON. Devuelve `undefined` si es inesperado: ese se registra completo y responde 500.
  * Lo usan los dos middlewares de error, así clasifican igual.
  */
 export function aErrorAplicacion(error: unknown): ErrorAplicacion | undefined {
@@ -30,5 +28,5 @@ export function aErrorAplicacion(error: unknown): ErrorAplicacion | undefined {
   const tipo = tipoDeErrorDelParser(error);
   if (tipo === "entity.parse.failed") return new JsonInvalidoError();
   if (tipo === "entity.too.large") return new CuerpoDemasiadoGrandeError();
-  return traducirErrorPersistencia(error);
+  return undefined;
 }

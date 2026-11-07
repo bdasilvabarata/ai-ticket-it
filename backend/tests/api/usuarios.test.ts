@@ -1,16 +1,14 @@
-import { Types } from "mongoose";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
-import { EventoModel } from "../../src/repositories/models/evento.model";
-import { usarBaseDePrueba } from "./helpers/base-de-prueba";
+import { Evento, TipoEntrada } from "../../src/domain/evento";
+import { EventoRepository } from "../../src/repositories/evento.repository";
+import { crearDatosEjemplo } from "../../src/seed/datos-ejemplo";
 
-usarBaseDePrueba();
-
-const app = crearApp({ almacenamiento: "memoria" });
-const LUCIA = "000000000000000000000101";
-const DIEGO = "000000000000000000000104";
-const INEXISTENTE = "0000000000000000000009ff";
+const app = crearApp();
+const LUCIA = "usuario-lucia";
+const DIEGO = "usuario-diego";
+const INEXISTENTE = "usuario-inexistente";
 
 function esperarErrorApi(cuerpo: unknown, codigo: string): void {
   expect(cuerpo).toMatchObject({ error: { codigo, mensaje: expect.any(String) } });
@@ -40,15 +38,26 @@ describe("GET /api/usuarios", () => {
   });
 
   it("cuenta también los eventos pasados", async () => {
-    await EventoModel.create({
+    const eventoViejo = new Evento({
+      id: "evento-viejo",
       nombre: "Evento viejo",
       descripcion: "Ya pasó",
-      categoria: new Types.ObjectId("000000000000000000000201"),
+      categoriaId: "categoria-musica",
       fechaHora: new Date("2020-01-01T00:00:00Z"),
-      organizador: new Types.ObjectId(DIEGO),
-      tiposEntrada: [{ nombre: "General", precio: 100, cupo: 10 }],
+      multimedia: [],
+      organizadorId: DIEGO,
+      tiposEntrada: [
+        new TipoEntrada({
+          id: "tipo-evento-viejo-general",
+          nombre: "General",
+          descripcion: "",
+          precio: 100,
+          cupo: 10,
+        }),
+      ],
     });
-    const respuesta = await request(app).get("/api/usuarios");
+    const eventos = new EventoRepository([...crearDatosEjemplo(new Date()).eventos, eventoViejo]);
+    const respuesta = await request(crearApp({ repositorios: { eventos } })).get("/api/usuarios");
     const diego = respuesta.body.find((u: { id: string }) => u.id === DIEGO);
     expect(diego.cantidadEventosOrganizados).toBe(1);
   });

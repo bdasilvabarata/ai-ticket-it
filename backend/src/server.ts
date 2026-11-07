@@ -1,11 +1,9 @@
 import type { Server } from "node:http";
 import type { Express } from "express";
 import { crearApp } from "./app";
-import { conectarBase, desconectarBase } from "./config/db";
 import { direccionesDeRed } from "./config/direcciones";
 import { env } from "./config/env";
 import { mensajeFallaArranque } from "./config/fallas-arranque";
-import { cargarSeed } from "./seed/cargar-seed";
 
 function escuchar(app: Express, puerto: number, host: string): Promise<Server> {
   return new Promise((resolve, reject) => {
@@ -16,10 +14,8 @@ function escuchar(app: Express, puerto: number, host: string): Promise<Server> {
 }
 
 async function arrancar(): Promise<void> {
-  const { almacenamiento } = await conectarBase();
-  if (almacenamiento === "memoria") await cargarSeed();
-
-  const servidor = await escuchar(crearApp({ almacenamiento }), env.PORT, env.HOST);
+  // crearApp() arma repositorios en memoria nuevos con los datos de ejemplo (FR-005).
+  const servidor = await escuchar(crearApp(), env.PORT, env.HOST);
 
   // console.log y no el logger: el arranque se ve aunque LOG_LEVEL=silent.
   console.log("AI Ticket It API escuchando");
@@ -27,23 +23,14 @@ async function arrancar(): Promise<void> {
   for (const { direccion, interfaz } of direccionesDeRed()) {
     console.log(`  Red:   http://${direccion}:${env.PORT}/api (${interfaz})`);
   }
-  console.log(
-    almacenamiento === "memoria"
-      ? "Almacenamiento: MongoDB en memoria con datos de ejemplo"
-      : "Almacenamiento: MongoDB externo",
-  );
+  console.log("Datos de ejemplo cargados en memoria (se pierden al detener el servidor)");
 
-  const apagar = async () => {
-    await new Promise<void>((resolve) => servidor.close(() => resolve()));
-    await desconectarBase();
-    process.exit(0);
-  };
-  process.once("SIGINT", () => void apagar());
-  process.once("SIGTERM", () => void apagar());
+  const apagar = () => servidor.close(() => process.exit(0));
+  process.once("SIGINT", apagar);
+  process.once("SIGTERM", apagar);
 }
 
-arrancar().catch(async (error: unknown) => {
+arrancar().catch((error: unknown) => {
   console.error(mensajeFallaArranque(error, env.PORT));
-  await desconectarBase().catch(() => undefined);
   process.exit(1);
 });

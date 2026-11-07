@@ -25,14 +25,14 @@ describe("crearDatosEjemplo", () => {
     expect(categorias).toHaveLength(6);
   });
 
-  it("tiene 5 usuarios: 101–103 organizan 3, 3 y 2; 104 y 105 ninguno", () => {
+  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 3, 3 y 2; Diego y Valentina ninguno", () => {
     expect(usuarios).toHaveLength(5);
     const cuenta = contarPorOrganizador();
-    expect(cuenta.get("000000000000000000000101")).toBe(3);
-    expect(cuenta.get("000000000000000000000102")).toBe(3);
-    expect(cuenta.get("000000000000000000000103")).toBe(2);
-    expect(cuenta.has("000000000000000000000104")).toBe(false);
-    expect(cuenta.has("000000000000000000000105")).toBe(false);
+    expect(cuenta.get("usuario-lucia")).toBe(3);
+    expect(cuenta.get("usuario-martin")).toBe(3);
+    expect(cuenta.get("usuario-sofia")).toBe(2);
+    expect(cuenta.has("usuario-diego")).toBe(false);
+    expect(cuenta.has("usuario-valentina")).toBe(false);
     const organizan = usuarios.filter((usuario) => cuenta.has(usuario.id));
     expect(organizan.length).toBeGreaterThanOrEqual(2);
     expect(usuarios.length - organizan.length).toBeGreaterThanOrEqual(1);
@@ -75,22 +75,28 @@ describe("crearDatosEjemplo", () => {
     }
   });
 
-  it("usa ids de 24 hex, únicos y con el prefijo de cada tipo", () => {
+  it("usa ids legibles, únicos y con el prefijo de cada tipo", () => {
     const grupos: [string[], string][] = [
-      [usuarios.map((u) => u.id), "0001"],
-      [categorias.map((c) => c.id), "0002"],
-      [eventos.map((e) => e.id), "0003"],
-      [tipos.map((t) => t.id), "0004"],
+      [usuarios.map((u) => u.id), "usuario"],
+      [categorias.map((c) => c.id), "categoria"],
+      [eventos.map((e) => e.id), "evento"],
+      [tipos.map((t) => t.id), "tipo"],
     ];
     const todos: string[] = [];
     for (const [ids, prefijo] of grupos) {
-      for (const id of ids) {
-        expect(id).toMatch(/^[0-9a-f]{24}$/);
-        expect(id).toMatch(new RegExp(`^0{18}${prefijo}\\d{2}$`));
-      }
+      for (const id of ids) expect(id).toMatch(new RegExp(`^${prefijo}(-[a-z0-9]+)+$`));
       todos.push(...ids);
     }
     expect(new Set(todos).size).toBe(todos.length);
+    expect(usuarios.map((u) => u.id)).toEqual([
+      "usuario-lucia",
+      "usuario-martin",
+      "usuario-sofia",
+      "usuario-diego",
+      "usuario-valentina",
+    ]);
+    expect(eventos.map((e) => e.id)).toContain("evento-noche-de-rock");
+    expect(tipos.map((t) => t.id)).toContain("tipo-festival-sonidos-del-sur-backstage");
   });
 
   it("es determinista para el mismo ahora", () => {

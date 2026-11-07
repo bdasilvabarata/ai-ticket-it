@@ -1,14 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { ErrorArranque, mensajeFallaArranque } from "../../src/config/fallas-arranque";
+import { mensajeFallaArranque } from "../../src/config/fallas-arranque";
 
 describe("mensajeFallaArranque", () => {
   it("explica que el puerto está en uso", () => {
     const error = Object.assign(new Error("listen EADDRINUSE"), { code: "EADDRINUSE" });
     expect(mensajeFallaArranque(error, 3000)).toContain("El puerto 3000 ya está en uso");
-  });
-
-  it("usa el mensaje propio de un ErrorArranque", () => {
-    expect(mensajeFallaArranque(new ErrorArranque("No hay base"), 3000)).toBe("No hay base");
   });
 
   it("envuelve cualquier otro Error", () => {

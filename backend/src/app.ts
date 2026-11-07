@@ -1,27 +1,21 @@
 import express, { type Express } from "express";
-import type { Almacenamiento } from "@ai-ticket-it/shared";
 import { SaludController } from "./controllers/salud.controller";
 import { UsuarioController } from "./controllers/usuario.controller";
-import type { RepositorioEventos, RepositorioUsuarios } from "./domain/repositorios";
 import { manejarErrores } from "./middlewares/manejar-errores";
 import { registrarError } from "./middlewares/registrar-error";
 import { registrarPedido } from "./middlewares/registrar-pedido";
 import { crearRequerirUsuario } from "./middlewares/requerir-usuario";
 import { rutaNoEncontrada } from "./middlewares/ruta-no-encontrada";
-import { EventoRepository } from "./repositories/evento.repository";
-import { UsuarioRepository } from "./repositories/usuario.repository";
 import { crearDocsRouter } from "./routes/docs.routes";
 import { crearRouterApi } from "./routes/index";
+import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
 import { UsuarioService } from "./services/usuario.service";
 
-export interface Repositorios {
-  usuarios: RepositorioUsuarios;
-  eventos: RepositorioEventos;
-}
-
 export interface OpcionesApp {
-  almacenamiento: Almacenamiento;
-  /** Reemplaza repositorios (los tests inyectan falsos); por defecto, los de Mongoose. */
+  /**
+   * Reemplaza repositorios (los tests inyectan los suyos). Por defecto, repositorios en
+   * memoria nuevos con los datos de ejemplo (FR-005).
+   */
   repositorios?: Partial<Repositorios>;
 }
 
@@ -30,14 +24,13 @@ export interface OpcionesApp {
  * repositories → services → controllers → rutas. No llama a `listen`: lo hace server.ts
  * (y los tests usan supertest).
  */
-export function crearApp({ almacenamiento, repositorios = {} }: OpcionesApp): Express {
-  const usuarios = repositorios.usuarios ?? new UsuarioRepository();
-  const eventos = repositorios.eventos ?? new EventoRepository();
+export function crearApp({ repositorios = {} }: OpcionesApp = {}): Express {
+  const { usuarios, eventos } = { ...crearRepositoriosDeEjemplo(), ...repositorios };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
 
   const controllers = {
-    salud: new SaludController(almacenamiento),
+    salud: new SaludController(),
     usuarios: new UsuarioController(usuarioService),
   };
   const requerirUsuario = crearRequerirUsuario(usuarioService);

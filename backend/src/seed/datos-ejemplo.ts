@@ -13,14 +13,18 @@ const ZONA = "America/Argentina/Buenos_Aires";
 /** Argentina es UTC−3 todo el año (sin horario de verano). */
 const DESFASE_UTC_HORAS = 3;
 
-/** Id fijo de 24 hex: 18 ceros + 4 dígitos de tipo + 2 de número. */
-function idFijo(tipo: string, numero: number): string {
-  return `${"0".repeat(18)}${tipo}${String(numero).padStart(2, "0")}`;
+/** "Entrada general" → "entrada-general", "Inscripción" → "inscripcion". */
+function slug(texto: string): string {
+  return texto
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
 }
 
-const usuarioId = (n: number) => idFijo("0001", n);
-const categoriaId = (n: number) => idFijo("0002", n);
-const eventoId = (n: number) => idFijo("0003", n);
+// Ids legibles y fijos de los datos de ejemplo: `<tipo>-<slug>` (constitución, principio IV).
+const categoriaId = (nombre: string) => `categoria-${slug(nombre)}`;
 
 function diaEnBuenosAires(ahora: Date): { anio: number; mes: number; dia: number } {
   const partes = new Intl.DateTimeFormat("en-US", {
@@ -42,7 +46,8 @@ function fechaLocal(ahora: Date, dias: number, hora: number): Date {
 const imagen = (slug: string) => `https://picsum.photos/seed/${slug}/800/450`;
 
 type TipoSinId = Omit<DatosTipoEntrada, "id">;
-type EventoSinIds = Omit<DatosEvento, "id" | "tiposEntrada"> & { tiposEntrada: TipoSinId[] };
+/** `slug` da el id del evento (`evento-<slug>`) y el de sus tipos (`tipo-<slug>-<tipo>`). */
+type EventoSinIds = Omit<DatosEvento, "id" | "tiposEntrada"> & { slug: string; tiposEntrada: TipoSinId[] };
 
 /**
  * Datos de ejemplo deterministas (data-model.md, "Datos de ejemplo"). Puro: sin IO.
@@ -50,41 +55,47 @@ type EventoSinIds = Omit<DatosEvento, "id" | "tiposEntrada"> & { tiposEntrada: T
  */
 export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   const datosCategorias: DatosCategoria[] = [
-    { id: categoriaId(1), nombre: "Música", descripcion: "Recitales, conciertos y shows en vivo." },
-    { id: categoriaId(2), nombre: "Teatro", descripcion: "Obras de teatro, musicales y danza." },
-    { id: categoriaId(3), nombre: "Deportes", descripcion: "Partidos, carreras y competencias." },
-    { id: categoriaId(4), nombre: "Conferencias", descripcion: "Charlas, congresos y talleres." },
-    { id: categoriaId(5), nombre: "Festivales", descripcion: "Festivales de uno o varios días." },
-    { id: categoriaId(6), nombre: "Stand-up", descripcion: "Comedia y monólogos en vivo." },
+    { id: categoriaId("Música"), nombre: "Música", descripcion: "Recitales, conciertos y shows en vivo." },
+    { id: categoriaId("Teatro"), nombre: "Teatro", descripcion: "Obras de teatro, musicales y danza." },
+    { id: categoriaId("Deportes"), nombre: "Deportes", descripcion: "Partidos, carreras y competencias." },
+    {
+      id: categoriaId("Conferencias"),
+      nombre: "Conferencias",
+      descripcion: "Charlas, congresos y talleres.",
+    },
+    { id: categoriaId("Festivales"), nombre: "Festivales", descripcion: "Festivales de uno o varios días." },
+    { id: categoriaId("Stand-up"), nombre: "Stand-up", descripcion: "Comedia y monólogos en vivo." },
   ];
 
   const datosUsuarios: DatosUsuario[] = [
-    { id: usuarioId(1), nombre: "Lucía", apellido: "Álvarez", favoritos: [] },
-    { id: usuarioId(2), nombre: "Martín", apellido: "Benítez", favoritos: [] },
-    { id: usuarioId(3), nombre: "Sofía", apellido: "Castro", favoritos: [] },
-    { id: usuarioId(4), nombre: "Diego", apellido: "Fernández", favoritos: [] },
-    { id: usuarioId(5), nombre: "Valentina", apellido: "Gómez", favoritos: [] },
+    { id: "usuario-lucia", nombre: "Lucía", apellido: "Álvarez", favoritos: [] },
+    { id: "usuario-martin", nombre: "Martín", apellido: "Benítez", favoritos: [] },
+    { id: "usuario-sofia", nombre: "Sofía", apellido: "Castro", favoritos: [] },
+    { id: "usuario-diego", nombre: "Diego", apellido: "Fernández", favoritos: [] },
+    { id: "usuario-valentina", nombre: "Valentina", apellido: "Gómez", favoritos: [] },
   ];
 
-  const lucia = usuarioId(1);
-  const martin = usuarioId(2);
-  const sofia = usuarioId(3);
+  const lucia = "usuario-lucia";
+  const martin = "usuario-martin";
+  const sofia = "usuario-sofia";
   const proximo = new Date(Math.round((ahora.getTime() + 24 * HORA_MS) / HORA_MS) * HORA_MS);
 
   const eventosSinIds: EventoSinIds[] = [
     {
+      slug: "noche-de-rock",
       nombre: "Noche de Rock en el Club",
       descripcion: "Tres bandas del under porteño en una sola noche.",
-      categoriaId: categoriaId(1),
+      categoriaId: categoriaId("Música"),
       fechaHora: proximo,
       multimedia: [imagen("noche-de-rock")],
       organizadorId: lucia,
       tiposEntrada: [{ nombre: "General", descripcion: "Acceso al campo.", precio: 15000, cupo: 200 }],
     },
     {
+      slug: "hamlet",
       nombre: "Hamlet, versión contemporánea",
       descripcion: "El clásico de Shakespeare en una puesta actual.",
-      categoriaId: categoriaId(2),
+      categoriaId: categoriaId("Teatro"),
       fechaHora: fechaLocal(ahora, 10, 20),
       multimedia: [imagen("hamlet"), imagen("hamlet-escenario")],
       organizadorId: martin,
@@ -94,9 +105,10 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       ],
     },
     {
+      slug: "festival-sonidos-del-sur",
       nombre: "Festival Sonidos del Sur",
       descripcion: "Un día entero de música con artistas de todo el país.",
-      categoriaId: categoriaId(5),
+      categoriaId: categoriaId("Festivales"),
       fechaHora: fechaLocal(ahora, 30, 14),
       multimedia: [imagen("sonidos-del-sur"), imagen("sonidos-del-sur-escenario")],
       organizadorId: lucia,
@@ -112,9 +124,10 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       ],
     },
     {
+      slug: "clasico-de-basquet",
       nombre: "Clásico de básquet",
       descripcion: "El partido más esperado de la liga.",
-      categoriaId: categoriaId(3),
+      categoriaId: categoriaId("Deportes"),
       fechaHora: fechaLocal(ahora, 5, 19),
       multimedia: [imagen("clasico-basquet")],
       organizadorId: sofia,
@@ -124,9 +137,10 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       ],
     },
     {
+      slug: "charla-ia-aplicada",
       nombre: "Charla abierta: IA aplicada",
       descripcion: "Casos reales de inteligencia artificial en la industria.",
-      categoriaId: categoriaId(4),
+      categoriaId: categoriaId("Conferencias"),
       fechaHora: fechaLocal(ahora, 15, 9),
       multimedia: [imagen("charla-ia")],
       organizadorId: martin,
@@ -135,27 +149,30 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       ],
     },
     {
+      slug: "noche-de-risas",
       nombre: "Stand-up: Noche de risas",
       descripcion: "Cuatro comediantes, una noche.",
-      categoriaId: categoriaId(6),
+      categoriaId: categoriaId("Stand-up"),
       fechaHora: fechaLocal(ahora, -3, 22),
       multimedia: [imagen("noche-de-risas")],
       organizadorId: sofia,
       tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 12000, cupo: 80 }],
     },
     {
+      slug: "jazz-en-el-patio",
       nombre: "Jazz en el Patio",
       descripcion: "Un cuarteto de jazz al aire libre.",
-      categoriaId: categoriaId(1),
+      categoriaId: categoriaId("Música"),
       fechaHora: fechaLocal(ahora, -10, 21),
       multimedia: [imagen("jazz-patio")],
       organizadorId: martin,
       tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 60 }],
     },
     {
+      slug: "maraton-10k",
       nombre: "Maratón Ciudad 10K",
       descripcion: "Carrera de 10 km por las calles de la ciudad.",
-      categoriaId: categoriaId(3),
+      categoriaId: categoriaId("Deportes"),
       fechaHora: fechaLocal(ahora, 45, 8),
       multimedia: [imagen("maraton-10k"), imagen("maraton-10k-llegada")],
       organizadorId: lucia,
@@ -165,14 +182,13 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     },
   ];
 
-  let numeroTipo = 0;
   const eventos = eventosSinIds.map(
-    (evento, indice) =>
+    ({ slug: slugEvento, ...evento }) =>
       new Evento({
         ...evento,
-        id: eventoId(indice + 1),
+        id: `evento-${slugEvento}`,
         tiposEntrada: evento.tiposEntrada.map(
-          (tipo) => new TipoEntrada({ id: idFijo("0004", ++numeroTipo), ...tipo }),
+          (tipo) => new TipoEntrada({ id: `tipo-${slugEvento}-${slug(tipo.nombre)}`, ...tipo }),
         ),
       }),
   );

@@ -8,10 +8,6 @@ const esquema = z.object({
     .max(65535, "debe estar entre 1 y 65535")
     .default(3000),
   HOST: z.string().min(1, "no puede estar vacía").default("0.0.0.0"),
-  MONGO_URI: z
-    .string()
-    .optional()
-    .transform((valor) => (valor === "" ? undefined : valor)),
   LOG_LEVEL: z.enum(["info", "silent"], { error: 'debe ser "info" o "silent"' }).default("info"),
 });
 
@@ -25,7 +21,6 @@ export function parsearEnv(fuente: Record<string, string | undefined>): Env {
   const resultado = esquema.safeParse({
     PORT: fuente.PORT,
     HOST: fuente.HOST,
-    MONGO_URI: fuente.MONGO_URI,
     LOG_LEVEL: fuente.LOG_LEVEL,
   });
   if (!resultado.success) {

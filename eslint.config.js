@@ -5,8 +5,6 @@ import tseslint from "typescript-eslint";
 
 const modulosConIo = [
   "express",
-  "mongoose",
-  "mongodb",
   "node:fs",
   "fs",
   "node:fs/promises",

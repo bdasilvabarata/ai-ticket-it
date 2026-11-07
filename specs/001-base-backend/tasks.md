@@ -669,36 +669,36 @@ Task: "eventoRepository.contarPorOrganizador en backend/src/repositories/evento.
 
 ### F3. Repositorios en memoria en producción (TDD)
 
-- [ ] M01 Tests de `idSchema` (validations): acepta UUID v4 e ids legibles `<tipo>-<slug>`;
+- [X] M01 Tests de `idSchema` (validations): acepta UUID v4 e ids legibles `<tipo>-<slug>`;
   rechaza `123`, `actual`, mayúsculas y 24 hex.
-- [ ] M02 `datos-ejemplo.test.ts`: ids legibles (`usuario-lucia`, `categoria-musica`,
+- [X] M02 `datos-ejemplo.test.ts`: ids legibles (`usuario-lucia`, `categoria-musica`,
   `evento-noche-de-rock`, `tipo-<evento>-<tipo>`), únicos y con su prefijo.
-- [ ] M03 `tests/repositories/`: `UsuarioRepository`, `CategoriaRepository` y
+- [X] M03 `tests/repositories/`: `UsuarioRepository`, `CategoriaRepository` y
   `EventoRepository` en memoria (listar, buscarPorId → entidad o null, contarPorOrganizador) y
   `crearRepositoriosDeEjemplo` (5/6/8 entidades; cada llamada crea repositorios independientes).
-- [ ] M04 Implementar `validations/comunes.ts` (UUID o `<tipo>-<slug>`), ids legibles en
+- [X] M04 Implementar `validations/comunes.ts` (UUID o `<tipo>-<slug>`), ids legibles en
   `seed/datos-ejemplo.ts`, repositorios en memoria en `src/repositories/` y
   `seed/repositorios-de-ejemplo.ts`.
-- [ ] M05 `crearApp({ repositorios? })`: por defecto `crearRepositoriosDeEjemplo()`, cada uno
+- [X] M05 `crearApp({ repositorios? })`: por defecto `crearRepositoriosDeEjemplo()`, cada uno
   reemplazable; `SaludController` sin almacenamiento y `SaludVista` = `{ estado: "ok" }`.
   Tests de API sin base (ids legibles, `usuario-inexistente` para el 404).
-- [ ] M06 Tests de services con los repositorios de `src/repositories/` (sin `tests/fakes/`).
+- [X] M06 Tests de services con los repositorios de `src/repositories/` (sin `tests/fakes/`).
 
 ### F4. Eliminar MongoDB
 
-- [ ] M07 Borrar modelos, `config/db.ts`, `config/destino-mongo.ts`, `ErrorArranque`,
+- [X] M07 Borrar modelos, `config/db.ts`, `config/destino-mongo.ts`, `ErrorArranque`,
   `repositories/errores-persistencia.ts`, `seed/cargar-seed.ts`, `scripts/`, `tests/fakes/`,
   el test de contrato, el helper de base y los tests de modelos, db, seed, seed-opciones y
   errores-persistencia.
-- [ ] M08 `server.ts` sin base (arranca con `crearApp()`), `MONGO_URI` fuera de
+- [X] M08 `server.ts` sin base (arranca con `crearApp()`), `MONGO_URI` fuera de
   `env-esquema.ts` y `.env.example`, sin la traducción de errores de Mongo, sin `mongoose` ni
   `mongodb-memory-server` en dependencias ni en la regla de lint, sin script `seed`.
-- [ ] M09 CI sin caché del binario; `vitest.config.ts` sin el `hookTimeout` de la descarga;
+- [X] M09 CI sin caché del binario; `vitest.config.ts` sin el `hookTimeout` de la descarga;
   `.gitignore` sin la caché de mongodb-memory-server.
 
 ### F5. Documentación de uso y cierre
 
-- [ ] M10 OpenAPI y colección de Postman con ids legibles y `SaludVista` sin almacenamiento.
+- [X] M10 OpenAPI y colección de Postman con ids legibles y `SaludVista` sin almacenamiento.
 - [ ] M11 README, AGENTS.md y skill `nuevo-endpoint` sin MongoDB; backlog (decisiones abiertas
   que mencionaban Mongo).
 - [ ] M12 `npm test`, `lint`, `typecheck` y `format:check` en verde; prueba manual de

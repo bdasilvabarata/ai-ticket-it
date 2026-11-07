@@ -4,11 +4,8 @@ import { crearApp } from "../../src/app";
 import { logger } from "../../src/config/logger";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
 import type { RepositorioUsuarios } from "../../src/domain/repositorios";
-import { usarBaseDePrueba } from "./helpers/base-de-prueba";
 
-usarBaseDePrueba();
-
-const app = crearApp({ almacenamiento: "memoria" });
+const app = crearApp();
 
 /** App con un repositorio de usuarios inyectado que falla con `error` (sin espiar globales). */
 function appConUsuariosQueFallan(error: unknown) {
@@ -16,7 +13,7 @@ function appConUsuariosQueFallan(error: unknown) {
     listar: () => Promise.reject(error),
     buscarPorId: () => Promise.reject(error),
   };
-  return crearApp({ almacenamiento: "memoria", repositorios: { usuarios } });
+  return crearApp({ repositorios: { usuarios } });
 }
 
 afterEach(() => {

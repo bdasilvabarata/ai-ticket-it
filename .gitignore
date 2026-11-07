@@ -23,9 +23,6 @@ mobile/android/
 .env.*
 !.env.example
 
-# Binarios de mongodb-memory-server
-.cache/
-
 # Logs
 npm-debug.log*
 *.log
