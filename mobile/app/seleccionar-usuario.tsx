@@ -1,4 +1,5 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
+import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -22,6 +23,8 @@ export default function SeleccionarUsuario() {
   const consulta = useUsuarios();
   const [eligiendo, setEligiendo] = useState(false);
 
+  // Con usuario, el selector es el modal de "Cambiar usuario" (FR-015).
+  const enModal = estado.fase === "con-usuario";
   const usuarioIdActual = estado.fase === "con-usuario" ? estado.usuarioId : null;
   const conAviso = estado.fase === "sin-usuario" && estado.aviso === "usuario-anterior-inexistente";
 
@@ -31,7 +34,13 @@ export default function SeleccionarUsuario() {
 
   function alElegir(usuario: UsuarioVista) {
     setEligiendo(true);
-    void elegirUsuario(usuario).finally(() => setEligiendo(false));
+    void elegirUsuario(usuario)
+      .then(() => {
+        // El selector sigue disponible con usuario (es el modal de Perfil): hay que salir de él.
+        if (enModal) router.back();
+        else router.replace("/");
+      })
+      .finally(() => setEligiendo(false));
   }
 
   let contenido: React.ReactNode;
@@ -79,7 +88,7 @@ export default function SeleccionarUsuario() {
   }
 
   return (
-    <SafeAreaView style={estilos.pantalla} edges={["top", "bottom"]}>
+    <SafeAreaView style={estilos.pantalla} edges={enModal ? ["bottom"] : ["top", "bottom"]}>
       {conAviso ? (
         <View style={estilos.aviso} accessibilityLiveRegion="polite">
           <Text style={estilos.textoAviso}>{AVISO_USUARIO_INEXISTENTE}</Text>

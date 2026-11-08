@@ -1,9 +1,10 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { Stack, useSegments } from "expo-router";
+import { router, Stack, useSegments } from "expo-router";
 import { useEffect, useMemo } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { colores } from "../componentes/estilos";
 import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
 import { DependenciasProvider, type Dependencias } from "../composicion";
 import { useConexion } from "../conexion/useConexion";
@@ -66,21 +67,53 @@ function Navegacion() {
 }
 
 function Pila({ estado }: { estado: EstadoSesion }) {
+  const conUsuario = estado.fase === "con-usuario";
   return (
     <Stack>
       <Stack.Protected guard={estado.fase === "iniciando"}>
         <Stack.Screen name="cargando" options={{ headerShown: false }} />
       </Stack.Protected>
-      <Stack.Protected guard={estado.fase === "sin-usuario"}>
-        <Stack.Screen name="seleccionar-usuario" options={{ headerShown: false, gestureEnabled: false }} />
-      </Stack.Protected>
-      <Stack.Protected guard={estado.fase === "con-usuario"}>
+      <Stack.Protected guard={conUsuario}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack.Protected>
+      {/* Expo Router no admite declarar dos veces la misma pantalla: el selector va una sola vez.
+          Sin usuario es la única ruta disponible, a pantalla completa. Con usuario, (tabs) está
+          antes y el selector se abre desde Perfil como modal con "Cerrar" (FR-015). Si un 401
+          olvida al usuario con el modal abierto, (tabs) sale y el selector queda a pantalla
+          completa, sin "Cerrar" (CHK020). */}
+      <Stack.Protected guard={estado.fase !== "iniciando"}>
+        <Stack.Screen
+          name="seleccionar-usuario"
+          options={
+            conUsuario
+              ? {
+                  presentation: "modal",
+                  headerShown: true,
+                  title: "Cambiar usuario",
+                  headerRight: BotonCerrar,
+                }
+              : { headerShown: false, gestureEnabled: false }
+          }
+        />
       </Stack.Protected>
     </Stack>
   );
 }
 
+function BotonCerrar() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Cerrar sin cambiar de usuario"
+      hitSlop={8}
+      onPress={() => router.back()}
+    >
+      <Text style={estilos.cerrar}>Cerrar</Text>
+    </Pressable>
+  );
+}
+
 const estilos = StyleSheet.create({
   raiz: { flex: 1 },
+  cerrar: { fontSize: 16, fontWeight: "600", color: colores.primario },
 });
