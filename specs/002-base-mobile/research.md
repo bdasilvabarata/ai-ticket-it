@@ -377,3 +377,15 @@ dependen del Expo Go instalado en el celular de la persona que hace el TP.
 - **R13**: `eslint-plugin-react-hooks@7.1.1` acepta `eslint ^10`; se usa
   `configs.flat.recommended`. En `jest.setup.ts` el mock de AsyncStorage se carga con
   `jest.requireActual` (la regla `no-require-imports` prohíbe `require`).
+- **R3 (SafeAreaProvider)**: `ExpoRoot` de expo-router 58 ya monta un `SafeAreaProvider`, así que
+  `LayoutRaiz` no monta otro. El resto del orden de providers no cambia.
+- **R5 (controlador de sesión)**: la lógica del `SesionProvider` vive en
+  `src/sesion/controlador-sesion.ts`, sin React. Lleva su propia copia del estado, calculada con
+  el mismo `reducirSesion` que el `useReducer`, para que el cliente HTTP lea el usuario actual
+  en el acto (sin esperar al próximo render). El provider solo conecta el controlador con React.
+- **R12 (RNTL 14)**: `render`, `fireEvent` y `act` son async (`await`). `renderRouter` activa
+  siempre los temporizadores falsos. El mock oficial de AsyncStorage es un `jest.fn` compartido
+  dentro de cada archivo de test: se usa `jest.mocked(...).mockImplementationOnce` y
+  `mockClear`, nunca `mockRestore` (le borraría la implementación).
+- **R2 (Metro)**: `npx expo export --platform android` arma el bundle sin `metro.config.js`
+  propio: Metro resuelve `@ai-ticket-it/shared` desde el workspace.

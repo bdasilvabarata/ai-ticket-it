@@ -1,0 +1,92 @@
+import type { UsuarioVista } from "@ai-ticket-it/shared";
+import { useState } from "react";
+import { FlatList, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+
+import { ErrorDeApi, ServidorNoDisponibleError } from "../src/api";
+import { Cargando } from "../src/componentes/Cargando";
+import { colores } from "../src/componentes/estilos";
+import { FilaUsuario } from "../src/componentes/FilaUsuario";
+import { ListaVacia } from "../src/componentes/ListaVacia";
+import { MensajeError } from "../src/componentes/MensajeError";
+import { useConexion } from "../src/conexion/useConexion";
+import { useUsuarios } from "../src/consultas/useUsuarios";
+import { useSesion } from "../src/sesion/SesionProvider";
+
+/** Selector de usuario (contracts/app.md "Seleccionar usuario"). */
+export default function SeleccionarUsuario() {
+  const { estado, elegirUsuario } = useSesion();
+  const conexion = useConexion();
+  const consulta = useUsuarios();
+  const [eligiendo, setEligiendo] = useState(false);
+
+  const usuarioIdActual = estado.fase === "con-usuario" ? estado.usuarioId : null;
+
+  function alElegir(usuario: UsuarioVista) {
+    setEligiendo(true);
+    void elegirUsuario(usuario).finally(() => setEligiendo(false));
+  }
+
+  let contenido: React.ReactNode;
+  if (consulta.isPending) {
+    contenido = <Cargando />;
+  } else if (consulta.isError) {
+    const { error } = consulta;
+    contenido =
+      error instanceof ServidorNoDisponibleError ? (
+        <MensajeError
+          titulo="Servidor no disponible"
+          mensaje={`No se pudo conectar con ${conexion.urlBase}.`}
+          alReintentar={() => void conexion.reintentarAhora()}
+          reintentando={conexion.enCurso}
+        />
+      ) : (
+        <MensajeError
+          mensaje={error instanceof ErrorDeApi ? error.mensaje : "Ocurrió un error inesperado."}
+          alReintentar={() => void consulta.refetch()}
+          reintentando={consulta.isFetching}
+        />
+      );
+  } else if (consulta.data.length === 0) {
+    contenido = <ListaVacia mensaje="No hay usuarios disponibles." />;
+  } else {
+    contenido = (
+      <FlatList
+        data={consulta.data}
+        keyExtractor={(usuario) => usuario.id}
+        ListHeaderComponent={
+          <Text style={estilos.titulo} accessibilityRole="header">
+            ¿Con quién querés operar?
+          </Text>
+        }
+        renderItem={({ item }) => (
+          <FilaUsuario
+            usuario={item}
+            esActual={item.id === usuarioIdActual}
+            deshabilitada={eligiendo}
+            alElegir={alElegir}
+          />
+        )}
+      />
+    );
+  }
+
+  return (
+    <SafeAreaView style={estilos.pantalla} edges={["top", "bottom"]}>
+      <View style={estilos.contenido}>{contenido}</View>
+    </SafeAreaView>
+  );
+}
+
+const estilos = StyleSheet.create({
+  pantalla: { flex: 1, backgroundColor: colores.fondo },
+  contenido: { flex: 1 },
+  titulo: {
+    fontSize: 22,
+    fontWeight: "600",
+    color: colores.texto,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+});

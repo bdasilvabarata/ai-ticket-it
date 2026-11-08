@@ -316,7 +316,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
 
 ### Tests for User Story 1 ⚠️
 
-- [ ] T035a [US1] Crear los stubs de las rutas, para que T036–T038 compilen (P1, U1):
+- [X] T035a [US1] Crear los stubs de las rutas, para que T036–T038 compilen (P1, U1):
   - `mobile/src/navegacion/LayoutRaiz.tsx` con `LayoutRaiz({ dependencias })`, que por ahora renderiza solo un `Stack`;
   - `mobile/app/_layout.tsx` con **solo** el export por defecto, que renderiza `LayoutRaiz`
     con las dependencias reales (R3);
@@ -324,7 +324,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
     una devolviendo `null`.
 
   T039–T048 los reemplazan por la implementación real.
-- [ ] T036 [US1] Helper `mobile/tests/helpers/render-con-dependencias.tsx`:
+- [X] T036 [US1] Helper `mobile/tests/helpers/render-con-dependencias.tsx`:
   `renderConDependencias({ respuestas, usuarioRecordado?, initialUrl? })` arma
   `crearDependencias` con `crearFetchFalso(respuestas)`, el mock de AsyncStorage (precargando
   `{ version: 1, usuarioId }` si se pide), `urlEntorno: "http://servidor-de-prueba:3000/api"`
@@ -336,7 +336,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
   - las rutas extra que reciba el test.
 
   Devuelve el resultado del render, el registro de pedidos y `deps` (R12).
-- [ ] T037 [P] [US1] Test `mobile/tests/pantallas/selector.test.tsx` (sin usuario recordado):
+- [X] T037 [P] [US1] Test `mobile/tests/pantallas/selector.test.tsx` (sin usuario recordado):
   - "Cargando…" mientras `GET /usuarios` está colgado (US1-3);
   - éxito: "¿Con quién querés operar?" y los usuarios en el orden de la respuesta, con
     "{nombre} {apellido}" y "Organiza 2 eventos", "Organiza 1 evento" o "No organiza
@@ -354,20 +354,20 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
   - doble toque sobre la fila → `setItem` una sola vez y navegación consistente (edge case);
   - `setItem` que rechaza → se ve Explorar igual, AsyncStorage queda sin la clave y hubo un
     `console.warn` (CHK004).
-- [ ] T038 [P] [US1] Test `mobile/tests/pantallas/guards.test.tsx`: sin usuario recordado y
+- [X] T038 [P] [US1] Test `mobile/tests/pantallas/guards.test.tsx`: sin usuario recordado y
   con `initialUrl: "/"` o `"/perfil"`, se ve el selector y no las pestañas (FR-011). Después
   de elegir, la ruta es `/` (Explorar).
 
 ### Implementation for User Story 1
 
-- [ ] T039 [P] [US1] Implementar `mobile/src/componentes/FilaUsuario.tsx`. Props `usuario:
+- [X] T039 [P] [US1] Implementar `mobile/src/componentes/FilaUsuario.tsx`. Props `usuario:
   UsuarioVista`, `esActual: boolean`, `deshabilitada: boolean`, `alElegir`. Es un `Pressable`
   con `accessibilityRole="button"`, que muestra "{nombre} {apellido}" y "Organiza {n}
   evento(s)" ("No organiza eventos" si es 0). `accessibilityLabel`: "Elegir a {nombre}
   {apellido}". La marca "Actual" y su etiqueta se agregan en US3 (contracts/app.md).
-- [ ] T040 [P] [US1] Implementar `mobile/src/componentes/SeccionPendiente.tsx` (prop `nombre`):
+- [X] T040 [P] [US1] Implementar `mobile/src/componentes/SeccionPendiente.tsx` (prop `nombre`):
   título con el nombre y "Esta sección todavía no está disponible." (FR-018).
-- [ ] T041 [US1] Implementar `mobile/src/sesion/SesionProvider.tsx` (parte de US1, depende de
+- [X] T041 [US1] Implementar `mobile/src/sesion/SesionProvider.tsx` (parte de US1, depende de
   T029–T034):
   - estado con `useReducer(reducirSesion, estadoInicial)` y un ref con el `usuarioId` actual.
     El cliente de la sesión se crea con `deps.crearCliente({ obtenerUsuarioId: () =>
@@ -387,15 +387,15 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
     llama `secuencia.iniciar()`. Un `ErrorDeApi` no hace nada global (R7, R8);
   - expone `useSesion()` → `{ estado, elegirUsuario, olvidarUsuario, reintentar }` y
     `useClienteApi()`.
-- [ ] T042 [US1] Implementar `mobile/src/conexion/useConexion.ts`: lee la secuencia y el estado
+- [X] T042 [US1] Implementar `mobile/src/conexion/useConexion.ts`: lee la secuencia y el estado
   del `SesionProvider` y devuelve `{ servidor, enCurso, automaticosRestantes, reintentarAhora,
   urlBase }` (data-model "EstadoConexion").
-- [ ] T043 [US1] Implementar `mobile/src/consultas/useUsuarios.ts`: `useQuery({ queryKey:
+- [X] T043 [US1] Implementar `mobile/src/consultas/useUsuarios.ts`: `useQuery({ queryKey:
   claves.usuarios(), queryFn: ({ signal }) => listarUsuarios(cliente, { signal }) })`, con el
   cliente de `useClienteApi()` (R9).
-- [ ] T044 [P] [US1] Implementar `mobile/app/cargando.tsx`: solo `<Cargando />`, sin selector ni
+- [X] T044 [P] [US1] Implementar `mobile/app/cargando.tsx`: solo `<Cargando />`, sin selector ni
   datos de usuario (US2-6).
-- [ ] T045 [US1] Implementar `mobile/app/seleccionar-usuario.tsx`, a pantalla completa, con los
+- [X] T045 [US1] Implementar `mobile/app/seleccionar-usuario.tsx`, a pantalla completa, con los
   estados de la tabla de [contracts/app.md](./contracts/app.md):
   - `isPending` → `Cargando`;
   - error `ServidorNoDisponibleError` → `MensajeError` con título "Servidor no disponible",
@@ -406,7 +406,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
   - éxito → título "¿Con quién querés operar?" y un `FlatList` de `FilaUsuario`.
 
   Mientras procesa la elección, deshabilita las filas (FR-020).
-- [ ] T046 [US1] Implementar `mobile/src/navegacion/LayoutRaiz.tsx` y `mobile/app/_layout.tsx`:
+- [X] T046 [US1] Implementar `mobile/src/navegacion/LayoutRaiz.tsx` y `mobile/app/_layout.tsx`:
   - `LayoutRaiz({ dependencias })` en `mobile/src/navegacion/LayoutRaiz.tsx`: `SafeAreaProvider` →
     `DependenciasProvider` → `QueryClientProvider` → `SesionProvider` → `Stack` con
     `Stack.Protected guard={fase === "iniciando"}` (`cargando`),
@@ -419,7 +419,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
 
   Si el SDK de T001 no trae `Stack.Protected`, se usa el plan B de R3 (`<Redirect>`) y se
   registra en research.
-- [ ] T047 [US1] Implementar `mobile/app/(tabs)/_layout.tsx` (`Tabs` con la pestaña `index`,
+- [X] T047 [US1] Implementar `mobile/app/(tabs)/_layout.tsx` (`Tabs` con la pestaña `index`,
   título y `tabBarLabel` "Explorar", ícono Ionicons `compass-outline`) y
   `mobile/app/(tabs)/index.tsx` (`<SeccionPendiente nombre="Explorar" />`). Las otras tres
   pestañas se suman en US3 (FR-017).
