@@ -68,8 +68,7 @@ configurados.
   T001 (`npx create-expo-app@latest mobile --template blank-typescript@sdk-NN --no-install`).
   Borrar lo que trae la plantilla y no se usa: `mobile/.git/` (si lo crea),
   `mobile/package-lock.json`, `mobile/App.tsx`, `mobile/index.ts` y `mobile/.gitignore`. El
-  `.gitignore` de la raíz ya cubre `mobile/.expo/`, `ios/`, `android/` y `.env`, y
-  `expo-env.d.ts` se tiene que versionar (R11) (R2).
+  `.gitignore` de la raíz ya cubre `mobile/.expo/`, `ios/`, `android/` y `.env`, (R2).
 - [X] T003 Editar `mobile/package.json`: `"name": "@ai-ticket-it/mobile"`, `"private": true`,
   **sin** `"type"`, `"main": "expo-router/entry"`. Scripts: `start` = `expo start`,
   `test` = `jest` (Jest activa `--ci` solo cuando detecta CI), `typecheck` = `tsc --noEmit`.
@@ -89,10 +88,8 @@ configurados.
   `scheme` "ai-ticket-it", `orientation` "portrait", `plugins: ["expo-router"]`, **sin**
   `experiments.typedRoutes` y sin `web` (R2, R11).
 - [X] T007 [P] Escribir `mobile/tsconfig.json`: `"extends": "expo/tsconfig.base"`,
-  `compilerOptions: { "strict": true, "noEmit": true }`, `include: ["**/*.ts", "**/*.tsx",
-  "expo-env.d.ts"]`, `exclude: ["node_modules", ".expo"]`. No hereda `tsconfig.base.json` de la
-  raíz. Crear `mobile/expo-env.d.ts` con `/// <reference types="expo/types" />` y versionarlo
-  (R11).
+  `compilerOptions: { "strict": true, "noEmit": true }`, `include: ["**/*.ts", "**/*.tsx"]`,
+  `exclude: ["node_modules", ".expo"]`. No hereda `tsconfig.base.json` de la raíz. Sin `expo-env.d.ts`: Expo SDK 58 lo borra al correr `expo start` (R11).
 - [X] T008 [P] Escribir `mobile/jest.config.js` (CommonJS): `preset: "jest-expo"`,
   `testMatch: ["<rootDir>/tests/**/*.test.ts?(x)"]`, `setupFilesAfterEnv:
   ["<rootDir>/jest.setup.ts"]`, **sin** `transformIgnorePatterns` propio. Escribir

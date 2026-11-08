@@ -125,7 +125,6 @@ mobile/
 │                            #   start/test/typecheck; dep "@ai-ticket-it/shared": "*"
 ├── app.json                 # nombre, slug, scheme, plugin expo-router (sin typedRoutes)
 ├── tsconfig.json            # extends expo/tsconfig.base, strict
-├── expo-env.d.ts            # versionado (R11)
 ├── jest.config.js · jest.setup.ts   # preset jest-expo; mock oficial de AsyncStorage
 ├── .env.example             # EXPO_PUBLIC_API_URL
 ├── app/

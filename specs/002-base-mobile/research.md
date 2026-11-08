@@ -288,10 +288,10 @@ dependen del Expo Go instalado en el celular de la persona que hace el TP.
 ## R11. Verificación de tipos en CI sin `expo start`
 
 - **Decision**: `mobile/tsconfig.json` extiende `expo/tsconfig.base` con `strict: true`,
-  `noEmit`, e incluye `**/*.ts`, `**/*.tsx` y `expo-env.d.ts`. `expo-env.d.ts`
-  (`/// <reference types="expo/types" />`) **se versiona** (la raíz no lo ignora; se quita de
-  cualquier `.gitignore` que genere la plantilla), así `tsc --noEmit` no depende de que
-  `expo start` lo haya creado. Sin `typedRoutes`, porque genera tipos en `.expo/` y obligaría a
+  `noEmit`, e incluye `**/*.ts` y `**/*.tsx`. **Sin `expo-env.d.ts`**: la decisión original
+  era versionarlo, pero al validar T048 (2026-11-08) `expo start` del SDK 58 lo borró y lo
+  sacó del `include` de `tsconfig.json`. `tsc --noEmit` pasa igual sin él, así que se acepta
+  el cambio de Expo en vez de restaurarlo después de cada `npm start`. Sin `typedRoutes`, porque genera tipos en `.expo/` y obligaría a
   correr Expo antes del typecheck. Las rutas se escriben como strings literales. No hereda
   `tsconfig.base.json` de la raíz: la base de Expo fija `jsx`, `lib` y la resolución de
   React Native, y mezclar ambas cambia opciones que Metro espera.
