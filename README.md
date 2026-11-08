@@ -23,10 +23,78 @@ Consigna y casos de uso: [`docs/consigna/consigna.md`](docs/consigna/consigna.md
 | Capa | Tecnología |
 |---|---|
 | Backend | Node + Express 5 + TypeScript, en capas (routes → controllers → services → repositories → domain) |
-| Persistencia | MongoDB con Mongoose — en memoria (mongodb-memory-server) por defecto |
+| Persistencia | En memoria: repositorios con `Map`, sin base de datos (lo pide la consigna) |
 | Mobile | React Native con Expo + Expo Router |
 | Tests | Vitest + supertest · Jest + React Native Testing Library |
 
-## Para arrancar
+## Para arrancar (backend)
 
-Las instrucciones de instalación y ejecución se completan con las features 001 (base backend) y 002 (base mobile).
+### Requisitos previos
+
+- **Node ≥ 22.12** y **npm ≥ 10** (`node -v`, `npm -v`).
+- No hace falta instalar ninguna base de datos: los datos viven en memoria.
+
+### Instalar y arrancar
+
+```bash
+npm install
+npm start        # o npm run dev para recargar ante cambios
+```
+
+El servidor guarda sus datos **en memoria** y arranca siempre con los datos de ejemplo
+(5 usuarios, 6 categorías y 8 eventos, con ids legibles como `usuario-lucia` o
+`evento-noche-de-rock`). Todo lo que se cree se pierde al detenerlo, y cada arranque vuelve a
+los mismos datos. La salida muestra las direcciones:
+
+```text
+AI Ticket It API escuchando
+  Local: http://localhost:3000/api
+  Red:   http://192.168.0.23:3000/api (Wi-Fi)
+Datos de ejemplo cargados en memoria (se pierden al detener el servidor)
+```
+
+Probalo con `curl http://localhost:3000/api/salud`. La documentación navegable de la API
+(Swagger) está en **http://localhost:3000/api/docs**; para Postman, importá
+`backend/src/docs/ai-ticket-it.postman_collection.json` o la especificación
+`http://localhost:3000/api/docs/openapi.json`. El contrato y el formato de errores están en
+[`specs/001-base-backend/contracts/api.md`](specs/001-base-backend/contracts/api.md).
+
+### Consultar desde otro dispositivo (el celular con la app)
+
+1. PC y celular en la **misma red Wi-Fi**.
+2. Usá la dirección `Red` que imprime `npm start` (por ejemplo,
+   `http://192.168.0.23:3000/api/salud`).
+3. Abrí la dirección en **Firefox**, escribiéndola completa con `http://`. Chrome y Samsung
+   Internet la cambian solos a `https://` (modo "usar siempre conexiones seguras") y fallan
+   sin avisar, porque el servidor local no tiene HTTPS.
+4. Si cambiás de red (por ejemplo, al hotspot del celular), reiniciá el servidor: las
+   direcciones `Red` se calculan al arrancar.
+5. Si desde la PC responde y desde el celular no, en Windows:
+   - Abrí **Seguridad de Windows → Firewall y protección de red → Permitir una aplicación a
+     través del firewall**.
+   - Tocá **Cambiar la configuración**, buscá **Node.js JavaScript Runtime** (o
+     **Permitir otra aplicación…** y elegí `node.exe`) y marcá **Privada**.
+   - En **Configuración → Red e Internet → Wi-Fi → (tu red)**, verificá que el perfil sea
+     **Red privada**.
+   - Si la PC tiene adaptadores virtuales (VirtualBox, WSL, VPN), imprime varias direcciones
+     `Red`, cada una con el nombre de su interfaz entre paréntesis: usá la de `(Wi-Fi)`.
+   - En redes institucionales (facultad, trabajo) suele estar bloqueada la comunicación entre
+     dispositivos. Si el celular no llega aunque el firewall esté bien, compartí internet
+     desde el celular, conectá la PC a ese hotspot y usá la nueva dirección `Red`.
+
+### Calidad
+
+```bash
+npm test          # Vitest en todos los paquetes (cada test usa sus propios repositorios)
+npm run lint      # ESLint: sin any, sin ts-ignore ni eslint-disable sin descripción, domain/ puro
+npm run typecheck # tsc --noEmit en backend y shared
+npm run format    # Prettier (format:check solo verifica)
+```
+
+El CI de GitHub Actions (`.github/workflows/ci.yml`) corre `format:check`, `lint`,
+`typecheck` y `test` en cada PR a `development` y `main`.
+
+Los tests **no** leen `backend/.env`: siempre usan su propia base en memoria y el registro
+en silencio.
+
+La app móvil se suma con la feature 002 (base mobile).

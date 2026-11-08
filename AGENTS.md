@@ -27,9 +27,21 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 - `shared/` — tipos de contratos y enums compartidos (ej.: `EstadoCompra`).
 - `backend/src/` — Express en capas:
   `routes/ → controllers/ → services/ → repositories/ → domain/`, más `middlewares/`
-  (usuario actual, validación, logging, 404, error handler), `errors/` y `config/`.
-  `domain/` es puro (sin Express ni Mongoose).
-- `backend/tests/{domain,api}` — Vitest; los de API usan supertest y Mongo en memoria propio.
+  (usuario actual, logging, 404, registro y respuesta de errores), `validations/` (zod),
+  `errors/`, `config/` y `docs/` (OpenAPI, servida en `/api/docs`).
+  - `app.ts` es el **composition root**: el único lugar que instancia y conecta las clases;
+    cada clase recibe sus dependencias por constructor (nada de instancias globales).
+  - `domain/` son clases con comportamiento (sin Express ni IO) y las interfaces de
+    repositorio de las que dependen los services.
+  - `repositories/` son repositorios **en memoria** (un `Map` privado por repositorio); no hay
+    base de datos. `seed/` arma los datos de ejemplo y `crearRepositoriosDeEjemplo()`;
+    `crearApp()` los usa por defecto. Las operaciones que toquen cupo o estados no pueden
+    tener un `await` entre verificar y modificar (constitución, "Cupo atómico").
+  - `domain/errores.ts`: `DatosInvalidosError` y `ReglaDeNegocioError` (sin HTTP); el
+    error handler los traduce a 400 y 409. `domain/` no importa `errors/` (lo controla el lint).
+- `backend/tests/{domain,repositories,services,api}` — Vitest; `services/` usa los
+  repositorios en memoria construidos con los datos de cada caso; `api/` usa supertest con
+  `crearApp()` (repositorios nuevos por test).
 - `mobile/` — Expo + Expo Router. Todo `fetch` vive en `mobile/src/api/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.
 
@@ -37,5 +49,27 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 
 ## Comandos
 
-Se completan en la feature 001. Antes de dar una tarea por terminada:
-`npm test`, `npm run lint` y `npm run typecheck`.
+Desde la raíz del repo:
+
+| Comando | Efecto |
+|---|---|
+| `npm install` | instala todos los workspaces (`backend`, `shared`) |
+| `npm start` | arranca el servidor con los datos de ejemplo en memoria |
+| `npm run dev` | igual, recargando ante cambios (cada recarga vuelve a los datos de ejemplo) |
+| `npm test` · `npm run lint` · `npm run typecheck` | calidad, en todos los paquetes |
+| `npm run format` · `npm run format:check` | Prettier (escribe / verifica); no toca los `.md` |
+
+Antes de dar una tarea por terminada: `npm test`, `npm run lint`, `npm run typecheck` y
+`npm run format:check` en verde. El CI (`.github/workflows/ci.yml`) los corre en cada PR.
+
+## Convención de nombres (repositories y services)
+
+| Capa | Método | Devuelve / hace |
+|---|---|---|
+| Repository | `listar()` | todas las entidades |
+| Repository | `buscarPorId(id)` · `buscarPor<Criterio>(...)` | la entidad o `null` (nunca lanza 404) |
+| Repository | `contarPor<Criterio>(...)` · `existe<Algo>(...)` | números / booleanos |
+| Repository | `guardar(entidad)` · `eliminarPorId(id)` | persistencia |
+| Service | `listar()` · `obtener(id)` · `crear(datos)` · `actualizar(id, datos)` · `eliminar(id)` | casos de uso; `obtener` lanza 404 |
+| Service | `#obtenerOFallar(id)` (privado) | **único** lugar del service que busca por id y lanza 404 |
+

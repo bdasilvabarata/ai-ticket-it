@@ -38,6 +38,10 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   establece al crear el tipo (por ejemplo, 300) y disminuye en la cantidad de cada compra que
   se registra. Una compra NO PUEDE dejar el cupo por debajo de 0, ni siquiera ante compras
   concurrentes.
+- **Cupo atómico**: verificar que hay cupo y descontarlo DEBEN ocurrir en un mismo tramo
+  síncrono de código, **sin ningún `await` entre la verificación y el descuento**. Node ejecuta
+  un tramo síncrono por vez, así ninguna otra compra puede intercalarse y leer el mismo cupo.
+  Lo mismo vale para devolver cupo al cancelar y para todo cambio de estado de una compra.
 - **Total**: lo calcula el servidor como `precio × cantidad` al momento de comprar. El cliente
   nunca envía precios ni totales.
 - **Estados de una compra** — solo estas transiciones son válidas:
@@ -81,9 +85,12 @@ registro de ese criterio y el contexto que guía a la IA.
 
 - Backend: TDD estricto — el test se escribe primero, se lo ve fallar, se implementa y se
   refactoriza.
-  - `backend/tests/domain/` — reglas puras, sin base de datos.
+  - `backend/tests/domain/` — entidades y reglas puras.
+  - `backend/tests/services/` — casos de uso con los repositorios en memoria de producción,
+    construidos con los datos del caso; sin servidor.
+  - `backend/tests/repositories/` — los repositorios en memoria.
   - `backend/tests/api/` — endpoints con supertest contra la app de Express (sin levantar
-    puerto) y una base MongoDB en memoria aislada por suite.
+    puerto), con repositorios nuevos por test: ningún test comparte estado con otro.
 - Mobile: tests de la lógica de presentación (formateos, mapeo de estados, días restantes) y
   de los componentes con comportamiento.
 - Toda regla de dominio de la constitución DEBE tener al menos un test que la verifique,
@@ -102,52 +109,77 @@ backend/src/
   routes/        ← declara endpoints y encadena middlewares + controller
   controllers/   ← HTTP: toma la request ya validada, llama al service, arma la response
   services/      ← casos de uso: orquesta repositories y domain, verifica permisos
-  repositories/  ← único acceso a datos (Mongoose); devuelve objetos de dominio planos
-  domain/        ← entidades y reglas de negocio puras
-  middlewares/   ← identificación de usuario, validación, logging, 404, error handler
+  repositories/  ← único acceso a los datos (en memoria); guarda y devuelve entidades
+  domain/        ← entidades con comportamiento y reglas de negocio puras
+  middlewares/   ← identificación de usuario, logging, 404, registro y respuesta de errores
+  validations/   ← esquemas de entrada (zod) y su middleware de validación
   errors/        ← errores de aplicación tipados
-  config/        ← entorno y conexión a la base
+  config/        ← entorno, arranque y logging
+  docs/          ← especificación OpenAPI de la API
+  app.ts         ← composition root: instancia y conecta repositories → services → controllers
 ```
 
-- `domain/` NO DEBE importar Express, Mongoose ni nada con IO.
+- `domain/` NO DEBE importar Express, `errors/` ni nada con IO. Lanza **errores de
+  dominio** semánticos, sin conocimiento de HTTP (`domain/errores.ts`): `DatosInvalidosError`
+  (una entidad no cumple sus invariantes; un detalle por campo) y `ReglaDeNegocioError` (una
+  regla del dominio impide la operación, con su código; por ejemplo `CUPO_INSUFICIENTE`). La
+  traducción a HTTP es responsabilidad del error handler: `400 ENTRADA_INVALIDA` y `409` con
+  el código de la regla, respectivamente.
+- Las entidades de `domain/` son **clases con comportamiento** que protegen sus invariantes al
+  construirse y exponen las operaciones del modelo de la consigna (por ejemplo,
+  `TipoEntrada.hayCupoPara(cantidad)`, `Evento.tuPrecioEstaEntre(min, max)`).
+- **Inyección de dependencias**: controllers, services y repositories son clases que reciben
+  sus colaboradores por constructor. Los services dependen de interfaces de repositorio
+  (`domain/repositorios.ts`), no de una implementación. Solo el composition root instancia y
+  conecta las piezas; ningún módulo usa instancias globales de otra capa.
 - Los controllers NO DEBEN contener reglas de negocio ni acceder a repositories.
-- Mongoose (modelos, `_id`, `ObjectId`, documentos) NO DEBE filtrarse por encima de
-  `repositories/`.
+- Cómo se almacenan los datos (estructuras internas de los repositorios) NO DEBE filtrarse
+  por encima de `repositories/`: los repositories reciben y devuelven entidades de dominio y no
+  exponen sus colecciones internas.
 - Los controllers NO usan `try/catch` para responder errores: los services lanzan errores de
-  `errors/` y el **error handler** centralizado los traduce a HTTP.
-- La validación de forma de la entrada vive en un middleware de validación con esquemas;
+  `errors/`; un middleware **registra** los errores y el **error handler** centralizado los
+  traduce a HTTP (dos responsabilidades, dos middlewares).
+- La validación de forma de la entrada vive en `validations/` (esquemas y su middleware);
   las reglas de negocio viven en `domain/` y `services/`.
 
 **Rationale**: la lógica se testea sin servidor ni base, y cada capa tiene una sola razón
 para cambiar.
 
-### IV. Persistencia MongoDB en Memoria
+### IV. Persistencia en Memoria
 
-- La persistencia es MongoDB vía Mongoose.
-- Por defecto el backend levanta **mongodb-memory-server** (cumple "persistencia en memoria"
-  de la consigna sin instalar nada). Si se define `MONGO_URI`, se conecta a ese Mongo real.
-  El código de producto es el mismo en ambos casos.
-- Al iniciar con base en memoria, un **seed** carga categorías, usuarios y eventos de ejemplo
-  para que la app sea demostrable desde el primer arranque.
-- Los tests usan siempre su propia instancia en memoria; nunca una base compartida.
-- Las operaciones que protegen invariantes (descontar cupo, cambiar estado) DEBEN ser
-  atómicas (actualización condicional o transacción).
+- La persistencia son **repositorios en memoria** que guardan entidades de dominio en
+  estructuras de JavaScript (`Map`). No hay base de datos ni bibliotecas que imiten una
+  (consigna: "mecanismo de persistencia en memoria").
+- Los datos viven mientras el proceso está corriendo. Al arrancar, un **seed** carga siempre
+  los mismos datos de ejemplo (categorías, usuarios y eventos) para que la app sea demostrable
+  desde el primer arranque; reiniciar el servidor vuelve a ese estado.
+- **Identificadores**: las entidades que crean los usuarios usan **UUID v4** generado en el
+  servidor (`crypto.randomUUID()`). Los datos de ejemplo usan **ids legibles y fijos** en
+  kebab-case con el tipo como prefijo (`usuario-lucia`, `evento-noche-de-rock`), estables entre
+  arranques para que la app, la demo, Postman y los tests puedan referirlos.
+- Las operaciones que protegen invariantes cumplen la regla de **cupo atómico** del dominio:
+  verificar y modificar en un mismo tramo síncrono, sin `await` en el medio.
+- Cada instancia de la app (y cada test) tiene sus propios repositorios: no hay estado global.
 
-**Rationale**: concilia el requerimiento del TP con el uso de MongoDB y deja el camino libre a
-una base real sin reescribir código.
+**Rationale**: es lo que pide la consigna, se lee sin conocer ninguna base de datos y los
+tests corren sin infraestructura. Las interfaces de repositorio permitirían agregar una base
+real en el futuro sin tocar services ni dominio (decisión registrada en
+`specs/001-base-backend/research.md`, R23).
 
 ### V. Contrato de API
 
 - Toda la API vive bajo `/api`, habla JSON y usa recursos en **plural y kebab-case**
   (`/api/eventos`, `/api/compras/:id/mensajes`, `/api/tipos-entrada`).
-- Los recursos exponen `id` como string; nunca `_id` ni `__v`.
+- Los recursos exponen `id` como string (UUID, o id legible en los datos de ejemplo).
 - Errores con un único formato:
   `{ "error": { "codigo": "CUPO_INSUFICIENTE", "mensaje": "<en español>", "detalles"?: [...] } }`
   - `400` entrada inválida · `401` usuario no identificado · `403` sin permiso sobre un
     recurso existente · `404` recurso inexistente · `409` conflicto de estado o de cupo ·
     `500` error inesperado (sin stack ni detalles internos en la respuesta).
 - Toda entrada DEBE validarse en el servidor, aunque la app ya la haya validado.
-- Cada feature documenta sus endpoints en `specs/NNN-slug/contracts/`.
+- Cada feature documenta sus endpoints en `specs/NNN-slug/contracts/` y en la especificación
+  OpenAPI de `backend/src/docs/`, servida en `/api/docs` (Swagger UI); un test verifica que
+  la especificación cubre las rutas implementadas.
 
 **Rationale**: un contrato predecible permite desarrollar backend y mobile en paralelo
 contra el contrato, y que la app muestre mensajes de error útiles.
@@ -193,8 +225,9 @@ y desalineaciones.
 ### IX. Calidad de Código (NON-NEGOTIABLE)
 
 - TypeScript en modo `strict` en todos los paquetes.
-- `npm test`, `npm run lint` y `npm run typecheck` DEBEN pasar antes de cerrar una tarea y
-  antes de abrir un PR.
+- `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` (Prettier) DEBEN
+  pasar antes de cerrar una tarea y antes de abrir un PR. El CI de GitHub Actions los corre en
+  cada PR a `development` y `main`.
 - Prohibido `any` explícito, `@ts-ignore` o `eslint-disable` sin un comentario que lo
   justifique.
 - Simplicidad primero: no se agrega una abstracción, dependencia o capa que la spec no
@@ -205,11 +238,11 @@ y desalineaciones.
 | Ámbito | Elección |
 |---|---|
 | Repo | Monorepo con npm workspaces: `backend/`, `mobile/`, `shared/` |
-| Backend | Node 22+ · Express 5 · TypeScript · Mongoose · zod (validación) |
-| Persistencia | MongoDB — mongodb-memory-server por defecto, `MONGO_URI` opcional |
+| Backend | Node 22+ · Express 5 · TypeScript · zod (validación) |
+| Persistencia | En memoria: repositorios con `Map`, sin base de datos |
 | Mobile | Expo (SDK estable vigente) · Expo Router · TypeScript |
 | Tests | Vitest + supertest (backend) · Jest + React Native Testing Library (mobile) |
-| Calidad | ESLint · `tsc --noEmit` |
+| Calidad | ESLint · `tsc --noEmit` · Prettier · GitHub Actions (CI) |
 
 - Solo herramientas y servicios gratuitos (requisito de la consigna).
 - Secretos y URLs locales en `.env` (no versionado); se versiona `.env.example`.
@@ -253,4 +286,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 1.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-03
+**Version**: 2.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-07

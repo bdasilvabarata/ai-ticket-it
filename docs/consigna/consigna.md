@@ -39,7 +39,7 @@ conferencias, deportes) con **compradores** de entradas.
 
 - **Back-End**: Node + Express.
 - **Front-End**: React Native, ejecutándose localmente en un dispositivo móvil.
-- **Persistencia en memoria** (resuelto con MongoDB en memoria, ver constitución).
+- **Persistencia en memoria** (repositorios en memoria, sin base de datos; ver constitución, principio IV).
 - Herramientas de IA gratuitas; se valora el criterio y la reflexión crítica sobre su uso.
 
 ## Casos de uso
