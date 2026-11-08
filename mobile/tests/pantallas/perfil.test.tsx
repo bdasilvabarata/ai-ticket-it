@@ -1,7 +1,7 @@
 import { act, screen } from "expo-router/testing-library";
 
 import { porRuta, type RespuestaFalsa } from "../helpers/fetch-falso";
-import { irAPestana } from "../helpers/pestanas";
+import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { lucia, todos } from "../helpers/usuarios";
 
@@ -12,7 +12,7 @@ async function abrirPerfil(actual: RespuestaFalsa[]) {
     usuarioRecordado: lucia.id,
     respuestas: porRuta({ "/usuarios/actual": actual, "/usuarios": [{ status: 200, json: todos }] }),
   });
-  await screen.findByRole("tablist");
+  await esperarPestanas();
   await irAPestana("Perfil");
   return resultado;
 }

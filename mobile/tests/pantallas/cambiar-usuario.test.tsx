@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
 
 import { porRuta, type RespuestaFalsa } from "../helpers/fetch-falso";
-import { irAPestana } from "../helpers/pestanas";
+import { botonesDePestanas, esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias, URL_DE_PRUEBA } from "../helpers/render-con-dependencias";
 import { CLAVE_RECORDADO, diego, lucia, todos } from "../helpers/usuarios";
 
@@ -33,7 +33,7 @@ async function enPerfil(actual: RespuestaFalsa[], usuarios: RespuestaFalsa[] = [
     usuarioRecordado: lucia.id,
     respuestas: porRuta({ [ACTUAL]: actual, "/usuarios": usuarios }),
   });
-  await screen.findByRole("tablist");
+  await esperarPestanas();
   await irAPestana("Perfil");
   await screen.findByRole("button", { name: "Cambiar usuario" });
   return resultado;
@@ -116,7 +116,7 @@ describe("cambiar de usuario desde Perfil (US3)", () => {
     expect(await screen.findByText(AVISO)).toBeOnTheScreen();
     expect(await screen.findByText(TITULO)).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: CERRAR })).toBeNull();
-    expect(screen.queryByRole("tablist")).toBeNull();
+    expect(botonesDePestanas()).toHaveLength(0);
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).toBeNull();
   });
 

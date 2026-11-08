@@ -1,15 +1,20 @@
-import { fireEvent, screen, within } from "expo-router/testing-library";
+import { fireEvent, screen } from "expo-router/testing-library";
 
 /**
- * Botones de la barra de pestañas, en orden. Jest corre con plataforma iOS, donde cada pestaña es
- * un `button` con la etiqueta "{nombre}, tab, {i} of {n}" dentro del `tablist`.
+ * Jest corre con plataforma iOS: cada pestaña es un `button` con la etiqueta
+ * "{nombre}, tab, {i} of {n}". El contenedor `tablist` no es accesible por sí mismo, así que no
+ * sirve para buscarlas.
  */
+const ETIQUETA_DE_PESTANA = /, tab, \d+ of \d+$/;
+
 export function botonesDePestanas() {
-  return within(screen.getByRole("tablist")).getAllByRole("button");
+  return screen.queryAllByRole("button", { name: ETIQUETA_DE_PESTANA });
+}
+
+export function esperarPestanas() {
+  return screen.findAllByRole("button", { name: ETIQUETA_DE_PESTANA });
 }
 
 export async function irAPestana(nombre: string) {
-  await fireEvent.press(
-    within(screen.getByRole("tablist")).getByRole("button", { name: new RegExp(`^${nombre},`) }),
-  );
+  await fireEvent.press(screen.getByRole("button", { name: new RegExp(`^${nombre}, tab, `) }));
 }

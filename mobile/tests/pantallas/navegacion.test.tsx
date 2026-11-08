@@ -1,4 +1,4 @@
-import { screen } from "expo-router/testing-library";
+import { screen, within } from "expo-router/testing-library";
 
 import { porRuta } from "../helpers/fetch-falso";
 import { botonesDePestanas, irAPestana } from "../helpers/pestanas";
@@ -23,16 +23,16 @@ describe("navegación principal (US3)", () => {
 
     expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
     const pestanas = botonesDePestanas();
-    expect(pestanas.map((boton) => boton.props.accessibilityLabel ?? boton.props["aria-label"])).toEqual([
+    expect(pestanas.map((boton) => boton.props.accessibilityLabel)).toEqual([
       "Explorar, tab, 1 of 4",
       "Mis compras, tab, 2 of 4",
       "Mis eventos, tab, 3 of 4",
       "Perfil, tab, 4 of 4",
     ]);
-    expect(pestanas[0]).toHaveTextContent("Explorar");
-    expect(pestanas[1]).toHaveTextContent("Mis compras");
-    expect(pestanas[2]).toHaveTextContent("Mis eventos");
-    expect(pestanas[3]).toHaveTextContent("Perfil");
+    // Texto visible, no solo ícono (el botón también contiene el glifo del ícono).
+    ["Explorar", "Mis compras", "Mis eventos", "Perfil"].forEach((nombre, i) => {
+      expect(within(pestanas[i]).getByText(nombre)).toBeOnTheScreen();
+    });
     expect(resultado.getPathname()).toBe("/");
   });
 
