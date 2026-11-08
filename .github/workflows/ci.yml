@@ -42,5 +42,5 @@ jobs:
       - name: Tipos (tsc)
         run: npm run typecheck
 
-      - name: Tests (Vitest)
+      - name: Tests (Vitest y Jest)
         run: npm test
