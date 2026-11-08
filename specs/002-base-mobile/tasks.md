@@ -139,22 +139,22 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
 
 ### Tests (escribir primero y verlos fallar) ⚠️
 
-- [ ] T013 [P] Test `mobile/tests/shared.test.ts`: importa el **valor** `EstadoCompra` de
+- [X] T013 [P] Test `mobile/tests/shared.test.ts`: importa el **valor** `EstadoCompra` de
   `@ai-ticket-it/shared` y verifica uno de sus miembros. Si Jest no transformara el TypeScript
   del workspace, fallaría al parsear, así que el test deja verificado que no hace falta
   `transformIgnorePatterns` (R12, US4-7).
-- [ ] T014 [P] Helper `mobile/tests/helpers/fetch-falso.ts`: `crearFetchFalso(respuestas)`
+- [X] T014 [P] Helper `mobile/tests/helpers/fetch-falso.ts`: `crearFetchFalso(respuestas)`
   devuelve un `typeof fetch` y un registro de los pedidos (url, método, encabezados). Cada
   respuesta puede ser `{ status, json }`, `{ status, texto }` (cuerpo no JSON), `"rechazar"`
   (`TypeError` de red) o `"colgar"` (nunca resuelve, pero rechaza con `AbortError` al abortarse
   su `signal`). También puede ser una función `(url, init) => respuesta` para elegir por ruta.
   Sin `any`.
-- [ ] T015 [P] Test `mobile/tests/api/errores.test.ts`: `ErrorDeApi` y
+- [X] T015 [P] Test `mobile/tests/api/errores.test.ts`: `ErrorDeApi` y
   `ServidorNoDisponibleError` extienden `Error`, se distinguen con `instanceof` y exponen sus
   campos (`status`, `codigo`, `mensaje`, `detalles` · `url`, `motivo`). El `mensaje` de
   `ServidorNoDisponibleError` es "No se pudo conectar con el servidor." (data-model "Errores de
   la app").
-- [ ] T016 [P] Test `mobile/tests/api/direccion.test.ts` con las tres filas de
+- [X] T016 [P] Test `mobile/tests/api/direccion.test.ts` con las tres filas de
   `resolverUrlBase` de [contracts/cliente-api.md](./contracts/cliente-api.md):
   - `"http://10.0.0.5:3000/api/"` → `"http://10.0.0.5:3000/api"`, con `hostUri` o sin él;
   - `urlEntorno` vacía o ausente con `hostUri` `"192.168.0.23:8081"` →
@@ -162,7 +162,7 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
   - ninguno → `"http://localhost:3000/api"`.
 
   Además, una `urlEntorno` de solo espacios cuenta como vacía (FR-004, FR-005, US4-6).
-- [ ] T017 [P] Test `mobile/tests/api/cliente.test.ts` con `crearFetchFalso`. Cubre cada fila
+- [X] T017 [P] Test `mobile/tests/api/cliente.test.ts` con `crearFetchFalso`. Cubre cada fila
   de la tabla "Resultado" de [contracts/cliente-api.md](./contracts/cliente-api.md):
   - 2xx JSON → cuerpo tipado. 2xx no JSON → `ErrorDeApi(status, "RESPUESTA_INESPERADA")`;
   - ≥ 400 con `ErrorApi` → `ErrorDeApi` con `codigo`, `mensaje` y `detalles` (o `[]` si
@@ -182,19 +182,19 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
     `alUsuarioNoIdentificado` con el id **del pedido** y rechaza el `ErrorDeApi`. En un pedido
     sin usuario no la llama;
   - `get("/usuarios")` pide `{urlBase}/usuarios`, y `cliente.urlBase` expone la base.
-- [ ] T018 [P] Test `mobile/tests/api/usuarios.test.ts`:
+- [X] T018 [P] Test `mobile/tests/api/usuarios.test.ts`:
   - `listarUsuarios(cliente)` hace `GET /usuarios` **sin** `X-Usuario-Id` aunque haya usuario
     actual, y devuelve los `UsuarioVista[]` en el orden del servidor;
   - `obtenerUsuarioActual(cliente, "usuario-lucia")` hace `GET /usuarios/actual` con
     `X-Usuario-Id: usuario-lucia`;
   - ambas pasan el `signal` al cliente.
-- [ ] T019 [P] Test `mobile/tests/sesion/estado-sesion.test.ts`: una prueba por fila de la
+- [X] T019 [P] Test `mobile/tests/sesion/estado-sesion.test.ts`: una prueba por fila de la
   tabla de transiciones de [data-model.md](./data-model.md) ("EstadoSesion"). Incluye:
   - `usuario-no-identificado(id)` con otro `id` → sin cambios;
   - un `validado` para un `usuarioId` distinto del actual → se descarta;
   - `elegido` desde `sin-usuario` y desde `con-usuario`;
   - `servidor-no-disponible` conserva `usuario`.
-- [ ] T020 [P] Test `mobile/tests/sesion/validacion.test.ts`: las cinco filas de
+- [X] T020 [P] Test `mobile/tests/sesion/validacion.test.ts`: las cinco filas de
   "DecisionValidacion" de [data-model.md](./data-model.md):
   - `ok: true` → `confirmado`;
   - 401 `USUARIO_NO_IDENTIFICADO` → `olvidar`;
@@ -203,7 +203,7 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
     `RESPUESTA_INESPERADA`) y una excepción cualquiera.
 
   Cubre SC-005.
-- [ ] T021 [P] Test `mobile/tests/sesion/usuario-recordado.test.ts` sobre el mock de
+- [X] T021 [P] Test `mobile/tests/sesion/usuario-recordado.test.ts` sobre el mock de
   AsyncStorage:
   - `guardar("usuario-lucia")` escribe en la clave `ai-ticket-it/usuario-recordado` el JSON
     `{ "version": 1, "usuarioId": "usuario-lucia" }`, y `leer()` lo devuelve;
@@ -211,7 +211,7 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
   - devuelven `null` **y borran la clave**: JSON inválido, `version !== 1`, `usuarioId`
     vacío o no string, y un `getItem` que rechaza. `leer()` nunca lanza;
   - `olvidar()` borra la clave (R6).
-- [ ] T022 [P] Test `mobile/tests/conexion/secuencia-reintentos.test.ts` con fake timers y un
+- [X] T022 [P] Test `mobile/tests/conexion/secuencia-reintentos.test.ts` con fake timers y un
   `intentar` falso. Cubre SC-005 y FR-021a:
   - `iniciar()` intenta a los 1000 ms y no antes; con fallos sigue a los 2000, 4000, 8000,
     16000 y 32000 ms;
@@ -224,27 +224,27 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
   - `iniciar()` con la secuencia ya corriendo no la reinicia;
   - `detener()` cancela todo;
   - el callback de cambios avisa `enCurso` y `automaticosRestantes`.
-- [ ] T023 [P] Test `mobile/tests/consultas/query-client.test.ts`: `crearQueryClient({
+- [X] T023 [P] Test `mobile/tests/consultas/query-client.test.ts`: `crearQueryClient({
   alFallar })` tiene `retry: false` en queries y mutations y `staleTime: 30_000`. Una query
   y una mutation que fallan llaman `alFallar(error)` una vez con el error original. Las claves
   de `claves.ts` cumplen `claves.usuarios() → ["usuarios"]` y
   `claves.usuarioActual("u1") → ["usuario-actual", "u1"]`: el `usuarioId` va en la posición 1
   (R9).
-- [ ] T024 [P] Test `mobile/tests/componentes/mensaje-error.test.tsx`: `MensajeError` muestra
+- [X] T024 [P] Test `mobile/tests/componentes/mensaje-error.test.tsx`: `MensajeError` muestra
   el mensaje. Con `alReintentar`, muestra el botón "Reintentar" y lo llama al tocarlo; sin
   `alReintentar`, no muestra botón. Con `reintentando`, muestra "Reintentando…" deshabilitado
   (`accessibilityState.disabled`) y no llama.
 
 ### Implementación
 
-- [ ] T025 [P] Implementar `mobile/src/api/errores.ts`: clases `ErrorDeApi(status, codigo,
+- [X] T025 [P] Implementar `mobile/src/api/errores.ts`: clases `ErrorDeApi(status, codigo,
   mensaje, detalles: DetalleError[] = [])` y `ServidorNoDisponibleError(url, motivo:
   "sin-conexion" | "tiempo-agotado")` con `name` propio. Además, el type guard `esErrorApi(valor):
   valor is ErrorApi` y la constante del mensaje de respuesta inesperada (T015).
-- [ ] T026 [P] Implementar `mobile/src/api/direccion.ts`: función pura `resolverUrlBase({
+- [X] T026 [P] Implementar `mobile/src/api/direccion.ts`: función pura `resolverUrlBase({
   urlEntorno, hostUri })` según R10. Toma el host de `hostUri` sin el puerto y le agrega
   `:3000/api`, y le saca la `/` final a `urlEntorno` (T016).
-- [ ] T027 Implementar `mobile/src/api/cliente.ts` (depende de T025): `crearClienteApi({
+- [X] T027 Implementar `mobile/src/api/cliente.ts` (depende de T025): `crearClienteApi({
   fetch, urlBase, obtenerUsuarioId, alUsuarioNoIdentificado, tiempoLimiteMs = 8000 })` →
   `ClienteApi { urlBase, get<T>(ruta, opciones?) }`. Detalles:
   - tiempo límite con un `AbortController` propio y `setTimeout`, encadenado a mano al
@@ -252,30 +252,30 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
     para relanzar el `AbortError` original o devolver `"tiempo-agotado"`;
   - limpia el temporizador y el listener en `finally`;
   - lee el cuerpo como texto y lo parsea con `JSON.parse` en un `try` (R4, T017).
-- [ ] T028 Implementar `mobile/src/api/usuarios.ts` (`listarUsuarios(cliente, { signal })`
+- [X] T028 Implementar `mobile/src/api/usuarios.ts` (`listarUsuarios(cliente, { signal })`
   con `usuarioId: null`, `obtenerUsuarioActual(cliente, usuarioId, { signal })`) y
   `mobile/src/api/index.ts`. `index.ts` exporta exactamente `crearClienteApi`, `ClienteApi`,
   `ErrorDeApi`, `ServidorNoDisponibleError`, `resolverUrlBase`, `listarUsuarios` y
   `obtenerUsuarioActual` (T018).
-- [ ] T029 [P] Implementar `mobile/src/sesion/estado-sesion.ts`: tipos `EstadoSesion` y
+- [X] T029 [P] Implementar `mobile/src/sesion/estado-sesion.ts`: tipos `EstadoSesion` y
   `EventoSesion` (uniones discriminadas, exactamente las de data-model), `estadoInicial = {
   fase: "iniciando" }` y el reducer puro `reducirSesion(estado, evento)`. Ante una
   combinación no listada en la tabla, devuelve el mismo estado (T019).
-- [ ] T030 [P] Implementar `mobile/src/sesion/validacion.ts` (depende de T025):
+- [X] T030 [P] Implementar `mobile/src/sesion/validacion.ts` (depende de T025):
   `decidirValidacion(resultado)` → `{ tipo: "confirmado", usuario } | { tipo: "olvidar" } | {
   tipo: "conservar-sin-servidor" }` (T020).
-- [ ] T031 [P] Implementar `mobile/src/sesion/usuario-recordado.ts`: interfaz `Almacenamiento
+- [X] T031 [P] Implementar `mobile/src/sesion/usuario-recordado.ts`: interfaz `Almacenamiento
   { getItem; setItem; removeItem }` y `crearRepositorioUsuarioRecordado(almacenamiento)` →
   `{ leer(): Promise<string | null>; guardar(id): Promise<void>; olvidar(): Promise<void> }`,
   con la clave `ai-ticket-it/usuario-recordado` y la versión `1`. La forma se valida con un
   type guard escrito a mano, sin zod (R6, T021).
-- [ ] T032 [P] Implementar `mobile/src/conexion/secuencia-reintentos.ts`: clase
+- [X] T032 [P] Implementar `mobile/src/conexion/secuencia-reintentos.ts`: clase
   `SecuenciaDeReintentos({ intentar: () => Promise<boolean>, alCambiar, temporizador? })` con
   `esperasMs = [1000, 2000, 4000, 8000, 16000, 32000]`, `iniciar()`, `reintentarAhora()`,
   `detener()` y los getters `enCurso` y `automaticosRestantes`. El temporizador por defecto es
   `setTimeout`/`clearTimeout`. Una excepción de `intentar` cuenta como fallo. Sin React (R7,
   T022).
-- [ ] T033 Implementar `mobile/src/consultas/claves.ts` (`claves.usuarios()`,
+- [X] T033 Implementar `mobile/src/consultas/claves.ts` (`claves.usuarios()`,
   `claves.usuarioActual(usuarioId)`) y `mobile/src/consultas/query-client.ts`:
   - `crearQueryClient({ alFallar })` con `defaultOptions: { queries: { retry: false,
     staleTime: 30_000 }, mutations: { retry: false } }`,
@@ -283,7 +283,7 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
     `mutationCache: new MutationCache({ onError: alFallar })`;
   - `conectarFocoDeLaApp()`: `focusManager.setEventListener` con `AppState`
     (`active` → foco) que devuelve la función de limpieza. Sin `onlineManager` (R9, T023).
-- [ ] T034 Implementar el composition root `mobile/src/composicion.tsx` (depende de T026–T028,
+- [X] T034 Implementar el composition root `mobile/src/composicion.tsx` (depende de T026–T028,
   T031, T033):
   - `crearDependencias({ fetch, almacenamiento, urlEntorno, hostUri })` → `Dependencias`:
     `urlBase`, `usuarioRecordado`, `queryClient`, `crearCliente({ obtenerUsuarioId,
@@ -295,7 +295,7 @@ el composition root y los componentes base. Son las piezas que usan todas las hi
   - `DependenciasProvider` y `useDependencias()`, que lanza un error claro fuera del provider.
 
   Es el único lugar que instancia piezas (data-model "Dependencias").
-- [ ] T035 [P] Implementar `mobile/src/componentes/Cargando.tsx` (`ActivityIndicator` +
+- [X] T035 [P] Implementar `mobile/src/componentes/Cargando.tsx` (`ActivityIndicator` +
   "Cargando…"), `mobile/src/componentes/MensajeError.tsx` (props `mensaje`, `titulo?`,
   `alReintentar?`, `reintentando?`, T024) y `mobile/src/componentes/ListaVacia.tsx` (prop
   `mensaje`). Todos centrados con flex y sin anchos fijos (R14).
