@@ -16,13 +16,13 @@ export function textoEventos(cantidad: number): string {
 }
 
 /** Una fila del selector de usuario. */
-export function FilaUsuario({ usuario, deshabilitada, alElegir }: PropsFilaUsuario) {
+export function FilaUsuario({ usuario, esActual, deshabilitada, alElegir }: PropsFilaUsuario) {
   const nombre = `${usuario.nombre} ${usuario.apellido}`;
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Elegir a ${nombre}`}
-      accessibilityState={{ disabled: deshabilitada }}
+      accessibilityLabel={esActual ? `${nombre}, usuario actual` : `Elegir a ${nombre}`}
+      accessibilityState={{ disabled: deshabilitada, selected: esActual }}
       disabled={deshabilitada}
       onPress={() => alElegir(usuario)}
       style={({ pressed }) => [estilos.fila, pressed && estilos.presionada]}
@@ -31,6 +31,7 @@ export function FilaUsuario({ usuario, deshabilitada, alElegir }: PropsFilaUsuar
         <Text style={estilos.nombre}>{nombre}</Text>
         <Text style={estilos.detalle}>{textoEventos(usuario.cantidadEventosOrganizados)}</Text>
       </View>
+      {esActual ? <Text style={estilos.actual}>Actual</Text> : null}
     </Pressable>
   );
 }
@@ -49,4 +50,5 @@ const estilos = StyleSheet.create({
   textos: { flex: 1, gap: 2 },
   nombre: { fontSize: 17, fontWeight: "500", color: colores.texto },
   detalle: { fontSize: 14, color: colores.textoSecundario },
+  actual: { fontSize: 14, fontWeight: "600", color: colores.primario, marginLeft: 12 },
 });
