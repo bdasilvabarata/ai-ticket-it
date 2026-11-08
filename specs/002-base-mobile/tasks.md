@@ -514,7 +514,7 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
   usuario con el que estabas operando ya no existe. Elegí otro." cuando `estado.aviso ===
   "usuario-anterior-inexistente"`. Lleva `accessibilityLiveRegion="polite"` y lo anuncia con
   `announceForAccessibility` al aparecer (FR-013, FR-022).
-- [ ] T057 [US2] **(persona)** Validar en el celular quickstart §3 (reabrir, servidor
+- [X] T057 [US2] **(persona)** Validar en el celular quickstart §3 (reabrir, servidor
   detenido, recuperación sola y con "Reintentar"), con el aviso en < 10 s (SC-003) y la
   reapertura en < 3 s (SC-002).
 
