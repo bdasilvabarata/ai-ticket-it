@@ -588,7 +588,7 @@ usuario y comprobar que al reabrir se recuerda el nuevo (quickstart §4). Automa
     sesión. Si la fase era `con-usuario`, después de `elegirUsuario` hace `router.back()`. El
     gesto y el botón "atrás" de Android cierran el modal sin cambios (comportamiento por
     defecto del modal). A pantalla completa no hay "Cerrar" (FR-015, contracts/app.md).
-- [ ] T066 [US3] **(persona)** Validar en el celular quickstart §4. Además, verificar a mano el
+- [X] T066 [US3] **(persona)** Validar en el celular quickstart §4. Además, verificar a mano el
   botón "atrás" de Android: en el modal vuelve a Perfil sin cambios, y a pantalla completa sale
   de la app. También, que las pantallas se ven sin cortes en 360 px (edge cases).
 
