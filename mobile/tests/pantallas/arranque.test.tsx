@@ -178,7 +178,7 @@ describe("arranque con usuario recordado (US2)", () => {
     await avanzar(1000);
 
     expect(await screen.findByText(AVISO)).toBeOnTheScreen();
-    expect(screen.getByText(TITULO)).toBeOnTheScreen();
+    expect(await screen.findByText(TITULO)).toBeOnTheScreen();
     expect(screen.queryByText(FRANJA)).toBeNull();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).toBeNull();
     expect(borrar.mock.calls.filter(([clave]) => clave === CLAVE_RECORDADO)).toHaveLength(1);

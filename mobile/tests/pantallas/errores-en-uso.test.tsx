@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
 import { act, screen, waitFor } from "expo-router/testing-library";
 import { useEffect } from "react";
 import { AccessibilityInfo, Text } from "react-native";
@@ -57,16 +56,13 @@ async function avanzar(ms: number) {
   await act(() => jest.advanceTimersByTimeAsync(ms));
 }
 
-/** Arranca con Lucía recordada y confirmada, y abre la pantalla de prueba. */
+/** Arranca con Lucía recordada y confirmada, en la pantalla de prueba. */
 async function abrirPrueba(prueba: RespuestaFalsa[], actual: RespuestaFalsa[] = [ok]) {
   const resultado = await renderConDependencias({
     usuarioRecordado: lucia.id,
     respuestas: porRuta({ [ACTUAL]: actual, [PRUEBA]: prueba, "/usuarios": [{ status: 200, json: todos }] }),
-    rutasExtra: { "(tabs)/prueba": PantallaDePrueba },
-  });
-  await waitFor(() => expect(resultado.falso.pedidosA(ACTUAL)).toHaveLength(1));
-  await act(async () => {
-    router.push("/prueba");
+    // Reemplaza a Explorar: es una ruta de `(tabs)` y se ve apenas se confirma al usuario.
+    rutasExtra: { "(tabs)/index": PantallaDePrueba },
   });
   await waitFor(() => expect(resultado.falso.pedidosA(PRUEBA)).toHaveLength(1));
   return resultado;
@@ -110,7 +106,7 @@ describe("errores durante el uso (US2, FR-014)", () => {
     await abrirPrueba([noIdentificado]);
 
     expect(await screen.findByText(AVISO)).toBeOnTheScreen();
-    expect(screen.getByText(TITULO)).toBeOnTheScreen();
+    expect(await screen.findByText(TITULO)).toBeOnTheScreen();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).toBeNull();
   });
 
