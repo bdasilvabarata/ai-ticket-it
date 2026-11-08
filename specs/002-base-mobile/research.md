@@ -70,6 +70,15 @@ dependen del Expo Go instalado en el celular de la persona que hace el TP.
     (`tabBarLabel`), abre en Explorar (FR-017).
   - `app/seleccionar-usuario.tsx`: el selector. Si se abrió como modal, al elegir o al
     salir hace `router.back()` (US3-4/5).
+- **Ajuste al implementar (T065)**: Expo Router exige nombres de pantalla únicos ("Screen names
+  must be unique"), así que `seleccionar-usuario` no puede estar en dos grupos. Se declara
+  **una sola vez**, en un grupo con guard `fase !== "iniciando"` y después de `(tabs)`, con
+  opciones según la fase: en `con-usuario`, `presentation: "modal"` con header y "Cerrar"; en
+  `sin-usuario`, sin header y sin gesto atrás. Como el selector sigue disponible con usuario,
+  el guard ya no lo saca al elegir: desde pantalla completa, `elegirUsuario` hace
+  `router.replace("/")`, y desde el modal, `router.back()`. El olvido sigue sin navegar a
+  mano: `(tabs)` sale y queda el selector. Que con el modal abierto el selector pase de verdad
+  a pantalla completa en el celular, y no quede como modal sin "Cerrar", se verifica en T066.
 - **Rationale**: `Stack.Protected` (Expo Router ≥ SDK 53) declara el guard en un único lugar
   y evita la carrera de un `Redirect` que se dispara antes de montar el layout. La ruta
   `cargando` evita que el selector se monte (y pida la lista) mientras se valida al usuario

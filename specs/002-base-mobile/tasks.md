@@ -533,17 +533,17 @@ usuario y comprobar que al reabrir se recuerda el nuevo (quickstart §4). Automa
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T058 [P] [US3] Test `mobile/tests/pantallas/navegacion.test.tsx` con un usuario
+- [X] T058 [P] [US3] Test `mobile/tests/pantallas/navegacion.test.tsx` con un usuario
   confirmado:
   - las pestañas "Explorar", "Mis compras", "Mis eventos" y "Perfil" aparecen en ese orden y
     con texto, y abre Explorar (US3-1, FR-017);
   - cada una de las tres primeras muestra su nombre y "Esta sección todavía no está
     disponible." (US3-2).
-- [ ] T059 [P] [US3] Test `mobile/tests/pantallas/perfil.test.tsx`:
+- [X] T059 [P] [US3] Test `mobile/tests/pantallas/perfil.test.tsx`:
   - confirmado → "Lucía Álvarez" y "Cambiar usuario" (US3-3);
   - conservado sin servidor → "Usuario usuario-lucia" y "No se pudieron cargar los datos del
     usuario."; tras un reintento exitoso con fake timers, pasa a "Lucía Álvarez" (FR-019).
-- [ ] T060 [P] [US3] Test `mobile/tests/pantallas/cambiar-usuario.test.tsx`:
+- [X] T060 [P] [US3] Test `mobile/tests/pantallas/cambiar-usuario.test.tsx`:
   - Perfil → "Cambiar usuario" abre el selector. La fila de Lucía muestra "Actual", con
     `accessibilityLabel` "Lucía Álvarez, usuario actual" y `accessibilityState.selected`
     (US3-6, FR-022);
@@ -567,20 +567,20 @@ usuario y comprobar que al reabrir se recuerda el nuevo (quickstart §4). Automa
 
 ### Implementation for User Story 3
 
-- [ ] T061 [US3] Completar `mobile/app/(tabs)/_layout.tsx` con las cuatro pestañas, en orden y
+- [X] T061 [US3] Completar `mobile/app/(tabs)/_layout.tsx` con las cuatro pestañas, en orden y
   con `tabBarLabel`: `index` "Explorar" (`compass-outline`), `mis-compras` "Mis compras"
   (`ticket-outline`), `mis-eventos` "Mis eventos" (`calendar-outline`) y `perfil` "Perfil"
   (`person-circle-outline`). Las etiquetas no se recortan en 360 px (FR-017, FR-022).
-- [ ] T062 [P] [US3] Crear `mobile/app/(tabs)/mis-compras.tsx` y
+- [X] T062 [P] [US3] Crear `mobile/app/(tabs)/mis-compras.tsx` y
   `mobile/app/(tabs)/mis-eventos.tsx` con `<SeccionPendiente nombre="…" />` (FR-018).
-- [ ] T063 [P] [US3] Crear `mobile/app/(tabs)/perfil.tsx`. Con `usuario`, muestra "{nombre}
+- [X] T063 [P] [US3] Crear `mobile/app/(tabs)/perfil.tsx`. Con `usuario`, muestra "{nombre}
   {apellido}"; con `usuario: null`, "Usuario {usuarioId}" y "No se pudieron cargar los datos
   del usuario.". El botón "Cambiar usuario" hace `router.push("/seleccionar-usuario")`
   (FR-019).
-- [ ] T064 [US3] Sumar a `mobile/src/componentes/FilaUsuario.tsx` la marca para `esActual`:
+- [X] T064 [US3] Sumar a `mobile/src/componentes/FilaUsuario.tsx` la marca para `esActual`:
   texto visible "Actual", `accessibilityLabel` "{nombre} {apellido}, usuario actual" y
   `accessibilityState={{ selected: true }}` (FR-015, FR-022).
-- [ ] T065 [US3] Modo modal del selector:
+- [X] T065 [US3] Modo modal del selector:
   - en `mobile/src/navegacion/LayoutRaiz.tsx`, dentro del grupo `con-usuario`, la pantalla
     `seleccionar-usuario` va con `presentation: "modal"` y un `headerRight` "Cerrar"
     (`accessibilityLabel` "Cerrar sin cambiar de usuario") que hace `router.back()`;
