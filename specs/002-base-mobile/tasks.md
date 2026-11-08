@@ -445,7 +445,7 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T049 [P] [US2] Test `mobile/tests/componentes/franja.test.tsx`:
+- [X] T049 [P] [US2] Test `mobile/tests/componentes/franja.test.tsx`:
   `FranjaServidorNoDisponible({ urlBase, reintentando, alReintentar })` muestra "Servidor no
   disponible · {urlBase}" y "Reintentar". Con `reintentando`, muestra "Reintentando…"
   deshabilitado. Tiene `accessibilityRole="alert"` y `accessibilityLiveRegion="polite"`. Al
