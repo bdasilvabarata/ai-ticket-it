@@ -1,6 +1,6 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
-import { useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../src/api";
@@ -13,6 +13,8 @@ import { useConexion } from "../src/conexion/useConexion";
 import { useUsuarios } from "../src/consultas/useUsuarios";
 import { useSesion } from "../src/sesion/SesionProvider";
 
+const AVISO_USUARIO_INEXISTENTE = "El usuario con el que estabas operando ya no existe. Elegí otro.";
+
 /** Selector de usuario (contracts/app.md "Seleccionar usuario"). */
 export default function SeleccionarUsuario() {
   const { estado, elegirUsuario } = useSesion();
@@ -21,6 +23,11 @@ export default function SeleccionarUsuario() {
   const [eligiendo, setEligiendo] = useState(false);
 
   const usuarioIdActual = estado.fase === "con-usuario" ? estado.usuarioId : null;
+  const conAviso = estado.fase === "sin-usuario" && estado.aviso === "usuario-anterior-inexistente";
+
+  useEffect(() => {
+    if (conAviso) AccessibilityInfo.announceForAccessibility(AVISO_USUARIO_INEXISTENTE);
+  }, [conAviso]);
 
   function alElegir(usuario: UsuarioVista) {
     setEligiendo(true);
@@ -73,6 +80,11 @@ export default function SeleccionarUsuario() {
 
   return (
     <SafeAreaView style={estilos.pantalla} edges={["top", "bottom"]}>
+      {conAviso ? (
+        <View style={estilos.aviso} accessibilityLiveRegion="polite">
+          <Text style={estilos.textoAviso}>{AVISO_USUARIO_INEXISTENTE}</Text>
+        </View>
+      ) : null}
       <View style={estilos.contenido}>{contenido}</View>
     </SafeAreaView>
   );
@@ -81,6 +93,16 @@ export default function SeleccionarUsuario() {
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: colores.fondo },
   contenido: { flex: 1 },
+  aviso: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colores.avisoTexto,
+    backgroundColor: colores.avisoFondo,
+  },
+  textoAviso: { fontSize: 15, color: colores.avisoTexto },
   titulo: {
     fontSize: 22,
     fontWeight: "600",
