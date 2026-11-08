@@ -360,3 +360,20 @@ dependen del Expo Go instalado en el celular de la persona que hace el TP.
   los repitan igual.
 - **Alternatives considered**: una librería de UI (contra el principio VII); dejar las
   convenciones solo en `AGENTS.md` (la skill se carga justo cuando se crea una pantalla).
+
+## Desvíos registrados al implementar
+
+- **R1 (TypeScript)**: el SDK 58 fija `typescript ~6.0.3`, la misma versión que la raíz, así
+  que npm instala una sola copia (no queda anidada en `mobile/node_modules`). Con TypeScript 6
+  `types` ya no incluye `@types/*` por defecto: `mobile/tsconfig.json` declara
+  `"types": ["jest"]`.
+- **R2 (React duplicado)**: `expo-router` pide `react-dom` como peer y npm izó `react-dom@19.3.1`
+  con `react@19.3.1`, mientras el SDK fija `react@19.3.0` en `mobile/`. Dos copias de React
+  rompen los hooks, así que la raíz fija `overrides: { react: "19.3.0", "react-dom": "19.3.0" }`.
+- **R2 (plantilla)**: la plantilla `blank-typescript@sdk-58` trae además `AGENTS.md`,
+  `.claude/settings.json` (plugin de Expo) y `LICENSE` propios; se borraron porque las
+  instrucciones del repo viven en la raíz. También `assets/favicon.png` y la sección `web` de
+  `app.json` (no hay cliente web).
+- **R13**: `eslint-plugin-react-hooks@7.1.1` acepta `eslint ^10`; se usa
+  `configs.flat.recommended`. En `jest.setup.ts` el mock de AsyncStorage se carga con
+  `jest.requireActual` (la regla `no-require-imports` prohíbe `require`).

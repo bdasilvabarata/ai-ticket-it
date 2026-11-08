@@ -64,19 +64,19 @@ configurados.
   SDK de Expo soporta el Expo Go de Android instalado y anotarlo en
   `specs/002-base-mobile/research.md` (R1, "SDK fijado: NN"). Ninguna tarea siguiente empieza
   sin este dato. **Resultado: SDK 58** (Expo Go 58.0.5, verificado el 2026-11-08).
-- [ ] T002 Generar `mobile/` desde la raíz con la plantilla mínima de TypeScript del SDK de
+- [X] T002 Generar `mobile/` desde la raíz con la plantilla mínima de TypeScript del SDK de
   T001 (`npx create-expo-app@latest mobile --template blank-typescript@sdk-NN --no-install`).
   Borrar lo que trae la plantilla y no se usa: `mobile/.git/` (si lo crea),
   `mobile/package-lock.json`, `mobile/App.tsx`, `mobile/index.ts` y `mobile/.gitignore`. El
   `.gitignore` de la raíz ya cubre `mobile/.expo/`, `ios/`, `android/` y `.env`, y
   `expo-env.d.ts` se tiene que versionar (R11) (R2).
-- [ ] T003 Editar `mobile/package.json`: `"name": "@ai-ticket-it/mobile"`, `"private": true`,
+- [X] T003 Editar `mobile/package.json`: `"name": "@ai-ticket-it/mobile"`, `"private": true`,
   **sin** `"type"`, `"main": "expo-router/entry"`. Scripts: `start` = `expo start`,
   `test` = `jest` (Jest activa `--ci` solo cuando detecta CI), `typecheck` = `tsc --noEmit`.
   En `dependencies`, `"@ai-ticket-it/shared": "*"` (R2, R13).
-- [ ] T004 Editar `package.json` de la raíz: `"workspaces": ["backend", "shared", "mobile"]` y
+- [X] T004 Editar `package.json` de la raíz: `"workspaces": ["backend", "shared", "mobile"]` y
   script `"mobile": "npm run start -w mobile"` (FR-001, FR-002).
-- [ ] T005 Instalar dependencias desde `mobile/`:
+- [X] T005 Instalar dependencias desde `mobile/`:
   - `npx expo install expo-router react-native-safe-area-context react-native-screens
     expo-linking expo-constants expo-status-bar @react-native-async-storage/async-storage
     @expo/vector-icons`;
@@ -85,24 +85,24 @@ configurados.
   - `npm install -D @testing-library/react-native -w mobile`.
 
   TypeScript queda como `devDependency` de `mobile/` en la versión que fija el SDK (R1, R9, R12).
-- [ ] T006 [P] Escribir `mobile/app.json`: `name` "AI Ticket It", `slug` "ai-ticket-it",
+- [X] T006 [P] Escribir `mobile/app.json`: `name` "AI Ticket It", `slug` "ai-ticket-it",
   `scheme` "ai-ticket-it", `orientation` "portrait", `plugins: ["expo-router"]`, **sin**
   `experiments.typedRoutes` y sin `web` (R2, R11).
-- [ ] T007 [P] Escribir `mobile/tsconfig.json`: `"extends": "expo/tsconfig.base"`,
+- [X] T007 [P] Escribir `mobile/tsconfig.json`: `"extends": "expo/tsconfig.base"`,
   `compilerOptions: { "strict": true, "noEmit": true }`, `include: ["**/*.ts", "**/*.tsx",
   "expo-env.d.ts"]`, `exclude: ["node_modules", ".expo"]`. No hereda `tsconfig.base.json` de la
   raíz. Crear `mobile/expo-env.d.ts` con `/// <reference types="expo/types" />` y versionarlo
   (R11).
-- [ ] T008 [P] Escribir `mobile/jest.config.js` (CommonJS): `preset: "jest-expo"`,
+- [X] T008 [P] Escribir `mobile/jest.config.js` (CommonJS): `preset: "jest-expo"`,
   `testMatch: ["<rootDir>/tests/**/*.test.ts?(x)"]`, `setupFilesAfterEnv:
   ["<rootDir>/jest.setup.ts"]`, **sin** `transformIgnorePatterns` propio. Escribir
   `mobile/jest.setup.ts`: `jest.mock("@react-native-async-storage/async-storage", () =>
   require("@react-native-async-storage/async-storage/jest/async-storage-mock"))` y un
   `beforeEach` con `await AsyncStorage.clear()` y `jest.useRealTimers()` (R12, FR-025).
-- [ ] T009 [P] Crear `mobile/.env.example` con un comentario en español y
+- [X] T009 [P] Crear `mobile/.env.example` con un comentario en español y
   `EXPO_PUBLIC_API_URL=http://192.168.0.23:3000/api`: dirección base con `/api`, prioridad
   sobre la detección por host (FR-005, R10).
-- [ ] T010 Actualizar `eslint.config.js` e instalar `eslint-plugin-react-hooks` (versión con
+- [X] T010 Actualizar `eslint.config.js` e instalar `eslint-plugin-react-hooks` (versión con
   peer `eslint ^10`; si no la hay, la última compatible, registrada en research R13) como
   devDependency de la raíz:
   - `ignores` suma `mobile/.expo/`;
@@ -116,8 +116,8 @@ configurados.
   - `no-restricted-globals` con `{ name: "fetch", message: "Todo pedido al servidor vive en
     src/api (principio VII)" }` para `mobile/**`, salvo `mobile/src/api/**` y
     `mobile/src/composicion.tsx` (FR-006, R13).
-- [ ] T011 [P] Sumar `mobile/.expo/` a `.prettierignore` (R13).
-- [ ] T012 Correr `npm install` desde la raíz y verificar:
+- [X] T011 [P] Sumar `mobile/.expo/` a `.prettierignore` (R13).
+- [X] T012 Correr `npm install` desde la raíz y verificar:
   - `mobile` usa su propio TypeScript: `npm exec -w mobile -- tsc -v` muestra la versión del
     SDK y la raíz sigue en `~6.0`;
   - `npm run lint` y `npm run format:check` en verde (correr `npm run format` si la plantilla
