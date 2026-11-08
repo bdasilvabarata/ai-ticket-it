@@ -423,7 +423,7 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
   título y `tabBarLabel` "Explorar", ícono Ionicons `compass-outline`) y
   `mobile/app/(tabs)/index.tsx` (`<SeccionPendiente nombre="Explorar" />`). Las otras tres
   pestañas se suman en US3 (FR-017).
-- [ ] T048 [US1] **(persona)** Validar en el celular quickstart §2 y §6 con `npm start` y `npm
+- [X] T048 [US1] **(persona)** Validar en el celular quickstart §2 y §6 con `npm start` y `npm
   run mobile`. Si Metro no resuelve `@ai-ticket-it/shared`, agregar el `mobile/metro.config.js`
   mínimo de la guía de monorepos de Expo y registrarlo en research R2.
 
