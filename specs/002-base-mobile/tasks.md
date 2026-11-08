@@ -471,7 +471,7 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
     nunca hay dos pedidos de validación simultáneos (registro del fetch falso) (FR-021a);
   - con la franja visible, un cambio de `AppState` a `active` pide la validación en el acto
     (CHK005).
-- [ ] T051 [P] [US2] Test `mobile/tests/pantallas/errores-en-uso.test.tsx`. Usa una ruta
+- [X] T051 [P] [US2] Test `mobile/tests/pantallas/errores-en-uso.test.tsx`. Usa una ruta
   extra de prueba dentro de `(tabs)` que hace `useQuery` de `cliente.get("/prueba")` con clave
   `["prueba", usuarioId]`, con usuario recordado confirmado:
   - `/prueba` → `"rechazar"`: aparece la franja y la secuencia arranca. Al recuperarse,
@@ -479,16 +479,16 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
   - `/prueba` → 500: no hay franja ni pedidos extra (CHK013);
   - `/prueba` → 401 `USUARIO_NO_IDENTIFICADO`: selector con el aviso (FR-014);
   - una respuesta 401 que llega con el id de un usuario anterior → se ignora.
-- [ ] T052 [US2] *(Fusionada en T050, que escribe el mismo archivo. Se conserva el número para
+- [X] T052 [US2] *(Fusionada en T050, que escribe el mismo archivo. Se conserva el número para
   no renumerar.)*
 
 ### Implementation for User Story 2
 
-- [ ] T053 [P] [US2] Implementar `mobile/src/componentes/FranjaServidorNoDisponible.tsx`
+- [X] T053 [P] [US2] Implementar `mobile/src/componentes/FranjaServidorNoDisponible.tsx`
   (props `urlBase`, `reintentando`, `alReintentar`). Va arriba, con fondo de aviso **y**
   texto, y ocupa `useSafeAreaInsets().top` como `paddingTop`. Anuncia en un efecto al
   montarse. El botón tiene texto (T049, R8).
-- [ ] T054 [US2] Completar `mobile/src/sesion/SesionProvider.tsx` (depende de T041):
+- [X] T054 [US2] Completar `mobile/src/sesion/SesionProvider.tsx` (depende de T041):
   - al montar con un id recordado: `obtenerUsuarioActual(cliente, id)` con `usuarioId`
     explícito → `decidirValidacion` → despacha `validado` con el `usuarioId`. En `olvidar`,
     llama `usuarioRecordado.olvidar()`. En `conservar-sin-servidor`, `secuencia.iniciar()`;
@@ -505,12 +505,12 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
     segundo plano (CHK005; test en T050);
   - un `validado` que llega para otro `usuarioId` se descarta (lo hace el reducer). La
     secuencia ya se detiene en `elegirUsuario` (T041, A1) (R5, R7, R8).
-- [ ] T055 [US2] En `mobile/src/navegacion/LayoutRaiz.tsx`, montar la franja encima del `Stack` cuando
+- [X] T055 [US2] En `mobile/src/navegacion/LayoutRaiz.tsx`, montar la franja encima del `Stack` cuando
   `fase === "con-usuario"`, `servidor === "no-disponible"` y `useSegments()[0] !==
   "seleccionar-usuario"` (condición por exclusión, R8). Mientras está visible, envolver el
   `Stack` en un `SafeAreaInsetsContext.Provider` con `top: 0`, para que los headers no dupliquen
   el espacio.
-- [ ] T056 [US2] En `mobile/app/seleccionar-usuario.tsx`, mostrar sobre la lista el aviso "El
+- [X] T056 [US2] En `mobile/app/seleccionar-usuario.tsx`, mostrar sobre la lista el aviso "El
   usuario con el que estabas operando ya no existe. Elegí otro." cuando `estado.aviso ===
   "usuario-anterior-inexistente"`. Lleva `accessibilityLiveRegion="polite"` y lo anuncia con
   `announceForAccessibility` al aparecer (FR-013, FR-022).
