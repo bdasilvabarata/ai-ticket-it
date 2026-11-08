@@ -530,7 +530,7 @@ un cambio incompatible en `EstadoCompra` hace fallar el typecheck del backend.
   MongoDB real: `npm run seed` sin `--forzar` sale con 1 sin borrar; con `--forzar` dos veces
   no duplica; `npm start` informa "MongoDB externo"; una `MONGO_URI` inaccesible termina en
   ~5 s con mensaje y código ≠ 0) y §6 (segundo `npm start` → "El puerto 3000 ya está en uso").
-- [ ] T068 Al abrir el PR de `feature/001-base-backend` a `development` con tests, lint y
+- [X] T068 Al abrir el PR de `feature/001-base-backend` a `development` con tests, lint y
   typecheck en verde, actualizar el estado de la feature 001 en `docs/backlog.md`.
 
 ---
