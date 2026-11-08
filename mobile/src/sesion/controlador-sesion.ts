@@ -1,10 +1,11 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 
-import { ServidorNoDisponibleError, type ClienteApi } from "../api";
+import { obtenerUsuarioActual, ServidorNoDisponibleError, type ClienteApi } from "../api";
 import type { Dependencias } from "../composicion";
 import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
 import { claves } from "../consultas/claves";
 import { estadoInicial, reducirSesion, type EstadoSesion, type EventoSesion } from "./estado-sesion";
+import { decidirValidacion, type DecisionValidacion } from "./validacion";
 
 export interface OpcionesControlador {
   dependencias: Dependencias;
@@ -19,6 +20,8 @@ export interface ControladorSesion {
   iniciar(): () => void;
   elegirUsuario(usuario: UsuarioVista): Promise<void>;
   reintentarAhora(): Promise<void>;
+  /** La app volvió a primer plano: con la franja visible, valida en el acto (CHK005). */
+  alVolverAPrimerPlano(): void;
 }
 
 /**
@@ -34,6 +37,8 @@ export function crearControladorSesion({
   const { queryClient, usuarioRecordado } = dependencias;
   let estado: EstadoSesion = estadoInicial;
   let eligiendo = false;
+  let olvidando = false;
+  let detenido = false;
 
   function aplicar(evento: EventoSesion): void {
     estado = reducirSesion(estado, evento);
@@ -44,10 +49,67 @@ export function crearControladorSesion({
 
   const cliente = dependencias.crearCliente({
     obtenerUsuarioId: usuarioIdActual,
-    alUsuarioNoIdentificado: () => {},
+    // Un 401 de un pedido hecho en nombre de otro usuario (uno anterior) se ignora.
+    alUsuarioNoIdentificado: (usuarioId) => {
+      if (usuarioId === usuarioIdActual()) void olvidarUsuario(usuarioId);
+    },
   });
 
+  /** Regla de FR-013 sobre `GET /usuarios/actual` en nombre de `usuarioId`. */
+  async function validar(usuarioId: string): Promise<DecisionValidacion> {
+    try {
+      return decidirValidacion({ ok: true, usuario: await obtenerUsuarioActual(cliente, usuarioId) });
+    } catch (error) {
+      return decidirValidacion({ ok: false, error });
+    }
+  }
+
+  async function olvidarRecordado(): Promise<void> {
+    try {
+      await usuarioRecordado.olvidar();
+    } catch (error) {
+      console.warn("No se pudo olvidar al usuario recordado.", error);
+    }
+  }
+
+  /**
+   * Olvida al usuario actual y vuelve al selector con el aviso. Idempotente (U2): si la fase ya no
+   * es `con-usuario`, el usuario cambió o ya se lo está olvidando, no hace nada. Así un 401 que llega
+   * por el cliente y por la validación a la vez borra la clave una sola vez.
+   */
+  async function olvidarUsuario(usuarioId: string): Promise<void> {
+    if (olvidando || usuarioIdActual() !== usuarioId) return;
+    olvidando = true;
+    try {
+      await queryClient.cancelQueries();
+      queryClient.clear(); // nada del usuario olvidado queda en caché (FR-016)
+      await olvidarRecordado();
+      aplicar({ tipo: "usuario-no-identificado", usuarioId });
+    } finally {
+      olvidando = false;
+    }
+  }
+
+  async function validarAlIniciar(usuarioId: string): Promise<void> {
+    const decision = await validar(usuarioId);
+    if (detenido) return;
+    if (decision.tipo === "olvidar") await olvidarRecordado();
+    aplicar({ tipo: "validado", usuarioId, decision });
+    if (decision.tipo === "conservar-sin-servidor") secuencia.iniciar();
+  }
+
   async function intentarSegunFase(): Promise<boolean> {
+    if (estado.fase === "con-usuario") {
+      // Éxito solo si el servidor respondió algo concluyente; un 500 también es fallo (I1).
+      const { usuarioId } = estado;
+      const decision = await validar(usuarioId);
+      if (decision.tipo === "olvidar") {
+        await olvidarUsuario(usuarioId);
+        return true;
+      }
+      aplicar({ tipo: "validado", usuarioId, decision });
+      return decision.tipo === "confirmado";
+    }
     if (estado.fase === "sin-usuario") {
       await queryClient.refetchQueries({ queryKey: claves.usuarios() });
       const error = queryClient.getQueryState(claves.usuarios())?.error;
@@ -68,8 +130,11 @@ export function crearControladorSesion({
     alCambiar: alCambiarSecuencia,
   });
 
+  // Los 401 llegan por `alUsuarioNoIdentificado` del cliente, que sabe en nombre de quién se pidió.
   function alFallarConsulta(error: unknown): void {
-    if (error instanceof ServidorNoDisponibleError) secuencia.iniciar();
+    if (!(error instanceof ServidorNoDisponibleError)) return;
+    aplicar({ tipo: "servidor-no-disponible" });
+    secuencia.iniciar();
   }
 
   return {
@@ -79,9 +144,12 @@ export function crearControladorSesion({
       const desuscribir = dependencias.registrarOyenteDeErrores(alFallarConsulta);
       void (async () => {
         const usuarioId = await usuarioRecordado.leer();
+        if (detenido) return;
         if (usuarioId === null) aplicar({ tipo: "sin-recordado" });
+        else await validarAlIniciar(usuarioId);
       })();
       return () => {
+        detenido = true;
         desuscribir();
         secuencia.detener();
       };
@@ -107,5 +175,11 @@ export function crearControladorSesion({
     },
 
     reintentarAhora: () => secuencia.reintentarAhora(),
+
+    alVolverAPrimerPlano() {
+      if (estado.fase === "con-usuario" && estado.servidor === "no-disponible") {
+        void secuencia.reintentarAhora();
+      }
+    },
   };
 }

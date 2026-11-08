@@ -1,5 +1,6 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
+import { AppState } from "react-native";
 
 import type { ClienteApi } from "../api";
 import { useDependencias } from "../composicion";
@@ -33,6 +34,14 @@ export function SesionProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => controlador.iniciar(), [controlador]);
+
+  // Sin pausa manual en segundo plano: al volver, si la franja está visible, valida en el acto (CHK005).
+  useEffect(() => {
+    const suscripcion = AppState.addEventListener("change", (estadoApp) => {
+      if (estadoApp === "active") controlador.alVolverAPrimerPlano();
+    });
+    return () => suscripcion.remove();
+  }, [controlador]);
 
   const valor: ValorSesion = {
     estado,
