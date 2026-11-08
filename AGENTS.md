@@ -64,6 +64,9 @@ Antes de dar una tarea por terminada: `npm test`, `npm run lint`, `npm run typec
 Además, un hook `Stop` de Claude Code (`.claude/settings.json` →
 `.claude/hooks/verificar-al-terminar.mjs`) corre `typecheck` y `lint` al terminar cada turno en
 que cambió algo que no sea Markdown, y si fallan no deja cerrar el turno hasta corregirlos.
+Por eso, en TDD, el test y un **stub con la firma real** del módulo que importa (que lanza
+`new Error("no implementado")`) se escriben en el mismo turno: el typecheck queda en verde y el
+test falla por comportamiento, no por un import inexistente.
 
 ## Convención de nombres (repositories y services)
 
