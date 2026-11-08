@@ -29,6 +29,18 @@ export default function LayoutPestanas() {
         name="index"
         options={{ title: "Explorar", tabBarLabel: "Explorar", tabBarIcon: icono("compass-outline") }}
       />
+      <Tabs.Screen
+        name="mis-compras"
+        options={{ title: "Mis compras", tabBarLabel: "Mis compras", tabBarIcon: icono("ticket-outline") }}
+      />
+      <Tabs.Screen
+        name="mis-eventos"
+        options={{ title: "Mis eventos", tabBarLabel: "Mis eventos", tabBarIcon: icono("calendar-outline") }}
+      />
+      <Tabs.Screen
+        name="perfil"
+        options={{ title: "Perfil", tabBarLabel: "Perfil", tabBarIcon: icono("person-circle-outline") }}
+      />
     </Tabs>
   );
 }
