@@ -93,3 +93,19 @@ export function crearFetchFalso(respuestas: Respuestas): FetchFalso {
     pedidosA: (ruta) => pedidos.filter((pedido) => pedido.url.endsWith(ruta)),
   };
 }
+
+/**
+ * Respuestas por ruta: cada ruta consume su propia lista y, cuando se acaba, repite la última.
+ * La ruta se compara con el final de la URL (`"/usuarios"` no matchea `"/usuarios/actual"`).
+ */
+export function porRuta(mapa: Record<string, ReadonlyArray<RespuestaFalsa>>): FuncionRespuesta {
+  const indices = new Map<string, number>();
+  return (url) => {
+    const ruta = Object.keys(mapa).find((candidata) => url.endsWith(candidata));
+    if (ruta === undefined) throw new Error(`porRuta: no hay respuestas para ${url}`);
+    const lista = mapa[ruta];
+    const indice = indices.get(ruta) ?? 0;
+    indices.set(ruta, indice + 1);
+    return lista[Math.min(indice, lista.length - 1)];
+  };
+}

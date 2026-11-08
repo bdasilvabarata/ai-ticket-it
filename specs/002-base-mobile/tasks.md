@@ -89,7 +89,8 @@ configurados.
   `experiments.typedRoutes` y sin `web` (R2, R11).
 - [X] T007 [P] Escribir `mobile/tsconfig.json`: `"extends": "expo/tsconfig.base"`,
   `compilerOptions: { "strict": true, "noEmit": true }`, `include: ["**/*.ts", "**/*.tsx"]`,
-  `exclude: ["node_modules", ".expo"]`. No hereda `tsconfig.base.json` de la raíz. Sin `expo-env.d.ts`: Expo SDK 58 lo borra al correr `expo start` (R11).
+  `exclude: ["node_modules", ".expo"]`. No hereda `tsconfig.base.json` de la raíz. Sin
+  `expo-env.d.ts`: Expo SDK 58 lo borra al correr `expo start` (R11).
 - [X] T008 [P] Escribir `mobile/jest.config.js` (CommonJS): `preset: "jest-expo"`,
   `testMatch: ["<rootDir>/tests/**/*.test.ts?(x)"]`, `setupFilesAfterEnv:
   ["<rootDir>/jest.setup.ts"]`, **sin** `transformIgnorePatterns` propio. Escribir
@@ -448,7 +449,7 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
   deshabilitado. Tiene `accessibilityRole="alert"` y `accessibilityLiveRegion="polite"`. Al
   montarse, llama `AccessibilityInfo.announceForAccessibility("Servidor no disponible")` una
   vez (espiado con `jest.spyOn`) (FR-021, FR-022).
-- [ ] T050 [P] [US2] Test `mobile/tests/pantallas/arranque.test.tsx` con `usuarioRecordado:
+- [X] T050 [P] [US2] Test `mobile/tests/pantallas/arranque.test.tsx` con `usuarioRecordado:
   "usuario-lucia"`:
   - mientras `GET /usuarios/actual` está colgado: "Cargando…", sin selector y sin pedido a
     `/usuarios` (US2-6);
