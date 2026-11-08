@@ -322,6 +322,21 @@ dependen del Expo Go instalado en el celular de la persona que hace el TP.
 - **Alternatives considered**: MSW (otra dependencia para lo que ya resuelve la inyección);
   `@testing-library/jest-native` (deprecada, sus matchers están en RNTL); tests junto a cada
   archivo (en `app/` se interpretarían como rutas).
+- **Hallazgos al implementar (US2–US3)**:
+  - `jest.config.js` lleva `clearMocks: true`. El preset ya mockea APIs como
+    `AccessibilityInfo.announceForAccessibility`, y `jest.spyOn` sobre un mock existente
+    devuelve ese mismo mock, con las llamadas de los tests anteriores. Sin `clearMocks`, contar o
+    verificar anuncios daba falsos resultados.
+  - Las pestañas se buscan como `button` con la etiqueta "{nombre}, tab, {i} of {n}" (Jest
+    corre con plataforma iOS). El contenedor `tablist` no es accesible por sí mismo, así que
+    `*ByRole("tablist")` no lo encuentra (helper `tests/helpers/pestanas.ts`).
+  - Una ruta de `(tabs)/` sin su `Tabs.Screen` en `(tabs)/_layout.tsx` no es una pestaña ni se
+    puede navegar a ella: `router.navigate` no cambia la ruta, aunque el archivo exista. Por
+    eso la ruta de prueba de `errores-en-uso.test.tsx` (T051) **reemplaza a `(tabs)/index`**
+    en lugar de ser `(tabs)/prueba`: así es una ruta real de `(tabs)` que se ve apenas se
+    confirma al usuario, sin tocar el layout que se está probando. Se había atribuido a que el
+    layout declaraba solo Explorar. Con las cuatro pestañas (T061) se volvió a probar:
+    `/perfil` navega, pero `(tabs)/prueba` sigue sin poder navegarse.
 
 ## R13. Lint, formato y CI
 
