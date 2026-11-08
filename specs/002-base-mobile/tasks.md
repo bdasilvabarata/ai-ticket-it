@@ -606,13 +606,13 @@ dirección configurable.
 **Independent Test**: `tests/api/*` y `tests/shared.test.ts` en verde (T013–T018), más las
 verificaciones de esta fase.
 
-- [ ] T067 [US4] Verificar que ninguna pantalla, hook ni componente importa archivos internos
+- [X] T067 [US4] Verificar que ninguna pantalla, hook ni componente importa archivos internos
   de `src/api/` salvo `src/api/index.ts` (o mover los imports), y que `index.ts` exporta
   exactamente lo que lista [contracts/cliente-api.md](./contracts/cliente-api.md).
-- [ ] T068 [US4] Verificación negativa del lint (FR-006): agregar temporalmente `fetch("x")` a
+- [X] T068 [US4] Verificación negativa del lint (FR-006): agregar temporalmente `fetch("x")` a
   `mobile/app/(tabs)/index.tsx` y comprobar que `npm run lint` falla con "Todo pedido al
   servidor vive en src/api (principio VII)". Revertir.
-- [ ] T069 [US4] Verificación negativa de tipos (US4-7): renombrar temporalmente un campo de
+- [X] T069 [US4] Verificación negativa de tipos (US4-7): renombrar temporalmente un campo de
   `UsuarioVista` en `shared/src/` y comprobar que `npm run typecheck` falla en `mobile`.
   Revertir.
 - [ ] T070 [US4] **(persona)** Validar en el celular quickstart §5 (`EXPO_PUBLIC_API_URL` con
@@ -631,17 +631,17 @@ verificaciones de esta fase.
 `mobile`. Un error introducido a propósito en `mobile/` hace fallar el comando
 correspondiente.
 
-- [ ] T071 [US5] En `.github/workflows/ci.yml`, renombrar el paso "Tests (Vitest)" a "Tests
+- [X] T071 [US5] En `.github/workflows/ci.yml`, renombrar el paso "Tests (Vitest)" a "Tests
   (Vitest y Jest)". Los demás pasos no cambian: `npm ci` instala `mobile` por estar en
   `workspaces` (R13, FR-023).
-- [ ] T072 [US5] Verificar desde la raíz que `npm test`, `npm run lint`, `npm run typecheck` y
+- [X] T072 [US5] Verificar desde la raíz que `npm test`, `npm run lint`, `npm run typecheck` y
   `npm run format:check` recorren `backend`, `shared` y `mobile` y terminan en verde, y que la
   suite de `mobile` tarda < 1 min (SC-006). `npm run typecheck` se corre con `mobile/.expo/`
   borrado, para comprobar que no depende de `expo start` (R11).
-- [ ] T073 [US5] Verificaciones negativas en `mobile/`: un error de tipos, una regla de lint
+- [X] T073 [US5] Verificaciones negativas en `mobile/`: un error de tipos, una regla de lint
   (`any`), un archivo mal formateado y un test que falla hacen fallar, cada uno, su comando.
   Revertir cada cambio (US5-1, US5-2).
-- [ ] T074 [US5] Verificar la instalación limpia: en una copia del repo sin `node_modules`,
+- [X] T074 [US5] Verificar la instalación limpia: en una copia del repo sin `node_modules`,
   `npm ci` instala también `mobile` con un solo comando (US5-3).
 
 **Checkpoint**: `mobile` queda bajo el mismo control de calidad que el backend.
