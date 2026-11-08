@@ -615,7 +615,7 @@ verificaciones de esta fase.
 - [X] T069 [US4] Verificación negativa de tipos (US4-7): renombrar temporalmente un campo de
   `UsuarioVista` en `shared/src/` y comprobar que `npm run typecheck` falla en `mobile`.
   Revertir.
-- [ ] T070 [US4] **(persona)** Validar en el celular quickstart §5 (`EXPO_PUBLIC_API_URL` con
+- [X] T070 [US4] **(persona)** Validar en el celular quickstart §5 (`EXPO_PUBLIC_API_URL` con
   un valor válido y con uno inválido; la franja o el selector muestran esa dirección). Borrar
   `mobile/.env` al terminar.
 
@@ -652,7 +652,7 @@ correspondiente.
 
 **Purpose**: documentación, validación de punta a punta y skill para las features siguientes.
 
-- [ ] T075 [P] Actualizar `README.md`:
+- [X] T075 [P] Actualizar `README.md`:
   - SDK de Expo y Expo Go requerido (FR-003);
   - `npm install`, `npm start` y `npm run mobile`, y cómo abrir con el QR;
   - `EXPO_PUBLIC_API_URL` y `mobile/.env.example`, y por qué `localhost` falla en el celular;
@@ -660,7 +660,7 @@ correspondiente.
     Windows con los puertos 3000 y 8081, y `REACT_NATIVE_PACKAGER_HOSTNAME` con el comando de
     PowerShell y el de bash para VirtualBox;
   - calidad de la app (FR-026, R10).
-- [ ] T076 [P] Actualizar `AGENTS.md`:
+- [X] T076 [P] Actualizar `AGENTS.md`:
   - mapa de `mobile/` (`app/`, `src/navegacion` con `LayoutRaiz`, `src/api`, `src/sesion`,
     `src/conexion`, `src/consultas`, `src/componentes`, `src/composicion.tsx` como composition
     root, `tests/`). Aclarar que las rutas de `app/` solo exportan su componente por defecto y
@@ -669,7 +669,7 @@ correspondiente.
   - `npm install` instala también `mobile`;
   - quitar la nota de que `mobile/` lo crea la 002;
   - mencionar la skill `nueva-pantalla` (FR-026).
-- [ ] T077 Correr desde `mobile/` `npx expo install --check` (sin advertencias) y, desde la
+- [X] T077 Correr desde `mobile/` `npx expo install --check` (sin advertencias) y, desde la
   raíz, `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check`, los cuatro
   en verde (R1, principio IX).
 - [ ] T078 **(persona)** Recorrer [quickstart.md](./quickstart.md) completo en el celular
