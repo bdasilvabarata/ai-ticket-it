@@ -61,6 +61,9 @@ Desde la raíz del repo:
 
 Antes de dar una tarea por terminada: `npm test`, `npm run lint`, `npm run typecheck` y
 `npm run format:check` en verde. El CI (`.github/workflows/ci.yml`) los corre en cada PR.
+Además, un hook `Stop` de Claude Code (`.claude/settings.json` →
+`.claude/hooks/verificar-al-terminar.mjs`) corre `typecheck` y `lint` al terminar cada turno en
+que cambió algo que no sea Markdown, y si fallan no deja cerrar el turno hasta corregirlos.
 
 ## Convención de nombres (repositories y services)
 
