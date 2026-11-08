@@ -351,7 +351,9 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
     (FR-021a);
   - elegir a Lucía → se ve Explorar, y AsyncStorage tiene
     `{"version":1,"usuarioId":"usuario-lucia"}` (US1-2, FR-012);
-  - doble toque sobre la fila → `setItem` una sola vez y navegación consistente (edge case).
+  - doble toque sobre la fila → `setItem` una sola vez y navegación consistente (edge case);
+  - `setItem` que rechaza → se ve Explorar igual, AsyncStorage queda sin la clave y hubo un
+    `console.warn` (CHK004).
 - [ ] T038 [P] [US1] Test `mobile/tests/pantallas/guards.test.tsx`: sin usuario recordado y
   con `initialUrl: "/"` o `"/perfil"`, se ve el selector y no las pestañas (FR-011). Después
   de elegir, la ruta es `/` (Explorar).
@@ -374,7 +376,9 @@ misma red sin configurar nada. Aparece la lista de usuarios y elegir uno lleva a
     validación del recordado es US2);
   - `elegirUsuario(usuario)` es idempotente: un ref "procesando" ignora una segunda llamada.
     Hace `secuencia.detener()`, `await queryClient.cancelQueries()`, `queryClient.clear()`,
-    `await usuarioRecordado.guardar(usuario.id)` y despacha `elegido(usuario)` (FR-016, A1);
+    `await usuarioRecordado.guardar(usuario.id)` y despacha `elegido(usuario)` (FR-016, A1).
+    Si `guardar` rechaza, entra igual con el elegido, sin recordarlo, y registra un
+    `console.warn` (CHK004, cubierto en T037);
   - una **única** `SecuenciaDeReintentos`, creada una vez. En `sin-usuario`, `intentar` hace
     `refetchQueries({ queryKey: claves.usuarios() })` y es éxito si el error ya no es
     `ServidorNoDisponibleError`. Ante un éxito, `refetchQueries({ type: "active", predicate:
@@ -466,7 +470,9 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
   - un reintento automático que recibe 401 → selector con el aviso, y la clave se borra una
     sola vez aunque el 401 llegue por el cliente y por la validación (FR-021a, U2);
   - secuencia única: con la franja visible, un fallo de otra query no reinicia la secuencia, y
-    nunca hay dos pedidos de validación simultáneos (registro del fetch falso) (FR-021a).
+    nunca hay dos pedidos de validación simultáneos (registro del fetch falso) (FR-021a);
+  - con la franja visible, un cambio de `AppState` a `active` pide la validación en el acto
+    (CHK005).
 - [ ] T051 [P] [US2] Test `mobile/tests/pantallas/errores-en-uso.test.tsx`. Usa una ruta
   extra de prueba dentro de `(tabs)` que hace `useQuery` de `cliente.get("/prueba")` con clave
   `["prueba", usuarioId]`, con usuario recordado confirmado:
@@ -496,6 +502,9 @@ con aviso (quickstart §3). Automatizado: `tests/pantallas/arranque.test.tsx`,
     es `con-usuario` o el `usuarioId` cambió, no hace nada (U2);
   - `alUsuarioNoIdentificado(id)` del cliente → si `id === ref.current`, `olvidarUsuario`;
   - el oyente de errores también despacha `servidor-no-disponible` en `con-usuario`;
+  - al volver la app a primer plano (`AppState` `active`) con la franja visible (`con-usuario`
+    y `servidor: "no-disponible"`), llama `secuencia.reintentarAhora()`. Sin pausa manual en
+    segundo plano (CHK005; test en T050);
   - un `validado` que llega para otro `usuarioId` se descarta (lo hace el reducer). La
     secuencia ya se detiene en `elegirUsuario` (T041, A1) (R5, R7, R8).
 - [ ] T055 [US2] En `mobile/src/navegacion/LayoutRaiz.tsx`, montar la franja encima del `Stack` cuando

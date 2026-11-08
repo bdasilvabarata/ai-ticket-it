@@ -46,6 +46,11 @@ features 003 en adelante), endpoints nuevos en el servidor, registro o contrase�
   - CHK020 → un 401 con el selector abierto como modal lo convierte en el selector a pantalla completa, sin "Cerrar" y con el aviso de usuario inexistente.
   - CHK022 → el botón "atrás" de Android equivale a "Cerrar" en el modal. Sin usuario elegido, hace lo normal del sistema (sale de la app).
   - CHK026/CHK027 → los avisos se anuncian al lector de pantalla al aparecer, y la marca "Actual" forma parte de la etiqueta accesible de la fila.
+- Revisión del checklist `sesion-y-ux` (antes de `/speckit-implement`):
+  - CHK018 → al elegir otro usuario desde el selector abierto como modal, la app vuelve a Perfil (`router.back()`) y Perfil muestra al nuevo usuario. Desde el selector a pantalla completa (sin usuario elegido), se entra a Explorar. US3-4 queda ajustado.
+  - CHK016 → ante un error inesperado (por ejemplo, 500) en la validación del usuario actual, la franja muestra el mismo texto "Servidor no disponible" (decisión I1); no hay un texto aparte.
+  - CHK004 → si falla guardar el usuario recordado al elegir, la app entra igual con el usuario elegido, sin recordarlo, y registra un `console.warn`.
+  - CHK005 → no hay pausa manual en segundo plano. Al volver la app a primer plano (`AppState` `active`) con la franja visible, se llama a `reintentarAhora()`.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -159,9 +164,10 @@ y que, al reabrir la app, se recuerda al nuevo.
    **Then** la sección indica su nombre y que su contenido todavía no está disponible.
 3. **Given** la navegación principal, **When** se entra a Perfil, **Then** se ven el nombre y
    el apellido del usuario actual y la acción "Cambiar usuario".
-4. **Given** Perfil, **When** se elige "Cambiar usuario" y luego otro usuario, **Then** la app
-   vuelve a la navegación principal operando como el nuevo usuario, Perfil lo muestra y es el
-   que se recuerda al reabrir la app.
+4. **Given** Perfil, **When** se elige "Cambiar usuario" y luego otro usuario, **Then** el
+   selector se cierra y la app vuelve a Perfil operando como el nuevo usuario, Perfil lo
+   muestra y es el que se recuerda al reabrir la app. (Desde el selector a pantalla completa,
+   sin usuario elegido, se entra a Explorar: US1-2.)
 5. **Given** el selector abierto desde Perfil, **When** el usuario sale sin elegir otro,
    **Then** la app vuelve a Perfil y sigue operando como el usuario anterior.
 6. **Given** el selector abierto desde Perfil, **When** se muestra la lista, **Then** el usuario
