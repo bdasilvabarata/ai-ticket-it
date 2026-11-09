@@ -672,11 +672,11 @@ correspondiente.
 - [X] T077 Correr desde `mobile/` `npx expo install --check` (sin advertencias) y, desde la
   raíz, `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check`, los cuatro
   en verde (R1, principio IX).
-- [ ] T078 **(persona)** Recorrer [quickstart.md](./quickstart.md) completo en el celular
+- [X] T078 **(persona)** Recorrer [quickstart.md](./quickstart.md) completo en el celular
   (§1–§6) y anotar cualquier desvío en research.
-- [ ] T079 Actualizar `docs/backlog.md`: la 002 pasa a "en PR" al abrir el PR a `development`
+- [X] T079 Actualizar `docs/backlog.md`: la 002 pasa a "en PR" al abrir el PR a `development`
   (FR-026).
-- [ ] T080 Crear `.claude/skills/nueva-pantalla/SKILL.md` (última tarea, R14), con frontmatter
+- [X] T080 Crear `.claude/skills/nueva-pantalla/SKILL.md` (última tarea, R14), con frontmatter
   `name` y `description` (en el estilo de `.claude/skills/nuevo-endpoint/SKILL.md`), que
   explique:
   - dónde va la ruta: dentro de `app/(tabs)/` o apilada en el grupo `con-usuario`;
