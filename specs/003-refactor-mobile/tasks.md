@@ -466,7 +466,7 @@ lectura de la 002 sin cambios (quickstart §4).
   repetir la tabla completa de quickstart §2, ahora con `../../usuarios/formato` tal como está
   escrita; comparar el número de tests
   con T001 en **Notas**.
-- [ ] T036 Validación en el celular (quickstart §5, SC-002; la hace la persona): con
+- [X] T036 Validación en el celular (quickstart §5, SC-002; la hace la persona): con
   `npm start` y `npm run mobile`, repetir los recorridos del quickstart de la 002 (primer
   arranque, usuario recordado, cambio de usuario, servidor no disponible con franja y reintento,
   usuario inexistente con aviso) y confirmar que se ve igual. Después de `expo start`,
@@ -567,6 +567,10 @@ Task: "T028 cuerpo en PedidoRegistrado de mobile/tests/helpers/fetch-falso.ts"
   respeta y la ruta nunca se monta. (2) `/prueba-escritura` responde siempre `"rechazar"`: con
   `["rechazar", 201]`, al poner `mutations.retry: 1` el reintento salía bien y el test fallaba por
   la franja ausente, no por el conteo; así falla con "Expected length: 1, Received length: 2".
+- **T036**: validado en el celular por la persona; se ve y se comporta igual que la 002. Después de
+  `expo start`, el único cambio fue `mobile/.gitignore`, que Expo genera con las rutas tipadas
+  (ignora `expo-env.d.ts`): se versiona para que `git status` quede limpio en las corridas
+  siguientes. `mobile/tsconfig.json` no cambió.
 - [P] = archivos distintos, sin dependencias pendientes.
 - Cada tarea deja `test`, `lint`, `typecheck` y `format:check` en verde (plan, "Orden de
   implementación").
