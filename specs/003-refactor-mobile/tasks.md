@@ -461,7 +461,7 @@ lectura de la 002 sin cambios (quickstart §4).
   vive en el reducer de `SesionProvider` y en el controlador; unificarlo en un store externo
   (`useSyncExternalStore`) sin cambiar `useSesion`, `useClienteApi` ni `useConexion`. No
   bloquea ninguna feature".
-- [ ] T035 Validar quickstart §1–§4 desde la raíz: `npm test && npm run lint && npm run
+- [X] T035 Validar quickstart §1–§4 desde la raíz: `npm test && npm run lint && npm run
   typecheck && npm run format:check` en verde (y `npm run format` si Prettier marca algo);
   repetir la tabla completa de quickstart §2, ahora con `../../usuarios/formato` tal como está
   escrita; comparar el número de tests
@@ -556,6 +556,12 @@ Task: "T028 cuerpo en PedidoRegistrado de mobile/tests/helpers/fetch-falso.ts"
 
 - **Base de tests (T001)**: en `5f296e9`, `mobile/` tiene 19 suites y 128 tests en verde
   (backend: 16 archivos, 95 tests); lint, typecheck y format:check en verde.
+- **Validación final (T035)**: `mobile/` tiene 25 suites y 178 tests en verde (los 128 de la base
+  más 50 nuevos: contratos de conexión y cliente, arquitectura, formato, `Boton`,
+  `SegunConsulta`, `pedir`/atajos y las dos escrituras de `errores-en-uso`); backend sin cambios
+  (95). Lint, typecheck (también sin `mobile/.expo`, como en el CI) y format:check en verde. La
+  tabla de quickstart §2 da `import-x/no-cycle`, `import-x/no-restricted-paths` (×2),
+  `no-restricted-imports` y un error de tipos en la ruta, como se espera.
 - **T031, dos ajustes**: (1) la pantalla de escritura reemplaza a `(tabs)/index`, como la de
   lectura del mismo archivo: con el guard, un `initialUrl` a `(tabs)/prueba-escritura` no se
   respeta y la ruta nunca se monta. (2) `/prueba-escritura` responde siempre `"rechazar"`: con
