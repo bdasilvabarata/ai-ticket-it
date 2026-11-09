@@ -61,12 +61,12 @@ US2 (`SegunConsulta`).
 
 **Purpose**: red de seguridad del refactor y dependencias de lint instaladas.
 
-- [ ] T001 Correr desde la raíz `npm test`, `npm run lint`, `npm run typecheck` y
+- [X] T001 Correr desde la raíz `npm test`, `npm run lint`, `npm run typecheck` y
   `npm run format:check` en el HEAD actual de `feature/003-refactor-mobile`, antes de tocar
   código (sobre `development` la rama solo tiene commits de documentación), y anotar en la
   sección **Notas** al final de `specs/003-refactor-mobile/tasks.md` la cantidad de suites y de
   tests de `mobile/` que pasan. Es la base contra la que se compara FR-003 / SC-001.
-- [ ] T002 Instalar en la raíz, como devDependencies, `eslint-plugin-import-x@^4` y
+- [X] T002 Instalar en la raíz, como devDependencies, `eslint-plugin-import-x@^4` y
   `eslint-import-resolver-typescript` (`npm install -D ...`); verificar que el peer de
   `import-x` acepta `eslint ^10` sin `--legacy-peer-deps`. Archivos: `package.json`,
   `package-lock.json`. Sin uso todavía en `eslint.config.js`.
@@ -452,7 +452,7 @@ lectura de la 002 sin cambios (quickstart §4).
   primera ruta dinámica se suma a `mobile/tests/tipos/rutas-tipadas.ts` un caso con
   `@ts-expect-error` que navega sin el parámetro obligatorio (FR-009); hooks de consulta en la
   feature, no en `src/consultas/`; reglas de import entre features.
-- [ ] T034 [P] Actualizar `docs/backlog.md` (FR-022): nueva fila **003 Refactor mobile**
+- [X] T034 [P] Actualizar `docs/backlog.md` (FR-022): nueva fila **003 Refactor mobile**
   (organización por feature, piezas base de pantalla, cliente HTTP con todos los métodos; P0;
   depende de 002; estado `en curso`); renumerar las features 003–011 a 004–012 en la tabla, en
   sus columnas "Depende de", en el grafo mermaid (nodos y aristas, con 003 entre 002 y las
@@ -554,7 +554,8 @@ Task: "T028 cuerpo en PedidoRegistrado de mobile/tests/helpers/fetch-falso.ts"
 
 ## Notes
 
-- **Base de tests (T001)**: _completar al hacer T001: suites y tests de `mobile/` en verde._
+- **Base de tests (T001)**: en `5f296e9`, `mobile/` tiene 19 suites y 128 tests en verde
+  (backend: 16 archivos, 95 tests); lint, typecheck y format:check en verde.
 - [P] = archivos distintos, sin dependencias pendientes.
 - Cada tarea deja `test`, `lint`, `typecheck` y `format:check` en verde (plan, "Orden de
   implementación").
