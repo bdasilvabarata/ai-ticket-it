@@ -42,13 +42,13 @@ mobile/
 
 | Módulo | Exporta |
 |---|---|
-| `src/api` | `crearClienteApi`, `ClienteApi`, `MetodoHttp`, `resolverUrlBase`, `ErrorDeApi`, `ServidorNoDisponibleError`, `listarUsuarios`, `obtenerUsuarioActual` |
+| `src/api` | `crearClienteApi`, `ClienteApi`, `MetodoHttp`, `OpcionesPedido`, `OpcionesPedidoConCuerpo`, `resolverUrlBase`, `ErrorDeApi`, `ServidorNoDisponibleError`, `listarUsuarios`, `obtenerUsuarioActual` |
 | `src/consultas/cliente-api` | `ClienteApiProvider`, `useClienteApi` |
 | `src/consultas/claves` · `query-client` | `claves` · `crearQueryClient`, `conectarFocoDeLaApp` |
 | `src/conexion` | `EstadoConexion`, `ConexionProvider`, `useConexion` |
 | `src/componentes` | `tema`, `Boton`, `Cargando`, `MensajeError`, `ListaVacia`, `SeccionPendiente`, `SegunConsulta`, `FranjaServidorNoDisponible` |
 | `src/features/usuarios` | `useUsuarios`, `FilaUsuario`, `nombreCompleto`, `textoEventosOrganizados` |
-| `src/features/sesion` | `SesionProvider`, `useSesion`, `DependenciasSesion`, `crearRepositorioUsuarioRecordado`, `Almacenamiento`, `RepositorioUsuarioRecordado`, `SeleccionarUsuario`, `Perfil` |
+| `src/features/sesion` | `SesionProvider`, `useSesion`, `DependenciasSesion`, `OpcionesCliente`, `crearRepositorioUsuarioRecordado`, `Almacenamiento`, `RepositorioUsuarioRecordado`, `SeleccionarUsuario`, `Perfil` |
 
 Firmas sin cambios (FR-002): `useSesion(): { estado, elegirUsuario, reintentar }`,
 `useClienteApi(): ClienteApi`, `useConexion(): EstadoConexion`.

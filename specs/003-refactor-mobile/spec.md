@@ -212,6 +212,8 @@ comportamiento.
   fallar si aparece una.
 - **FR-009**: Las rutas de la app DEBEN estar tipadas: navegar a una ruta inexistente o sin sus
   parámetros obligatorios DEBE hacer fallar la verificación de tipos, tanto local como en el CI.
+  Hoy la app no tiene rutas con parámetros: esa parte se verifica con la misma guarda de tipos
+  cuando aparezca la primera ruta dinámica (features 004 en adelante).
 - **FR-010**: La sesión y los usuarios DEBEN ser dos features: **usuarios** (consulta de la
   lista, fila del selector, formato de usuario) y **sesion** (estado, controlador, conexión,
   selector y Perfil). Una feature DEBE poder importar de la base y, de otra feature, solo lo
@@ -271,8 +273,10 @@ comportamiento.
   (pantallas, componentes, consultas, formato). Se relaciona con la base compartida y, según
   las reglas de FR-010, con otras features.
 - **Base compartida**: acceso al servidor, consultas, composición de dependencias, navegación y
-  componentes genéricos. No depende de ninguna feature, salvo la composición y la navegación,
-  que son las que las conectan (FR-010).
+  componentes genéricos. Dentro de ella, la composición de dependencias y la navegación son los
+  **conectores** (en el plan, `composicion.ts` y `navegacion/`): los únicos módulos de la base
+  que importan features, para conectarlas (FR-010). El resto de la base no depende de ninguna
+  feature.
 - **Tema**: valores visuales con nombre (colores, espaciados, tamaños de texto).
 - **Pedido**: método, ruta, cuerpo opcional, cancelación y usuario; su resultado es un valor,
   ningún valor (sin contenido) o un error tipado.
@@ -287,7 +291,9 @@ comportamiento.
 - **SC-002**: Los recorridos de la 002 (quickstart de la 002) se repiten en el celular con el
   mismo resultado que antes del refactor, sin diferencias visibles.
 - **SC-003**: El 100 % de los archivos de navegación tienen a lo sumo una sentencia propia
-  (exponer una pantalla o layout), y ninguno define estilos.
+  (exponer una pantalla o layout), sin contar los imports, y ninguno define estilos. En las
+  secciones todavía vacías (FR-006), esa sentencia es la función que renderiza la sección
+  pendiente.
 - **SC-004**: Cero dependencias circulares entre módulos de la app; un ciclo, un import de una
   feature desde la base o un import interno entre features introducidos a propósito hacen
   fallar el lint, y una ruta mal escrita a propósito hace fallar la

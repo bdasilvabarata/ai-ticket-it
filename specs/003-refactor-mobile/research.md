@@ -20,8 +20,10 @@ sigue vigente salvo lo que se dice acá. No quedan "NEEDS CLARIFICATION".
   3. Desde afuera de una feature (otra feature, `app/`, `navegacion/`, `composicion.ts`) solo se
      importa su `index.ts`. Adentro, los archivos se importan entre sí por ruta relativa, nunca
      por el `index.ts` propio (cerraría un ciclo).
-  4. Dentro de la base, un módulo importa a otro por su archivo o por el `index.ts` de otra
-     carpeta, nunca por el `index.ts` de su propia carpeta.
+  4. `app/` sin lógica, estado ni estilos (R3; `no-restricted-imports`).
+- **Convención de imports en la base** (no la verifica el lint): un módulo importa otro de su
+  carpeta por archivo y el de otra carpeta por su `index.ts`. Si importara el `index.ts` de su
+  propia carpeta, `no-cycle` lo detecta como ciclo.
 - **Rationale**: es la organización del cliente de referencia de la cátedra
   (`ddso-utn/ejercicio-megasuper-2026`, rama `clase11-integracion-front-back`) adaptada a Expo
   Router. Con 10–15 pantallas por venir, agrupar por dominio mantiene juntos los archivos que
@@ -40,7 +42,9 @@ pasar a features con `index.ts`, aparecerían ciclos reales entre archivos (por 
 
 - **Conexión** (clarificación 3): la base define `EstadoConexion`, su contexto,
   `ConexionProvider` y `useConexion()` en `src/conexion/`. `SesionProvider` calcula el valor y
-  lo provee. La franja y `SegunConsulta` solo dependen de `useConexion()`.
+  lo provee. `SegunConsulta` usa `useConexion()`. La franja conserva sus props (`urlBase`,
+  `reintentando`, `alReintentar`), así sus tests no cambian (FR-003); `LayoutRaiz` se las pasa
+  desde `useConexion()`. Ninguna de las dos importa la feature `sesion` (FR-010a).
 - **Cliente HTTP en React**: `useUsuarios` (feature `usuarios`) necesita `useClienteApi()`, y la
   feature `sesion` usa a `usuarios` (selector y Perfil). Si `useClienteApi` quedara en `sesion`,
   `usuarios ↔ sesion` sería un ciclo. Mismo patrón que la conexión: la base define
@@ -153,7 +157,9 @@ pasar a features con `index.ts`, aparecerían ciclos reales entre archivos (por 
   [data-model.md](./data-model.md#tema), para que nada cambie a la vista (FR-001). Se elimina
   `estilos.ts`.
 - **Rationale**: FR-011. Los `StyleSheet.create` de cada componente toman los valores de
-  `tema.*`, sin números sueltos (salvo `StyleSheet.hairlineWidth` y los insets).
+  `tema.*`, sin números sueltos. Excepciones: `StyleSheet.hairlineWidth`, los insets, el
+  `borderWidth: 1` de los avisos, el `hitSlop={8}` de "Cerrar" y los valores de layout
+  (`flex`).
 - **Alternatives considered**: hook `useTema()` con contexto (no hay modo oscuro: YAGNI);
   librería de theming (principio VII).
 
