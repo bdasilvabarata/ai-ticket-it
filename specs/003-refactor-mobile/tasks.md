@@ -254,7 +254,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `mobile/src/features/sesion/pantallas/X.tsx` con `import "../../usuarios";` → sin errores.
   Si (b) o (c) no fallan, el resolver o las zonas de T007 están mal: corregir
   `eslint.config.js`, no el test.
-- [ ] T018 [US1] Cierre de US1: verificar que `mobile/src/sesion/` y
+- [X] T018 [US1] Cierre de US1: verificar que `mobile/src/sesion/` y
   `mobile/src/conexion/useConexion.ts` ya no existen, que cada archivo de `mobile/app/` tiene a
   lo sumo una sentencia propia sin contar los imports y sin estilos (SC-003; en las secciones
   pendientes, la función que renderiza `SeccionPendiente`) y que la suite tiene al menos los tests de
