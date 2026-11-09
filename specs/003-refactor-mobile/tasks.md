@@ -247,7 +247,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `mobile/app/**` con `no-restricted-imports` sobre `react`, `react-native`,
   `@tanstack/react-query`, `@expo/vector-icons` y `expo-router`, mensaje "app/ solo expone una
   pantalla o layout de src/ (FR-006)". Test y `npm run lint` en verde.
-- [ ] T017 [US1] Completar el test de arquitectura con las reglas 2 y 3 ahora que existen las
+- [X] T017 [US1] Completar el test de arquitectura con las reglas 2 y 3 ahora que existen las
   features: (b) `mobile/src/componentes/X.tsx` con `import "../features/sesion";` y (c)
   `mobile/src/features/sesion/pantallas/X.tsx` con `import "../../usuarios/useUsuarios";` →
   ambos incluyen `import-x/no-restricted-paths`; (f) control positivo:

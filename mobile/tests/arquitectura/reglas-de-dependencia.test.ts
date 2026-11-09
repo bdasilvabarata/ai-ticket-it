@@ -55,6 +55,26 @@ describe("reglas de dependencia de mobile (FR-008, FR-010)", () => {
     expect(lintear("mobile/src/api/errores.ts", codigo)).toContain("import-x/no-cycle");
   });
 
+  it("(b) regla 2: la base no importa features → import-x/no-restricted-paths", () => {
+    const codigo = 'import "../features/sesion";\n';
+
+    expect(lintear("mobile/src/componentes/X.tsx", codigo)).toContain("import-x/no-restricted-paths");
+  });
+
+  it("(c) regla 3: entre features, un archivo interno de otra → import-x/no-restricted-paths", () => {
+    const codigo = 'import "../../usuarios/useUsuarios";\n';
+
+    expect(lintear("mobile/src/features/sesion/pantallas/X.tsx", codigo)).toContain(
+      "import-x/no-restricted-paths",
+    );
+  });
+
+  it("(f) regla 3, control positivo: el index.ts de otra feature se puede importar", () => {
+    const codigo = 'import "../../usuarios";\n';
+
+    expect(lintear("mobile/src/features/sesion/pantallas/X.tsx", codigo)).toEqual([]);
+  });
+
   it("(d) regla 4: app/ no importa react-native (sin lógica ni estilos) → no-restricted-imports", () => {
     const codigo = 'import { View } from "react-native";\n\nexport default View;\n';
 
