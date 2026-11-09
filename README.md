@@ -82,19 +82,96 @@ Probalo con `curl http://localhost:3000/api/salud`. La documentación navegable 
      dispositivos. Si el celular no llega aunque el firewall esté bien, compartí internet
      desde el celular, conectá la PC a ese hotspot y usá la nueva dirección `Red`.
 
-### Calidad
+## Para arrancar (app móvil)
+
+### Requisitos previos
+
+- El backend andando (sección anterior) y `npm install` hecho desde la raíz: instala también
+  `mobile/`.
+- Un celular Android (o iOS) con **Expo Go** de la tienda. La app usa el **SDK 58 de Expo**
+  (validado con Expo Go para Android 58.0.5). Expo Go abre solo proyectos del SDK que soporta:
+  verificalo en Expo Go → Ajustes ("Supported SDK"). Con otro SDK la app no abre.
+- PC y celular en la **misma red Wi-Fi**.
+
+### Arrancar y abrir en el celular
 
 ```bash
-npm test          # Vitest en todos los paquetes (cada test usa sus propios repositorios)
-npm run lint      # ESLint: sin any, sin ts-ignore ni eslint-disable sin descripción, domain/ puro
-npm run typecheck # tsc --noEmit en backend y shared
+npm start          # terminal 1: el servidor; anotá la IP de la línea "Red:"
+npm run mobile     # terminal 2: Metro (expo start) muestra un QR
+```
+
+Escaneá el QR con Expo Go (Android) o con la cámara (iOS). La primera vez aparece
+"¿Con quién querés operar?" con los usuarios de ejemplo: elegí uno y entrás a las pestañas
+Explorar · Mis compras · Mis eventos · Perfil. La app recuerda al usuario elegido; para cambiarlo,
+Perfil → "Cambiar usuario".
+
+### Dirección del servidor
+
+Por defecto la app le habla al servidor en la misma IP desde la que Expo sirve la app (la de la
+PC), puerto 3000: `http://<IP de la PC>:3000/api`. Si hace falta otra, copiá
+`mobile/.env.example` a `mobile/.env` (no se versiona) y poné la dirección **con `/api`**:
+
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.0.23:3000/api
+```
+
+Después de crear, cambiar o borrar `mobile/.env`, arrancá con `npm run mobile -- --clear`:
+Metro guarda las variables en caché y sin `--clear` sigue usando las anteriores.
+
+No uses `localhost`: en el celular, `localhost` es el propio celular, no la PC. La dirección que
+usa la app se ve en la franja "Servidor no disponible" y en el selector cuando no llega.
+
+### Si el QR o la app apuntan a otra IP (VirtualBox, WSL, VPN)
+
+Si la PC tiene adaptadores virtuales, Expo puede anunciar la IP de uno de ellos (por ejemplo,
+`192.168.56.1` de VirtualBox Host-Only): el QR y la dirección del servidor quedan apuntando ahí
+y el celular no llega. Detené Expo y arrancalo con la IP de la Wi-Fi (la línea `Red: … (Wi-Fi)`
+de `npm start`):
+
+```powershell
+$env:REACT_NATIVE_PACKAGER_HOSTNAME="192.168.0.23"; npm run mobile   # PowerShell
+```
+
+```bash
+REACT_NATIVE_PACKAGER_HOSTNAME=192.168.0.23 npm run mobile           # bash
+```
+
+### Diagnóstico de "Servidor no disponible"
+
+La app muestra una franja "Servidor no disponible · <dirección>" (o el selector, el mismo
+aviso con "Reintentar") cuando no llega al servidor. Reintenta sola (1, 2, 4, 8, 16 y 32 s) y
+al tocar "Reintentar"; al volver el servidor, desaparece sola. Si no vuelve:
+
+1. ¿Está corriendo `npm start`? Probá `http://<IP>:3000/api/salud` desde el navegador del
+   celular (en Firefox, ver la sección del backend).
+2. ¿La dirección de la franja es la IP de la Wi-Fi de la PC? Si no, revisá `mobile/.env` (y
+   `--clear`) o usá `REACT_NATIVE_PACKAGER_HOSTNAME` (sección anterior).
+3. **Firewall de Windows**: tienen que estar permitidos el puerto **3000** (servidor) y el
+   **8081** (Metro, que sirve la app). Ambos son `node.exe`: permitir **Node.js JavaScript
+   Runtime** en redes **privadas** (ver la sección del backend) cubre los dos, con el perfil
+   de la Wi-Fi en **Red privada**.
+4. **Aislamiento de clientes**: en redes institucionales o de invitados los dispositivos no
+   se ven entre sí. Usá el hotspot del celular, reiniciá el servidor y Expo (las IP cambian) y
+   usá la nueva dirección.
+
+Si lo que no abre es la app (Expo Go no carga el QR), suele ser el puerto 8081 o la IP del QR:
+mismos puntos 2 a 4.
+
+## Calidad
+
+```bash
+npm test          # Vitest (backend, shared) y Jest + React Native Testing Library (mobile)
+npm run lint      # ESLint: sin any, sin ts-ignore ni eslint-disable sin descripción, domain/ puro,
+                  # y en mobile/ ningún fetch fuera de src/api
+npm run typecheck # tsc --noEmit en backend, shared y mobile (no hace falta haber corrido expo start)
 npm run format    # Prettier (format:check solo verifica)
 ```
 
 El CI de GitHub Actions (`.github/workflows/ci.yml`) corre `format:check`, `lint`,
 `typecheck` y `test` en cada PR a `development` y `main`.
 
-Los tests **no** leen `backend/.env`: siempre usan su propia base en memoria y el registro
-en silencio.
+Los tests **no** leen `backend/.env` ni `mobile/.env`: el backend usa su propia base en memoria
+y el registro en silencio; la app usa un `fetch` falso, sin red ni servidor.
 
-La app móvil se suma con la feature 002 (base mobile).
+Las versiones de las dependencias de `mobile/` ligadas al SDK se agregan con
+`npx expo install <paquete>` (desde `mobile/`), y `npx expo install --check` las verifica.

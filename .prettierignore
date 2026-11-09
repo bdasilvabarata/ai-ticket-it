@@ -10,3 +10,6 @@ dist/
 # Archivos que administra Spec Kit / Claude Code
 .specify/
 .claude/
+
+# Expo
+mobile/.expo/

@@ -1,0 +1,119 @@
+import { QueryClientProvider } from "@tanstack/react-query";
+import { router, Stack, useSegments } from "expo-router";
+import { useEffect, useMemo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { colores } from "../componentes/estilos";
+import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
+import { DependenciasProvider, type Dependencias } from "../composicion";
+import { useConexion } from "../conexion/useConexion";
+import { conectarFocoDeLaApp } from "../consultas/query-client";
+import type { EstadoSesion } from "../sesion/estado-sesion";
+import { SesionProvider, useSesion } from "../sesion/SesionProvider";
+
+/**
+ * Layout raíz de la app (R3). Vive fuera de `app/` para que los tests lo rendericen con
+ * dependencias falsas. `ExpoRoot` ya monta el `SafeAreaProvider`.
+ */
+export function LayoutRaiz({ dependencias }: { dependencias: Dependencias }) {
+  useEffect(() => conectarFocoDeLaApp(), []);
+
+  return (
+    <DependenciasProvider dependencias={dependencias}>
+      <QueryClientProvider client={dependencias.queryClient}>
+        <SesionProvider>
+          <Navegacion />
+        </SesionProvider>
+      </QueryClientProvider>
+    </DependenciasProvider>
+  );
+}
+
+/**
+ * Guard por fase de la sesión: Expo Router muestra solo las rutas permitidas (R3, FR-011). Encima,
+ * la franja de servidor no disponible en toda ruta salvo el selector, que tiene su propio estado
+ * de error (R8).
+ */
+function Navegacion() {
+  const { estado } = useSesion();
+  const conexion = useConexion();
+  const segmentos = useSegments();
+  const insets = useSafeAreaInsets();
+
+  const conFranja =
+    estado.fase === "con-usuario" &&
+    estado.servidor === "no-disponible" &&
+    segmentos[0] !== "seleccionar-usuario";
+
+  // La franja ya ocupa el inset superior: los headers de abajo no lo vuelven a sumar.
+  const insetsDelStack = useMemo(() => (conFranja ? { ...insets, top: 0 } : insets), [conFranja, insets]);
+
+  // El Provider se monta siempre, para que mostrar u ocultar la franja no remonte el Stack.
+  return (
+    <View style={estilos.raiz}>
+      {conFranja ? (
+        <FranjaServidorNoDisponible
+          urlBase={conexion.urlBase}
+          reintentando={conexion.enCurso}
+          alReintentar={() => void conexion.reintentarAhora()}
+        />
+      ) : null}
+      <SafeAreaInsetsContext.Provider value={insetsDelStack}>
+        <Pila estado={estado} />
+      </SafeAreaInsetsContext.Provider>
+    </View>
+  );
+}
+
+function Pila({ estado }: { estado: EstadoSesion }) {
+  const conUsuario = estado.fase === "con-usuario";
+  return (
+    <Stack>
+      <Stack.Protected guard={estado.fase === "iniciando"}>
+        <Stack.Screen name="cargando" options={{ headerShown: false }} />
+      </Stack.Protected>
+      <Stack.Protected guard={conUsuario}>
+        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      </Stack.Protected>
+      {/* Expo Router no admite declarar dos veces la misma pantalla: el selector va una sola vez.
+          Sin usuario es la única ruta disponible, a pantalla completa. Con usuario, (tabs) está
+          antes y el selector se abre desde Perfil como modal con "Cerrar" (FR-015). Si un 401
+          olvida al usuario con el modal abierto, (tabs) sale y el selector queda a pantalla
+          completa, sin "Cerrar" (CHK020). */}
+      <Stack.Protected guard={estado.fase !== "iniciando"}>
+        <Stack.Screen
+          name="seleccionar-usuario"
+          options={
+            conUsuario
+              ? {
+                  presentation: "modal",
+                  headerShown: true,
+                  title: "Cambiar usuario",
+                  headerRight: BotonCerrar,
+                }
+              : { headerShown: false, gestureEnabled: false }
+          }
+        />
+      </Stack.Protected>
+    </Stack>
+  );
+}
+
+function BotonCerrar() {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Cerrar sin cambiar de usuario"
+      hitSlop={8}
+      onPress={() => router.back()}
+    >
+      <Text style={estilos.cerrar}>Cerrar</Text>
+    </Pressable>
+  );
+}
+
+const estilos = StyleSheet.create({
+  raiz: { flex: 1 },
+  cerrar: { fontSize: 16, fontWeight: "600", color: colores.primario },
+});

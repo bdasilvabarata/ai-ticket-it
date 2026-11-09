@@ -36,3 +36,6 @@ Thumbs.db
 
 # Configuración local de Claude Code
 .claude/settings.local.json
+
+# Metro
+mobile/.metro-health-check*

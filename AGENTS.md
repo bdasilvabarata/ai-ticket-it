@@ -42,10 +42,31 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 - `backend/tests/{domain,repositories,services,api}` — Vitest; `services/` usa los
   repositorios en memoria construidos con los datos de cada caso; `api/` usa supertest con
   `crearApp()` (repositorios nuevos por test).
-- `mobile/` — Expo + Expo Router. Todo `fetch` vive en `mobile/src/api/`.
+- `mobile/` — Expo (SDK 58) + Expo Router + TanStack Query. Para crear o cambiar una pantalla,
+  usá la skill `nueva-pantalla`.
+  - `app/` — **solo rutas**: cada archivo exporta únicamente su componente por defecto.
+    `app/_layout.tsx` arma las dependencias reales y renderiza `LayoutRaiz`; `(tabs)/` tiene
+    las pestañas Explorar · Mis compras · Mis eventos · Perfil; `seleccionar-usuario` es el
+    selector (pantalla completa sin usuario, modal desde Perfil) y `cargando`, la espera inicial.
+  - `src/navegacion/LayoutRaiz.tsx` — providers, franja de servidor no disponible y el `Stack`
+    con los guards (`Stack.Protected`) por fase de la sesión. La lógica testeable de la
+    navegación vive acá, no en `app/`.
+  - `src/composicion.tsx` — **composition root** de la app: `crearDependencias({ fetch,
+    almacenamiento, urlEntorno, hostUri })` arma la dirección, el `QueryClient`, el usuario
+    recordado y la fábrica del cliente; `DependenciasProvider`/`useDependencias` los exponen.
+  - `src/api/` — el cliente HTTP y una función por endpoint, exportados por `index.ts`. **Todo
+    `fetch` vive acá** (el lint lo prohíbe en el resto de `mobile/`). Agrega `X-Usuario-Id` y
+    traduce errores a `ErrorDeApi` / `ServidorNoDisponibleError`.
+  - `src/sesion/` — usuario actual (reducer puro + controlador sin React + `SesionProvider`),
+    usuario recordado en AsyncStorage y su validación; `useSesion()` y `useClienteApi()`.
+  - `src/conexion/` — secuencia única de reintentos (1, 2, 4, 8, 16, 32 s) y `useConexion()`.
+  - `src/consultas/` — `QueryClient` (sin reintentos propios; todo error de query o mutation va
+    a la sesión vía `QueryCache`/`MutationCache`), claves en `claves.ts` y hooks de query.
+  - `src/componentes/` — `Cargando`, `MensajeError`, `ListaVacia`, `SeccionPendiente`, la franja y
+    los colores compartidos.
+  - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
+    `renderConDependencias` (la app real con `fetch` falso) y `crearFetchFalso`/`porRuta`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.
-
-> `backend/` y `shared/` los crea la feature 001 (base backend); `mobile/`, la 002 (base mobile).
 
 ## Comandos
 
@@ -53,9 +74,10 @@ Desde la raíz del repo:
 
 | Comando | Efecto |
 |---|---|
-| `npm install` | instala todos los workspaces (`backend`, `shared`) |
+| `npm install` | instala todos los workspaces (`backend`, `shared`, `mobile`) |
 | `npm start` | arranca el servidor con los datos de ejemplo en memoria |
 | `npm run dev` | igual, recargando ante cambios (cada recarga vuelve a los datos de ejemplo) |
+| `npm run mobile` | arranca Metro (`expo start`) para abrir la app con Expo Go (ver README) |
 | `npm test` · `npm run lint` · `npm run typecheck` | calidad, en todos los paquetes |
 | `npm run format` · `npm run format:check` | Prettier (escribe / verifica); no toca los `.md` |
 
@@ -64,6 +86,12 @@ Antes de dar una tarea por terminada: `npm test`, `npm run lint`, `npm run typec
 Además, un hook `Stop` de Claude Code (`.claude/settings.json` →
 `.claude/hooks/verificar-al-terminar.mjs`) corre `typecheck` y `lint` al terminar cada turno en
 que cambió algo que no sea Markdown, y si fallan no deja cerrar el turno hasta corregirlos.
+Por eso, en TDD, el test y un **stub con la firma real** del módulo que importa (que lanza
+`new Error("no implementado")`) se escriben en el mismo turno: el typecheck queda en verde y el
+test falla por comportamiento, no por un import inexistente.
+Vale igual en `mobile/`: el test de una pantalla, hook o función de `src/api/` va en el mismo
+turno que el stub de lo que importa (la ruta de `app/` con su export por defecto, el hook o la
+función con su firma real).
 
 ## Convención de nombres (repositories y services)
 

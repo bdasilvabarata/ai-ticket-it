@@ -12,7 +12,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | # | Feature | Casos de uso | Prioridad | Depende de | Estado |
 |---|---|---|---|---|---|
 | 001 | **Base backend**: monorepo, servidor en capas con middlewares y error handler, repositorios en memoria + datos de ejemplo, recurso Usuarios de referencia, tipos compartidos | — | P0 | — | integrada |
-| 002 | **Base mobile**: app Expo con navegación, cliente HTTP y selector de usuario | — | P0 | 001 (contrato de usuarios) | pendiente |
+| 002 | **Base mobile**: app Expo con navegación, cliente HTTP y selector de usuario | — | P0 | 001 (contrato de usuarios) | en PR |
 | 003 | **Crear evento** con tipos de entrada (precio y cupo) y catálogo de categorías | UC-04 | P1 | 001, 002 | pendiente |
 | 004 | **Explorar eventos**: búsqueda textual, filtro por categoría, detalle del evento y ordenamiento por precio, fecha y puntaje del organizador | UC-03, UC-11 | P1 | 001, 002 (usa eventos del seed) | pendiente |
 | 005 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (detalle del evento) | pendiente |
