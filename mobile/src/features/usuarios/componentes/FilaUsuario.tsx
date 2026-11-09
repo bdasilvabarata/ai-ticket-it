@@ -2,6 +2,7 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colores } from "../../../componentes";
+import { nombreCompleto, textoEventosOrganizados } from "../formato";
 
 export interface PropsFilaUsuario {
   usuario: UsuarioVista;
@@ -10,14 +11,9 @@ export interface PropsFilaUsuario {
   alElegir: (usuario: UsuarioVista) => void;
 }
 
-export function textoEventos(cantidad: number): string {
-  if (cantidad === 0) return "No organiza eventos";
-  return cantidad === 1 ? "Organiza 1 evento" : `Organiza ${cantidad} eventos`;
-}
-
 /** Una fila del selector de usuario. */
 export function FilaUsuario({ usuario, esActual, deshabilitada, alElegir }: PropsFilaUsuario) {
-  const nombre = `${usuario.nombre} ${usuario.apellido}`;
+  const nombre = nombreCompleto(usuario);
   return (
     <Pressable
       accessibilityRole="button"
@@ -29,7 +25,7 @@ export function FilaUsuario({ usuario, esActual, deshabilitada, alElegir }: Prop
     >
       <View style={estilos.textos}>
         <Text style={estilos.nombre}>{nombre}</Text>
-        <Text style={estilos.detalle}>{textoEventos(usuario.cantidadEventosOrganizados)}</Text>
+        <Text style={estilos.detalle}>{textoEventosOrganizados(usuario.cantidadEventosOrganizados)}</Text>
       </View>
       {esActual ? <Text style={estilos.actual}>Actual</Text> : null}
     </Pressable>

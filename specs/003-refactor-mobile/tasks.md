@@ -281,14 +281,14 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
 
 ### Formato de vista
 
-- [ ] T019 [P] [US2] Tests en `mobile/tests/features/usuarios/formato.test.ts` y, en el mismo
+- [X] T019 [P] [US2] Tests en `mobile/tests/features/usuarios/formato.test.ts` y, en el mismo
   turno, stub de `mobile/src/features/usuarios/formato.ts` con
   `nombreCompleto(usuario: Pick<UsuarioVista, "nombre" | "apellido">): string` y
   `textoEventosOrganizados(cantidad: number): string`. Casos de
   [contracts/componentes-base.md](./contracts/componentes-base.md#formato-de-vista-featuresusuariosformatots):
   `{ nombre: "Lucía", apellido: "Gómez" }` → `"Lucía Gómez"`; `0` → `"No organiza eventos"`;
   `1` → `"Organiza 1 evento"`; `3` → `"Organiza 3 eventos"`. Ver fallar.
-- [ ] T020 [US2] Implementar `formato.ts` (la lógica de `textoEventos` de hoy) y exportar ambas
+- [X] T020 [US2] Implementar `formato.ts` (la lógica de `textoEventos` de hoy) y exportar ambas
   funciones desde `features/usuarios/index.ts`. Usarlas en `FilaUsuario.tsx` (texto y
   `accessibilityLabel`; borrar `textoEventos`) y en `features/sesion/pantallas/Perfil.tsx`
   (`nombreCompleto(usuario)`, importado de `../../usuarios`). FR-015.

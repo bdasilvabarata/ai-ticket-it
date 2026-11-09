@@ -2,6 +2,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colores } from "../../../componentes";
+import { nombreCompleto } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
 /** Perfil: el usuario actual y "Cambiar usuario" (contracts/app.md "Perfil", FR-019). */
@@ -14,7 +15,7 @@ export function Perfil() {
     <View style={estilos.contenedor}>
       {usuario ? (
         <Text style={estilos.nombre} accessibilityRole="header">
-          {`${usuario.nombre} ${usuario.apellido}`}
+          {nombreCompleto(usuario)}
         </Text>
       ) : (
         <>
