@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { listarUsuarios } from "../api";
-import { useClienteApi } from "../sesion/SesionProvider";
+import { useClienteApi } from "./cliente-api";
 import { claves } from "./claves";
 
 /** Lista de usuarios del selector (pública: su clave no lleva usuarioId). */

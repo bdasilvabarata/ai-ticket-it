@@ -7,7 +7,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 import { colores } from "../componentes/estilos";
 import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
 import { DependenciasProvider, type Dependencias } from "../composicion";
-import { useConexion } from "../conexion/useConexion";
+import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
 import type { EstadoSesion } from "../sesion/estado-sesion";
 import { SesionProvider, useSesion } from "../sesion/SesionProvider";

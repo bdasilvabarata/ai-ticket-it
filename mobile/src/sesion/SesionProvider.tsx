@@ -2,9 +2,10 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 
-import type { ClienteApi } from "../api";
 import { useDependencias } from "../composicion";
+import { ConexionProvider, type EstadoConexion } from "../conexion";
 import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
+import { ClienteApiProvider } from "../consultas/cliente-api";
 import { crearControladorSesion } from "./controlador-sesion";
 import { estadoInicial, reducirSesion, type EstadoSesion } from "./estado-sesion";
 
@@ -12,9 +13,6 @@ interface ValorSesion {
   estado: EstadoSesion;
   elegirUsuario(usuario: UsuarioVista): Promise<void>;
   reintentar(): Promise<void>;
-  cliente: ClienteApi;
-  secuencia: EstadoSecuencia;
-  urlBase: string;
 }
 
 const ContextoSesion = createContext<ValorSesion | null>(null);
@@ -47,11 +45,22 @@ export function SesionProvider({ children }: { children: ReactNode }) {
     estado,
     elegirUsuario: controlador.elegirUsuario,
     reintentar: controlador.reintentarAhora,
-    cliente: controlador.cliente,
-    secuencia,
+  };
+  // Contrato de la base (clarificación 3): "no disponible" solo con usuario y sin servidor.
+  const conexion: EstadoConexion = {
+    servidor: estado.fase === "con-usuario" ? estado.servidor : "disponible",
+    enCurso: secuencia.enCurso,
+    automaticosRestantes: secuencia.automaticosRestantes,
+    reintentarAhora: controlador.reintentarAhora,
     urlBase: dependencias.urlBase,
   };
-  return <ContextoSesion.Provider value={valor}>{children}</ContextoSesion.Provider>;
+  return (
+    <ContextoSesion.Provider value={valor}>
+      <ConexionProvider valor={conexion}>
+        <ClienteApiProvider cliente={controlador.cliente}>{children}</ClienteApiProvider>
+      </ConexionProvider>
+    </ContextoSesion.Provider>
+  );
 }
 
 function useValorSesion(): ValorSesion {
@@ -63,14 +72,4 @@ function useValorSesion(): ValorSesion {
 export function useSesion() {
   const { estado, elegirUsuario, reintentar } = useValorSesion();
   return { estado, elegirUsuario, reintentar };
-}
-
-export function useClienteApi(): ClienteApi {
-  return useValorSesion().cliente;
-}
-
-/** Uso interno de `useConexion`. */
-export function useSecuenciaDeLaSesion() {
-  const { estado, secuencia, reintentar, urlBase } = useValorSesion();
-  return { estado, secuencia, reintentar, urlBase };
 }

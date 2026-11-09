@@ -10,7 +10,7 @@ import { colores } from "../src/componentes/estilos";
 import { FilaUsuario } from "../src/componentes/FilaUsuario";
 import { ListaVacia } from "../src/componentes/ListaVacia";
 import { MensajeError } from "../src/componentes/MensajeError";
-import { useConexion } from "../src/conexion/useConexion";
+import { useConexion } from "../src/conexion";
 import { useUsuarios } from "../src/consultas/useUsuarios";
 import { useSesion } from "../src/sesion/SesionProvider";
 

@@ -81,7 +81,7 @@ listo el contrato que usa `SegunConsulta` (US2).
 
 **⚠️ CRITICAL**: US1 y US2 dependen de esta fase.
 
-- [ ] T003 Test de contrato en `mobile/tests/conexion/conexion.test.tsx` y, en el mismo turno,
+- [X] T003 Test de contrato en `mobile/tests/conexion/conexion.test.tsx` y, en el mismo turno,
   stub de `mobile/src/conexion/conexion.tsx` con las firmas reales (`EstadoConexion` copiado
   tal cual de `mobile/src/conexion/useConexion.ts`: `servidor: "disponible" | "no-disponible"`,
   `enCurso`, `automaticosRestantes`, `reintentarAhora: () => Promise<void>`, `urlBase`;
@@ -89,7 +89,7 @@ listo el contrato que usa `SegunConsulta` (US2).
   `mobile/src/conexion/index.ts` que los exporta. Casos: dentro de `ConexionProvider`,
   `useConexion()` devuelve el `valor` provisto; fuera, lanza un error cuyo mensaje dice que se
   usa dentro de `ConexionProvider`. Ver fallar.
-- [ ] T004 Implementar `mobile/src/conexion/conexion.tsx` (contexto `null` por defecto y el
+- [X] T004 Implementar `mobile/src/conexion/conexion.tsx` (contexto `null` por defecto y el
   error de T003). En `mobile/src/sesion/SesionProvider.tsx`, armar el valor igual que el
   `useConexion` de hoy (`servidor` es `"no-disponible"` solo en fase `con-usuario` con
   `estado.servidor === "no-disponible"`; `enCurso` y `automaticosRestantes` de la secuencia;
@@ -98,7 +98,7 @@ listo el contrato que usa `SegunConsulta` (US2).
   `mobile/src/conexion/useConexion.ts` (`git rm`); actualizar los imports de `useConexion` en
   `mobile/src/navegacion/LayoutRaiz.tsx` y `mobile/app/seleccionar-usuario.tsx` a `../conexion`
   / `../src/conexion`. T003 y toda la suite en verde.
-- [ ] T005 Test de contrato en `mobile/tests/consultas/cliente-api.test.tsx` y, en el mismo
+- [X] T005 Test de contrato en `mobile/tests/consultas/cliente-api.test.tsx` y, en el mismo
   turno, stub de `mobile/src/consultas/cliente-api.tsx` con `ClienteApiProvider({ cliente,
   children })` y `useClienteApi(): ClienteApi`. Casos: dentro del provider devuelve el
   `cliente` provisto; fuera, lanza un error cuyo mensaje dice que se usa dentro de

@@ -5,7 +5,8 @@ import { useEffect } from "react";
 import { AccessibilityInfo, Text } from "react-native";
 
 import type { ClienteApi } from "../../src/api";
-import { useClienteApi, useSesion } from "../../src/sesion/SesionProvider";
+import { useClienteApi } from "../../src/consultas/cliente-api";
+import { useSesion } from "../../src/sesion/SesionProvider";
 import { porRuta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { renderConDependencias, URL_DE_PRUEBA } from "../helpers/render-con-dependencias";
 import { CLAVE_RECORDADO, lucia, martin, todos } from "../helpers/usuarios";
