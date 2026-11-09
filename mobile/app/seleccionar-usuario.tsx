@@ -7,12 +7,11 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ErrorDeApi, ServidorNoDisponibleError } from "../src/api";
 import { Cargando } from "../src/componentes/Cargando";
 import { colores } from "../src/componentes/estilos";
-import { FilaUsuario } from "../src/componentes/FilaUsuario";
 import { ListaVacia } from "../src/componentes/ListaVacia";
 import { MensajeError } from "../src/componentes/MensajeError";
 import { useConexion } from "../src/conexion";
-import { useUsuarios } from "../src/consultas/useUsuarios";
 import { useSesion } from "../src/features/sesion";
+import { FilaUsuario, useUsuarios } from "../src/features/usuarios";
 
 const AVISO_USUARIO_INEXISTENTE = "El usuario con el que estabas operando ya no existe. Elegí otro.";
 

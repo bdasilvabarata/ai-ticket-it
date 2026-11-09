@@ -204,7 +204,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `mobile/tests/features/sesion/` con imports a `../../../src/...`; ajustar
   `mobile/tests/pantallas/errores-en-uso.test.tsx`. Borrar `mobile/src/sesion/`. Suite y lint en
   verde; `grep -rn "composicion" mobile/src/features` sin resultados.
-- [ ] T012 [US1] Feature `usuarios`: `git mv mobile/src/componentes/FilaUsuario.tsx
+- [X] T012 [US1] Feature `usuarios`: `git mv mobile/src/componentes/FilaUsuario.tsx
   mobile/src/features/usuarios/componentes/FilaUsuario.tsx` y `git mv
   mobile/src/consultas/useUsuarios.ts mobile/src/features/usuarios/useUsuarios.ts` (importa
   `useClienteApi` de `../../consultas/cliente-api`, `claves` de `../../consultas/claves` y

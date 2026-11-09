@@ -1,7 +1,7 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colores } from "./estilos";
+import { colores } from "../../../componentes/estilos";
 
 export interface PropsFilaUsuario {
   usuario: UsuarioVista;
