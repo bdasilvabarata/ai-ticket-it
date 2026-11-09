@@ -4,8 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colores } from "../componentes/estilos";
-import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
+import { colores, FranjaServidorNoDisponible } from "../componentes";
 import type { Dependencias } from "../composicion";
 import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";

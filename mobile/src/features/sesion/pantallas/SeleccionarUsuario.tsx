@@ -5,10 +5,7 @@ import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Cargando } from "../../../componentes/Cargando";
-import { colores } from "../../../componentes/estilos";
-import { ListaVacia } from "../../../componentes/ListaVacia";
-import { MensajeError } from "../../../componentes/MensajeError";
+import { Cargando, colores, ListaVacia, MensajeError } from "../../../componentes";
 import { useConexion } from "../../../conexion";
 import { FilaUsuario, useUsuarios } from "../../usuarios";
 import { useSesion } from "../SesionProvider";

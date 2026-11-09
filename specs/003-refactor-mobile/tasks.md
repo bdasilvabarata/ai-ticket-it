@@ -232,7 +232,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `mobile/app/(tabs)/perfil.tsx` (`export { Perfil as default } from
   "../../src/features/sesion";`). `tests/pantallas/{selector,perfil,cambiar-usuario,arranque}`
   en verde.
-- [ ] T015 [US1] Punto de entrada de componentes y rutas restantes: crear
+- [X] T015 [US1] Punto de entrada de componentes y rutas restantes: crear
   `mobile/src/componentes/index.ts` con `Cargando`, `MensajeError`, `ListaVacia`,
   `SeccionPendiente`, `FranjaServidorNoDisponible` (y `colores` hasta que T021 lo reemplace).
   `mobile/app/cargando.tsx` → `export { Cargando as default } from "../src/componentes";`.
