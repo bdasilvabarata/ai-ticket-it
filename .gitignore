@@ -23,9 +23,6 @@ mobile/android/
 .env.*
 !.env.example
 
-# Binarios de mongodb-memory-server
-.cache/
-
 # Logs
 npm-debug.log*
 *.log
@@ -39,3 +36,9 @@ Thumbs.db
 
 # Configuración local de Claude Code
 .claude/settings.local.json
+
+# Metro
+mobile/.metro-health-check*
+
+# Expo genera este archivo al levantar el servidor (rutas tipadas, feature 003)
+mobile/expo-env.d.ts

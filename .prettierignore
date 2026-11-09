@@ -1,0 +1,15 @@
+# Dependencias y generados
+node_modules/
+package-lock.json
+coverage/
+dist/
+
+# Documentación en Markdown: tiene saltos de línea a mano (specs, constitución, README)
+*.md
+
+# Archivos que administra Spec Kit / Claude Code
+.specify/
+.claude/
+
+# Expo
+mobile/.expo/
