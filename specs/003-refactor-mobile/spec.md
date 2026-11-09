@@ -35,6 +35,8 @@ externo (se registra como deuda técnica); cambios en el backend.
 
 - Q: ¿Las funciones de endpoint se mueven a su feature o se quedan en la base de acceso al servidor? → A: Se quedan en la base (`src/api/`), un archivo por recurso; las features las importan. No requiere enmendar la constitución (VII) y coincide con el `service/` centralizado de la referencia.
 - Q: ¿La sesión y los usuarios son una feature o dos? → A: Dos: `usuarios` (lista, fila del selector, formato) y `sesion` (estado, controlador, conexión, selector y Perfil). Entre features solo se importa por el punto de entrada público.
+- Q: ¿Dónde vive el estado de conexión para que la pieza de cuatro estados lo use sin que la base importe la feature `sesion`? → A: La base define el contrato de conexión (`EstadoConexion`), su context y `useConexion()`; la feature `sesion` lo implementa y lo provee en el layout raíz. La pieza de cuatro estados y la franja de servidor no disponible quedan en la base.
+- Q: ¿El lint hace cumplir las reglas de dependencia entre features o solo detecta ciclos? → A: Hace cumplir las tres: sin ciclos, la base no importa features (salvo composición y navegación) y entre features solo por el punto de entrada público.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -77,10 +79,13 @@ escribe mal el nombre de una ruta.
    conexión y composición ↔ sesión).
 3. **Given** el código reorganizado, **When** un desarrollador agrega un import que cierra un
    ciclo entre dos módulos, **Then** el lint falla e identifica los módulos del ciclo.
-4. **Given** las rutas tipadas activas, **When** un desarrollador navega a una ruta que no
+4. **Given** el código reorganizado, **When** un desarrollador importa una feature desde la
+   base, o un archivo interno de otra feature en lugar de su punto de entrada público,
+   **Then** el lint falla e indica la regla violada.
+5. **Given** las rutas tipadas activas, **When** un desarrollador navega a una ruta que no
    existe (por ejemplo, `"/seleccionar-usuarios"`), **Then** la verificación de tipos falla,
    tanto en su máquina como en el CI.
-5. **Given** la app con el refactor, **When** se repiten los recorridos de la 002 (primer
+6. **Given** la app con el refactor, **When** se repiten los recorridos de la 002 (primer
    arranque, usuario recordado, cambio de usuario, servidor no disponible, usuario
    inexistente), **Then** todo se ve y se comporta igual que antes.
 
@@ -212,7 +217,14 @@ comportamiento.
   selector y Perfil). Una feature DEBE poder importar de la base y, de otra feature, solo lo
   que esa feature expone en su punto de entrada público; la base NO DEBE importar de ninguna
   feature salvo la composición y la navegación, que las conectan. Estas reglas DEBEN quedar
-  documentadas en la guía para agentes y, donde sea posible, verificadas por el lint.
+  documentadas en la guía para agentes y verificadas por el lint: un import de una feature
+  desde la base (fuera de la composición y la navegación), o de un archivo interno de otra
+  feature en lugar de su punto de entrada público, DEBE hacer fallar el lint.
+- **FR-010a**: El estado de conexión DEBE definirse en la base como un contrato (servidor
+  disponible o no, intento en curso, reintentos automáticos restantes, "reintentar ahora" y
+  dirección del servidor) con su `useConexion()`; la feature `sesion` lo implementa y lo provee
+  en el layout raíz. La pieza de cuatro estados y la franja de servidor no disponible son de la
+  base y solo dependen de ese contrato, nunca de la feature `sesion`.
 
 **Piezas base de pantalla (US2)**
 
@@ -276,8 +288,9 @@ comportamiento.
   mismo resultado que antes del refactor, sin diferencias visibles.
 - **SC-003**: El 100 % de los archivos de navegación tienen a lo sumo una sentencia propia
   (exponer una pantalla o layout), y ninguno define estilos.
-- **SC-004**: Cero dependencias circulares entre módulos de la app; un ciclo introducido a
-  propósito hace fallar el lint, y una ruta mal escrita a propósito hace fallar la
+- **SC-004**: Cero dependencias circulares entre módulos de la app; un ciclo, un import de una
+  feature desde la base o un import interno entre features introducidos a propósito hacen
+  fallar el lint, y una ruta mal escrita a propósito hace fallar la
   verificación de tipos en el CI.
 - **SC-005**: El selector de usuario dedica a sus cuatro estados una sola pieza reutilizable
   en lugar de un bloque propio de ramas, y no queda ningún estilo de botón repetido entre
