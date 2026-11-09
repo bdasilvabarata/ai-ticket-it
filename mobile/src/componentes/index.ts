@@ -1,3 +1,4 @@
+export { Boton, type PropsBoton } from "./Boton";
 export { Cargando } from "./Cargando";
 export {
   FranjaServidorNoDisponible,

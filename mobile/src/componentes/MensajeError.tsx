@@ -1,5 +1,6 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
+import { Boton } from "./Boton";
 import { tema } from "./tema";
 
 export interface PropsMensajeError {
@@ -20,15 +21,12 @@ export function MensajeError({ mensaje, titulo, alReintentar, reintentando = fal
       ) : null}
       <Text style={estilos.mensaje}>{mensaje}</Text>
       {alReintentar ? (
-        <Pressable
-          accessibilityRole="button"
-          accessibilityState={{ disabled: reintentando }}
-          disabled={reintentando}
-          onPress={alReintentar}
-          style={({ pressed }) => [estilos.boton, (pressed || reintentando) && estilos.botonApagado]}
-        >
-          <Text style={estilos.textoBoton}>{reintentando ? "Reintentando…" : "Reintentar"}</Text>
-        </Pressable>
+        <Boton
+          texto="Reintentar"
+          textoEnCurso="Reintentando…"
+          enCurso={reintentando}
+          alPresionar={alReintentar}
+        />
       ) : null}
     </View>
   );
@@ -49,16 +47,4 @@ const estilos = StyleSheet.create({
     color: tema.colores.texto,
   },
   mensaje: { fontSize: tema.texto.normal, textAlign: "center", color: tema.colores.texto },
-  boton: {
-    paddingVertical: tema.espacio.medio,
-    paddingHorizontal: tema.espacio.grande,
-    borderRadius: tema.radio.normal,
-    backgroundColor: tema.colores.primario,
-  },
-  botonApagado: { opacity: tema.opacidadApagado },
-  textoBoton: {
-    color: tema.colores.sobrePrimario,
-    fontSize: tema.texto.normal,
-    fontWeight: tema.peso.fuerte,
-  },
 });

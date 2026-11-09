@@ -312,7 +312,7 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
 
 ### Boton
 
-- [ ] T022 [P] [US2] Tests en `mobile/tests/componentes/boton.test.tsx` y, en el mismo turno,
+- [X] T022 [P] [US2] Tests en `mobile/tests/componentes/boton.test.tsx` y, en el mismo turno,
   stub de `mobile/src/componentes/Boton.tsx` (devuelve `null`) con `PropsBoton` de
   [data-model.md "Boton"](./data-model.md#boton): `texto: string`, `alPresionar: () => void`,
   `variante?: "primario" | "aviso" | "texto"` (por defecto `"primario"`), `deshabilitado?`,
@@ -323,7 +323,7 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
   `deshabilitado` → deshabilitado para el lector y tocarlo no llama; `enCurso` con
   `textoEnCurso="Reintentando…"` → muestra ese texto, `accessibilityState` `disabled` y `busy`,
   tocarlo no llama; `enCurso` sin `textoEnCurso` → muestra `texto`. Ver fallar.
-- [ ] T023 [US2] Implementar `Boton.tsx` (R7): `Pressable` con `accessibilityRole="button"`,
+- [X] T023 [US2] Implementar `Boton.tsx` (R7): `Pressable` con `accessibilityRole="button"`,
   `disabled={deshabilitado || enCurso}`, `accessibilityState={{ disabled: deshabilitado ||
   enCurso, busy: enCurso }}`, opacidad `tema.opacidadApagado` presionado, deshabilitado o en
   curso; estilos por variante tomados del código actual: `primario` = el botón de
@@ -331,7 +331,7 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
   `primario`, texto `sobrePrimario` `normal` `fuerte`); `aviso` = el "Reintentar" de la franja
   (con borde sobre el fondo de aviso, mismos valores de hoy); `texto` = "Cerrar" (`normal`,
   `fuerte`, color `primario`, sin fondo). Exportar desde `componentes/index.ts`.
-- [ ] T024 [US2] Migrar a `Boton` (FR-012, SC-005): `MensajeError.tsx` (`primario`,
+- [X] T024 [US2] Migrar a `Boton` (FR-012, SC-005): `MensajeError.tsx` (`primario`,
   "Reintentar"/"Reintentando…"), Perfil "Cambiar usuario" (`primario`, `style` con
   `marginTop: tema.espacio.chico`), `FranjaServidorNoDisponible.tsx` (`aviso`, mantiene sus
   props `urlBase`, `reintentando`, `alReintentar`) y `BotonCerrar` de `LayoutRaiz.tsx`

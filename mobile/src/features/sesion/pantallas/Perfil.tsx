@@ -1,7 +1,7 @@
 import { router } from "expo-router";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { tema } from "../../../componentes";
+import { Boton, tema } from "../../../componentes";
 import { nombreCompleto } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
@@ -25,13 +25,11 @@ export function Perfil() {
           <Text style={estilos.aviso}>No se pudieron cargar los datos del usuario.</Text>
         </>
       )}
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => router.push("/seleccionar-usuario")}
-        style={({ pressed }) => [estilos.boton, pressed && estilos.presionado]}
-      >
-        <Text style={estilos.textoBoton}>Cambiar usuario</Text>
-      </Pressable>
+      <Boton
+        texto="Cambiar usuario"
+        alPresionar={() => router.push("/seleccionar-usuario")}
+        style={estilos.boton}
+      />
     </View>
   );
 }
@@ -51,17 +49,5 @@ const estilos = StyleSheet.create({
     textAlign: "center",
   },
   aviso: { fontSize: tema.texto.aviso, color: tema.colores.textoSecundario, textAlign: "center" },
-  boton: {
-    marginTop: tema.espacio.chico,
-    paddingVertical: tema.espacio.medio,
-    paddingHorizontal: tema.espacio.grande,
-    borderRadius: tema.radio.normal,
-    backgroundColor: tema.colores.primario,
-  },
-  presionado: { opacity: tema.opacidadApagado },
-  textoBoton: {
-    color: tema.colores.sobrePrimario,
-    fontSize: tema.texto.normal,
-    fontWeight: tema.peso.fuerte,
-  },
+  boton: { marginTop: tema.espacio.chico },
 });
