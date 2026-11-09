@@ -212,7 +212,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   hasta US2. Crear `mobile/src/features/usuarios/index.ts` con `useUsuarios` y `FilaUsuario`
   (`PropsFilaUsuario` como tipo). Ajustar `mobile/app/seleccionar-usuario.tsx` para importar de
   `../src/features/usuarios`. Suite y lint en verde.
-- [ ] T013 [US1] Conectores de navegación (R3): crear `mobile/src/navegacion/RaizDeLaApp.tsx`
+- [X] T013 [US1] Conectores de navegación (R3): crear `mobile/src/navegacion/RaizDeLaApp.tsx`
   con `export function RaizDeLaApp()` (el `useState(crearDependenciasDeProduccion)` + `<LayoutRaiz
   dependencias={...} />` de hoy) y `git mv "mobile/app/(tabs)/_layout.tsx"
   mobile/src/navegacion/LayoutPestanas.tsx` con export con nombre `LayoutPestanas` (íconos,
