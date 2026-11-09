@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Cargando, ListaVacia, MensajeError, tema } from "../../../componentes";
-import { useConexion } from "../../../conexion";
+import { SegunConsulta, tema } from "../../../componentes";
 import { FilaUsuario, useUsuarios } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
@@ -15,7 +13,6 @@ const AVISO_USUARIO_INEXISTENTE = "El usuario con el que estabas operando ya no 
 /** Selector de usuario (contracts/app.md "Seleccionar usuario"). */
 export function SeleccionarUsuario() {
   const { estado, elegirUsuario } = useSesion();
-  const conexion = useConexion();
   const consulta = useUsuarios();
   const [eligiendo, setEligiendo] = useState(false);
 
@@ -39,50 +36,6 @@ export function SeleccionarUsuario() {
       .finally(() => setEligiendo(false));
   }
 
-  let contenido: React.ReactNode;
-  if (consulta.isPending) {
-    contenido = <Cargando />;
-  } else if (consulta.isError) {
-    const { error } = consulta;
-    contenido =
-      error instanceof ServidorNoDisponibleError ? (
-        <MensajeError
-          titulo="Servidor no disponible"
-          mensaje={`No se pudo conectar con ${conexion.urlBase}.`}
-          alReintentar={() => void conexion.reintentarAhora()}
-          reintentando={conexion.enCurso}
-        />
-      ) : (
-        <MensajeError
-          mensaje={error instanceof ErrorDeApi ? error.mensaje : "Ocurrió un error inesperado."}
-          alReintentar={() => void consulta.refetch()}
-          reintentando={consulta.isFetching}
-        />
-      );
-  } else if (consulta.data.length === 0) {
-    contenido = <ListaVacia mensaje="No hay usuarios disponibles." />;
-  } else {
-    contenido = (
-      <FlatList
-        data={consulta.data}
-        keyExtractor={(usuario) => usuario.id}
-        ListHeaderComponent={
-          <Text style={estilos.titulo} accessibilityRole="header">
-            ¿Con quién querés operar?
-          </Text>
-        }
-        renderItem={({ item }) => (
-          <FilaUsuario
-            usuario={item}
-            esActual={item.id === usuarioIdActual}
-            deshabilitada={eligiendo}
-            alElegir={alElegir}
-          />
-        )}
-      />
-    );
-  }
-
   return (
     <SafeAreaView style={estilos.pantalla} edges={enModal ? ["bottom"] : ["top", "bottom"]}>
       {conAviso ? (
@@ -90,7 +43,29 @@ export function SeleccionarUsuario() {
           <Text style={estilos.textoAviso}>{AVISO_USUARIO_INEXISTENTE}</Text>
         </View>
       ) : null}
-      <View style={estilos.contenido}>{contenido}</View>
+      <View style={estilos.contenido}>
+        <SegunConsulta consulta={consulta} mensajeVacio="No hay usuarios disponibles.">
+          {(usuarios) => (
+            <FlatList
+              data={usuarios}
+              keyExtractor={(usuario) => usuario.id}
+              ListHeaderComponent={
+                <Text style={estilos.titulo} accessibilityRole="header">
+                  ¿Con quién querés operar?
+                </Text>
+              }
+              renderItem={({ item }) => (
+                <FilaUsuario
+                  usuario={item}
+                  esActual={item.id === usuarioIdActual}
+                  deshabilitada={eligiendo}
+                  alElegir={alElegir}
+                />
+              )}
+            />
+          )}
+        </SegunConsulta>
+      </View>
     </SafeAreaView>
   );
 }

@@ -342,7 +342,7 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
 
 ### SegunConsulta
 
-- [ ] T025 [P] [US2] Tests en `mobile/tests/componentes/segun-consulta.test.tsx` y, en el mismo
+- [X] T025 [P] [US2] Tests en `mobile/tests/componentes/segun-consulta.test.tsx` y, en el mismo
   turno, stub de `mobile/src/componentes/SegunConsulta.tsx` (devuelve `null`) con
   `ConsultaMostrable<T>` (`isPending`, `isError`, `error: unknown`, `data: T | undefined`,
   `isFetching`, `refetch: () => unknown`) y `PropsSegunConsulta<T>` (`consulta`, `mensajeVacio`,
@@ -358,11 +358,11 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
   Más un caso con `useQuery` real (`QueryClient` nuevo, sin reintentos): con datos ya cargados,
   cancelar un refetch colgado (`queryClient.cancelQueries()`) sigue mostrando los datos, sin
   error (edge case). Ver fallar.
-- [ ] T026 [US2] Implementar `SegunConsulta.tsx` con `useConexion()` de `../conexion`, las
+- [X] T026 [US2] Implementar `SegunConsulta.tsx` con `useConexion()` de `../conexion`, las
   clases de error de `../api`, `Cargando`, `MensajeError` y `ListaVacia` por archivo (misma
   carpeta). `esVacio` por defecto: `datos === undefined || datos === null || (Array.isArray(datos)
   && datos.length === 0)`. Exportar desde `componentes/index.ts`. T025 en verde.
-- [ ] T027 [US2] Migrar `features/sesion/pantallas/SeleccionarUsuario.tsx` a `<SegunConsulta
+- [X] T027 [US2] Migrar `features/sesion/pantallas/SeleccionarUsuario.tsx` a `<SegunConsulta
   consulta={consulta} mensajeVacio="No hay usuarios disponibles.">{(usuarios) => <FlatList
   .../>}</SegunConsulta>` (FR-014, SC-005): sin el bloque `isPending/isError/length === 0`,
   sin `useConexion` ni las clases de error importadas si ya no se usan; el aviso de usuario
