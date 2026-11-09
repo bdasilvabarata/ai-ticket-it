@@ -221,7 +221,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `mobile/app/(tabs)/_layout.tsx` con `export { LayoutPestanas as default } from
   "../../src/navegacion/LayoutPestanas";`. `tests/pantallas/navegacion.test.tsx` y
   `guards.test.tsx` en verde.
-- [ ] T014 [US1] Pantallas de la feature `sesion`: `git mv mobile/app/seleccionar-usuario.tsx
+- [X] T014 [US1] Pantallas de la feature `sesion`: `git mv mobile/app/seleccionar-usuario.tsx
   mobile/src/features/sesion/pantallas/SeleccionarUsuario.tsx` y `git mv
   "mobile/app/(tabs)/perfil.tsx" mobile/src/features/sesion/pantallas/Perfil.tsx`, con export
   con nombre (`SeleccionarUsuario`, `Perfil`) e imports relativos a su nueva ubicación (la

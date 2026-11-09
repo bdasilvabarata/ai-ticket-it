@@ -6,3 +6,5 @@ export {
   type Almacenamiento,
   type RepositorioUsuarioRecordado,
 } from "./usuario-recordado";
+export { Perfil } from "./pantallas/Perfil";
+export { SeleccionarUsuario } from "./pantallas/SeleccionarUsuario";
