@@ -16,6 +16,8 @@ export interface PedidoRegistrado {
   url: string;
   metodo: string;
   encabezados: Record<string, string>;
+  /** El `init.body` si es un string (los pedidos con cuerpo JSON); si no, `undefined`. */
+  cuerpo?: string;
 }
 
 export interface FetchFalso {
@@ -72,6 +74,7 @@ export function crearFetchFalso(respuestas: Respuestas): FetchFalso {
       url,
       metodo: init?.method ?? "GET",
       encabezados: normalizarEncabezados(init?.headers),
+      cuerpo: typeof init?.body === "string" ? init.body : undefined,
     });
     const respuesta = siguiente(url, init);
     const signal = init?.signal ?? undefined;

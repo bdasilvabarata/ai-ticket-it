@@ -14,9 +14,21 @@ export interface OpcionesPedido {
   usuarioId?: string | null;
 }
 
+export type MetodoHttp = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
+
+export interface OpcionesPedidoConCuerpo extends OpcionesPedido {
+  /** Si está, se envía como JSON con `Content-Type: application/json`. */
+  cuerpo?: unknown;
+}
+
 export interface ClienteApi {
   readonly urlBase: string;
+  pedir<T>(metodo: MetodoHttp, ruta: string, opciones?: OpcionesPedidoConCuerpo): Promise<T>;
   get<T>(ruta: string, opciones?: OpcionesPedido): Promise<T>;
+  post<T>(ruta: string, cuerpo?: unknown, opciones?: OpcionesPedido): Promise<T>;
+  put<T>(ruta: string, cuerpo?: unknown, opciones?: OpcionesPedido): Promise<T>;
+  patch<T>(ruta: string, cuerpo?: unknown, opciones?: OpcionesPedido): Promise<T>;
+  delete<T>(ruta: string, opciones?: OpcionesPedido): Promise<T>;
 }
 
 export interface DependenciasCliente {
@@ -46,11 +58,18 @@ export function crearClienteApi({
   alUsuarioNoIdentificado,
   tiempoLimiteMs = TIEMPO_LIMITE_POR_DEFECTO_MS,
 }: DependenciasCliente): ClienteApi {
-  async function get<T>(ruta: string, opciones: OpcionesPedido = {}): Promise<T> {
+  /** Todo pedido pasa por acá (research R10): mismo tiempo límite, errores y 401 para todo método. */
+  async function pedir<T>(
+    metodo: MetodoHttp,
+    ruta: string,
+    opciones: OpcionesPedidoConCuerpo = {},
+  ): Promise<T> {
     const url = `${urlBase}${ruta}`;
     const usuarioId = opciones.usuarioId !== undefined ? opciones.usuarioId : obtenerUsuarioId();
     const encabezados: Record<string, string> = { Accept: "application/json" };
     if (usuarioId !== null) encabezados["X-Usuario-Id"] = usuarioId;
+    const conCuerpo = opciones.cuerpo !== undefined;
+    if (conCuerpo) encabezados["Content-Type"] = "application/json";
 
     // Tiempo límite propio, encadenado a mano al signal externo (sin AbortSignal.any, R4).
     const controlador = new AbortController();
@@ -74,10 +93,13 @@ export function crearClienteApi({
       let texto: string;
       try {
         respuesta = await fetchInyectado(url, {
-          method: "GET",
+          method: metodo,
           headers: encabezados,
+          body: conCuerpo ? JSON.stringify(opciones.cuerpo) : undefined,
           signal: controlador.signal,
         });
+        // 204 No Content: no hay cuerpo que interpretar (FR-018).
+        if (respuesta.status === 204) return undefined as T;
         texto = await respuesta.text();
       } catch (error) {
         throw traducirFalla(error);
@@ -111,5 +133,13 @@ export function crearClienteApi({
     }
   }
 
-  return { urlBase, get };
+  return {
+    urlBase,
+    pedir,
+    get: (ruta, opciones) => pedir("GET", ruta, opciones),
+    post: (ruta, cuerpo, opciones) => pedir("POST", ruta, { ...opciones, cuerpo }),
+    put: (ruta, cuerpo, opciones) => pedir("PUT", ruta, { ...opciones, cuerpo }),
+    patch: (ruta, cuerpo, opciones) => pedir("PATCH", ruta, { ...opciones, cuerpo }),
+    delete: (ruta, opciones) => pedir("DELETE", ruta, opciones),
+  };
 }

@@ -382,10 +382,10 @@ tiempo límite y 401 que la 002, y escrituras que nunca se repiten solas.
 **Independent Test**: `npm test -w mobile -- api` y `errores-en-uso` en verde; los tests de
 lectura de la 002 sin cambios (quickstart §4).
 
-- [ ] T028 [P] [US3] En `mobile/tests/helpers/fetch-falso.ts`, sumar `cuerpo?: string` a
+- [X] T028 [P] [US3] En `mobile/tests/helpers/fetch-falso.ts`, sumar `cuerpo?: string` a
   `PedidoRegistrado` (el `init.body` si es string, si no `undefined`). Agregado puro: ningún
   test existente cambia (FR-003, R10).
-- [ ] T029 [US3] Tests en `mobile/tests/api/cliente.test.ts` (nuevo `describe("pedir y atajos")`)
+- [X] T029 [US3] Tests en `mobile/tests/api/cliente.test.ts` (nuevo `describe("pedir y atajos")`)
   y, en el mismo turno, stub en `mobile/src/api/cliente.ts` con las firmas de
   [contracts/cliente-api.md](./contracts/cliente-api.md): `MetodoHttp = "GET" | "POST" | "PUT" |
   "PATCH" | "DELETE"`, `OpcionesPedidoConCuerpo extends OpcionesPedido { cuerpo?: unknown }` y
@@ -403,7 +403,7 @@ lectura de la 002 sin cambios (quickstart §4).
   abortado → el error de cancelación tal cual; 401 `USUARIO_NO_IDENTIFICADO` en un `patch` con
   `usuarioId: "u2"` → `alUsuarioNoIdentificado("u2")`; en todos, `fetch` se llamó una sola vez.
   Ver fallar.
-- [ ] T030 [US3] Implementar `pedir` en `mobile/src/api/cliente.ts` moviendo ahí el cuerpo del
+- [X] T030 [US3] Implementar `pedir` en `mobile/src/api/cliente.ts` moviendo ahí el cuerpo del
   `get` actual (R10): `method: metodo`; si `opciones.cuerpo !== undefined`, `body:
   JSON.stringify(cuerpo)` y `Content-Type: application/json`; `status === 204` resuelve
   `undefined` antes de interpretar el cuerpo; tiempo límite, encadenado del `signal`,
