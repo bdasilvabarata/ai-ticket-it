@@ -126,7 +126,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
 
 ### Lint de dependencias (antes de mover)
 
-- [ ] T006 [US1] Test de arquitectura en `mobile/tests/arquitectura/reglas-de-dependencia.test.ts`
+- [X] T006 [US1] Test de arquitectura en `mobile/tests/arquitectura/reglas-de-dependencia.test.ts`
   con docblock `/** @jest-environment node */` y timeout de 60 s. Helper
   `lintear(rutaRelativaALaRaiz, codigo)` que corre ESLint como proceso hijo
   (`execFileSync(process.execPath, [<raíz>/node_modules/eslint/bin/eslint.js, "--stdin",
@@ -135,7 +135,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   real de `mobile/src/api/errores.ts` + `import "./cliente";` como
   `mobile/src/api/errores.ts` → incluye `import-x/no-cycle`; (e) `eslint mobile --format json`
   sobre el código real → cero errores. Ver fallar (a) (la regla todavía no existe).
-- [ ] T007 [US1] Configurar `eslint-plugin-import-x` en `eslint.config.js` para
+- [X] T007 [US1] Configurar `eslint-plugin-import-x` en `eslint.config.js` para
   `mobile/**/*.{ts,tsx}` (R4): resolver `eslint-import-resolver-typescript` con
   `project: "mobile/tsconfig.json"`; `import-x/no-cycle` con `ignoreExternal: true`;
   `import-x/no-restricted-paths` con zonas **calculadas** por una función
