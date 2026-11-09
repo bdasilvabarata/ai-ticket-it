@@ -5,7 +5,7 @@ import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-nativ
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Cargando, colores, ListaVacia, MensajeError } from "../../../componentes";
+import { Cargando, ListaVacia, MensajeError, tema } from "../../../componentes";
 import { useConexion } from "../../../conexion";
 import { FilaUsuario, useUsuarios } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
@@ -96,24 +96,24 @@ export function SeleccionarUsuario() {
 }
 
 const estilos = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: colores.fondo },
+  pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
   contenido: { flex: 1 },
   aviso: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 12,
-    borderRadius: 8,
+    marginHorizontal: tema.espacio.normal,
+    marginTop: tema.espacio.normal,
+    padding: tema.espacio.medio,
+    borderRadius: tema.radio.normal,
     borderWidth: 1,
-    borderColor: colores.avisoTexto,
-    backgroundColor: colores.avisoFondo,
+    borderColor: tema.colores.avisoTexto,
+    backgroundColor: tema.colores.avisoFondo,
   },
-  textoAviso: { fontSize: 15, color: colores.avisoTexto },
+  textoAviso: { fontSize: tema.texto.aviso, color: tema.colores.avisoTexto },
   titulo: {
-    fontSize: 22,
-    fontWeight: "600",
-    color: colores.texto,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 8,
+    fontSize: tema.texto.titulo,
+    fontWeight: tema.peso.fuerte,
+    color: tema.colores.texto,
+    paddingHorizontal: tema.espacio.normal,
+    paddingTop: tema.espacio.normal,
+    paddingBottom: tema.espacio.chico,
   },
 });

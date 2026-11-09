@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from "react-native";
 
-import { colores } from "./estilos";
+import { tema } from "./tema";
 
 export function ListaVacia({ mensaje }: { mensaje: string }) {
   return (
@@ -11,6 +11,6 @@ export function ListaVacia({ mensaje }: { mensaje: string }) {
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24 },
-  texto: { fontSize: 16, textAlign: "center", color: colores.textoSecundario },
+  contenedor: { flex: 1, alignItems: "center", justifyContent: "center", padding: tema.espacio.amplio },
+  texto: { fontSize: tema.texto.normal, textAlign: "center", color: tema.colores.textoSecundario },
 });

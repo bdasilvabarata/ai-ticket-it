@@ -295,7 +295,7 @@ sueltos, el selector sin su propio bloque `isPending/isError`).
 
 ### Tema
 
-- [ ] T021 [US2] Crear `mobile/src/componentes/tema.ts` con `export const tema = { ... } as
+- [X] T021 [US2] Crear `mobile/src/componentes/tema.ts` con `export const tema = { ... } as
   const` y **exactamente** los valores de [data-model.md "Tema"](./data-model.md#tema):
   `colores` (`texto #1f2933`, `textoSecundario #52606d`, `primario #1d4ed8`, `sobrePrimario
   #ffffff`, `fondo #ffffff`, `borde #d9e2ec`, `avisoFondo #fff4ce`, `avisoTexto #5c3c00`),

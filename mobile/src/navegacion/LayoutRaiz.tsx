@@ -4,7 +4,7 @@ import { useEffect, useMemo } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colores, FranjaServidorNoDisponible } from "../componentes";
+import { FranjaServidorNoDisponible, tema } from "../componentes";
 import type { Dependencias } from "../composicion";
 import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
@@ -111,5 +111,5 @@ function BotonCerrar() {
 
 const estilos = StyleSheet.create({
   raiz: { flex: 1 },
-  cerrar: { fontSize: 16, fontWeight: "600", color: colores.primario },
+  cerrar: { fontSize: tema.texto.normal, fontWeight: tema.peso.fuerte, color: tema.colores.primario },
 });

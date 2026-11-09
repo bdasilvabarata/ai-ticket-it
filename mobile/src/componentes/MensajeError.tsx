@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colores } from "./estilos";
+import { tema } from "./tema";
 
 export interface PropsMensajeError {
   mensaje: string;
@@ -35,10 +35,30 @@ export function MensajeError({ mensaje, titulo, alReintentar, reintentando = fal
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
-  titulo: { fontSize: 18, fontWeight: "600", textAlign: "center", color: colores.texto },
-  mensaje: { fontSize: 16, textAlign: "center", color: colores.texto },
-  boton: { paddingVertical: 12, paddingHorizontal: 20, borderRadius: 8, backgroundColor: colores.primario },
-  botonApagado: { opacity: 0.6 },
-  textoBoton: { color: colores.sobrePrimario, fontSize: 16, fontWeight: "600" },
+  contenedor: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: tema.espacio.amplio,
+    gap: tema.espacio.medio,
+  },
+  titulo: {
+    fontSize: tema.texto.subtitulo,
+    fontWeight: tema.peso.fuerte,
+    textAlign: "center",
+    color: tema.colores.texto,
+  },
+  mensaje: { fontSize: tema.texto.normal, textAlign: "center", color: tema.colores.texto },
+  boton: {
+    paddingVertical: tema.espacio.medio,
+    paddingHorizontal: tema.espacio.grande,
+    borderRadius: tema.radio.normal,
+    backgroundColor: tema.colores.primario,
+  },
+  botonApagado: { opacity: tema.opacidadApagado },
+  textoBoton: {
+    color: tema.colores.sobrePrimario,
+    fontSize: tema.texto.normal,
+    fontWeight: tema.peso.fuerte,
+  },
 });

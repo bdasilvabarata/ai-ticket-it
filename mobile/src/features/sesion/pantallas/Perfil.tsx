@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { colores } from "../../../componentes";
+import { tema } from "../../../componentes";
 import { nombreCompleto } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
@@ -37,16 +37,31 @@ export function Perfil() {
 }
 
 const estilos = StyleSheet.create({
-  contenedor: { flex: 1, alignItems: "center", justifyContent: "center", padding: 24, gap: 12 },
-  nombre: { fontSize: 22, fontWeight: "600", color: colores.texto, textAlign: "center" },
-  aviso: { fontSize: 15, color: colores.textoSecundario, textAlign: "center" },
-  boton: {
-    marginTop: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    backgroundColor: colores.primario,
+  contenedor: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: tema.espacio.amplio,
+    gap: tema.espacio.medio,
   },
-  presionado: { opacity: 0.6 },
-  textoBoton: { color: colores.sobrePrimario, fontSize: 16, fontWeight: "600" },
+  nombre: {
+    fontSize: tema.texto.titulo,
+    fontWeight: tema.peso.fuerte,
+    color: tema.colores.texto,
+    textAlign: "center",
+  },
+  aviso: { fontSize: tema.texto.aviso, color: tema.colores.textoSecundario, textAlign: "center" },
+  boton: {
+    marginTop: tema.espacio.chico,
+    paddingVertical: tema.espacio.medio,
+    paddingHorizontal: tema.espacio.grande,
+    borderRadius: tema.radio.normal,
+    backgroundColor: tema.colores.primario,
+  },
+  presionado: { opacity: tema.opacidadApagado },
+  textoBoton: {
+    color: tema.colores.sobrePrimario,
+    fontSize: tema.texto.normal,
+    fontWeight: tema.peso.fuerte,
+  },
 });
