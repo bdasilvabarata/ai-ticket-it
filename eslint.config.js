@@ -137,6 +137,10 @@ export default tseslint.config(
     languageOptions: { sourceType: "commonjs" },
   },
   {
+    files: ["mobile/scripts/**"],
+    languageOptions: { globals: { ...globals.node }, sourceType: "commonjs" },
+  },
+  {
     files: ["mobile/tests/**", "mobile/jest.setup.ts"],
     languageOptions: { globals: { ...globals.jest } },
   },

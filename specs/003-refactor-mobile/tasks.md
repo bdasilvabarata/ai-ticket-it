@@ -153,14 +153,14 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
 
 ### Rutas tipadas
 
-- [ ] T008 [US1] Guarda de rutas en `mobile/tests/tipos/rutas-tipadas.ts` (no matchea el
+- [X] T008 [US1] Guarda de rutas en `mobile/tests/tipos/rutas-tipadas.ts` (no matchea el
   `testMatch` de `mobile/jest.config.js`, solo lo compila `tsc`): `import type { Href } from
   "expo-router";`, `export const valida: Href = "/seleccionar-usuario";` y, con
   `// @ts-expect-error la ruta no existe: las rutas tipadas deben rechazarla (FR-009)`,
   `export const invalida: Href = "/seleccionar-usuarios";`. Correr `npx tsc --noEmit -p mobile`
   y **ver fallar** por la directiva sin uso. Como el hook `Stop` exige typecheck en verde, T009
   se hace en el mismo turno.
-- [ ] T009 [US1] Activar las rutas tipadas (R5): `"experiments": { "typedRoutes": true }` en
+- [X] T009 [US1] Activar las rutas tipadas (R5): `"experiments": { "typedRoutes": true }` en
   `mobile/app.json`; `mobile/scripts/generar-tipos-rutas.js` (CommonJS, ~15 líneas) que define
   `process.env.EXPO_ROUTER_APP_ROOT = <mobile>/app`, crea `mobile/.expo/types/`, resuelve
   `@expo/router-server/build/typed-routes` desde `@expo/cli` (`require.resolve(..., { paths:
