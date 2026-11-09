@@ -433,7 +433,7 @@ lectura de la 002 sin cambios (quickstart §4).
 
 **Purpose**: guía para agentes, skill y backlog al día (FR-021, FR-022) y validación final.
 
-- [ ] T032 [P] Actualizar `AGENTS.md`, sección "Mapa" de `mobile/`: `app/` como re-exports de
+- [X] T032 [P] Actualizar `AGENTS.md`, sección "Mapa" de `mobile/`: `app/` como re-exports de
   una línea; base (`api/`, `consultas/` con `cliente-api`, `conexion/` como contrato,
   `componentes/` con `tema`, `Boton`, `SegunConsulta`); `features/<dominio>/` con `index.ts`
   público (`usuarios`, `sesion`); conectores (`composicion.ts` sin contexto,
@@ -442,7 +442,7 @@ lectura de la 002 sin cambios (quickstart §4).
   `tsc`; cómo agregar un endpoint de escritura (`cliente.post<T>(ruta, cuerpo)`) y que las
   escrituras no se reintentan solas; tests en `tests/features/<dominio>/`. Quitar las menciones
   a `composicion.tsx`, `DependenciasProvider`/`useDependencias` y `src/sesion/`.
-- [ ] T033 [P] Actualizar `.claude/skills/nueva-pantalla/SKILL.md`: la pantalla va en
+- [X] T033 [P] Actualizar `.claude/skills/nueva-pantalla/SKILL.md`: la pantalla va en
   `src/features/<dominio>/pantallas/` y `app/<ruta>.tsx` es `export { X as default } from
   ".../src/features/<dominio>";`; pestañas nuevas en `src/navegacion/LayoutPestanas.tsx` y
   pantallas apiladas en el `Stack.Protected` de `src/navegacion/LayoutRaiz.tsx`; los cuatro
