@@ -471,7 +471,7 @@ lectura de la 002 sin cambios (quickstart §4).
   arranque, usuario recordado, cambio de usuario, servidor no disponible con franja y reintento,
   usuario inexistente con aviso) y confirmar que se ve igual. Después de `expo start`,
   `git status` limpio (sin cambios en `mobile/tsconfig.json` ni `expo-env.d.ts` versionado).
-- [ ] T037 Abrir el PR de `feature/003-refactor-mobile` a `development` con el CI en verde y
+- [X] T037 Abrir el PR de `feature/003-refactor-mobile` a `development` con el CI en verde y
   pasar la 003 a `en PR` en `docs/backlog.md`.
 
 ---
