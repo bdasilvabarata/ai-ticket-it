@@ -410,7 +410,7 @@ lectura de la 002 sin cambios (quickstart §4).
   traducción de errores y aviso del 401 en nombre del usuario **del pedido** sin cambios. `get`,
   `post`, `put`, `patch` y `delete` solo llaman a `pedir`. `tests/api/*.test.ts` (los de la 002
   incluidos) en verde; `mobile/src/api/usuarios.ts` sin cambios (SC-006).
-- [ ] T031 [US3] Test de FR-020 en `mobile/tests/pantallas/errores-en-uso.test.tsx`: ruta extra
+- [X] T031 [US3] Test de FR-020 en `mobile/tests/pantallas/errores-en-uso.test.tsx`: ruta extra
   `"(tabs)/prueba-escritura"` (vía `rutasExtra`) con un `useMutation` que hace
   `cliente.post("/prueba-escritura", { x: 1 })` al montar; `porRuta` con `"/prueba-escritura":
   ["rechazar", { status: 201, json: {} }]` y `/usuarios/actual` respondiendo bien. Con usuario
@@ -556,6 +556,11 @@ Task: "T028 cuerpo en PedidoRegistrado de mobile/tests/helpers/fetch-falso.ts"
 
 - **Base de tests (T001)**: en `5f296e9`, `mobile/` tiene 19 suites y 128 tests en verde
   (backend: 16 archivos, 95 tests); lint, typecheck y format:check en verde.
+- **T031, dos ajustes**: (1) la pantalla de escritura reemplaza a `(tabs)/index`, como la de
+  lectura del mismo archivo: con el guard, un `initialUrl` a `(tabs)/prueba-escritura` no se
+  respeta y la ruta nunca se monta. (2) `/prueba-escritura` responde siempre `"rechazar"`: con
+  `["rechazar", 201]`, al poner `mutations.retry: 1` el reintento salía bien y el test fallaba por
+  la franja ausente, no por el conteo; así falla con "Expected length: 1, Received length: 2".
 - [P] = archivos distintos, sin dependencias pendientes.
 - Cada tarea deja `test`, `lint`, `typecheck` y `format:check` en verde (plan, "Orden de
   implementación").

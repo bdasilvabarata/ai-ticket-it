@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { act, screen, waitFor } from "expo-router/testing-library";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { AccessibilityInfo, Text } from "react-native";
 
 import type { ClienteApi } from "../../src/api";
@@ -124,5 +124,71 @@ describe("errores durante el uso (US2, FR-014)", () => {
     expect(screen.queryByText(AVISO)).toBeNull();
     expect(screen.queryByText(TITULO)).toBeNull();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).not.toBeNull();
+  });
+});
+
+const ESCRITURA = "/prueba-escritura";
+const ESCRITURA_ENVIADA = "Escritura enviada";
+const ESCRITURA_FALLIDA = "La escritura falló";
+
+/** Pantalla de las features 004+: una escritura (mutation POST) que sale apenas se monta. */
+function PantallaDeEscritura() {
+  const cliente = useClienteApi();
+  const mutation = useMutation({ mutationFn: () => cliente.post(ESCRITURA, { x: 1 }) });
+  const { mutate } = mutation;
+  const enviada = useRef(false);
+
+  useEffect(() => {
+    if (enviada.current) return;
+    enviada.current = true;
+    mutate();
+  }, [mutate]);
+
+  if (mutation.isError) return <Text>{ESCRITURA_FALLIDA}</Text>;
+  return <Text>{ESCRITURA_ENVIADA}</Text>;
+}
+
+async function abrirEscritura(escritura: RespuestaFalsa[]) {
+  const resultado = await renderConDependencias({
+    usuarioRecordado: lucia.id,
+    respuestas: porRuta({
+      [ACTUAL]: [ok],
+      [ESCRITURA]: escritura,
+      "/usuarios": [{ status: 200, json: todos }],
+    }),
+    // Como en `abrirPrueba`: reemplaza a Explorar, que es lo que se ve apenas se confirma al usuario
+    // (con el guard, un `initialUrl` a otra pestaña no se respeta).
+    rutasExtra: { "(tabs)/index": PantallaDeEscritura },
+  });
+  await waitFor(() => expect(resultado.falso.pedidosA(ESCRITURA)).toHaveLength(1));
+  return resultado;
+}
+
+describe("escrituras durante el uso (US3, FR-020)", () => {
+  it("un POST que cae sin servidor no se repite cuando la secuencia se recupera", async () => {
+    // Todo POST falla: si algo lo repitiera (un reintento de la mutation o de la secuencia), el
+    // conteo final lo muestra.
+    const { falso } = await abrirEscritura(["rechazar"]);
+
+    expect(await screen.findByText(FRANJA)).toBeOnTheScreen();
+    expect(await screen.findByText(ESCRITURA_FALLIDA)).toBeOnTheScreen();
+
+    await avanzar(1000);
+    await waitFor(() => expect(screen.queryByText(FRANJA)).toBeNull());
+    expect(falso.pedidosA(ACTUAL)).toHaveLength(2);
+    await avanzar(70_000);
+
+    const escrituras = falso.pedidosA(ESCRITURA);
+    expect(escrituras).toHaveLength(1);
+    expect(escrituras[0]).toMatchObject({ metodo: "POST", cuerpo: '{"x":1}' });
+  });
+
+  it("401 USUARIO_NO_IDENTIFICADO en una escritura → olvida al usuario como en una lectura", async () => {
+    await abrirEscritura([noIdentificado]);
+
+    expect(await screen.findByText(AVISO)).toBeOnTheScreen();
+    expect(await screen.findByText(TITULO)).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cerrar sin cambiar de usuario" })).toBeNull();
+    expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).toBeNull();
   });
 });
