@@ -68,6 +68,7 @@ describe("arranque con usuario recordado (US2)", () => {
 
     await waitFor(() => expect(falso.pedidosA(ACTUAL)).toHaveLength(1));
     expect(screen.getByText("Cargando…")).toBeOnTheScreen();
+    expect(screen.getByLabelText("AI Ticket It")).toBeOnTheScreen();
     expect(screen.queryByText(TITULO)).toBeNull();
     expect(falso.pedidosA("/usuarios")).toHaveLength(0);
   });

@@ -6,12 +6,23 @@ export const tema = {
   colores: {
     texto: "#1f2933",
     textoSecundario: "#52606d",
-    primario: "#1d4ed8",
+    // Verde del logo oscurecido: con texto blanco encima llega a 5:1 (el del logo da 1,8:1).
+    primario: "#15803d",
     sobrePrimario: "#ffffff",
+    // Verde exacto del logo: solo para acentos sin texto encima.
+    marca: "#69d73c",
     fondo: "#ffffff",
     borde: "#d9e2ec",
     avisoFondo: "#fff4ce",
     avisoTexto: "#5c3c00",
+    // Estados de compra (siempre junto a su etiqueta de texto, no solo el color):
+    // éxito → CONFIRMADA y UTILIZADA; peligro → CANCELADA y REEMBOLSADA; advertencia → PENDIENTE.
+    exito: "#166534",
+    sobreExito: "#ffffff",
+    peligro: "#b91c1c",
+    sobrePeligro: "#ffffff",
+    advertencia: "#b45309",
+    sobreAdvertencia: "#ffffff",
   },
   espacio: {
     minimo: 2,
@@ -36,6 +47,9 @@ export const tema = {
   },
   radio: {
     normal: 8,
+  },
+  logo: {
+    alto: 150,
   },
   opacidadApagado: 0.6,
 } as const;

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { AccessibilityInfo, FlatList, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { SegunConsulta, tema } from "../../../componentes";
+import { Logo, SegunConsulta, tema } from "../../../componentes";
 import { FilaUsuario, useUsuarios } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
@@ -38,6 +38,12 @@ export function SeleccionarUsuario() {
 
   return (
     <SafeAreaView style={estilos.pantalla} edges={enModal ? ["bottom"] : ["top", "bottom"]}>
+      {/* El logo da la bienvenida; en el modal de "Cambiar usuario" no hace falta. */}
+      {enModal ? null : (
+        <View style={estilos.logo}>
+          <Logo />
+        </View>
+      )}
       {conAviso ? (
         <View style={estilos.aviso} accessibilityLiveRegion="polite">
           <Text style={estilos.textoAviso}>{AVISO_USUARIO_INEXISTENTE}</Text>
@@ -73,6 +79,7 @@ export function SeleccionarUsuario() {
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
   contenido: { flex: 1 },
+  logo: { paddingTop: tema.espacio.normal },
   aviso: {
     marginHorizontal: tema.espacio.normal,
     marginTop: tema.espacio.normal,

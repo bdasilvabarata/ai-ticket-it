@@ -66,7 +66,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       la sesión y lo leen la franja y `SegunConsulta`.
     - `src/componentes/` — `tema` (colores, espacios, textos, pesos, radio, opacidad: nada suelto),
       `Boton` (`primario` · `aviso` · `texto`), `SegunConsulta` (los cuatro estados), `Cargando`,
-      `MensajeError`, `ListaVacia`, `SeccionPendiente` y la franja; todo por `index.ts`.
+      `MensajeError`, `ListaVacia`, `SeccionPendiente`, la franja, `Logo` y `CargandoInicio`
+      (la ruta `cargando`); todo por `index.ts`. El primario es el verde del logo oscurecido
+      (`marca` es el verde exacto, solo para acentos sin texto encima); los estados de compra usan
+      `exito` (CONFIRMADA, UTILIZADA), `peligro` (CANCELADA, REEMBOLSADA) y `advertencia`
+      (PENDIENTE), cada uno con su `sobre…`, y siempre junto a la etiqueta del estado.
   - **Features** — `src/features/<dominio>/` con `pantallas/`, `componentes/`, hooks de consulta,
     `formato.ts` (textos derivados puros) e `index.ts`, su **único punto de entrada público**:
     - `usuarios/` — `useUsuarios`, `FilaUsuario`, `nombreCompleto`, `textoEventosOrganizados`;

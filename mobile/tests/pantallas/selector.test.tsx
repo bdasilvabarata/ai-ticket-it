@@ -33,6 +33,13 @@ describe("selector de usuario (sin usuario recordado)", () => {
     expect(falso.pedidosA("/usuarios")[0].encabezados).not.toHaveProperty("X-Usuario-Id");
   });
 
+  it("muestra el logo arriba del selector", async () => {
+    await renderConDependencias({ respuestas: [{ status: 200, json: todos }] });
+
+    expect(await screen.findByText(TITULO)).toBeOnTheScreen();
+    expect(screen.getByLabelText("AI Ticket It")).toBeOnTheScreen();
+  });
+
   it("con la lista vacía muestra el mensaje de lista vacía", async () => {
     await renderConDependencias({ respuestas: [{ status: 200, json: [] }] });
 

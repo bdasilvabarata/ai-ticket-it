@@ -1,1 +1,1 @@
-export { Cargando as default } from "../src/componentes";
+export { CargandoInicio as default } from "../src/componentes";
