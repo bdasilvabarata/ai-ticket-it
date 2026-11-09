@@ -10,6 +10,12 @@ description: Checklist para crear o modificar una pantalla de la app móvil de A
 - ¿Depende del usuario actual (mis compras, mis eventos) o es pública (el selector)?
 - ¿Qué muestra en cada estado: cargando, error, vacío y éxito? Textos en `contracts/` de la feature.
 
+## Boceto (opcional, antes de los tests)
+- Para ver la distribución de tarjetas, botones y campos, un prompt rápido en v0 alcanza. Sirve solo
+  para decidir el **orden y la jerarquía** de los elementos: su código y sus estilos no se copian.
+- La pantalla se escribe después con lo de `src/componentes` (`tema`, `Boton`, `SegunConsulta`…). Si
+  el boceto pide un valor que el tema no tiene, se agrega al tema, no a la pantalla.
+
 ## Dónde va cada cosa
 ```text
 mobile/
@@ -17,7 +23,7 @@ mobile/
 └── src/
     ├── api/<recurso>.ts              # funciones de endpoint (+ export en api/index.ts)
     ├── consultas/claves.ts           # claves de query
-    ├── componentes/                  # base: tema, Boton, SegunConsulta, Cargando, MensajeError, ListaVacia…
+    ├── componentes/                  # base: tema, Boton, SegunConsulta, Cargando, MensajeError, ListaVacia, Logo…
     ├── navegacion/                   # LayoutPestanas (pestañas) y LayoutRaiz (Stack con guards)
     └── features/<dominio>/
         ├── pantallas/<Pantalla>.tsx  # export con nombre
@@ -131,6 +137,14 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
 - Estilos con `tema` de `src/componentes` (`tema.colores`, `tema.espacio`, `tema.texto`,
   `tema.peso`, `tema.radio`, `tema.opacidadApagado`): ni hex ni números sueltos. Si falta un valor,
   agregalo al tema.
+  - `primario` / `sobrePrimario` para acciones; `marca` (verde exacto del logo) solo para acentos sin
+    texto encima, porque con texto no llega al contraste mínimo.
+  - Estados de compra: `exito` / `sobreExito` → `CONFIRMADA` y `UTILIZADA`; `peligro` /
+    `sobrePeligro` → `CANCELADA` y `REEMBOLSADA`; `advertencia` / `sobreAdvertencia` → `PENDIENTE`.
+    Siempre con la etiqueta del estado escrita (ver Accesibilidad): `exito` y `primario` son verdes.
+  - El logo es el componente `Logo` (ya tiene su `accessibilityLabel`); no importes el `.png` suelto.
+- Sombras, bordes, transiciones y demás pulido visual **no** se agregan pantalla por pantalla: van en
+  la feature 013 (pulido estético), de forma global en `tema.ts` y en los componentes base.
 
 ## Accesibilidad y 360 px
 - Títulos con `accessibilityRole="header"`. `Boton` ya es `button` con su texto y anuncia
