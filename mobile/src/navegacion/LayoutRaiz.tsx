@@ -6,7 +6,7 @@ import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area
 
 import { colores } from "../componentes/estilos";
 import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
-import { DependenciasProvider, type Dependencias } from "../composicion";
+import type { Dependencias } from "../composicion";
 import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
 import type { EstadoSesion } from "../sesion/estado-sesion";
@@ -20,13 +20,11 @@ export function LayoutRaiz({ dependencias }: { dependencias: Dependencias }) {
   useEffect(() => conectarFocoDeLaApp(), []);
 
   return (
-    <DependenciasProvider dependencias={dependencias}>
-      <QueryClientProvider client={dependencias.queryClient}>
-        <SesionProvider>
-          <Navegacion />
-        </SesionProvider>
-      </QueryClientProvider>
-    </DependenciasProvider>
+    <QueryClientProvider client={dependencias.queryClient}>
+      <SesionProvider dependencias={dependencias}>
+        <Navegacion />
+      </SesionProvider>
+    </QueryClientProvider>
   );
 }
 

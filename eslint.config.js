@@ -163,7 +163,7 @@ export default tseslint.config(
   },
   {
     files: ["mobile/**/*.{ts,tsx,js}"],
-    ignores: ["mobile/src/api/**", "mobile/src/composicion.tsx"],
+    ignores: ["mobile/src/api/**", "mobile/src/composicion.ts"],
     rules: {
       "no-restricted-globals": [
         "error",

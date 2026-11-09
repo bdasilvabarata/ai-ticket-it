@@ -1,30 +1,13 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { QueryClient } from "@tanstack/react-query";
 import Constants from "expo-constants";
-import { createContext, useContext, type ReactNode } from "react";
 
-import { crearClienteApi, resolverUrlBase, type ClienteApi } from "./api";
+import { crearClienteApi, resolverUrlBase } from "./api";
 import { crearQueryClient } from "./consultas/query-client";
-import {
-  crearRepositorioUsuarioRecordado,
-  type Almacenamiento,
-  type RepositorioUsuarioRecordado,
-} from "./sesion/usuario-recordado";
+import type { DependenciasSesion } from "./sesion/controlador-sesion";
+import { crearRepositorioUsuarioRecordado, type Almacenamiento } from "./sesion/usuario-recordado";
 
-export interface OpcionesCliente {
-  obtenerUsuarioId: () => string | null;
-  alUsuarioNoIdentificado: (usuarioId: string) => void;
-}
-
-/** Piezas de la app, armadas en un solo lugar (data-model "Dependencias"). */
-export interface Dependencias {
-  urlBase: string;
-  usuarioRecordado: RepositorioUsuarioRecordado;
-  queryClient: QueryClient;
-  crearCliente(opciones: OpcionesCliente): ClienteApi;
-  /** La sesión se entera de los errores de toda query o mutation (R8). Devuelve cómo desuscribirse. */
-  registrarOyenteDeErrores(oyente: (error: unknown) => void): () => void;
-}
+/** Piezas de la app, armadas en un solo lugar (data-model "Dependencias"); hoy, las de la sesión. */
+export type Dependencias = DependenciasSesion;
 
 export interface EntradaDependencias {
   fetch: typeof fetch;
@@ -70,22 +53,4 @@ export function crearDependenciasDeProduccion(): Dependencias {
     urlEntorno: process.env.EXPO_PUBLIC_API_URL,
     hostUri: Constants.expoConfig?.hostUri ?? null,
   });
-}
-
-const ContextoDependencias = createContext<Dependencias | null>(null);
-
-export function DependenciasProvider({
-  dependencias,
-  children,
-}: {
-  dependencias: Dependencias;
-  children: ReactNode;
-}) {
-  return <ContextoDependencias.Provider value={dependencias}>{children}</ContextoDependencias.Provider>;
-}
-
-export function useDependencias(): Dependencias {
-  const dependencias = useContext(ContextoDependencias);
-  if (!dependencias) throw new Error("useDependencias se usa dentro de DependenciasProvider");
-  return dependencias;
 }

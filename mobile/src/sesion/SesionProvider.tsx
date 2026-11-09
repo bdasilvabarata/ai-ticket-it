@@ -2,11 +2,10 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 
-import { useDependencias } from "../composicion";
 import { ConexionProvider, type EstadoConexion } from "../conexion";
 import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
 import { ClienteApiProvider } from "../consultas/cliente-api";
-import { crearControladorSesion } from "./controlador-sesion";
+import { crearControladorSesion, type DependenciasSesion } from "./controlador-sesion";
 import { estadoInicial, reducirSesion, type EstadoSesion } from "./estado-sesion";
 
 interface ValorSesion {
@@ -23,8 +22,13 @@ const secuenciaInicial: EstadoSecuencia = {
 };
 
 /** Sesión de la app: usuario actual, cliente HTTP y la única secuencia de reintentos (R5, R7). */
-export function SesionProvider({ children }: { children: ReactNode }) {
-  const dependencias = useDependencias();
+export function SesionProvider({
+  dependencias,
+  children,
+}: {
+  dependencias: DependenciasSesion;
+  children: ReactNode;
+}) {
   const [estado, despachar] = useReducer(reducirSesion, estadoInicial);
   const [secuencia, setSecuencia] = useState(secuenciaInicial);
   const [controlador] = useState(() =>

@@ -175,7 +175,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
 
 ### Movimientos (base → features → conectores → app/)
 
-- [ ] T010 [US1] Dependencias por props, **antes de mover** (R2): con los archivos todavía en
+- [X] T010 [US1] Dependencias por props, **antes de mover** (R2): con los archivos todavía en
   `mobile/src/sesion/`, en `mobile/src/sesion/controlador-sesion.ts` definir y exportar
   `OpcionesCliente` (movida de `composicion`) y `DependenciasSesion { urlBase;
   usuarioRecordado: RepositorioUsuarioRecordado; queryClient: QueryClient;
