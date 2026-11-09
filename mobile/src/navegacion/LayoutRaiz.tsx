@@ -1,16 +1,14 @@
 import { QueryClientProvider } from "@tanstack/react-query";
 import { router, Stack, useSegments } from "expo-router";
 import { useEffect, useMemo } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colores } from "../componentes/estilos";
-import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDisponible";
-import { DependenciasProvider, type Dependencias } from "../composicion";
-import { useConexion } from "../conexion/useConexion";
+import { Boton, FranjaServidorNoDisponible } from "../componentes";
+import type { Dependencias } from "../composicion";
+import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
-import type { EstadoSesion } from "../sesion/estado-sesion";
-import { SesionProvider, useSesion } from "../sesion/SesionProvider";
+import { SesionProvider, useSesion, type EstadoSesion } from "../features/sesion";
 
 /**
  * Layout raíz de la app (R3). Vive fuera de `app/` para que los tests lo rendericen con
@@ -20,13 +18,11 @@ export function LayoutRaiz({ dependencias }: { dependencias: Dependencias }) {
   useEffect(() => conectarFocoDeLaApp(), []);
 
   return (
-    <DependenciasProvider dependencias={dependencias}>
-      <QueryClientProvider client={dependencias.queryClient}>
-        <SesionProvider>
-          <Navegacion />
-        </SesionProvider>
-      </QueryClientProvider>
-    </DependenciasProvider>
+    <QueryClientProvider client={dependencias.queryClient}>
+      <SesionProvider dependencias={dependencias}>
+        <Navegacion />
+      </SesionProvider>
+    </QueryClientProvider>
   );
 }
 
@@ -102,18 +98,16 @@ function Pila({ estado }: { estado: EstadoSesion }) {
 
 function BotonCerrar() {
   return (
-    <Pressable
-      accessibilityRole="button"
+    <Boton
+      variante="texto"
+      texto="Cerrar"
       accessibilityLabel="Cerrar sin cambiar de usuario"
       hitSlop={8}
-      onPress={() => router.back()}
-    >
-      <Text style={estilos.cerrar}>Cerrar</Text>
-    </Pressable>
+      alPresionar={() => router.back()}
+    />
   );
 }
 
 const estilos = StyleSheet.create({
   raiz: { flex: 1 },
-  cerrar: { fontSize: 16, fontWeight: "600", color: colores.primario },
 });

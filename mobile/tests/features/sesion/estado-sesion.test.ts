@@ -1,6 +1,6 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 
-import { estadoInicial, reducirSesion, type EstadoSesion } from "../../src/sesion/estado-sesion";
+import { estadoInicial, reducirSesion, type EstadoSesion } from "../../../src/features/sesion/estado-sesion";
 
 const lucia: UsuarioVista = {
   id: "usuario-lucia",

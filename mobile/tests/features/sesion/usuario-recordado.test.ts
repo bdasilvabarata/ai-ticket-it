@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-import { crearRepositorioUsuarioRecordado, type Almacenamiento } from "../../src/sesion/usuario-recordado";
+import {
+  crearRepositorioUsuarioRecordado,
+  type Almacenamiento,
+} from "../../../src/features/sesion/usuario-recordado";
 
 const CLAVE = "ai-ticket-it/usuario-recordado";
 

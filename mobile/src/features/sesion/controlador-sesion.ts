@@ -1,14 +1,30 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
+import type { QueryClient } from "@tanstack/react-query";
 
-import { obtenerUsuarioActual, ServidorNoDisponibleError, type ClienteApi } from "../api";
-import type { Dependencias } from "../composicion";
-import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
-import { claves } from "../consultas/claves";
+import { obtenerUsuarioActual, ServidorNoDisponibleError, type ClienteApi } from "../../api";
+import { claves } from "../../consultas/claves";
 import { estadoInicial, reducirSesion, type EstadoSesion, type EventoSesion } from "./estado-sesion";
+import { SecuenciaDeReintentos, type EstadoSecuencia } from "./secuencia-reintentos";
+import type { RepositorioUsuarioRecordado } from "./usuario-recordado";
 import { decidirValidacion, type DecisionValidacion } from "./validacion";
 
+export interface OpcionesCliente {
+  obtenerUsuarioId: () => string | null;
+  alUsuarioNoIdentificado: (usuarioId: string) => void;
+}
+
+/** Lo que la sesión necesita, inyectado por props a `SesionProvider` (research R2). */
+export interface DependenciasSesion {
+  urlBase: string;
+  usuarioRecordado: RepositorioUsuarioRecordado;
+  queryClient: QueryClient;
+  crearCliente(opciones: OpcionesCliente): ClienteApi;
+  /** La sesión se entera de los errores de toda query o mutation (R8). Devuelve cómo desuscribirse. */
+  registrarOyenteDeErrores(oyente: (error: unknown) => void): () => void;
+}
+
 export interface OpcionesControlador {
-  dependencias: Dependencias;
+  dependencias: DependenciasSesion;
   /** El `dispatch` del reducer de React: recibe los mismos eventos que el estado interno. */
   despachar: (evento: EventoSesion) => void;
   alCambiarSecuencia: (estado: EstadoSecuencia) => void;

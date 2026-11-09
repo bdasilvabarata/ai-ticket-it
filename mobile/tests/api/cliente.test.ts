@@ -197,3 +197,135 @@ describe("crearClienteApi", () => {
     });
   });
 });
+
+describe("pedir y atajos (US3, contracts/cliente-api.md)", () => {
+  const creado = { status: 201, json: { id: "e1" } };
+
+  it.each([
+    ["post", "POST"],
+    ["put", "PUT"],
+    ["patch", "PATCH"],
+    ["delete", "DELETE"],
+    ["get", "GET"],
+  ] as const)("%s usa el método %s", async (atajo, metodo) => {
+    const { cliente, falso } = armar([creado]);
+
+    await cliente[atajo]("/eventos");
+    expect(falso.pedidos).toHaveLength(1);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL_BASE}/eventos`, metodo });
+  });
+
+  it("post con cuerpo → JSON, Content-Type, Accept y X-Usuario-Id del usuario actual", async () => {
+    const { cliente, falso } = armar([creado], { usuarioId: "usuario-lucia" });
+    const cuerpo = { nombre: "Recital", tipos: [{ precio: 100 }] };
+
+    await expect(cliente.post<{ id: string }>("/eventos", cuerpo)).resolves.toEqual({ id: "e1" });
+    expect(falso.pedidos).toHaveLength(1);
+    expect(falso.pedidos[0].cuerpo).toBe(JSON.stringify(cuerpo));
+    expect(falso.pedidos[0].encabezados).toEqual({
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      "X-Usuario-Id": "usuario-lucia",
+    });
+  });
+
+  it.each(["post", "delete"] as const)("%s sin cuerpo → sin Content-Type ni body", async (atajo) => {
+    const { cliente, falso } = armar([creado], { usuarioId: "usuario-lucia" });
+
+    await cliente[atajo]("/eventos/e1");
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados).toEqual({
+      Accept: "application/json",
+      "X-Usuario-Id": "usuario-lucia",
+    });
+  });
+
+  it("pedir PUT con usuarioId null → sin X-Usuario-Id", async () => {
+    const { cliente, falso } = armar([creado], { usuarioId: "usuario-lucia" });
+
+    await cliente.pedir("PUT", "/eventos/e1", { cuerpo: { x: 1 }, usuarioId: null });
+    expect(falso.pedidos).toHaveLength(1);
+    expect(falso.pedidos[0].metodo).toBe("PUT");
+    expect(falso.pedidos[0].encabezados).not.toHaveProperty("X-Usuario-Id");
+  });
+
+  it.each(["delete", "get"] as const)("204 en %s → resuelve undefined", async (atajo) => {
+    const { cliente, falso } = armar([{ status: 204, texto: "" }]);
+
+    await expect(cliente[atajo]("/eventos/e1")).resolves.toBeUndefined();
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("200 con cuerpo vacío → ErrorDeApi RESPUESTA_INESPERADA", async () => {
+    const { cliente, falso } = armar([{ status: 200, texto: "" }]);
+
+    const error = await capturar(cliente.post("/eventos", { x: 1 }));
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({ status: 200, codigo: "RESPUESTA_INESPERADA" });
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("409 con ErrorApi en un post → ErrorDeApi con status, código, mensaje y detalles", async () => {
+    const detalles = [{ campo: "body.cantidad", mensaje: "Supera el cupo." }];
+    const { cliente, falso } = armar([
+      { status: 409, json: { error: { codigo: "CUPO_AGOTADO", mensaje: "No quedan entradas.", detalles } } },
+    ]);
+
+    const error = await capturar(cliente.post("/compras", { cantidad: 3 }));
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({
+      status: 409,
+      codigo: "CUPO_AGOTADO",
+      mensaje: "No quedan entradas.",
+      detalles,
+    });
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("post colgado → a los 8000 ms ServidorNoDisponibleError tiempo-agotado, sin repetir", async () => {
+    jest.useFakeTimers();
+    const { cliente, falso } = armar(["colgar"]);
+    let resultado: unknown = "pendiente";
+    cliente.post("/compras", { cantidad: 1 }).catch((error: unknown) => (resultado = error));
+
+    await jest.advanceTimersByTimeAsync(8000);
+    expect(resultado).toBeInstanceOf(ServidorNoDisponibleError);
+    expect(resultado).toMatchObject({ motivo: "tiempo-agotado", url: `${URL_BASE}/compras` });
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("post rechazado → ServidorNoDisponibleError sin-conexion, sin repetir", async () => {
+    const { cliente, falso } = armar(["rechazar"]);
+
+    const error = await capturar(cliente.post("/compras", { cantidad: 1 }));
+    expect(error).toBeInstanceOf(ServidorNoDisponibleError);
+    expect(error).toMatchObject({ motivo: "sin-conexion" });
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("post con signal externo abortado → el error de cancelación tal cual", async () => {
+    const { cliente, falso } = armar(["colgar"]);
+    const controlador = new AbortController();
+
+    const promesa = capturar(cliente.post("/compras", { cantidad: 1 }, { signal: controlador.signal }));
+    controlador.abort();
+    const error = await promesa;
+
+    expect((error as Error).name).toBe("AbortError");
+    expect(error).not.toBeInstanceOf(ServidorNoDisponibleError);
+    expect(falso.pedidos).toHaveLength(1);
+  });
+
+  it("401 USUARIO_NO_IDENTIFICADO en un patch → avisa con el usuario del pedido", async () => {
+    const { cliente, falso, alUsuarioNoIdentificado } = armar(
+      [{ status: 401, json: { error: { codigo: "USUARIO_NO_IDENTIFICADO", mensaje: "No existe." } } }],
+      { usuarioId: "u1" },
+    );
+
+    const error = await capturar(cliente.patch("/compras/c1", { estado: "x" }, { usuarioId: "u2" }));
+    expect(error).toMatchObject({ status: 401, codigo: "USUARIO_NO_IDENTIFICADO" });
+    expect(alUsuarioNoIdentificado).toHaveBeenCalledTimes(1);
+    expect(alUsuarioNoIdentificado).toHaveBeenCalledWith("u2");
+    expect(falso.pedidos).toHaveLength(1);
+  });
+});

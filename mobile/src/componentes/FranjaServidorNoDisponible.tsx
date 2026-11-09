@@ -1,8 +1,9 @@
 import { useEffect } from "react";
-import { AccessibilityInfo, Pressable, StyleSheet, Text, View } from "react-native";
+import { AccessibilityInfo, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colores } from "./estilos";
+import { Boton } from "./Boton";
+import { tema } from "./tema";
 
 export interface PropsFranjaServidorNoDisponible {
   urlBase: string;
@@ -26,20 +27,18 @@ export function FranjaServidorNoDisponible({
   }, []);
 
   return (
-    <View style={[estilos.franja, { paddingTop: top + 8 }]}>
+    <View style={[estilos.franja, { paddingTop: top + tema.espacio.chico }]}>
       {/* El rol va en el texto y no en el contenedor: así el botón sigue siendo un elemento aparte. */}
       <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={estilos.texto}>
         {`Servidor no disponible · ${urlBase}`}
       </Text>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityState={{ disabled: reintentando }}
-        disabled={reintentando}
-        onPress={alReintentar}
-        style={({ pressed }) => [estilos.boton, (pressed || reintentando) && estilos.botonApagado]}
-      >
-        <Text style={estilos.textoBoton}>{reintentando ? "Reintentando…" : "Reintentar"}</Text>
-      </Pressable>
+      <Boton
+        variante="aviso"
+        texto="Reintentar"
+        textoEnCurso="Reintentando…"
+        enCurso={reintentando}
+        alPresionar={alReintentar}
+      />
     </View>
   );
 }
@@ -49,21 +48,12 @@ const estilos = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingBottom: 8,
-    backgroundColor: colores.avisoFondo,
+    gap: tema.espacio.chico,
+    paddingHorizontal: tema.espacio.normal,
+    paddingBottom: tema.espacio.chico,
+    backgroundColor: tema.colores.avisoFondo,
     borderBottomWidth: 1,
-    borderBottomColor: colores.borde,
+    borderBottomColor: tema.colores.borde,
   },
-  texto: { flexGrow: 1, flexShrink: 1, fontSize: 14, color: colores.avisoTexto },
-  boton: {
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colores.avisoTexto,
-  },
-  botonApagado: { opacity: 0.6 },
-  textoBoton: { fontSize: 14, fontWeight: "600", color: colores.avisoTexto },
+  texto: { flexGrow: 1, flexShrink: 1, fontSize: tema.texto.chico, color: tema.colores.avisoTexto },
 });

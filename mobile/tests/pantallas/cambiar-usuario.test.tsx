@@ -56,6 +56,7 @@ describe("cambiar de usuario desde Perfil (US3)", () => {
     expect(actual).toBeSelected();
     expect(screen.getByRole("button", { name: "Elegir a Diego Fernández" })).not.toBeSelected();
     expect(screen.getByRole("button", { name: CERRAR })).toBeOnTheScreen();
+    expect(screen.queryByLabelText("AI Ticket It")).toBeNull();
   });
 
   it("Cerrar vuelve a Perfil sin cambiar de usuario (US3-5)", async () => {
