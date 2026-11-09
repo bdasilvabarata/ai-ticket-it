@@ -26,6 +26,14 @@ const modulosConIo = [
   "os",
 ];
 
+const modulosProhibidosEnApp = [
+  "react",
+  "react-native",
+  "@tanstack/react-query",
+  "@expo/vector-icons",
+  "expo-router",
+];
+
 /** Entradas de `dir` (relativo a la raíz); lista vacía si no existe. */
 function entradas(dir) {
   const absoluto = path.join(raiz, dir);
@@ -135,6 +143,23 @@ export default tseslint.config(
   {
     files: ["mobile/*.config.js"],
     languageOptions: { sourceType: "commonjs" },
+  },
+  // Regla 4: app/ solo expone pantallas o layouts de src/, sin lógica, estado ni estilos (SC-003).
+  {
+    files: ["mobile/app/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: modulosProhibidosEnApp.flatMap((modulo) => [modulo, `${modulo}/*`]),
+              message: "app/ solo expone una pantalla o layout de src/ (FR-006)",
+            },
+          ],
+        },
+      ],
+    },
   },
   {
     files: ["mobile/scripts/**"],

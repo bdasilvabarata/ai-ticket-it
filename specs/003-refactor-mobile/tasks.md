@@ -241,7 +241,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   una sola declaración `export default function ...` sin estilos. `LayoutRaiz.tsx` y las
   pantallas de `sesion` importan los componentes por `componentes/index` (convención de imports
   en la base).
-- [ ] T016 [US1] Regla 4 (`app/` sin lógica, SC-003): agregar al test de T006 el caso (d)
+- [X] T016 [US1] Regla 4 (`app/` sin lógica, SC-003): agregar al test de T006 el caso (d)
   `mobile/app/x.tsx` con `import { View } from "react-native";` → incluye
   `no-restricted-imports`; ver fallar. En el mismo turno, en `eslint.config.js`, bloque para
   `mobile/app/**` con `no-restricted-imports` sobre `react`, `react-native`,

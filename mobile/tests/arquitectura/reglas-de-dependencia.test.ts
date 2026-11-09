@@ -55,6 +55,12 @@ describe("reglas de dependencia de mobile (FR-008, FR-010)", () => {
     expect(lintear("mobile/src/api/errores.ts", codigo)).toContain("import-x/no-cycle");
   });
 
+  it("(d) regla 4: app/ no importa react-native (sin lógica ni estilos) → no-restricted-imports", () => {
+    const codigo = 'import { View } from "react-native";\n\nexport default View;\n';
+
+    expect(lintear("mobile/app/x.tsx", codigo)).toContain("no-restricted-imports");
+  });
+
   it("(e) el código real no tiene errores de lint", () => {
     const resultados = correrEslint(["mobile"]);
     const errores = resultados.flatMap((resultado) =>
