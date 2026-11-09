@@ -2,7 +2,7 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { colores } from "../../src/componentes/estilos";
-import { useSesion } from "../../src/sesion/SesionProvider";
+import { useSesion } from "../../src/features/sesion";
 
 /** Perfil: el usuario actual y "Cambiar usuario" (contracts/app.md "Perfil", FR-019). */
 export default function Perfil() {

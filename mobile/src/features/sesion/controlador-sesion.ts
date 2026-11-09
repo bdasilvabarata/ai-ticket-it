@@ -1,10 +1,10 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 import type { QueryClient } from "@tanstack/react-query";
 
-import { obtenerUsuarioActual, ServidorNoDisponibleError, type ClienteApi } from "../api";
-import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
-import { claves } from "../consultas/claves";
+import { obtenerUsuarioActual, ServidorNoDisponibleError, type ClienteApi } from "../../api";
+import { claves } from "../../consultas/claves";
 import { estadoInicial, reducirSesion, type EstadoSesion, type EventoSesion } from "./estado-sesion";
+import { SecuenciaDeReintentos, type EstadoSecuencia } from "./secuencia-reintentos";
 import type { RepositorioUsuarioRecordado } from "./usuario-recordado";
 import { decidirValidacion, type DecisionValidacion } from "./validacion";
 

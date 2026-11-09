@@ -9,8 +9,7 @@ import { FranjaServidorNoDisponible } from "../componentes/FranjaServidorNoDispo
 import type { Dependencias } from "../composicion";
 import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
-import type { EstadoSesion } from "../sesion/estado-sesion";
-import { SesionProvider, useSesion } from "../sesion/SesionProvider";
+import { SesionProvider, useSesion, type EstadoSesion } from "../features/sesion";
 
 /**
  * Layout raíz de la app (R3). Vive fuera de `app/` para que los tests lo rendericen con

@@ -2,11 +2,11 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { createContext, useContext, useEffect, useReducer, useState, type ReactNode } from "react";
 import { AppState } from "react-native";
 
-import { ConexionProvider, type EstadoConexion } from "../conexion";
-import { SecuenciaDeReintentos, type EstadoSecuencia } from "../conexion/secuencia-reintentos";
-import { ClienteApiProvider } from "../consultas/cliente-api";
+import { ConexionProvider, type EstadoConexion } from "../../conexion";
+import { ClienteApiProvider } from "../../consultas/cliente-api";
 import { crearControladorSesion, type DependenciasSesion } from "./controlador-sesion";
 import { estadoInicial, reducirSesion, type EstadoSesion } from "./estado-sesion";
+import { SecuenciaDeReintentos, type EstadoSecuencia } from "./secuencia-reintentos";
 
 interface ValorSesion {
   estado: EstadoSesion;

@@ -12,7 +12,7 @@ import { ListaVacia } from "../src/componentes/ListaVacia";
 import { MensajeError } from "../src/componentes/MensajeError";
 import { useConexion } from "../src/conexion";
 import { useUsuarios } from "../src/consultas/useUsuarios";
-import { useSesion } from "../src/sesion/SesionProvider";
+import { useSesion } from "../src/features/sesion";
 
 const AVISO_USUARIO_INEXISTENTE = "El usuario con el que estabas operando ya no existe. Elegí otro.";
 

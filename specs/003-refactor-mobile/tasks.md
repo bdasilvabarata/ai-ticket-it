@@ -189,7 +189,7 @@ quickstart §2 hacen fallar lint o typecheck con la regla esperada.
   `eslint.config.js`, el `ignores` de la regla de `fetch` pasa a `mobile/src/composicion.ts`.
   `mobile/tests/helpers/render-con-dependencias.tsx` sigue igual salvo el import. Suite en
   verde; `grep -rn "composicion" mobile/src/sesion` sin resultados.
-- [ ] T011 [US1] Feature `sesion`, archivos: `git mv` de `mobile/src/sesion/{estado-sesion,
+- [X] T011 [US1] Feature `sesion`, archivos: `git mv` de `mobile/src/sesion/{estado-sesion,
   validacion,usuario-recordado,controlador-sesion}.ts` y `SesionProvider.tsx` a
   `mobile/src/features/sesion/`, y de `mobile/src/conexion/secuencia-reintentos.ts` a
   `mobile/src/features/sesion/secuencia-reintentos.ts` (R2: solo la usa el controlador). Crear

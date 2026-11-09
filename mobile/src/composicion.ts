@@ -3,8 +3,11 @@ import Constants from "expo-constants";
 
 import { crearClienteApi, resolverUrlBase } from "./api";
 import { crearQueryClient } from "./consultas/query-client";
-import type { DependenciasSesion } from "./sesion/controlador-sesion";
-import { crearRepositorioUsuarioRecordado, type Almacenamiento } from "./sesion/usuario-recordado";
+import {
+  crearRepositorioUsuarioRecordado,
+  type Almacenamiento,
+  type DependenciasSesion,
+} from "./features/sesion";
 
 /** Piezas de la app, armadas en un solo lugar (data-model "Dependencias"); hoy, las de la sesión. */
 export type Dependencias = DependenciasSesion;

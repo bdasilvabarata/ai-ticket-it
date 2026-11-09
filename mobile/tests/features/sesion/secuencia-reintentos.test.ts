@@ -1,4 +1,7 @@
-import { SecuenciaDeReintentos, type EstadoSecuencia } from "../../src/conexion/secuencia-reintentos";
+import {
+  SecuenciaDeReintentos,
+  type EstadoSecuencia,
+} from "../../../src/features/sesion/secuencia-reintentos";
 
 /** `intentar` falso: cada llamada devuelve el siguiente resultado (repite el último). */
 function crearIntentar(resultados: boolean[]) {

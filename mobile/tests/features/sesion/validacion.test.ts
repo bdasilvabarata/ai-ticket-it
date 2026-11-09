@@ -1,7 +1,7 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 
-import { ErrorDeApi, ServidorNoDisponibleError } from "../../src/api";
-import { decidirValidacion } from "../../src/sesion/validacion";
+import { ErrorDeApi, ServidorNoDisponibleError } from "../../../src/api";
+import { decidirValidacion } from "../../../src/features/sesion/validacion";
 
 const lucia: UsuarioVista = {
   id: "usuario-lucia",

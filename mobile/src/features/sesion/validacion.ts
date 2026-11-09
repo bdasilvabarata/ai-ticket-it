@@ -1,6 +1,6 @@
 import type { UsuarioVista } from "@ai-ticket-it/shared";
 
-import { ErrorDeApi } from "../api";
+import { ErrorDeApi } from "../../api";
 
 export type ResultadoValidacion = { ok: true; usuario: UsuarioVista } | { ok: false; error: unknown };
 
