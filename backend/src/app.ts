@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import { relojDelSistema } from "./config/reloj";
+import { EventoController } from "./controllers/evento.controller";
 import { SaludController } from "./controllers/salud.controller";
 import { UsuarioController } from "./controllers/usuario.controller";
 import { manejarErrores } from "./middlewares/manejar-errores";
@@ -8,9 +9,10 @@ import { registrarPedido } from "./middlewares/registrar-pedido";
 import { crearRequerirUsuario } from "./middlewares/requerir-usuario";
 import { rutaNoEncontrada } from "./middlewares/ruta-no-encontrada";
 import { crearDocsRouter } from "./routes/docs.routes";
-import { crearRouterApi } from "./routes/index";
 import type { Reloj } from "./domain/reloj";
+import { crearRouterApi } from "./routes/index";
 import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
+import { EventoService } from "./services/evento.service";
 import { UsuarioService } from "./services/usuario.service";
 
 export interface OpcionesApp {
@@ -29,13 +31,15 @@ export interface OpcionesApp {
  * (y los tests usan supertest).
  */
 export function crearApp({ repositorios = {}, reloj = relojDelSistema }: OpcionesApp = {}): Express {
-  const { usuarios, eventos } = { ...crearRepositoriosDeEjemplo(reloj.ahora()), ...repositorios };
+  const { usuarios, categorias, eventos } = { ...crearRepositoriosDeEjemplo(reloj.ahora()), ...repositorios };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
+  const eventoService = new EventoService({ eventos, categorias, reloj });
 
   const controllers = {
     salud: new SaludController(),
     usuarios: new UsuarioController(usuarioService),
+    eventos: new EventoController(eventoService),
   };
   const requerirUsuario = crearRequerirUsuario(usuarioService);
 

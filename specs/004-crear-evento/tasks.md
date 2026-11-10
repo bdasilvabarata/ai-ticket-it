@@ -125,29 +125,29 @@ Maratón en ese orden, sin eventos de otros; elegir a Sofía y ver Noche de risa
 
 ### Backend
 
-- [ ] T020 [US2] Test de `EventoService.listarMios(usuarioId)` en `backend/tests/services/evento.service.test.ts`, con los stubs de `backend/src/services/evento.service.ts` (constructor `{ eventos, categorias, reloj }`; `cerrojo` y `compras` se suman en T056 y T076, cuando se usan) y de `backend/src/services/evento.vistas.ts` (`aEventoResumenVista`). Usar repositorios en memoria con los datos de cada caso y un reloj fijo. Casos:
+- [X] T020 [US2] Test de `EventoService.listarMios(usuarioId)` en `backend/tests/services/evento.service.test.ts`, con los stubs de `backend/src/services/evento.service.ts` (constructor `{ eventos, categorias, reloj }`; `cerrojo` y `compras` se suman en T056 y T076, cuando se usan) y de `backend/src/services/evento.vistas.ts` (`aEventoResumenVista`). Usar repositorios en memoria con los datos de cada caso y un reloj fijo. Casos:
   - solo los del organizador (FR-002);
   - primero los próximos por `fechaHora` ascendente y después los realizados por `fechaHora` descendente (FR-004);
   - `realizado` en el borde (evento en el instante exacto del reloj → realizado);
   - `categoria: { id, nombre }`, `fechaHora` ISO, `fechaHoraLocal` de Buenos Aires y `cantidadTiposEntrada`;
   - sin eventos → `[]`.
-- [ ] T021 [US2] Implementar `aEventoResumenVista(evento, categoria, ahora)` en `backend/src/services/evento.vistas.ts` (con `horaDeBuenosAires`) y `EventoService.listarMios` en `backend/src/services/evento.service.ts`.
-- [ ] T022 [US2] Test de `GET /api/eventos/mios` en `backend/tests/api/eventos.test.ts` (supertest con `crearApp({ reloj })`), con los stubs de `backend/src/controllers/evento.controller.ts` y `backend/src/routes/eventos.routes.ts`. Casos: `401 USUARIO_NO_IDENTIFICADO` sin `X-Usuario-Id`; Lucía → Noche de Rock, Festival y Maratón en ese orden; Sofía → Clásico de básquet y, al final, Noche de risas con `realizado: true`; un usuario sin eventos → `[]`.
-- [ ] T023 [US2] Implementar `EventoController.listarMios` en `backend/src/controllers/evento.controller.ts` y `crearEventosRouter` en `backend/src/routes/eventos.routes.ts` (`GET /mios` con `requerirUsuario`, declarada antes de `/:eventoId`). Montarlo en `/eventos` en `backend/src/routes/index.ts` (`ControllersApi` suma `eventos`) y conectar `EventoService` y `EventoController` en `backend/src/app.ts`.
+- [X] T021 [US2] Implementar `aEventoResumenVista(evento, categoria, ahora)` en `backend/src/services/evento.vistas.ts` (con `horaDeBuenosAires`) y `EventoService.listarMios` en `backend/src/services/evento.service.ts`.
+- [X] T022 [US2] Test de `GET /api/eventos/mios` en `backend/tests/api/eventos.test.ts` (supertest con `crearApp({ reloj })`), con los stubs de `backend/src/controllers/evento.controller.ts` y `backend/src/routes/eventos.routes.ts`. Casos: `401 USUARIO_NO_IDENTIFICADO` sin `X-Usuario-Id`; Lucía → Noche de Rock, Festival y Maratón en ese orden; Sofía → Clásico de básquet y, al final, Noche de risas con `realizado: true`; un usuario sin eventos → `[]`.
+- [X] T023 [US2] Implementar `EventoController.listarMios` en `backend/src/controllers/evento.controller.ts` y `crearEventosRouter` en `backend/src/routes/eventos.routes.ts` (`GET /mios` con `requerirUsuario`, declarada antes de `/:eventoId`). Montarlo en `/eventos` en `backend/src/routes/index.ts` (`ControllersApi` suma `eventos`) y conectar `EventoService` y `EventoController` en `backend/src/app.ts`.
 - [ ] T024 [US2] Documentar `GET /api/eventos/mios` en `backend/src/docs/openapi.json` (tag **Eventos**, esquema `EventoResumenVista`, `401`) y sumar el pedido a `backend/src/docs/ai-ticket-it.postman_collection.json`. `backend/tests/api/docs.test.ts` en verde.
 
 ### Mobile
 
-- [ ] T025 [P] [US2] Test de `listarMisEventos(cliente, { signal })` en `mobile/tests/api/eventos.test.ts` (`GET /eventos/mios` con `X-Usuario-Id`), con el stub en `mobile/src/api/eventos.ts` exportado por `mobile/src/api/index.ts`.
-- [ ] T026 [US2] Implementar `listarMisEventos` en `mobile/src/api/eventos.ts`.
-- [ ] T027 [US2] Test de `mobile/tests/pantallas/mis-eventos.test.tsx` con `renderConDependencias` y `crearFetchFalso`/`porRuta`. Stubs en el mismo turno: `useMisEventos(usuarioId)` en `mobile/src/features/eventos/useMisEventos.ts`, `FilaEvento` y `MarcaRealizado` en `mobile/src/features/eventos/componentes/`, `MisEventos` en `mobile/src/features/eventos/pantallas/MisEventos.tsx` exportado por `mobile/src/features/eventos/index.ts`, y `mobile/app/(tabs)/mis-eventos.tsx` como re-export (`export { MisEventos as default } from "../../src/features/eventos";`). Casos:
+- [X] T025 [P] [US2] Test de `listarMisEventos(cliente, { signal })` en `mobile/tests/api/eventos.test.ts` (`GET /eventos/mios` con `X-Usuario-Id`), con el stub en `mobile/src/api/eventos.ts` exportado por `mobile/src/api/index.ts`.
+- [X] T026 [US2] Implementar `listarMisEventos` en `mobile/src/api/eventos.ts`.
+- [X] T027 [US2] Test de `mobile/tests/pantallas/mis-eventos.test.tsx` con `renderConDependencias` y `crearFetchFalso`/`porRuta`. Stubs en el mismo turno: `useMisEventos(usuarioId)` en `mobile/src/features/eventos/useMisEventos.ts`, `FilaEvento` y `MarcaRealizado` en `mobile/src/features/eventos/componentes/`, `MisEventos` en `mobile/src/features/eventos/pantallas/MisEventos.tsx` exportado por `mobile/src/features/eventos/index.ts`, y `mobile/app/(tabs)/mis-eventos.tsx` como re-export (`export { MisEventos as default } from "../../src/features/eventos";`). Casos:
   - cargando;
   - error con "Reintentar";
   - vacío con "Todavía no organizás eventos.";
   - con datos: nombre, `textoFechaHora(fechaHoraLocal)` · categoría, `textoCantidadTipos(n)` y "Realizado" solo en los realizados, en el orden del servidor;
   - `accessibilityLabel` `"Editar <nombre>, <fecha y hora>"` / `"Ver <nombre>, realizado, <fecha y hora>"`;
   - al cambiar de usuario se ven los eventos del nuevo (US2-5).
-- [ ] T028 [US2] Implementar `useMisEventos` (`claves.misEventos(usuarioId)`), `MarcaRealizado` (texto "Realizado" sobre `tema.colores.neutro`), `FilaEvento` (`Pressable` con `accessibilityRole="button"`; la navegación llega en US3) y `MisEventos` (`SegunConsulta` y `FlatList`) en `mobile/src/features/eventos/`, según `contracts/app.md`, "Mis eventos".
+- [X] T028 [US2] Implementar `useMisEventos` (`claves.misEventos(usuarioId)`), `MarcaRealizado` (texto "Realizado" sobre `tema.colores.neutro`), `FilaEvento` (`Pressable` con `accessibilityRole="button"`; la navegación llega en US3) y `MisEventos` (`SegunConsulta` y `FlatList`) en `mobile/src/features/eventos/`, según `contracts/app.md`, "Mis eventos".
 
 **Checkpoint**: Mis eventos muestra los eventos del seed de cada usuario. La acción de crear de
 US2-AS3 y US2-AS4 ("Crear tu primer evento" / "Crear evento") se suma en T051 y se valida al

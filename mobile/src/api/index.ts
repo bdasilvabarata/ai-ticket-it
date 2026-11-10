@@ -7,4 +7,5 @@ export {
 } from "./cliente";
 export { resolverUrlBase } from "./direccion";
 export { ErrorDeApi, ServidorNoDisponibleError } from "./errores";
+export { listarMisEventos } from "./eventos";
 export { listarUsuarios, obtenerUsuarioActual } from "./usuarios";

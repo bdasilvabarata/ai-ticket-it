@@ -36,9 +36,9 @@ describe("navegación principal (US3)", () => {
     expect(resultado.getPathname()).toBe("/");
   });
 
+  // Mis eventos ya no es una sección pendiente (feature 004): la prueba tests/pantallas/mis-eventos.
   it.each([
     ["Mis compras", "/mis-compras"],
-    ["Mis eventos", "/mis-eventos"],
     ["Explorar", "/"],
   ])("la pestaña %s muestra su nombre y que todavía no está disponible (US3-2)", async (nombre, ruta) => {
     const resultado = await entrarConfirmado();
