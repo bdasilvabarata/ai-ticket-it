@@ -1,4 +1,17 @@
-import { EstadoCompra, type ErrorApi, type UsuarioVista } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  LIMITES_EVENTO,
+  LIMITES_TIPO_ENTRADA,
+  type CategoriaVista,
+  type DatosEvento,
+  type DatosNuevoEvento,
+  type DatosTipoEntrada,
+  type ErrorApi,
+  type EventoResumenVista,
+  type EventoVista,
+  type TipoEntradaVista,
+  type UsuarioVista,
+} from "@ai-ticket-it/shared";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 // Este archivo entra en el typecheck del backend: un cambio de forma en shared lo rompe.
@@ -32,5 +45,18 @@ describe("tipos compartidos", () => {
     };
     expect(usuario.cantidadEventosOrganizados).toBe(3);
     expect(error.error.detalles).toHaveLength(1);
+  });
+
+  it("los límites de evento y de tipo de entrada son los del contrato", () => {
+    expect(LIMITES_EVENTO).toEqual({ nombre: 100, descripcion: 2000, multimedia: 5 });
+    expect(LIMITES_TIPO_ENTRADA).toEqual({ nombre: 50, descripcion: 300 });
+  });
+
+  it("EventoVista amplía EventoResumenVista con descripción, multimedia y tipos", () => {
+    expectTypeOf<EventoVista>().toExtend<EventoResumenVista>();
+    expectTypeOf<EventoVista["tiposEntrada"]>().toEqualTypeOf<TipoEntradaVista[]>();
+    expectTypeOf<DatosNuevoEvento["tiposEntrada"]>().toEqualTypeOf<DatosTipoEntrada[]>();
+    expectTypeOf<DatosNuevoEvento>().toExtend<DatosEvento>();
+    expectTypeOf<CategoriaVista>().toEqualTypeOf<{ id: string; nombre: string; descripcion: string }>();
   });
 });
