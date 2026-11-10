@@ -55,3 +55,195 @@ describe("GET /api/eventos/mios", () => {
     expect(respuesta.body).toEqual([]);
   });
 });
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+/** El ejemplo del contrato (contracts/api.md, POST /api/eventos), con cambios. */
+function cuerpoNuevo(cambios: Record<string, unknown> = {}) {
+  return {
+    nombre: "Noche de Tango",
+    descripcion: "Milonga con orquesta en vivo.",
+    categoriaId: "categoria-musica",
+    fechaHora: "2026-12-01T20:00",
+    multimedia: ["https://example.com/tango.jpg"],
+    tiposEntrada: [
+      { nombre: "General", precio: 15000, cupo: 200 },
+      { nombre: "VIP", descripcion: "Mesa preferencial.", precio: 60000, cupo: 30 },
+    ],
+    ...cambios,
+  };
+}
+
+const tiposCon = (segundo: Record<string, unknown>) => [
+  { nombre: "General", precio: 15000, cupo: 200 },
+  segundo,
+];
+
+function crearEvento(app: ReturnType<typeof nuevaApp>, cuerpo: object, usuarioId: string | null = LUCIA) {
+  const pedido = request(app).post("/api/eventos");
+  if (usuarioId) pedido.set("X-Usuario-Id", usuarioId);
+  return pedido.send(cuerpo);
+}
+
+/** Los detalles del 400 como `campo → mensaje`. */
+function detalles(respuesta: request.Response): Record<string, string> {
+  expect(respuesta.status).toBe(400);
+  expect(respuesta.body.error.codigo).toBe("ENTRADA_INVALIDA");
+  return Object.fromEntries(
+    (respuesta.body.error.detalles as { campo: string; mensaje: string }[]).map((d) => [d.campo, d.mensaje]),
+  );
+}
+
+describe("POST /api/eventos", () => {
+  it("responde 201 con el evento del usuario actual, sus fechas y UUIDs nuevos", async () => {
+    const respuesta = await crearEvento(nuevaApp(), cuerpoNuevo());
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body).toMatchObject({
+      id: expect.stringMatching(UUID),
+      nombre: "Noche de Tango",
+      descripcion: "Milonga con orquesta en vivo.",
+      categoria: { id: "categoria-musica", nombre: "Música" },
+      fechaHora: "2026-12-01T23:00:00.000Z",
+      fechaHoraLocal: "2026-12-01T20:00",
+      multimedia: ["https://example.com/tango.jpg"],
+      organizadorId: LUCIA,
+      realizado: false,
+      cantidadTiposEntrada: 2,
+      tiposEntrada: [
+        { id: expect.stringMatching(UUID), nombre: "General", descripcion: "", precio: 15000, cupo: 200 },
+        {
+          id: expect.stringMatching(UUID),
+          nombre: "VIP",
+          descripcion: "Mesa preferencial.",
+          precio: 60000,
+          cupo: 30,
+        },
+      ],
+    });
+  });
+
+  it("recorta los textos y usa los valores por defecto de descripción y multimedia", async () => {
+    const respuesta = await crearEvento(
+      nuevaApp(),
+      cuerpoNuevo({ nombre: "  Noche de Tango  ", descripcion: undefined, multimedia: undefined }),
+    );
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body).toMatchObject({ nombre: "Noche de Tango", descripcion: "", multimedia: [] });
+  });
+
+  it("responde 401 sin usuario y no crea nada", async () => {
+    const app = nuevaApp();
+    esperarError(await crearEvento(app, cuerpoNuevo(), null), 401, "USUARIO_NO_IDENTIFICADO");
+    const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
+    expect(mios.body).toHaveLength(3);
+  });
+
+  it("responde 400 con un detalle por campo", async () => {
+    const respuesta = await crearEvento(
+      nuevaApp(),
+      cuerpoNuevo({
+        nombre: "x".repeat(101),
+        categoriaId: "Música",
+        fechaHora: "2026-02-30T20:00",
+        multimedia: ["ftp://example.com/a.jpg"],
+        tiposEntrada: tiposCon({ nombre: "VIP", precio: -1, cupo: 0 }),
+      }),
+    );
+    expect(detalles(respuesta)).toEqual({
+      "body.nombre": "Debe tener como máximo 100 caracteres.",
+      "body.categoriaId": "Debe ser un identificador válido.",
+      "body.fechaHora": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm).",
+      "body.multimedia.0": "Debe ser una URL http o https.",
+      "body.tiposEntrada.1.precio": "Debe ser un entero mayor o igual a 0.",
+      "body.tiposEntrada.1.cupo": "Debe ser un entero mayor o igual a 1.",
+    });
+  });
+
+  it.each(["2026-12-01T25:00", "2026-12-01T24:00", "mañana a las 8", "2026-12-01T20:00:00", "2026-12-01"])(
+    "rechaza la fecha %s",
+    async (fechaHora) => {
+      const respuesta = await crearEvento(nuevaApp(), cuerpoNuevo({ fechaHora }));
+      expect(detalles(respuesta)).toEqual({
+        "body.fechaHora": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm).",
+      });
+    },
+  );
+
+  it.each([
+    ["negativo", -1, "Debe ser un entero mayor o igual a 0."],
+    ["con decimales", 1.5, "Debe ser un entero mayor o igual a 0."],
+    ["como texto", "15000", "Debe ser un entero mayor o igual a 0."],
+    ["null", null, "Es obligatorio."],
+  ])("rechaza el precio %s", async (_caso, precio, mensaje) => {
+    const respuesta = await crearEvento(
+      nuevaApp(),
+      cuerpoNuevo({ tiposEntrada: tiposCon({ nombre: "VIP", precio, cupo: 1 }) }),
+    );
+    expect(detalles(respuesta)).toEqual({ "body.tiposEntrada.1.precio": mensaje });
+  });
+
+  it.each([0, -1, 2.5])("rechaza el cupo inicial %s", async (cupo) => {
+    const respuesta = await crearEvento(
+      nuevaApp(),
+      cuerpoNuevo({ tiposEntrada: tiposCon({ nombre: "VIP", precio: 0, cupo }) }),
+    );
+    expect(detalles(respuesta)).toEqual({
+      "body.tiposEntrada.1.cupo": "Debe ser un entero mayor o igual a 1.",
+    });
+  });
+
+  it("rechaza más de 5 URLs, sin tipos de entrada y los obligatorios que faltan", async () => {
+    const seis = Array.from({ length: 6 }, (_, i) => `https://example.com/${i}.jpg`);
+    expect(detalles(await crearEvento(nuevaApp(), cuerpoNuevo({ multimedia: seis })))).toEqual({
+      "body.multimedia": "Puede tener como máximo 5 URLs.",
+    });
+    expect(detalles(await crearEvento(nuevaApp(), cuerpoNuevo({ tiposEntrada: [] })))).toEqual({
+      "body.tiposEntrada": "El evento necesita al menos un tipo de entrada.",
+    });
+    expect(detalles(await crearEvento(nuevaApp(), {}))).toEqual({
+      "body.nombre": "Es obligatorio.",
+      "body.categoriaId": "Es obligatorio.",
+      "body.fechaHora": "Es obligatorio.",
+      "body.tiposEntrada": "Es obligatorio.",
+    });
+  });
+
+  it("rechaza un nombre solo con espacios", async () => {
+    expect(detalles(await crearEvento(nuevaApp(), cuerpoNuevo({ nombre: "   " })))).toEqual({
+      "body.nombre": "Es obligatorio.",
+    });
+  });
+
+  it("responde 400 con body.categoriaId si la categoría no existe", async () => {
+    expect(detalles(await crearEvento(nuevaApp(), cuerpoNuevo({ categoriaId: "categoria-opera" })))).toEqual({
+      "body.categoriaId": "No existe la categoría.",
+    });
+  });
+
+  it("responde 409 FECHA_NO_FUTURA con la fecha de ayer", async () => {
+    const respuesta = await crearEvento(nuevaApp(), cuerpoNuevo({ fechaHora: "2026-11-09T12:00" }));
+    esperarError(respuesta, 409, "FECHA_NO_FUTURA");
+  });
+
+  it.each([
+    ["VIP", " vip "],
+    ["Platea", "Plátea"],
+  ])("responde 409 NOMBRE_TIPO_ENTRADA_REPETIDO con %s y %s", async (primero, segundo) => {
+    const tiposEntrada = [
+      { nombre: primero, precio: 1, cupo: 1 },
+      { nombre: segundo, precio: 1, cupo: 1 },
+    ];
+    const respuesta = await crearEvento(nuevaApp(), cuerpoNuevo({ tiposEntrada }));
+    esperarError(respuesta, 409, "NOMBRE_TIPO_ENTRADA_REPETIDO");
+  });
+
+  it("ignora un organizadorId en el cuerpo (FR-009) y el evento aparece en Mis eventos", async () => {
+    const app = nuevaApp();
+    const respuesta = await crearEvento(app, cuerpoNuevo({ organizadorId: SOFIA }));
+    expect(respuesta.body.organizadorId).toBe(LUCIA);
+    const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
+    expect(mios.body.map((e: { id: string }) => e.id)).toContain(respuesta.body.id);
+    const deSofia = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", SOFIA);
+    expect(deSofia.body.map((e: { id: string }) => e.id)).not.toContain(respuesta.body.id);
+  });
+});

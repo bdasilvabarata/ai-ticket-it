@@ -9,6 +9,13 @@ export function mismoNombreDeTipo(a: string, b: string): boolean {
   return comparadorDeNombres.compare(a.trim(), b.trim()) === 0;
 }
 
+/** "Futura" = `fechaHora > ahora`: el complemento exacto de "realizado" (research R3). */
+function exigirFechaFutura(fechaHora: Date, ahora: Date): void {
+  if (!(fechaHora.getTime() > ahora.getTime())) {
+    throw new ReglaDeNegocioError("FECHA_NO_FUTURA", "La fecha y hora del evento deben ser futuras.");
+  }
+}
+
 function hayNombresRepetidos(tipos: readonly TipoEntrada[]): boolean {
   return tipos.some((tipo, i) =>
     tipos.slice(i + 1).some((otro) => mismoNombreDeTipo(tipo.nombre, otro.nombre)),
@@ -52,10 +59,13 @@ export class TipoEntrada {
   }
 
   /** Un tipo nuevo con los datos editados y el mismo `id`; este no cambia. */
-  con(datos: Omit<PropiedadesTipoEntrada, "id">): TipoEntrada {
+  con(datos: DatosDeTipoEntrada): TipoEntrada {
     return new TipoEntrada({ ...datos, id: this.id });
   }
 }
+
+/** Datos editables de un tipo de entrada (todo menos el id). */
+export type DatosDeTipoEntrada = Omit<PropiedadesTipoEntrada, "id">;
 
 export interface PropiedadesEvento {
   id: string;
@@ -69,6 +79,9 @@ export interface PropiedadesEvento {
   organizadorId: string;
   tiposEntrada: TipoEntrada[];
 }
+
+/** Datos editables de un evento: lo que reemplaza `actualizar` (ni id, ni organizador, ni tipos). */
+export type DatosDeEvento = Omit<PropiedadesEvento, "id" | "organizadorId" | "tiposEntrada">;
 
 /** Evento publicado por un organizador, con uno o más tipos de entrada. */
 export class Evento {
@@ -108,9 +121,14 @@ export class Evento {
   }
 
   /**
-   * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
-   * consigna; lo usa la búsqueda por precio de la feature 005).
+   * Fábrica de alta: la fecha tiene que ser futura según `ahora` (el reloj del servidor). Después
+   * construye, y el constructor verifica las invariantes.
    */
+  static crear(propiedades: PropiedadesEvento, ahora: Date): Evento {
+    exigirFechaFutura(propiedades.fechaHora, ahora);
+    return new Evento(propiedades);
+  }
+
   /** Realizado desde el instante de inicio, inclusive (`ahora ≥ fechaHora`; research R3). */
   estaRealizado(ahora: Date): boolean {
     return ahora.getTime() >= this.fechaHora.getTime();
@@ -124,6 +142,10 @@ export class Evento {
     return this.tiposEntrada.find((tipo) => tipo.id === tipoId) ?? null;
   }
 
+  /**
+   * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
+   * consigna; lo usa la búsqueda por precio de la feature 005).
+   */
   tuPrecioEstaEntre(min: number, max: number): boolean {
     return this.tiposEntrada.some((tipo) => tipo.precio >= min && tipo.precio <= max);
   }

@@ -166,19 +166,19 @@ actual como organizador, y cada dato inválido → `400` con su detalle por camp
 
 ### Backend: categorías
 
-- [ ] T029 [P] [US1] Test de `CategoriaService.listar()` en `backend/tests/services/categoria.service.test.ts` (las `CategoriaVista` ordenadas por nombre con el collator `es`), con el stub de `backend/src/services/categoria.service.ts`.
-- [ ] T030 [US1] Implementar `CategoriaService` en `backend/src/services/categoria.service.ts`.
-- [ ] T031 [US1] Test de `GET /api/categorias` (público, 6 categorías por nombre) en `backend/tests/api/categorias.test.ts`, con los stubs de `backend/src/controllers/categoria.controller.ts` y `backend/src/routes/categorias.routes.ts`.
+- [X] T029 [P] [US1] Test de `CategoriaService.listar()` en `backend/tests/services/categoria.service.test.ts` (las `CategoriaVista` ordenadas por nombre con el collator `es`), con el stub de `backend/src/services/categoria.service.ts`.
+- [X] T030 [US1] Implementar `CategoriaService` en `backend/src/services/categoria.service.ts`.
+- [X] T031 [US1] Test de `GET /api/categorias` (público, 6 categorías por nombre) en `backend/tests/api/categorias.test.ts`, con los stubs de `backend/src/controllers/categoria.controller.ts` y `backend/src/routes/categorias.routes.ts`.
 - [ ] T032 [US1] Implementar `CategoriaController` y `crearCategoriasRouter`, montarlo en `/categorias` en `backend/src/routes/index.ts` y conectarlo en `backend/src/app.ts`. Documentarlo en `backend/src/docs/openapi.json` (tag **Categorías**) y en la colección de Postman.
 
 ### Backend: crear evento
 
-- [ ] T033 [US1] Test de `Evento.crear(datos, ahora)` en `backend/tests/domain/evento.test.ts`. Casos:
+- [X] T033 [US1] Test de `Evento.crear(datos, ahora)` en `backend/tests/domain/evento.test.ts`. Casos:
   - `fechaHora` igual a `ahora` → `ReglaDeNegocioError("FECHA_NO_FUTURA")`; `ahora + 1 ms` → se acepta;
   - con fecha futura, se verifican después las invariantes: tipos "VIP" y " vip " → `NOMBRE_TIPO_ENTRADA_REPETIDO`; sin tipos → `DatosInvalidosError`;
   - un tipo con precio 0 se acepta.
-- [ ] T034 [US1] Implementar la fábrica estática `Evento.crear` en `backend/src/domain/evento.ts`.
-- [ ] T035 [US1] Validaciones (contracts/api.md, "Reglas de los cuerpos"). En `backend/src/validations/comunes.ts`, `fechaDeParedSchema`: `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/` y fecha real (rechaza `2026-02-30` y `25:00`), con el mensaje "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."; transforma a instante con `instanteDesdeHoraDeBuenosAires`. En `backend/src/validations/evento.validation.ts`, el cuerpo de crear:
+- [X] T034 [US1] Implementar la fábrica estática `Evento.crear` en `backend/src/domain/evento.ts`.
+- [X] T035 [US1] Validaciones (contracts/api.md, "Reglas de los cuerpos"). En `backend/src/validations/comunes.ts`, `fechaDeParedSchema`: `/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/` y fecha real (rechaza `2026-02-30` y `25:00`), con el mensaje "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."; transforma a instante con `instanteDesdeHoraDeBuenosAires`. En `backend/src/validations/evento.validation.ts`, el cuerpo de crear:
   - `nombre`: string, `trim`, 1–100 ("Es obligatorio." / "Debe tener como máximo 100 caracteres.");
   - `descripcion`: opcional, `trim`, ≤ 2000, `""` por defecto;
   - `categoriaId`: `idSchema`;
@@ -186,14 +186,14 @@ actual como organizador, y cada dato inválido → `400` con su detalle por camp
   - `multimedia`: arreglo opcional (≤ 5, "Puede tener como máximo 5 URLs.") de URLs `http`/`https` con `trim` ("Debe ser una URL http o https."), `[]` por defecto;
   - `tiposEntrada`: arreglo ≥ 1 ("El evento necesita al menos un tipo de entrada."), con `nombre` (`trim`, 1–50), `descripcion` (opcional, `trim`, ≤ 300), `precio` (entero ≥ 0: "Debe ser un entero mayor o igual a 0.") y `cupo` (entero ≥ 1: "Debe ser un entero mayor o igual a 1.").
   - Los valores faltantes, `null` o de otro tipo responden "Es obligatorio." (los obligatorios) o el mensaje de la regla. Las claves desconocidas (`organizadorId`) se descartan. Usar `LIMITES_EVENTO` y `LIMITES_TIPO_ENTRADA` de `shared`.
-- [ ] T036 [US1] Test de `EventoService.crear(usuarioId, datos)` en `backend/tests/services/evento.service.test.ts`, con el stub de `aEventoVista` en `backend/src/services/evento.vistas.ts`. Casos:
+- [X] T036 [US1] Test de `EventoService.crear(usuarioId, datos)` en `backend/tests/services/evento.service.test.ts`, con el stub de `aEventoVista` en `backend/src/services/evento.vistas.ts`. Casos:
   - el organizador es el usuario actual;
   - ids nuevos (UUID) para el evento y sus tipos;
   - categoría inexistente → `EntradaInvalidaError` con detalle `body.categoriaId` "No existe la categoría.", sin guardar nada;
   - `FECHA_NO_FUTURA` con el reloj fijo, sin guardar nada;
   - `EventoVista` con `tiposEntrada` en el orden recibido.
-- [ ] T037 [US1] Implementar `aEventoVista` y `aTipoEntradaVista` en `backend/src/services/evento.vistas.ts`, y `EventoService.crear` en `backend/src/services/evento.service.ts` (sin cerrojo, `crypto.randomUUID()`).
-- [ ] T038 [US1] Test de `POST /api/eventos` en `backend/tests/api/eventos.test.ts`. Casos:
+- [X] T037 [US1] Implementar `aEventoVista` y `aTipoEntradaVista` en `backend/src/services/evento.vistas.ts`, y `EventoService.crear` en `backend/src/services/evento.service.ts` (sin cerrojo, `crypto.randomUUID()`).
+- [X] T038 [US1] Test de `POST /api/eventos` en `backend/tests/api/eventos.test.ts`. Casos:
   - `201` con el ejemplo del contrato: `organizadorId` del usuario actual, `fechaHora: "2026-12-01T23:00:00.000Z"` y `fechaHoraLocal: "2026-12-01T20:00"`;
   - `401` sin usuario, sin crear nada;
   - `400` con `body.nombre`, `body.categoriaId` (formato e inexistente), `body.fechaHora` (`2026-02-30`, `25:00`, texto libre), `body.multimedia.0` (`ftp://…`), 6 URLs, `body.tiposEntrada` vacío, y `body.tiposEntrada.1.precio` (−1 y 1.5) y `…cupo` (0, −1 y 2.5);

@@ -1,15 +1,20 @@
-import type { EventoResumenVista } from "@ai-ticket-it/shared";
+import { randomUUID } from "node:crypto";
+import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import type { Categoria } from "../domain/categoria";
-import type { Evento } from "../domain/evento";
+import { Evento, TipoEntrada, type DatosDeEvento, type DatosDeTipoEntrada } from "../domain/evento";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCategorias, RepositorioEventos } from "../domain/repositorios";
-import { aEventoResumenVista } from "./evento.vistas";
+import { EntradaInvalidaError } from "../errors/index";
+import { aEventoResumenVista, aEventoVista } from "./evento.vistas";
 
 export interface DependenciasEventoService {
   eventos: RepositorioEventos;
   categorias: RepositorioCategorias;
   reloj: Reloj;
 }
+
+/** Datos ya validados de `POST /eventos`. */
+export type DatosNuevoEventoValidados = DatosDeEvento & { tiposEntrada: DatosDeTipoEntrada[] };
 
 /** Próximos por fecha ascendente; después los realizados, del más reciente al más antiguo (FR-004). */
 function compararParaMisEventos(a: EventoResumenVista, b: EventoResumenVista): number {
@@ -43,6 +48,37 @@ export class EventoService {
     return eventos
       .map((evento) => aEventoResumenVista(evento, categoriaDe(evento, categorias), ahora))
       .toSorted(compararParaMisEventos);
+  }
+
+  /**
+   * Crea un evento con sus tipos; el organizador es el usuario actual (FR-009). Sin cerrojo: el id
+   * es nuevo y nadie más puede tocarlo todavía (research R1). Orden: categoría (400) → fecha futura
+   * → nombres repetidos (409).
+   */
+  async crear(usuarioId: string, datos: DatosNuevoEventoValidados): Promise<EventoVista> {
+    const categoria = await this.#categoriaOFallar(datos.categoriaId);
+    const { tiposEntrada, ...datosDelEvento } = datos;
+    const ahora = this.#reloj.ahora();
+    const evento = Evento.crear(
+      {
+        ...datosDelEvento,
+        id: randomUUID(),
+        organizadorId: usuarioId,
+        tiposEntrada: tiposEntrada.map((tipo) => new TipoEntrada({ ...tipo, id: randomUUID() })),
+      },
+      ahora,
+    );
+    await this.#eventos.guardar(evento);
+    return aEventoVista(evento, categoria, ahora);
+  }
+
+  /** La categoría elegida tiene que existir: si no, 400 con detalle en `body.categoriaId` (R5). */
+  async #categoriaOFallar(categoriaId: string): Promise<Categoria> {
+    const categoria = await this.#categorias.buscarPorId(categoriaId);
+    if (!categoria) {
+      throw new EntradaInvalidaError([{ campo: "body.categoriaId", mensaje: "No existe la categoría." }]);
+    }
+    return categoria;
   }
 }
 

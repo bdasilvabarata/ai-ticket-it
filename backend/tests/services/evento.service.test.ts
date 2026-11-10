@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
+import { EntradaInvalidaError } from "../../src/errors/index";
 import { CategoriaRepository } from "../../src/repositories/categoria.repository";
 import { EventoRepository } from "../../src/repositories/evento.repository";
 import { EventoService } from "../../src/services/evento.service";
@@ -84,5 +86,70 @@ describe("EventoService.listarMios", () => {
   it("sin eventos devuelve []", async () => {
     const { service } = crearService([evento({ organizadorId: "usuario-martin" })]);
     expect(await service.listarMios("usuario-diego")).toEqual([]);
+  });
+});
+
+describe("EventoService.crear", () => {
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+  const datos = (cambios: { categoriaId?: string; fechaHora?: Date } = {}) => ({
+    nombre: "Noche de Tango",
+    descripcion: "Milonga.",
+    categoriaId: cambios.categoriaId ?? musica.id,
+    fechaHora: cambios.fechaHora ?? new Date(AHORA.getTime() + DIA),
+    multimedia: ["https://example.com/tango.jpg"],
+    tiposEntrada: [
+      { nombre: "General", descripcion: "", precio: 15000, cupo: 200 },
+      { nombre: "VIP", descripcion: "Mesa.", precio: 60000, cupo: 30 },
+    ],
+  });
+
+  it("crea el evento con el usuario actual como organizador, ids nuevos y los tipos en orden", async () => {
+    const { service, repositorioEventos } = crearService();
+    const vista = await service.crear("usuario-lucia", datos());
+
+    expect(vista.id).toMatch(UUID);
+    expect(vista.tiposEntrada.map((t) => t.id)).toEqual([
+      expect.stringMatching(UUID),
+      expect.stringMatching(UUID),
+    ]);
+    expect(new Set([vista.id, ...vista.tiposEntrada.map((t) => t.id)]).size).toBe(3);
+    expect(vista).toMatchObject({
+      nombre: "Noche de Tango",
+      descripcion: "Milonga.",
+      categoria: { id: "categoria-musica", nombre: "Música" },
+      fechaHora: "2026-11-11T15:00:00.000Z",
+      fechaHoraLocal: "2026-11-11T12:00",
+      multimedia: ["https://example.com/tango.jpg"],
+      organizadorId: "usuario-lucia",
+      realizado: false,
+      cantidadTiposEntrada: 2,
+      tiposEntrada: [
+        { nombre: "General", descripcion: "", precio: 15000, cupo: 200 },
+        { nombre: "VIP", descripcion: "Mesa.", precio: 60000, cupo: 30 },
+      ],
+    });
+    expect((await repositorioEventos.buscarPorId(vista.id))?.organizadorId).toBe("usuario-lucia");
+  });
+
+  it("con una categoría inexistente responde 400 con detalle en body.categoriaId, sin guardar", async () => {
+    const { service, repositorioEventos } = crearService();
+    await expect(
+      service.crear("usuario-lucia", datos({ categoriaId: "categoria-inexistente" })),
+    ).rejects.toMatchObject({
+      constructor: EntradaInvalidaError,
+      detalles: [{ campo: "body.categoriaId", mensaje: "No existe la categoría." }],
+    });
+    expect(await repositorioEventos.listar()).toEqual([]);
+  });
+
+  it("con una fecha que no es futura según el reloj responde FECHA_NO_FUTURA, sin guardar", async () => {
+    const { service, repositorioEventos } = crearService();
+    await expect(service.crear("usuario-lucia", datos({ fechaHora: new Date(AHORA) }))).rejects.toMatchObject(
+      {
+        constructor: ReglaDeNegocioError,
+        codigo: "FECHA_NO_FUTURA",
+      },
+    );
+    expect(await repositorioEventos.listar()).toEqual([]);
   });
 });

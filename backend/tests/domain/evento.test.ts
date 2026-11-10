@@ -189,3 +189,55 @@ describe("Evento: invariantes y consultas de la feature 004", () => {
     ).not.toThrow();
   });
 });
+
+describe("Evento.crear", () => {
+  const ahora = new Date("2026-11-10T15:00:00.000Z");
+  const propiedades = (cambios: { fechaHora?: Date; tiposEntrada?: TipoEntrada[] } = {}) => ({
+    id: "e1",
+    nombre: "Noche de Tango",
+    descripcion: "",
+    categoriaId: "c1",
+    fechaHora: cambios.fechaHora ?? new Date(ahora.getTime() + 1),
+    multimedia: [],
+    organizadorId: "u1",
+    tiposEntrada: cambios.tiposEntrada ?? [tipo()],
+  });
+
+  it("rechaza una fecha igual a ahora con FECHA_NO_FUTURA", () => {
+    expect(codigoDeRegla(() => Evento.crear(propiedades({ fechaHora: new Date(ahora) }), ahora))).toBe(
+      "FECHA_NO_FUTURA",
+    );
+  });
+
+  it("rechaza una fecha pasada, aunque además tenga nombres repetidos (la fecha va primero)", () => {
+    const repetidos = [tipo({ id: "t1", nombre: "VIP" }), tipo({ id: "t2", nombre: " vip " })];
+    expect(
+      codigoDeRegla(() =>
+        Evento.crear(
+          propiedades({ fechaHora: new Date(ahora.getTime() - 1), tiposEntrada: repetidos }),
+          ahora,
+        ),
+      ),
+    ).toBe("FECHA_NO_FUTURA");
+  });
+
+  it("acepta ahora + 1 ms y devuelve el evento", () => {
+    const creado = Evento.crear(propiedades(), ahora);
+    expect(creado).toBeInstanceOf(Evento);
+    expect(creado.fechaHora.getTime()).toBe(ahora.getTime() + 1);
+  });
+
+  it("con fecha futura verifica las invariantes: nombres repetidos y sin tipos", () => {
+    const repetidos = [tipo({ id: "t1", nombre: "VIP" }), tipo({ id: "t2", nombre: " vip " })];
+    expect(codigoDeRegla(() => Evento.crear(propiedades({ tiposEntrada: repetidos }), ahora))).toBe(
+      "NOMBRE_TIPO_ENTRADA_REPETIDO",
+    );
+    expect(camposInvalidos(() => Evento.crear(propiedades({ tiposEntrada: [] }), ahora))).toEqual([
+      "tiposEntrada",
+    ]);
+  });
+
+  it("acepta un tipo con precio 0 (gratis)", () => {
+    expect(() => Evento.crear(propiedades({ tiposEntrada: [tipo({ precio: 0 })] }), ahora)).not.toThrow();
+  });
+});

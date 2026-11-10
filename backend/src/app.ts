@@ -1,5 +1,6 @@
 import express, { type Express } from "express";
 import { relojDelSistema } from "./config/reloj";
+import { CategoriaController } from "./controllers/categoria.controller";
 import { EventoController } from "./controllers/evento.controller";
 import { SaludController } from "./controllers/salud.controller";
 import { UsuarioController } from "./controllers/usuario.controller";
@@ -12,6 +13,7 @@ import { crearDocsRouter } from "./routes/docs.routes";
 import type { Reloj } from "./domain/reloj";
 import { crearRouterApi } from "./routes/index";
 import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
+import { CategoriaService } from "./services/categoria.service";
 import { EventoService } from "./services/evento.service";
 import { UsuarioService } from "./services/usuario.service";
 
@@ -34,11 +36,13 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
   const { usuarios, categorias, eventos } = { ...crearRepositoriosDeEjemplo(reloj.ahora()), ...repositorios };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
+  const categoriaService = new CategoriaService({ categorias });
   const eventoService = new EventoService({ eventos, categorias, reloj });
 
   const controllers = {
     salud: new SaludController(),
     usuarios: new UsuarioController(usuarioService),
+    categorias: new CategoriaController(categoriaService),
     eventos: new EventoController(eventoService),
   };
   const requerirUsuario = crearRequerirUsuario(usuarioService);

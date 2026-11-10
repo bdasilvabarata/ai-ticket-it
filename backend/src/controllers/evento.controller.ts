@@ -1,7 +1,8 @@
-import type { EventoResumenVista } from "@ai-ticket-it/shared";
+import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { EventoService } from "../services/evento.service";
+import { eventoNuevo } from "../validations/evento.validation";
 
 /** HTTP de eventos: lee la entrada ya validada, llama al service y arma la respuesta. */
 export class EventoController {
@@ -10,5 +11,10 @@ export class EventoController {
   // Métodos como propiedades flecha: se pasan a las rutas sin perder `this`.
   listarMios = async (req: Request, res: Response<EventoResumenVista[]>): Promise<void> => {
     res.json(await this.eventoService.listarMios(usuarioActual(req).id));
+  };
+
+  crear = async (req: Request, res: Response<EventoVista>): Promise<void> => {
+    const datos = eventoNuevo.leer(req, "body");
+    res.status(201).json(await this.eventoService.crear(usuarioActual(req).id, datos));
   };
 }
