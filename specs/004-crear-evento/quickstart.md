@@ -6,8 +6,7 @@ Guía para comprobar la feature de punta a punta. Los detalles están en
 
 ## Prerrequisitos
 
-- Haber aplicado la **enmienda MINOR** de la constitución (research R1) con
-  `/speckit-constitution`, antes de implementar.
+- La constitución en **2.1.0** ("Operaciones atómicas por evento", research R1), ya aplicada.
 - `npm install` desde la raíz. En `mobile/`, `npx expo install
   @react-native-community/datetimepicker` y `npx expo install --check` sin advertencias.
 - Un celular con Expo Go del SDK 58 en la misma red que la PC (README).
@@ -47,6 +46,7 @@ Qué tiene que pasar:
 | eliminar el evento mientras una operación simulada de la 006 guarda una compra bajo el mismo cerrojo | o se elimina y la compra ve el evento inexistente, o la compra entra primero y el eliminar da `EVENTO_CON_COMPRAS` |
 | dos tipos "VIP" agregados a la vez | uno `201`, el otro `NOMBRE_TIPO_ENTRADA_REPETIDO` |
 | dos tipos distintos agregados a la vez | quedan los dos (sin actualización perdida) |
+| dos tipos renombrados a la vez al mismo nombre | uno `200`, el otro `NOMBRE_TIPO_ENTRADA_REPETIDO` |
 | quitar a la vez los dos tipos de un evento con dos | uno se quita, el otro da `ULTIMO_TIPO_ENTRADA` |
 | una operación sobre el evento A, bloqueada a propósito | una operación sobre el evento B termina antes |
 

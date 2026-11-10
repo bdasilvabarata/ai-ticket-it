@@ -81,12 +81,12 @@ detalle por campo.
 8. **Given** el organizador eligiendo la fecha y la hora, **When** usa el selector, **Then** la
    fecha y la hora que ve y elige son las de Buenos Aires, cualquiera sea la zona horaria del
    teléfono, y no puede escribirlas a mano.
-10. **Given** un teléfono con el reloj adelantado, atrasado o en otra zona horaria, **When** el
-    organizador guarda una fecha, **Then** si es futura o no lo decide el reloj del servidor, y
-    el evento queda en el mismo instante que si se hubiera cargado desde un teléfono en hora.
-9. **Given** un pedido de creación que llega al servidor con datos inválidos sin pasar por la
-   app, **When** el servidor lo recibe, **Then** lo rechaza como entrada inválida con un
-   detalle por campo, igual que si la app no lo hubiera validado.
+9. **Given** un teléfono con el reloj adelantado, atrasado o en otra zona horaria, **When** el
+   organizador guarda una fecha, **Then** si es futura o no lo decide el reloj del servidor, y
+   el evento queda en el mismo instante que si se hubiera cargado desde un teléfono en hora.
+10. **Given** un pedido de creación que llega al servidor con datos inválidos sin pasar por la
+    app, **When** el servidor lo recibe, **Then** lo rechaza como entrada inválida con un
+    detalle por campo, igual que si la app no lo hubiera validado.
 
 ---
 
@@ -305,7 +305,7 @@ rechazo de un evento realizado, con compras, ajeno o inexistente.
 - **FR-016**: El sistema DEBE rechazar quitar un tipo de entrada que tenga compras, y quitar el
   único tipo de entrada de un evento.
 - **FR-017**: El sistema DEBE rechazar todo cambio sobre un evento realizado o sobre sus tipos
-  de entrada. La app NO DEBE ofrecer editar ni eliminar un evento realizado.
+  de entrada. En la app, un evento realizado se abre en la vista de solo lectura de FR-006a.
 - **FR-018**: Los cambios guardados DEBEN verse en Mis eventos sin recargar la lista a mano.
 
 **Eliminar evento (US4)**

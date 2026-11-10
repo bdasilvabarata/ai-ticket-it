@@ -31,6 +31,15 @@ ejemplo. Las decisiones están en [research.md](./research.md).
 | `organizadorId` | string | el usuario que lo creó; no cambia |
 | `tiposEntrada` | TipoEntrada[] | **≥ 1**; nombres únicos con `mismoNombreDeTipo` (R14) |
 
+Los límites de longitud (nombres y descripciones) y los de multimedia (hasta 5 URLs
+`http`/`https`) de las dos tablas son **de forma**: los valida zod en `validations/` con
+`LIMITES_EVENTO` y `LIMITES_TIPO_ENTRADA`, y el dominio no los vuelve a verificar. Quien crea
+eventos es un usuario habilitado y sin malas intenciones; el dominio protege las reglas de
+negocio (fecha futura, nombres únicos, al menos un tipo, cupo, realizado y compras).
+
+Las interfaces del constructor se llaman `PropiedadesEvento` y `PropiedadesTipoEntrada`.
+`DatosEvento` y `DatosTipoEntrada` son los cuerpos HTTP de `shared/`.
+
 **Invariantes del constructor**, que se verifican en toda instancia nueva:
 - nombre, fecha válida y ≥ 1 tipo → `DatosInvalidosError`;
 - nombres de tipo repetidos → `ReglaDeNegocioError("NOMBRE_TIPO_ENTRADA_REPETIDO")`.

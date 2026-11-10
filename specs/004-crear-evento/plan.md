@@ -36,9 +36,8 @@ administra sus tipos de entrada de a uno, desde la pestaña **Mis eventos**.
 - Al salir de un formulario se pide confirmación con `usePreventRemove` de Expo Router.
 - La app no duplica las reglas: muestra junto a cada campo los detalles del 400 del servidor.
 
-El cerrojo cumple el objetivo de "Cupo atómico" pero no su letra. Antes de implementar hay que
-aplicar una enmienda **MINOR** de la constitución (ver Complexity Tracking y research R1).
-Decisiones en [research.md](./research.md).
+El cerrojo cumple la regla "Operaciones atómicas por evento" de la constitución 2.1.0,
+enmendada para esta feature (research R1). Decisiones en [research.md](./research.md).
 
 ## Technical Context
 
@@ -85,7 +84,7 @@ esperan entre sí (FR-029).
 | Principio | Cómo lo cumple el plan | Estado |
 |---|---|---|
 | Dominio · Cupo / Total / Estados | Esta feature no descuenta cupo ni crea compras. Al editar, el cupo es el disponible (≥ 0). El total de `Compra` queda fijo, y cambiar un precio no lo toca (FR-015) | ✅ |
-| Dominio · **Cupo atómico** | Verificar y modificar un evento corre **bajo el cerrojo del evento**, con `await` adentro. Cumple el objetivo (nada se intercala sobre el mismo evento) pero **no la letra** ("sin ningún `await`") | ⚠️ enmienda MINOR (Complexity Tracking) |
+| Dominio · **Operaciones atómicas por evento** (v2.1.0) | Verificar y modificar un evento corre **bajo el cerrojo del evento**, con relectura adentro, liberación en `finally` y sin anidar | ✅ |
 | Dominio · Días restantes / zona | "Realizado" y "fecha futura" se calculan al consultar y al operar, con el reloj del servidor, en `America/Argentina/Buenos_Aires` (no se persisten) | ✅ |
 | I. Spec-Driven | Spec con 6 clarificaciones. Plan → tasks → implement. El backlog se ajusta (la 006 depende de la 004) | ✅ |
 | II. Test-First | Cada regla tiene su test con caso borde, en domain, repositories, services (con concurrencia) y api. En mobile: api, formato, fecha de pared y pantallas. Cada test va con su stub de firma real | ✅ |
@@ -97,9 +96,8 @@ esperan entre sí (FR-029).
 | VIII. Tipos compartidos | `EventoVista`, `EventoResumenVista`, `TipoEntradaVista`, `CategoriaVista`, los datos de entrada y los límites de texto viven en `shared/` | ✅ |
 | IX. Calidad | `strict`, las cuatro verificaciones y el CI. Complejidad nueva solo donde la spec la pide (cerrojo y reloj), justificada abajo | ✅ |
 
-**Gate**: pasa con **una violación justificada**: la letra de "Cupo atómico". La enmienda
-(texto propuesto en research R1) se aplica con `/speckit-constitution` como **primera tarea**,
-antes de cualquier código.
+**Gate**: pasa sin violaciones. La regla de atomicidad se amplió con la enmienda MINOR 2.1.0
+(research R1, commit `a6c9a70`), aplicada antes de implementar.
 
 **Post-design re-check (Phase 1)**: el diseño no agrega violaciones. Cambios menores de
 convención que se registran en AGENTS.md:
@@ -221,6 +219,6 @@ en base, features y conectores) sin carpetas nuevas de primer nivel:
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |---|---|---|
-| "Cupo atómico" exige "sin ningún `await` entre la verificación y el descuento"; el plan verifica y modifica **bajo un cerrojo por evento**, con `await` adentro | Los repositorios devuelven `Promise` (R23 de la 001). Eliminar un evento verifica en `RepositorioCompras` y modifica en `RepositorioEventos`, y editar un tipo es leer el agregado, operar y guardarlo: entre medio otro pedido puede intercalarse (verificar-y-modificar, y actualización perdida). FR-029 / SC-008 piden que no pase | **Repositorios sincrónicos**: rompen las interfaces async de R23. **Operación combinada en un repositorio**: mezcla eventos y compras en una pieza. **Versión optimista**: cumple la letra, pero ante concurrencia uno de los pedidos recibe 409 o hay que reintentar, y se prioriza que no haya errores ni incongruencias (research R1). Se resuelve con la **enmienda MINOR** propuesta en R1, aplicada antes de implementar |
+| "Cupo atómico" exige "sin ningún `await` entre la verificación y el descuento"; el plan verifica y modifica **bajo un cerrojo por evento**, con `await` adentro | Los repositorios devuelven `Promise` (R23 de la 001). Eliminar un evento verifica en `RepositorioCompras` y modifica en `RepositorioEventos`, y editar un tipo es leer el agregado, operar y guardarlo: entre medio otro pedido puede intercalarse (verificar-y-modificar, y actualización perdida). FR-029 / SC-008 piden que no pase | **Repositorios sincrónicos**: rompen las interfaces async de R23. **Operación combinada en un repositorio**: mezcla eventos y compras en una pieza. **Versión optimista**: cumple la letra, pero ante concurrencia uno de los pedidos recibe 409 o hay que reintentar, y se prioriza que no haya errores ni incongruencias (research R1). Resuelto con la **enmienda MINOR 2.1.0** (`a6c9a70`); la fila queda como registro de por qué se eligió el cerrojo |
 | Pieza nueva `CerrojoPorClave` (una cola de promesas por clave) | Es el mecanismo de la fila de arriba. La 006 la reutiliza para el cupo y los estados | Un cerrojo global serializaría también los eventos distintos (FR-029: no se esperan entre sí) |
 | Pieza nueva `Reloj` inyectada | FR-010a: el servidor es la única referencia de "ahora", y los tests necesitan fijar el instante exacto de "realizado" y de "fecha futura" | `new Date()` suelto en dominio o services: los tests no podrían fijar el borde |

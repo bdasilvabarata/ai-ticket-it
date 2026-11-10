@@ -417,7 +417,8 @@ de mobile (R10–R18).
   - Rutas apiladas, declaradas una vez en el `Stack.Protected` de `con-usuario` de
     `LayoutRaiz`, con su `title`:
     - `eventos/nuevo` ("Crear evento");
-    - `eventos/[eventoId]/index` ("Evento");
+    - `eventos/[eventoId]/index` (título inicial "Evento"; `EventoDelOrganizador` lo cambia a
+      "Editar evento" o "Evento realizado", según `realizado`);
     - `eventos/[eventoId]/tipos-entrada/nuevo` ("Agregar tipo de entrada");
     - `eventos/[eventoId]/tipos-entrada/[tipoEntradaId]` ("Editar tipo de entrada").
   - `eventos/[eventoId]` muestra `EventoDelOrganizador`, que según el `realizado` del
