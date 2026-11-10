@@ -38,10 +38,14 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   establece al crear el tipo (por ejemplo, 300) y disminuye en la cantidad de cada compra que
   se registra. Una compra NO PUEDE dejar el cupo por debajo de 0, ni siquiera ante compras
   concurrentes.
-- **Cupo atómico**: verificar que hay cupo y descontarlo DEBEN ocurrir en un mismo tramo
-  síncrono de código, **sin ningún `await` entre la verificación y el descuento**. Node ejecuta
-  un tramo síncrono por vez, así ninguna otra compra puede intercalarse y leer el mismo cupo.
-  Lo mismo vale para devolver cupo al cancelar y para todo cambio de estado de una compra.
+- **Operaciones atómicas por evento**: verificar una regla y modificar un evento, sus tipos de
+  entrada o sus compras (por ejemplo, que hay cupo y descontarlo) DEBEN ocurrir en un mismo
+  tramo síncrono de código o **bajo el cerrojo de ese evento**, de modo que ninguna otra
+  operación sobre el mismo evento se intercale entre la verificación y la modificación.
+  Dentro del cerrojo, la operación DEBE volver a leer lo que verifica; el cerrojo se libera
+  siempre, también ante un error, y no se anidan cerrojos. Lo mismo vale para devolver cupo
+  al cancelar y para todo cambio de estado de una compra. Las operaciones sobre eventos
+  distintos no se esperan entre sí.
 - **Total**: lo calcula el servidor como `precio × cantidad` al momento de comprar. El cliente
   nunca envía precios ni totales.
 - **Estados de una compra** — solo estas transiciones son válidas:
@@ -157,8 +161,10 @@ para cambiar.
   servidor (`crypto.randomUUID()`). Los datos de ejemplo usan **ids legibles y fijos** en
   kebab-case con el tipo como prefijo (`usuario-lucia`, `evento-noche-de-rock`), estables entre
   arranques para que la app, la demo, Postman y los tests puedan referirlos.
-- Las operaciones que protegen invariantes cumplen la regla de **cupo atómico** del dominio:
-  verificar y modificar en un mismo tramo síncrono, sin `await` en el medio.
+- Las operaciones que protegen invariantes cumplen la regla de **operaciones atómicas por
+  evento** del dominio: verificar y modificar en un mismo tramo síncrono o bajo el cerrojo del
+  evento. El cerrojo es una única instancia por app, inyectada por constructor desde el
+  composition root (nunca estado global ni `static`).
 - Cada instancia de la app (y cada test) tiene sus propios repositorios: no hay estado global.
 
 **Rationale**: es lo que pide la consigna, se lee sin conocer ninguna base de datos y los
@@ -286,4 +292,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-07
+**Version**: 2.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-10
