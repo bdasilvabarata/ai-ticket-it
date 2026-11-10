@@ -5,4 +5,7 @@
 export const claves = {
   usuarios: () => ["usuarios"] as const,
   usuarioActual: (usuarioId: string) => ["usuario-actual", usuarioId] as const,
+  categorias: () => ["categorias"] as const,
+  misEventos: (usuarioId: string) => ["mis-eventos", usuarioId] as const,
+  evento: (usuarioId: string, eventoId: string) => ["evento", usuarioId, eventoId] as const,
 };

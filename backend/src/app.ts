@@ -1,4 +1,5 @@
 import express, { type Express } from "express";
+import { relojDelSistema } from "./config/reloj";
 import { SaludController } from "./controllers/salud.controller";
 import { UsuarioController } from "./controllers/usuario.controller";
 import { manejarErrores } from "./middlewares/manejar-errores";
@@ -8,6 +9,7 @@ import { crearRequerirUsuario } from "./middlewares/requerir-usuario";
 import { rutaNoEncontrada } from "./middlewares/ruta-no-encontrada";
 import { crearDocsRouter } from "./routes/docs.routes";
 import { crearRouterApi } from "./routes/index";
+import type { Reloj } from "./domain/reloj";
 import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
 import { UsuarioService } from "./services/usuario.service";
 
@@ -17,6 +19,8 @@ export interface OpcionesApp {
    * memoria nuevos con los datos de ejemplo (FR-005).
    */
   repositorios?: Partial<Repositorios>;
+  /** Única referencia de "ahora" (FR-010a). Los tests fijan el instante. */
+  reloj?: Reloj;
 }
 
 /**
@@ -24,8 +28,8 @@ export interface OpcionesApp {
  * repositories → services → controllers → rutas. No llama a `listen`: lo hace server.ts
  * (y los tests usan supertest).
  */
-export function crearApp({ repositorios = {} }: OpcionesApp = {}): Express {
-  const { usuarios, eventos } = { ...crearRepositoriosDeEjemplo(), ...repositorios };
+export function crearApp({ repositorios = {}, reloj = relojDelSistema }: OpcionesApp = {}): Express {
+  const { usuarios, eventos } = { ...crearRepositoriosDeEjemplo(reloj.ahora()), ...repositorios };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
 

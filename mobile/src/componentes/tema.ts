@@ -23,6 +23,9 @@ export const tema = {
     sobrePeligro: "#ffffff",
     advertencia: "#b45309",
     sobreAdvertencia: "#ffffff",
+    // Marca "Realizado" de un evento (siempre con la etiqueta escrita): 6,4:1 con blanco encima.
+    neutro: "#52606d",
+    sobreNeutro: "#ffffff",
   },
   espacio: {
     minimo: 2,

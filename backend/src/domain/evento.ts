@@ -1,6 +1,21 @@
+import { ReglaDeNegocioError } from "./errores";
 import { esEnteroNoNegativo, esTextoConContenido, Invariantes } from "./invariantes";
 
-export interface DatosTipoEntrada {
+// En `es`, con sensitivity "base", "Platea" = " PLATEA " = "Plátea", pero "Año" ≠ "Ano" (R14).
+const comparadorDeNombres = new Intl.Collator("es", { sensitivity: "base" });
+
+/** ¿Dos nombres de tipo de entrada son "el mismo"? Sin distinguir mayúsculas, tildes ni espacios de los extremos. */
+export function mismoNombreDeTipo(a: string, b: string): boolean {
+  return comparadorDeNombres.compare(a.trim(), b.trim()) === 0;
+}
+
+function hayNombresRepetidos(tipos: readonly TipoEntrada[]): boolean {
+  return tipos.some((tipo, i) =>
+    tipos.slice(i + 1).some((otro) => mismoNombreDeTipo(tipo.nombre, otro.nombre)),
+  );
+}
+
+export interface PropiedadesTipoEntrada {
   id: string;
   nombre: string;
   descripcion: string;
@@ -18,7 +33,7 @@ export class TipoEntrada {
   readonly precio: number;
   readonly cupo: number;
 
-  constructor({ id, nombre, descripcion, precio, cupo }: DatosTipoEntrada) {
+  constructor({ id, nombre, descripcion, precio, cupo }: PropiedadesTipoEntrada) {
     new Invariantes()
       .exigir(esTextoConContenido(nombre), "nombre", "Es obligatorio.")
       .exigir(esEnteroNoNegativo(precio), "precio", "Debe ser un entero mayor o igual a 0.")
@@ -35,9 +50,14 @@ export class TipoEntrada {
   hayCupoPara(cantidad: number): boolean {
     return Number.isInteger(cantidad) && cantidad > 0 && cantidad <= this.cupo;
   }
+
+  /** Un tipo nuevo con los datos editados y el mismo `id`; este no cambia. */
+  con(datos: Omit<PropiedadesTipoEntrada, "id">): TipoEntrada {
+    return new TipoEntrada({ ...datos, id: this.id });
+  }
 }
 
-export interface DatosEvento {
+export interface PropiedadesEvento {
   id: string;
   nombre: string;
   descripcion: string;
@@ -61,7 +81,7 @@ export class Evento {
   readonly organizadorId: string;
   readonly tiposEntrada: readonly TipoEntrada[];
 
-  constructor(datos: DatosEvento) {
+  constructor(datos: PropiedadesEvento) {
     new Invariantes()
       .exigir(esTextoConContenido(datos.nombre), "nombre", "Es obligatorio.")
       .exigir(!Number.isNaN(datos.fechaHora.getTime()), "fechaHora", "Debe ser una fecha válida.")
@@ -71,6 +91,12 @@ export class Evento {
         "El evento necesita al menos un tipo de entrada.",
       )
       .verificar();
+    if (hayNombresRepetidos(datos.tiposEntrada)) {
+      throw new ReglaDeNegocioError(
+        "NOMBRE_TIPO_ENTRADA_REPETIDO",
+        "Ya hay un tipo de entrada con ese nombre en el evento.",
+      );
+    }
     this.id = datos.id;
     this.nombre = datos.nombre.trim();
     this.descripcion = datos.descripcion;
@@ -83,8 +109,21 @@ export class Evento {
 
   /**
    * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
-   * consigna; lo usa la búsqueda por precio de la feature 004).
+   * consigna; lo usa la búsqueda por precio de la feature 005).
    */
+  /** Realizado desde el instante de inicio, inclusive (`ahora ≥ fechaHora`; research R3). */
+  estaRealizado(ahora: Date): boolean {
+    return ahora.getTime() >= this.fechaHora.getTime();
+  }
+
+  esOrganizadoPor(usuarioId: string): boolean {
+    return this.organizadorId === usuarioId;
+  }
+
+  buscarTipoEntrada(tipoId: string): TipoEntrada | null {
+    return this.tiposEntrada.find((tipo) => tipo.id === tipoId) ?? null;
+  }
+
   tuPrecioEstaEntre(min: number, max: number): boolean {
     return this.tiposEntrada.some((tipo) => tipo.precio >= min && tipo.precio <= max);
   }

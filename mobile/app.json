@@ -7,11 +7,7 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "plugins": [
-      "expo-router",
-      "expo-status-bar",
-      "@react-native-community/datetimepicker"
-    ],
+    "plugins": ["expo-router", "expo-status-bar", "@react-native-community/datetimepicker"],
     "ios": {
       "supportsTablet": true
     },
