@@ -36,7 +36,7 @@ Qué tiene que pasar:
   puntaje con reseñas de un evento **realizado** del organizador, orden por puntaje, y
   `obtener` con `organizador`.
 - **api**: listado público (sin usuario y con un `X-Usuario-Id` inválido), los 400 de `texto` y
-  `orden` con su detalle, categoría inexistente → `[]`, detalle con `organizador`, 404; la
+  `orden` con su detalle, categoría inexistente → 400 en `query.categoriaId`, detalle con `organizador`, 404; la
   cobertura de OpenAPI y de Postman.
 - **mobile**: `listarEventos` (URL exacta), `formato`, `SegunConsulta`/`ListaVacia` con sus
   props nuevas, y las pantallas Explorar y detalle con `renderConDependencias`. Los tests de la
@@ -52,7 +52,8 @@ Qué tiene que pasar:
 | `GET /api/eventos?texto=BASQUET` | solo "Clásico de básquet" |
 | `GET /api/eventos?categoriaId=categoria-musica` | solo "Noche de Rock en el Club" |
 | `GET /api/eventos?orden=precio` | Maratón (`precioDesde: 0`) primero, Festival último; Hamlet con `agotado: true` |
-| `GET /api/eventos?categoriaId=categoria-nada` | `200 { "eventos": [], "hayEventosProximos": true }` |
+| `GET /api/eventos?categoriaId=categoria-nada` | `400`, detalle en `query.categoriaId` ("No existe la categoría.") |
+| `GET /api/eventos?texto=rock&categoriaId=categoria-deportes` | `200 { "eventos": [], "hayEventosProximos": true }` |
 | `GET /api/eventos?orden=nombre` | `400`, detalle en `query.orden` |
 | `GET /api/eventos/evento-hamlet` | los campos de la 004 + `organizador` de Martín |
 | `GET /api/eventos/evento-noche-de-risas` | `200` con `realizado: true` (el detalle de un realizado sigue disponible) |

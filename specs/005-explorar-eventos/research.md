@@ -18,12 +18,26 @@ dice lo contrario.
     | Parámetro | Regla | Mensaje (detalle en `query.<campo>`) |
     |---|---|---|
     | `texto` | string opcional, `trim`, ≤ `LIMITES_BUSQUEDA.texto` (100), `""` por defecto | "Debe tener como máximo 100 caracteres." / "Debe ser un texto." |
-    | `categoriaId` | string opcional, `trim`; vacío = sin filtro | "Debe ser un texto." |
+    | `categoriaId` | string opcional, `trim`; vacío = sin filtro | "Debe ser un texto." · inexistente → "No existe la categoría." (lo lanza el service) |
     | `orden` | `z.enum(ORDENES_CATALOGO)`, `"fecha"` por defecto | "Debe ser fecha, precio o puntaje." |
 
-  - `categoriaId` **no** usa `idSchema` ni se busca en el repositorio: un valor que no es una
-    categoría del catálogo (también uno mal formado) no coincide con ningún evento y la respuesta
-    es la lista vacía (FR-016).
+  - `categoriaId` es una **referencia de la entrada** (constitución 2.2.0, principio III): la
+    forma solo exige un texto (**no** `idSchema`) y, si viene, `EventoService.listar` la valida
+    **primero** con `categoriaService.buscarReferenciada(categoriaId, "consulta")`. Si no existe
+    (también si está mal formada), `ReferenciaInvalidaError` → `400 ENTRADA_INVALIDA` con
+    `{ campo: "query.categoriaId", mensaje: "No existe la categoría." }` (FR-016). Es el orden de
+    chequeos de siempre: 400 de forma (zod) → 400 de categoría.
+  - Para que el detalle nombre la query y no el cuerpo, `ReferenciaInvalidaError` suma
+    `origen: "datos" | "consulta"` (por defecto `"datos"`): de qué parte de la entrada vino la
+    referencia, **en términos del caso de uso** (los datos que se escriben o la consulta que se
+    hace), no de HTTP. `buscarReferenciada(id, origen = "datos")` lo pasa. Recién
+    `aErrorAplicacion` (`middlewares/`, la capa que sí conoce HTTP) lo traduce con una tabla
+    `{ datos: "body", consulta: "query" }` y arma el campo como `body.categoriaId` o
+    `query.categoriaId`. Así `errors/` no nombra partes de la request ni status (constitución,
+    principio III), y las escrituras de la 004 no cambian (siguen en `body.categoriaId`).
+  - Alternativas descartadas para el prefijo: `origen: "body" | "query"` en `errors/` (vocabulario
+    de HTTP dentro de `errors/`); que el error lleve solo el campo y el controller o el traductor
+    adivinen el prefijo según la ruta (regla implícita, fácil de romper).
   - Un parámetro repetido (`?orden=fecha&orden=precio`) llega como arreglo con el parser
     `"simple"` de Express 5 y falla el `z.string` → 400 con el detalle en ese campo.
   - El 100 se cuenta **después** del `trim`, igual que en los textos de los cuerpos: "  rock  "
@@ -32,8 +46,10 @@ dice lo contrario.
   cualquier listado REST. Mismo `crearValidacion` y mismos mensajes que el resto
   (`textoOpcional` de `comunes.ts` sirve para `texto`).
 - **Alternatives considered**: `GET /api/eventos/buscar` (otro recurso para lo mismo); `POST` con
-  cuerpo (no es cacheable ni idempotente en la semántica HTTP); validar que la categoría exista y
-  responder 400 (la spec pide lista vacía).
+  cuerpo (no es cacheable ni idempotente en la semántica HTTP); una categoría inexistente →
+  lista vacía (era el default de la spec antes de la constitución 2.2.0, que la descarta: una
+  referencia de la entrada que no existe es un dato inválido); validar la existencia en zod
+  (la forma no consulta datos: la existencia la decide el service dueño).
 
 ## R2. Respuesta del listado: `CatalogoVista` (los dos vacíos sin pedir de más; FR-007)
 
@@ -124,7 +140,10 @@ dice lo contrario.
 - **Decision**: función pura
   `ordenarCatalogo<T extends Ordenable>(elementos: readonly T[], orden: OrdenCatalogo): T[]`,
   con `Ordenable = { id; nombre; fechaHora: Date; precioDesde: number; puntaje: number | null }`.
-  Recibe los puntajes **ya calculados** (R7) y devuelve un arreglo nuevo (`toSorted`):
+  Recibe los puntajes **ya calculados** (R7) y devuelve un arreglo nuevo (`toSorted`). No ordena
+  vistas (`EventoCatalogoVista` tiene `fechaHora` string y el puntaje anidado): el service le
+  pasa elementos `Ordenable & { vista }` armados desde la entidad y después toma las vistas
+  (data-model, "Flujo de `listar`"):
   1. criterio principal:
      - `fecha`: `fechaHora` ascendente;
      - `precio`: `precioDesde` ascendente (los gratis primero);
@@ -209,6 +228,8 @@ dice lo contrario.
     (igual que `CategoriaService.obtenerPorIds`; si falta alguno, 404).
   - `listar({ texto, categoriaId, orden }): Promise<CatalogoVista>`, sin cerrojo (lectura, R2.4
     de la 004):
+    0. si viene `categoriaId`, `categoriaService.buscarReferenciada(categoriaId, "consulta")`
+       (400 si no existe, antes de leer eventos; R1);
     1. `ahora = reloj.ahora()` **una vez** por pedido (todos los eventos se juzgan con el mismo
        instante);
     2. `proximos = todos.filter((e) => !e.estaRealizado(ahora))`;
@@ -218,8 +239,10 @@ dice lo contrario.
        (`usuarioService.obtenerPorIds`) y sus puntajes (`reseniaService.puntajesPorOrganizador`
        con todos los eventos de esos organizadores; R7), y arma las vistas
        (`aEventoCatalogoVista`);
-    5. ordena con `ordenarCatalogo` (R6) y responde `{ eventos, hayEventosProximos:
-       proximos.length > 0 }`.
+    5. ordena con `ordenarCatalogo` (R6) los elementos `Ordenable & { vista }` y responde
+       `{ eventos: elementos.map((e) => e.vista), hayEventosProximos: proximos.length > 0 }`.
+    Si después del paso 3 no queda ningún evento, responde `{ eventos: [], hayEventosProximos }`
+    sin el paso 4 (no pide lotes vacíos).
   - **Toda** `EventoVista` (la de `GET /:eventoId` y también las respuestas de `POST` y `PUT`)
     suma `organizador: OrganizadorVista`; ningún campo se quita ni cambia (`organizadorId`
     sigue). Un helper privado `#organizadorVista(organizadorId)` pide el usuario

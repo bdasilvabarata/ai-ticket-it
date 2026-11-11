@@ -21,7 +21,7 @@ Query (todos opcionales; las claves desconocidas se ignoran):
 | Parámetro | Regla | Por defecto | Error (detalle en `query.<campo>`) |
 |---|---|---|---|
 | `texto` | string, `trim`, ≤ 100 caracteres después del `trim` | `""` (sin filtro) | "Debe tener como máximo 100 caracteres." · repetido → "Debe ser un texto." |
-| `categoriaId` | string, `trim`; vacío = sin filtro | sin filtro | repetido → "Debe ser un texto." |
+| `categoriaId` | string, `trim`; vacío = sin filtro; debe ser una categoría del catálogo | sin filtro | repetido → "Debe ser un texto." · inexistente → "No existe la categoría." |
 | `orden` | `fecha` \| `precio` \| `puntaje` | `fecha` | "Debe ser fecha, precio o puntaje." |
 
 Reglas:
@@ -30,8 +30,10 @@ Reglas:
 - `texto`: se separa en palabras (uno o más espacios); un evento coincide si **cada** palabra
   está, como subcadena literal, en su nombre **o** en su descripción, sin distinguir
   mayúsculas, acentos ni diéresis; la ñ es distinta de la n.
-- `categoriaId`: igualdad exacta. Una categoría que no existe (o un valor cualquiera) → la lista
-  vacía, **no** un error.
+- `categoriaId`: igualdad exacta. Es una referencia de la entrada (constitución 2.2.0,
+  principio III): una categoría que no existe (o un valor cualquiera) → `400 ENTRADA_INVALIDA`
+  con `{ "campo": "query.categoriaId", "mensaje": "No existe la categoría." }`, **no** la lista
+  vacía. Se verifica después de la forma y antes de leer los eventos.
 - Texto y categoría se combinan (deben cumplirse los dos); el orden se aplica después.
 - Orden y desempates: `fecha` ↑ · `precio` ("desde") ↑ · `puntaje` ↓ con `null` al final; los
   empates, por fecha ↑, después nombre (sin mayúsculas ni tildes) y por último `id`.
@@ -81,7 +83,8 @@ Ejemplos (datos de ejemplo, research R9):
 | `?texto=club+rock` · `?texto=rock%20%20%20club` | Noche de Rock en el Club |
 | `?texto=clasico` | Clásico de básquet (nombre) y Hamlet ("El clásico de Shakespeare…", descripción) |
 | `?categoriaId=categoria-musica` | Noche de Rock (Jazz en el Patio ya se realizó) |
-| `?categoriaId=categoria-inexistente` | `{ "eventos": [], "hayEventosProximos": true }` |
+| `?categoriaId=categoria-inexistente` | `400` con detalle en `query.categoriaId` ("No existe la categoría.") |
+| `?texto=rock&categoriaId=categoria-deportes` | `{ "eventos": [], "hayEventosProximos": true }` (sin coincidencias) |
 | `?orden=precio` | Maratón (0), Charla (2000), Clásico (8000), Noche de Rock (15000), Hamlet (18000), Festival (45000) |
 | `?orden=puntaje` | sin reseñas: igual que por fecha (desempate) |
 | `?orden=nombre` | `400` con detalle en `query.orden` |
@@ -107,7 +110,7 @@ respondiendo `404 EVENTO_NO_ENCONTRADO` ("No existe el evento.") si no existe.
 
 | Status | `codigo` | Cuándo |
 |---|---|---|
-| 400 | `ENTRADA_INVALIDA` | `texto` > 100, `orden` desconocido o parámetro repetido (`detalles` en `query.*`); id de evento mal formado (`params.eventoId`, como en la 004) |
+| 400 | `ENTRADA_INVALIDA` | `texto` > 100, `orden` desconocido, `categoriaId` que no existe o parámetro repetido (`detalles` en `query.*`); id de evento mal formado (`params.eventoId`, como en la 004) |
 | 404 | `EVENTO_NO_ENCONTRADO` | detalle de un evento inexistente |
 
 El listado no tiene 401, 403, 404 ni 409.

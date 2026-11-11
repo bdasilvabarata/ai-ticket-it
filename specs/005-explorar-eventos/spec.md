@@ -8,6 +8,10 @@
 
 **Input**: User description: "Feature 005 — Explorar eventos (UC-03, UC-11). Cualquier usuario explora el catálogo desde la pestaña Explorar, que hoy muestra la sección pendiente. Explorar: lista los eventos publicados [default: solo los que no se realizaron; también los del propio usuario y los agotados, marcados como "Agotado"]. Cada tarjeta muestra nombre, categoría, fecha y hora, precio "desde" (el menor precio de sus tipos de entrada; "Gratis" si es 0), nombre del organizador y su puntaje [default: con un decimal; "Sin reseñas" si no tiene]. Tiene los cuatro estados, con un vacío distinto para "no hay eventos" y para "ningún evento coincide con la búsqueda". Búsqueda por texto: un campo que busca en el nombre y la descripción del evento [default: coincidencia parcial, sin distinguir mayúsculas ni tildes, ignorando espacios al principio y al final; vacío = sin filtro; hasta 100 caracteres]. Filtro por categoría: una sola categoría del catálogo o "Todas" [default: "Todas"]. Texto y categoría se combinan (deben cumplirse los dos). Orden (UC-11): por fecha (la más próxima primero), por precio (el precio "desde" más bajo primero) o por puntaje del organizador (el más alto primero; los organizadores sin puntaje van al final) [default: por fecha; un solo sentido por criterio; los empates se desempatan por fecha y después por nombre]. El puntaje del organizador es el promedio de las reseñas de sus eventos: hasta que exista la 011 no hay reseñas, así que es siempre "sin puntaje" (no 0). Búsqueda, filtro y orden los resuelve el servidor en un endpoint público de listado [default: sin usuario requerido; una categoría inexistente da una lista vacía; un criterio de orden desconocido es entrada inválida]. Detalle del evento: al tocar una tarjeta se abre el detalle público, con nombre, descripción, categoría, fecha y hora, imágenes de multimedia [default: en una fila horizontal; si una imagen no carga, no se muestra], organizador con nombre y puntaje, y los tipos de entrada con nombre, descripción, precio y cupo disponible ("Agotado" si es 0). Amplía el GET público del evento que ya existe con el nombre y el puntaje del organizador, sin cambiar los campos actuales. Un evento inexistente muestra "no encontrado"; si el evento ya se realizó, el detalle lo indica. Fuera de alcance: comprar (006, el detalle todavía no tiene botón de compra), reseñas y su listado (011, UC-10), filtro por rango de precio, favoritos (012), y paginación."
 
+> La descripción se conserva tal como llegó. Su default "una categoría inexistente da una
+> lista vacía" quedó reemplazado por la clarificación del 2026-11-11 (constitución 2.2.0): ver
+> FR-016.
+
 **Casos de uso**:
 
 - UC-03 — *Como comprador, quiero buscar Eventos por texto o explorarlos por categorías.*
@@ -36,6 +40,10 @@ sigue en Mis eventos, 004); pulido estético (013).
 - Q: Con varias palabras ("rock club"), ¿coincide la frase tal cual o cada palabra por separado? → A: Cada palabra por separado: un evento coincide si contiene todas las palabras, en cualquier orden y lugar del nombre o la descripción; los espacios repetidos entre palabras no cuentan (FR-011).
 - Q: Mientras la lista se vuelve a pedir, ¿qué ve el comprador? → A: Un skeleton (tarjetas de relleno con la forma de las tarjetas reales), siempre: en la primera carga y en cada cambio de texto, categoría u orden; los resultados anteriores no quedan a la vista y el campo de búsqueda y los selectores siguen visibles y usables (FR-007, FR-014). Volver a una combinación de texto, categoría y orden que ya se respondió mientras la app está abierta muestra la respuesta de **esa** combinación (no la de la anterior) mientras se revalida; no cuenta como "resultados anteriores".
 - Q: Junto al puntaje del organizador, ¿se muestra cuántas reseñas tiene? → A: Sí, en la tarjeta y en el detalle: "4,5 · 12 reseñas" ("1 reseña" en singular); sin reseñas, "Sin reseñas". El servidor informa la cantidad (0 hasta la 011) junto al puntaje (FR-006, FR-009).
+
+### Session 2026-11-11
+
+- Alineación con la constitución 2.2.0 (principio III, "Una referencia que llega en la entrada (por ejemplo, `categoriaId`) se valida con `buscarReferenciada` del service dueño: si no existe, es un dato inválido (400 sobre el campo)"): un pedido con una categoría que no existe en el catálogo ya **no** responde una lista vacía, sino entrada inválida (400) con el detalle en la categoría. Reemplaza el default "una categoría inexistente da una lista vacía" de la descripción inicial (FR-016, US3 escenario 10, caso borde "Categoría inexistente"). En la app no cambia nada: solo se pueden elegir categorías del catálogo.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -177,7 +185,8 @@ verificar por el lado del servidor la misma lógica con pedidos directos.
    aparece un vacío propio ("Ningún evento coincide con tu búsqueda") distinto del vacío de
    catálogo sin eventos, con una acción para limpiar la búsqueda y el filtro.
 10. **Given** un pedido directo al servidor con una categoría que no existe en el catálogo,
-   **When** el servidor lo recibe, **Then** responde una lista vacía (no un error).
+   **When** el servidor lo recibe, **Then** lo rechaza como entrada inválida con el detalle en
+   la categoría.
 11. **Given** el comprador que abrió el detalle de un evento desde una búsqueda, **When**
     vuelve a Explorar, **Then** encuentra el mismo texto, la misma categoría y el mismo orden
     que había dejado.
@@ -249,7 +258,8 @@ sus desempates y que un criterio desconocido se rechaza.
   el vacío de catálogo aunque haya un texto o una categoría elegidos; si hay eventos pero
   ninguno coincide, se muestra el vacío de búsqueda.
 - **Categoría inexistente**: en la app solo se pueden elegir categorías del catálogo; un
-  pedido directo con otra categoría da una lista vacía (no "entrada inválida").
+  pedido directo con otra categoría es "entrada inválida" (constitución, principio III: una
+  referencia de la entrada que no existe es un dato inválido), no una lista vacía.
 - **Multimedia rota**: una URL que no responde o no es una imagen no deja un hueco; las demás
   imágenes se muestran igual.
 - **Evento eliminado o editado entre el listado y el detalle**: el detalle siempre muestra lo
@@ -325,8 +335,8 @@ sus desempates y que un criterio desconocido se rechaza.
   mientras tanto, muestra el skeleton de FR-007 sin quitarle el foco ni lo escrito al campo.
 - **FR-015**: El comprador DEBE poder filtrar por una sola categoría del catálogo o por
   "Todas", que es la opción inicial.
-- **FR-016**: Un pedido con una categoría que no existe en el catálogo DEBE responder una lista
-  vacía, no un error.
+- **FR-016**: Un pedido con una categoría que no existe en el catálogo DEBE rechazarse como
+  entrada inválida (400) con el detalle en la categoría (constitución, principio III).
 - **FR-017**: El texto y la categoría DEBEN combinarse: un evento aparece solo si cumple los
   dos.
 

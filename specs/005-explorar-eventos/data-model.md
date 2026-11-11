@@ -66,6 +66,15 @@ function puntajesPorOrganizador(eventos: readonly Evento[], resenias: readonly R
   un evento que no está en `eventos` se ignora. Un organizador sin reseñas no aparece en el
   `Map` (`ReseniaService` lo completa con `calcularPuntaje([])`).
 
+**Nombres del puntaje** (el mismo dato en cada capa; el cambio de nombre es deliberado y se
+comenta en `aOrganizadorVista`):
+
+| Capa | Promedio | Cantidad | Por qué |
+|---|---|---|---|
+| `domain/resenia.ts` → `Puntaje` | `promedio` | `cantidad` | dentro de un `Puntaje`, "puntaje.puntaje" sería redundante |
+| `shared` → `OrganizadorVista` | `puntaje` | `cantidadResenias` | el contrato habla del organizador: "su puntaje" y "cuántas reseñas" |
+| `domain/orden-catalogo.ts` → `Ordenable` | `puntaje` | — | el criterio de orden se llama `puntaje` (`ORDENES_CATALOGO`) |
+
 ### Interfaces de repositorio (`domain/repositorios.ts`)
 
 ```ts
@@ -108,6 +117,18 @@ ciclos: `TipoEntradaService` → `EventoService` → `CategoriaService`, `Usuari
 | `obtenerOFallar(id)` | pasa a ser público (lo usa `EventoService` para el organizador del detalle) |
 | `obtenerPorIds(ids)` (nuevo) | `Map<string, Usuario>` en una lectura (`listarPorIds`); si falta alguno, `404 USUARIO_NO_ENCONTRADO` |
 
+### CategoriaService (ampliado)
+
+| Método | Cambio |
+|---|---|
+| `buscarReferenciada(id, origen: OrigenDeReferencia = "datos")` | suma `origen`: el `categoriaId` de la consulta del catálogo es una referencia de la entrada; si no existe, `ReferenciaInvalidaError("categoriaId", "No existe la categoría.", origen)`. Con `"consulta"` → 400 sobre `query.categoriaId`; sin `origen`, igual que en la 004 (`body.categoriaId`) |
+
+`errors/index.ts`: `type OrigenDeReferencia = "datos" | "consulta"` (de qué parte de la entrada
+del caso de uso vino la referencia, sin vocabulario HTTP) y `ReferenciaInvalidaError` suma
+`readonly origen: OrigenDeReferencia` (por defecto `"datos"`). `aErrorAplicacion`
+(`middlewares/traducir-error.ts`) lo traduce con `{ datos: "body", consulta: "query" }` y arma el
+detalle como `body.categoriaId` / `query.categoriaId`.
+
 ### ReseniaService (nuevo)
 
 Dependencias: `resenias: RepositorioResenias`. No depende de otros services.
@@ -124,7 +145,7 @@ Dependencias: `eventos`, `compras`, `categoriaService`, **`usuarioService`**,
 
 | Método | Cambio |
 |---|---|
-| `listar(consulta: ConsultaCatalogoValidada)` (nuevo) | `{ texto: string; categoriaId?: string; orden: OrdenCatalogo }` → `CatalogoVista`. Sin cerrojo. Un `ahora` por pedido. Lecturas fijas por pedido (R7): `eventos.listar` y una llamada en lote a cada dueño: `categoriaService.obtenerPorIds`, `usuarioService.obtenerPorIds`, `reseniaService.puntajesPorOrganizador` |
+| `listar(consulta: ConsultaCatalogoValidada)` (nuevo) | `{ texto: string; categoriaId?: string; orden: OrdenCatalogo }` → `CatalogoVista`. Sin cerrojo. Si viene `categoriaId`, primero `categoriaService.buscarReferenciada(categoriaId, "consulta")` (400 si no existe). Un `ahora` por pedido. Lecturas fijas por pedido (R7): `eventos.listar` y una llamada en lote a cada dueño: `categoriaService.obtenerPorIds`, `usuarioService.obtenerPorIds`, `reseniaService.puntajesPorOrganizador` (ninguna si la lista filtrada queda vacía). Ordena elementos `Ordenable & { vista }`, no las vistas |
 | `obtener(id)` | suma `organizador` a la vista |
 | `crear` / `actualizar` | su `EventoVista` también trae `organizador` (mismo tipo) |
 | `#organizadorVista(organizadorId)` (privado) | `usuarioService.obtenerOFallar` + `eventos.listarPorOrganizador` + `reseniaService.puntajeDe` → `OrganizadorVista` |
@@ -132,14 +153,33 @@ Dependencias: `eventos`, `compras`, `categoriaService`, **`usuarioService`**,
 Flujo de `listar`:
 
 ```text
+categoriaId? ──► categoriaService.buscarReferenciada(categoriaId, "consulta") ──► (no existe → 400 query.categoriaId)
 ahora ─┐
 eventos.listar() ──► proximos (no realizados) ──► filtrados (categoría ∧ palabras)
                          │                              │
-                         └─ hayEventosProximos           ├─ categoriaService.obtenerPorIds ─► categorías
+                         └─ hayEventosProximos           ├─ filtrados = [] ─► { eventos: [], hayEventosProximos } (sin pedir lotes)
+                                                         ├─ categoriaService.obtenerPorIds ─► categorías
                                                          ├─ usuarioService.obtenerPorIds ─► organizadores
                                                          ├─ sus eventos (todos) ─► reseniaService.puntajesPorOrganizador ─► puntajes
-                                                         └─► vistas ─► ordenarCatalogo ─► { eventos, hayEventosProximos }
+                                                         └─► elementos { ordenables + vista } ─► ordenarCatalogo ─► .map(vista) ─► { eventos, hayEventosProximos }
 ```
+
+- **Lista filtrada vacía**: `listar` responde enseguida `{ eventos: [], hayEventosProximos }` y
+  **no** pide los lotes (ni categorías, ni organizadores, ni puntajes): no hay nada que armar.
+  Las lecturas siguen siendo fijas por pedido (a lo sumo una por dueño).
+- **Qué se ordena**: `EventoCatalogoVista` no cumple `Ordenable` (su `fechaHora` es un `string`
+  ISO y el puntaje está en `organizador.puntaje`), así que no se ordenan las vistas. Por cada
+  evento filtrado, el service arma un elemento privado, los ordena con `ordenarCatalogo` y
+  responde `elementos.map((e) => e.vista)`. El tipo vive en `services/evento.service.ts` (no se
+  exporta) y `domain/orden-catalogo.ts` no conoce vistas:
+
+  ```ts
+  type ElementoDelCatalogo = Ordenable & { vista: EventoCatalogoVista };
+  // por evento filtrado:
+  { id: evento.id, nombre: evento.nombre, fechaHora: evento.fechaHora /* Date de la entidad */,
+    precioDesde: evento.precioDesde(), puntaje: puntaje.promedio /* sin redondear */,
+    vista: aEventoCatalogoVista(evento, categoria, organizador, ahora) }
+  ```
 
 ### Vistas (`services/evento.vistas.ts`)
 
