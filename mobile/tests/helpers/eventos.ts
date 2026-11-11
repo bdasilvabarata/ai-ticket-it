@@ -1,4 +1,11 @@
-import type { CategoriaVista, EventoResumenVista, EventoVista, OrganizadorVista } from "@ai-ticket-it/shared";
+import type {
+  CatalogoVista,
+  CategoriaVista,
+  EventoCatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  OrganizadorVista,
+} from "@ai-ticket-it/shared";
 
 // Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
 
@@ -93,3 +100,71 @@ export const nocheDeRisasCompleta: EventoVista = {
 export function errorApi(codigo: string, mensaje: string, detalles?: { campo: string; mensaje: string }[]) {
   return { error: detalles ? { codigo, mensaje, detalles } : { codigo, mensaje } };
 }
+
+/** Sofía como organizadora, sin reseñas. */
+export const sofiaOrganizadora: OrganizadorVista = {
+  id: "usuario-sofia",
+  nombre: "Sofía",
+  apellido: "Castro",
+  puntaje: null,
+  cantidadResenias: 0,
+};
+
+/** Tarjetas del catálogo (feature 005), en el orden por fecha del seed. */
+export const rockEnCatalogo: EventoCatalogoVista = {
+  ...nocheDeRock,
+  precioDesde: 15000,
+  agotado: false,
+  organizador: { ...luciaOrganizadora, puntaje: 4.5, cantidadResenias: 12 },
+};
+
+export const clasicoEnCatalogo: EventoCatalogoVista = {
+  id: "evento-clasico-de-basquet",
+  nombre: "Clásico de básquet",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-11-15T22:00:00.000Z",
+  fechaHoraLocal: "2026-11-15T19:00",
+  organizadorId: "usuario-sofia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 8000,
+  agotado: false,
+  organizador: sofiaOrganizadora,
+};
+
+export const hamletEnCatalogo: EventoCatalogoVista = {
+  ...hamletDeMartin,
+  precioDesde: 18000,
+  agotado: true,
+  organizador: {
+    id: "usuario-martin",
+    nombre: "Martín",
+    apellido: "Benítez",
+    puntaje: null,
+    cantidadResenias: 0,
+  },
+};
+
+export const maratonEnCatalogo: EventoCatalogoVista = {
+  id: "evento-maraton-10k",
+  nombre: "Maratón Ciudad 10K",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-12-25T11:00:00.000Z",
+  fechaHoraLocal: "2026-12-25T08:00",
+  organizadorId: "usuario-lucia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 0,
+  agotado: false,
+  organizador: luciaOrganizadora,
+};
+
+export function catalogo(
+  eventos: EventoCatalogoVista[],
+  hayEventosProximos = eventos.length > 0,
+): CatalogoVista {
+  return { eventos, hayEventosProximos };
+}
+
+/** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */
+export const CATALOGO_INICIAL = "/eventos?orden=fecha";

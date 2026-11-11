@@ -27,3 +27,24 @@ export function textoCupo(cupo: number): string {
   if (cupo === 0) return "Agotado";
   return cupo === 1 ? "1 disponible" : `${cupo} disponibles`;
 }
+
+/** El precio "desde" de una tarjeta: 0 → "Gratis"; 8000 → "desde $ 8.000". */
+export function textoPrecioDesde(precio: number): string {
+  return precio === 0 ? "Gratis" : `desde ${textoPrecio(precio)}`;
+}
+
+/**
+ * El puntaje del organizador, redondeado al décimo con coma: `null` → "Sin reseñas" (nunca "0");
+ * 4.5 y 12 → "4,5 · 12 reseñas"; 5 y 1 → "5,0 · 1 reseña".
+ */
+export function textoPuntaje({
+  puntaje,
+  cantidadResenias,
+}: {
+  puntaje: number | null;
+  cantidadResenias: number;
+}): string {
+  if (puntaje === null) return "Sin reseñas";
+  const redondeado = (Math.round(puntaje * 10) / 10).toFixed(1).replace(".", ",");
+  return `${redondeado} · ${cantidadResenias === 1 ? "1 reseña" : `${cantidadResenias} reseñas`}`;
+}

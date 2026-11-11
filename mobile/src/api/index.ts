@@ -14,6 +14,7 @@ export {
   crearEvento,
   editarTipoEntrada,
   eliminarEvento,
+  listarEventos,
   listarMisEventos,
   obtenerEvento,
   quitarTipoEntrada,

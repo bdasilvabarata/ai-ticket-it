@@ -16,13 +16,17 @@ export interface ConsultaMostrable<T> {
   refetch: () => unknown;
 }
 
-export interface PropsSegunConsulta<T> {
+/** El vacío: el `ListaVacia` de siempre con `mensajeVacio`, o uno propio con `vacio`. */
+type PropsVacio = { mensajeVacio: string; vacio?: never } | { vacio: ReactNode; mensajeVacio?: never };
+
+export type PropsSegunConsulta<T> = PropsVacio & {
   consulta: ConsultaMostrable<T>;
-  mensajeVacio: string;
+  /** Lo que se ve mientras carga; por defecto, `<Cargando />`. */
+  cargando?: ReactNode;
   /** Por defecto: `undefined`, `null` o un arreglo vacío. */
   esVacio?: (datos: T | undefined) => boolean;
   children: (datos: T) => ReactNode;
-}
+};
 
 function esVacioPorDefecto(datos: unknown): boolean {
   return datos === undefined || datos === null || (Array.isArray(datos) && datos.length === 0);
@@ -35,12 +39,14 @@ function esVacioPorDefecto(datos: unknown): boolean {
 export function SegunConsulta<T>({
   consulta,
   mensajeVacio,
+  vacio,
+  cargando,
   esVacio = esVacioPorDefecto,
   children,
 }: PropsSegunConsulta<T>) {
   const conexion = useConexion();
 
-  if (consulta.isPending) return <Cargando />;
+  if (consulta.isPending) return cargando ?? <Cargando />;
 
   if (consulta.isError) {
     const { error } = consulta;
@@ -64,6 +70,6 @@ export function SegunConsulta<T>({
   }
 
   const { data } = consulta;
-  if (esVacio(data) || data === undefined) return <ListaVacia mensaje={mensajeVacio} />;
+  if (esVacio(data) || data === undefined) return vacio ?? <ListaVacia mensaje={mensajeVacio ?? ""} />;
   return children(data);
 }

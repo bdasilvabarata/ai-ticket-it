@@ -8,7 +8,8 @@ import { renderConDependencias, URL_DE_PRUEBA } from "../helpers/render-con-depe
 import { CLAVE_RECORDADO, lucia, todos } from "../helpers/usuarios";
 
 const TITULO = "¿Con quién querés operar?";
-const PENDIENTE = "Esta sección todavía no está disponible.";
+// Explorar con el catálogo vacío (feature 005; antes era una sección pendiente).
+const EXPLORAR = "Todavía no hay eventos próximos.";
 const FRANJA = `Servidor no disponible · ${URL_DE_PRUEBA}`;
 const AVISO = "El usuario con el que estabas operando ya no existe. Elegí otro.";
 const ACTUAL = "/usuarios/actual";
@@ -76,7 +77,7 @@ describe("arranque con usuario recordado (US2)", () => {
   it("200 → entra a Explorar sin pasar por el selector y sin franja (US2-1)", async () => {
     const { falso } = await arrancar([ok]);
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     expect(screen.queryByText(TITULO)).toBeNull();
     expect(screen.queryByText(FRANJA)).toBeNull();
     expect(falso.pedidosA(ACTUAL)).toHaveLength(1);
@@ -88,7 +89,7 @@ describe("arranque con usuario recordado (US2)", () => {
     await arrancar(["rechazar"]);
 
     expect(await screen.findByText(FRANJA)).toBeOnTheScreen();
-    expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     expect(screen.queryByText(TITULO)).toBeNull();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).not.toBeNull();
   });
@@ -113,7 +114,7 @@ describe("arranque con usuario recordado (US2)", () => {
     await avanzar(4000);
     expect(falso.pedidosA(ACTUAL)).toHaveLength(4);
     await waitFor(() => expect(screen.queryByText(FRANJA)).toBeNull());
-    expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
 
     await avanzar(120_000);
     expect(falso.pedidosA(ACTUAL)).toHaveLength(4);
@@ -132,7 +133,7 @@ describe("arranque con usuario recordado (US2)", () => {
 
     expect(await screen.findByText(TITULO)).toBeOnTheScreen();
     expect(screen.getByText(AVISO)).toBeOnTheScreen();
-    expect(screen.queryByText(PENDIENTE)).toBeNull();
+    expect(screen.queryByText(EXPLORAR)).toBeNull();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).toBeNull();
     expect(anunciar).toHaveBeenCalledWith(AVISO);
   });
@@ -141,7 +142,7 @@ describe("arranque con usuario recordado (US2)", () => {
     await arrancar([interno]);
 
     expect(await screen.findByText(FRANJA)).toBeOnTheScreen();
-    expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     expect(await AsyncStorage.getItem(CLAVE_RECORDADO)).not.toBeNull();
   });
 

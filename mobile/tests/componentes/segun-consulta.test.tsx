@@ -171,3 +171,45 @@ describe("SegunConsulta (FR-013, research R8)", () => {
     expect(screen.queryByText("Ocurrió un error inesperado.")).toBeNull();
   });
 });
+
+describe("SegunConsulta: cargando y vacío propios (feature 005)", () => {
+  it("con cargando, lo muestra en lugar de Cargando…", async () => {
+    await renderConConexion(
+      <SegunConsulta
+        consulta={consulta<string[]>({ isPending: true })}
+        mensajeVacio={VACIO}
+        cargando={<Text>Esqueleto</Text>}
+      >
+        {() => <Text>Datos</Text>}
+      </SegunConsulta>,
+    );
+
+    expect(screen.getByText("Esqueleto")).toBeOnTheScreen();
+    expect(screen.queryByText("Cargando…")).toBeNull();
+  });
+
+  it("con vacio, lo muestra en lugar de ListaVacia", async () => {
+    await renderConConexion(
+      <SegunConsulta consulta={consulta<string[]>({ data: [] })} vacio={<Text>Vacío propio</Text>}>
+        {() => <Text>Datos</Text>}
+      </SegunConsulta>,
+    );
+
+    expect(screen.getByText("Vacío propio")).toBeOnTheScreen();
+    expect(screen.queryByText(VACIO)).toBeNull();
+  });
+
+  it("con datos, cargando y vacio no se ven", async () => {
+    await renderConConexion(
+      <SegunConsulta
+        consulta={consulta<string[]>({ data: ["a"] })}
+        vacio={<Text>Vacío propio</Text>}
+        cargando={<Text>Esqueleto</Text>}
+      >
+        {(datos) => <Text>{`Datos: ${datos.join(", ")}`}</Text>}
+      </SegunConsulta>,
+    );
+
+    expect(screen.getByText("Datos: a")).toBeOnTheScreen();
+  });
+});

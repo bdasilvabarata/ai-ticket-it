@@ -21,7 +21,8 @@ describe("navegación principal (US3)", () => {
   it("muestra las cuatro pestañas en orden y con texto, y abre Explorar (US3-1, FR-017)", async () => {
     const resultado = await entrarConfirmado();
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    // Explorar ya no es una sección pendiente (feature 005): muestra el catálogo, acá vacío.
+    expect(await screen.findByText("Todavía no hay eventos próximos.")).toBeOnTheScreen();
     const pestanas = botonesDePestanas();
     expect(pestanas.map((boton) => boton.props.accessibilityLabel)).toEqual([
       "Explorar, tab, 1 of 4",
@@ -36,19 +37,19 @@ describe("navegación principal (US3)", () => {
     expect(resultado.getPathname()).toBe("/");
   });
 
-  // Mis eventos ya no es una sección pendiente (feature 004): la prueba tests/pantallas/mis-eventos.
-  it.each([
-    ["Mis compras", "/mis-compras"],
-    ["Explorar", "/"],
-  ])("la pestaña %s muestra su nombre y que todavía no está disponible (US3-2)", async (nombre, ruta) => {
-    const resultado = await entrarConfirmado();
-    await screen.findByText(PENDIENTE);
-    if (nombre === "Explorar") await irAPestana("Mis compras"); // para volver a Explorar desde otra
+  // Mis eventos (feature 004) y Explorar (feature 005) ya no son secciones pendientes: las prueban
+  // tests/pantallas/mis-eventos y tests/pantallas/explorar.
+  it.each([["Mis compras", "/mis-compras"]])(
+    "la pestaña %s muestra su nombre y que todavía no está disponible (US3-2)",
+    async (nombre, ruta) => {
+      const resultado = await entrarConfirmado();
+      await screen.findByText("Todavía no hay eventos próximos.");
 
-    await irAPestana(nombre);
+      await irAPestana(nombre);
 
-    expect(resultado.getPathname()).toBe(ruta);
-    expect(screen.getByRole("header", { name: nombre })).toBeOnTheScreen();
-    expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
-  });
+      expect(resultado.getPathname()).toBe(ruta);
+      expect(screen.getByRole("header", { name: nombre })).toBeOnTheScreen();
+      expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
+    },
+  );
 });

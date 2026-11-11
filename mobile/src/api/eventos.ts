@@ -1,4 +1,6 @@
 import type {
+  CatalogoVista,
+  ConsultaCatalogo,
   DatosEvento,
   DatosTipoEntrada,
   EventoResumenVista,
@@ -39,6 +41,27 @@ interface EnNombreDe {
 const rutaDelEvento = (eventoId: string) => `/eventos/${encodeURIComponent(eventoId)}`;
 const rutaDelTipo = (eventoId: string, tipoId: string) =>
   `${rutaDelEvento(eventoId)}/tipos-entrada/${encodeURIComponent(tipoId)}`;
+
+/**
+ * `GET /eventos?…`: el catálogo, público (sin `X-Usuario-Id`). Solo van los parámetros con valor, en
+ * el orden `texto`, `categoriaId`, `orden` (este, siempre). `URLSearchParams` codifica el espacio
+ * como `+`, y `&` y `+` literales (R13).
+ */
+export function listarEventos(
+  cliente: ClienteApi,
+  { texto, categoriaId, orden = "fecha" }: ConsultaCatalogo,
+  opciones: ConSignal = {},
+): Promise<CatalogoVista> {
+  const parametros = new URLSearchParams();
+  const textoRecortado = texto?.trim();
+  if (textoRecortado) parametros.append("texto", textoRecortado);
+  if (categoriaId) parametros.append("categoriaId", categoriaId);
+  parametros.append("orden", orden);
+  return cliente.get<CatalogoVista>(`/eventos?${parametros.toString()}`, {
+    signal: opciones.signal,
+    usuarioId: null,
+  });
+}
 
 /** `GET /eventos/mios`: los eventos que organiza el usuario actual, en el orden del servidor. */
 export function listarMisEventos(
