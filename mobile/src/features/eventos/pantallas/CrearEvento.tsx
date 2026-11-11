@@ -1,8 +1,8 @@
 import { router } from "expo-router";
 import { useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { Boton, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { AvisoDeFormulario } from "../componentes/AvisoDeFormulario";
 import { CamposEvento } from "../componentes/CamposEvento";
@@ -64,7 +64,7 @@ function FormularioCrearEvento({ usuarioId }: { usuarioId: string }) {
   }
 
   return (
-    <ScrollView style={estilos.pantalla} contentContainerStyle={estilos.contenido}>
+    <PantallaDesplazable>
       <CamposEvento valores={valores} alCambiar={cambiar} errores={errores.campos} />
 
       <View accessibilityLabel="Tipos de entrada" style={estilos.seccion}>
@@ -97,13 +97,11 @@ function FormularioCrearEvento({ usuarioId }: { usuarioId: string }) {
 
       <AvisoDeFormulario mensaje={errores.mensajeGeneral} />
       <Boton texto="Crear evento" textoEnCurso="Creando…" enCurso={crear.isPending} alPresionar={guardar} />
-    </ScrollView>
+    </PantallaDesplazable>
   );
 }
 
 const estilos = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  contenido: { padding: tema.espacio.normal, gap: tema.espacio.amplio },
   seccion: { gap: tema.espacio.medio },
   titulo: { fontSize: tema.texto.subtitulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
   tarjeta: {

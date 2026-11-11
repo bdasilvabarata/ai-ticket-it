@@ -1,7 +1,7 @@
 import type { EventoVista } from "@ai-ticket-it/shared";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
-import { tema } from "../../../componentes";
+import { PantallaDesplazable, tema } from "../../../componentes";
 import { AvisoDeFormulario } from "../componentes/AvisoDeFormulario";
 import { ListaTiposEntrada } from "../componentes/ListaTiposEntrada";
 import { MarcaRealizado } from "../componentes/MarcaRealizado";
@@ -10,7 +10,7 @@ import { textoFechaHora } from "../formato";
 /** Un evento realizado, en solo lectura (FR-006a): sin acciones y sin confirmar al salir. */
 export function VerEventoRealizado({ evento, aviso }: { evento: EventoVista; aviso: string | null }) {
   return (
-    <ScrollView style={estilos.pantalla} contentContainerStyle={estilos.contenido}>
+    <PantallaDesplazable separacion={tema.espacio.normal}>
       <AvisoDeFormulario mensaje={aviso} />
       <MarcaRealizado />
       <Text style={estilos.nombre} accessibilityRole="header">
@@ -39,13 +39,11 @@ export function VerEventoRealizado({ evento, aviso }: { evento: EventoVista; avi
         </Text>
         <ListaTiposEntrada tipos={evento.tiposEntrada} />
       </View>
-    </ScrollView>
+    </PantallaDesplazable>
   );
 }
 
 const estilos = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  contenido: { padding: tema.espacio.normal, gap: tema.espacio.normal },
   nombre: { fontSize: tema.texto.titulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
   datos: { gap: tema.espacio.minimo },
   dato: { fontSize: tema.texto.normal, color: tema.colores.textoSecundario },

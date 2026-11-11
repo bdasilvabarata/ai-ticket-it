@@ -1,9 +1,9 @@
 import type { EventoVista, TipoEntradaVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
-import { Boton, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable, tema } from "../../../componentes";
 import { AvisoDeFormulario } from "../componentes/AvisoDeFormulario";
 import { CamposEvento } from "../componentes/CamposEvento";
 import { ListaTiposEntrada } from "../componentes/ListaTiposEntrada";
@@ -93,7 +93,7 @@ export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuar
     });
 
   return (
-    <ScrollView style={estilos.pantalla} contentContainerStyle={estilos.contenido}>
+    <PantallaDesplazable>
       <View style={estilos.seccion}>
         <Text style={estilos.titulo} accessibilityRole="header">
           Datos del evento
@@ -142,13 +142,11 @@ export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuar
           alPresionar={confirmarEliminar}
         />
       </View>
-    </ScrollView>
+    </PantallaDesplazable>
   );
 }
 
 const estilos = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  contenido: { padding: tema.espacio.normal, gap: tema.espacio.amplio },
   seccion: { gap: tema.espacio.medio },
   titulo: { fontSize: tema.texto.subtitulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
 });

@@ -2,10 +2,10 @@ import type { TipoEntradaVista } from "@ai-ticket-it/shared";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useState } from "react";
-import { Alert, ScrollView, StyleSheet } from "react-native";
+import { Alert } from "react-native";
 
 import type { CuerpoTipoEntrada } from "../../../api";
-import { Boton, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable } from "../../../componentes";
 import { AvisoDeFormulario } from "../componentes/AvisoDeFormulario";
 import { CamposTipoEntrada } from "../componentes/CamposTipoEntrada";
 import {
@@ -60,7 +60,7 @@ export function FormularioTipoEntrada({
   }
 
   return (
-    <ScrollView style={estilos.pantalla} contentContainerStyle={estilos.contenido}>
+    <PantallaDesplazable>
       <CamposTipoEntrada
         valores={valores}
         alCambiar={(cambios) => setValores((actuales) => ({ ...actuales, ...cambios }))}
@@ -74,11 +74,6 @@ export function FormularioTipoEntrada({
         enCurso={mutacion.isPending}
         alPresionar={guardar}
       />
-    </ScrollView>
+    </PantallaDesplazable>
   );
 }
-
-const estilos = StyleSheet.create({
-  pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  contenido: { padding: tema.espacio.normal, gap: tema.espacio.amplio },
-});
