@@ -1,7 +1,7 @@
 import type { CategoriaVista } from "@ai-ticket-it/shared";
 import { compararPorNombre, type Categoria } from "../domain/categoria";
 import type { RepositorioCategorias } from "../domain/repositorios";
-import { NoEncontradoError, ReferenciaInvalidaError } from "../errors/index";
+import { NoEncontradoError, ReferenciaInvalidaError, type OrigenDeReferencia } from "../errors/index";
 
 /** Catálogo de categorías (solo lectura). Los otros services le piden acá sus categorías. */
 export class CategoriaService {
@@ -39,13 +39,16 @@ export class CategoriaService {
 
   /**
    * La categoría que eligió el usuario (el `categoriaId` de la entrada): si no existe, no es un 404
-   * del recurso pedido sino un dato inválido del cuerpo (400 sobre `body.categoriaId`).
+   * del recurso pedido sino un dato inválido (400 sobre `body.categoriaId` en una escritura, o sobre
+   * `query.categoriaId` en la consulta del catálogo, según `origen`).
    */
-  async buscarReferenciada(id: string): Promise<Categoria> {
+  async buscarReferenciada(id: string, origen: OrigenDeReferencia = "datos"): Promise<Categoria> {
     try {
       return await this.obtenerOFallar(id);
     } catch (error) {
-      if (error instanceof NoEncontradoError) throw new ReferenciaInvalidaError("categoriaId", error.mensaje);
+      if (error instanceof NoEncontradoError) {
+        throw new ReferenciaInvalidaError("categoriaId", error.mensaje, origen);
+      }
       throw error;
     }
   }

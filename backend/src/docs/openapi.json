@@ -97,14 +97,45 @@
       "get": {
         "tags": ["Eventos"],
         "summary": "Catálogo de eventos próximos (público)",
-        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Sin paginación.",
-        "parameters": [],
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Sin paginación.",
+        "parameters": [
+          {
+            "name": "texto",
+            "in": "query",
+            "required": false,
+            "description": "Palabras separadas por espacios: cada una tiene que estar en el nombre o en la descripción, sin distinguir mayúsculas, acentos ni diéresis (la ñ es distinta de la n). Hasta 100 caracteres después de recortar.",
+            "schema": { "type": "string", "maxLength": 100 },
+            "example": "basquet"
+          },
+          {
+            "name": "categoriaId",
+            "in": "query",
+            "required": false,
+            "description": "Una categoría del catálogo (igualdad exacta). Vacío = sin filtro; si no existe, 400 sobre `query.categoriaId`.",
+            "schema": { "type": "string" },
+            "example": "categoria-musica"
+          }
+        ],
         "responses": {
           "200": {
             "description": "El catálogo y si hay eventos próximos antes de aplicar los filtros",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
           },
-          "400": { "$ref": "#/components/responses/EntradaInvalida" }
+          "400": {
+            "description": "Texto de más de 100 caracteres, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [{ "campo": "query.categoriaId", "mensaje": "No existe la categoría." }]
+                  }
+                }
+              }
+            }
+          }
         }
       },
       "post": {

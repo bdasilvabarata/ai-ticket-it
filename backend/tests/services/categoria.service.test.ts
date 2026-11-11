@@ -46,6 +46,17 @@ describe("CategoriaService: búsqueda por id", () => {
     await expect(service.buscarReferenciada("categoria-x")).rejects.toMatchObject({
       constructor: ReferenciaInvalidaError,
       campo: "categoriaId",
+      origen: "datos",
+      mensaje: "No existe la categoría.",
+    });
+  });
+
+  it("buscarReferenciada con origen consulta (el categoriaId del catálogo)", async () => {
+    expect(await service.buscarReferenciada("categoria-musica", "consulta")).toBe(musica);
+    await expect(service.buscarReferenciada("categoria-nada", "consulta")).rejects.toMatchObject({
+      constructor: ReferenciaInvalidaError,
+      campo: "categoriaId",
+      origen: "consulta",
       mensaje: "No existe la categoría.",
     });
   });

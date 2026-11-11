@@ -1,3 +1,4 @@
+import { normalizarParaBuscar } from "./busqueda";
 import { ReglaDeNegocioError } from "./errores";
 import { esEnteroNoNegativo, esTextoConContenido, Invariantes } from "./invariantes";
 
@@ -143,6 +144,17 @@ export class Evento {
   /** Todos los tipos sin cupo (FR-005). Un agotado parcial no cuenta. */
   estaAgotado(): boolean {
     return this.tiposEntrada.every((tipo) => tipo.cupo === 0);
+  }
+
+  /**
+   * ¿Cada palabra (ya normalizada con `palabrasDeBusqueda`) está en el nombre **o** en la
+   * descripción? Sin palabras, sí (FR-011, R4). Coincidencia literal (`includes`), sin expresiones
+   * regulares armadas con la entrada; nombre y descripción se comparan por separado.
+   */
+  coincideCon(palabras: readonly string[]): boolean {
+    const nombre = normalizarParaBuscar(this.nombre);
+    const descripcion = normalizarParaBuscar(this.descripcion);
+    return palabras.every((palabra) => nombre.includes(palabra) || descripcion.includes(palabra));
   }
 
   esOrganizadoPor(usuarioId: string): boolean {

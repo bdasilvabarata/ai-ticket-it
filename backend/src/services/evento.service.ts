@@ -13,6 +13,7 @@ import {
   type DatosDeEvento,
   type DatosDeTipoEntrada,
 } from "../domain/evento";
+import { palabrasDeBusqueda } from "../domain/busqueda";
 import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
@@ -84,26 +85,37 @@ export class EventoService {
   }
 
   /**
-   * El catálogo de Explorar (UC-05): los eventos no realizados de todos los organizadores. Lectura:
-   * sin cerrojo y con un único `ahora` por pedido. Hace un número fijo de lecturas (sin N+1): los
-   * eventos y un lote por dueño (categorías, organizadores y sus puntajes).
+   * El catálogo de Explorar (UC-05): los eventos no realizados de todos los organizadores, filtrados
+   * por texto y categoría. Lectura: sin cerrojo y con un único `ahora` por pedido. Hace un número fijo
+   * de lecturas (sin N+1): la categoría pedida, los eventos y un lote por dueño (categorías,
+   * organizadores y sus puntajes).
    */
   async listar(consulta: ConsultaCatalogoValidada): Promise<CatalogoVista> {
+    const { texto, categoriaId, orden } = consulta;
+    // Una referencia de la entrada (principio III): si no existe, 400 sobre query.categoriaId, antes
+    // de leer los eventos. El error lo lanza el dueño de las categorías.
+    if (categoriaId !== undefined) await this.#categoriaService.buscarReferenciada(categoriaId, "consulta");
     const ahora = this.#reloj.ahora();
     const todos = await this.#eventos.listar();
     const proximos = todos.filter((evento) => !evento.estaRealizado(ahora));
+    // Antes de aplicar texto y categoría: decide el vacío de la app (R2).
     const hayEventosProximos = proximos.length > 0;
-    if (proximos.length === 0) return { eventos: [], hayEventosProximos };
+    const palabras = palabrasDeBusqueda(texto);
+    const filtrados = proximos.filter(
+      (evento) =>
+        (categoriaId === undefined || evento.categoriaId === categoriaId) && evento.coincideCon(palabras),
+    );
+    if (filtrados.length === 0) return { eventos: [], hayEventosProximos };
 
-    const organizadorIds = new Set(proximos.map((e) => e.organizadorId));
+    const organizadorIds = new Set(filtrados.map((e) => e.organizadorId));
     const [categorias, organizadores, puntajes] = await Promise.all([
-      this.#categoriaService.obtenerPorIds(proximos.map((e) => e.categoriaId)),
+      this.#categoriaService.obtenerPorIds(filtrados.map((e) => e.categoriaId)),
       this.#usuarioService.obtenerPorIds([...organizadorIds]),
       // Todos sus eventos, próximos y realizados: solo se reseñan los realizados (R7).
       this.#reseniaService.puntajesPorOrganizador(todos.filter((e) => organizadorIds.has(e.organizadorId))),
     ]);
     // `obtenerPorIds` y `puntajesPorOrganizador` garantizan que están todos (si falta uno, lanzan).
-    const elementos = proximos.map((evento): ElementoDelCatalogo => {
+    const elementos = filtrados.map((evento): ElementoDelCatalogo => {
       const puntaje = puntajes.get(evento.organizadorId)!;
       const organizador = aOrganizadorVista(organizadores.get(evento.organizadorId)!, puntaje);
       return {
@@ -116,7 +128,7 @@ export class EventoService {
       };
     });
     return {
-      eventos: ordenarCatalogo(elementos, consulta.orden).map((elemento) => elemento.vista),
+      eventos: ordenarCatalogo(elementos, orden).map((elemento) => elemento.vista),
       hayEventosProximos,
     };
   }

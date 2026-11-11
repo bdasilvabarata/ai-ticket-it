@@ -78,6 +78,71 @@ describe("GET /api/eventos (catálogo)", () => {
   });
 });
 
+describe("GET /api/eventos: texto y categoría (US3)", () => {
+  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+
+  it.each(["texto=BASQUET", "texto=b%C3%A1squet", "texto=%20basquet%20"])(
+    "%s → solo el Clásico",
+    async (query) => {
+      const respuesta = await catalogo(query);
+      expect(respuesta.status).toBe(200);
+      expect(idsDelCatalogo(respuesta)).toEqual(["evento-clasico-de-basquet"]);
+    },
+  );
+
+  it.each(["texto=club+rock", "texto=rock%20%20%20club"])("%s → Noche de Rock", async (query) => {
+    expect(idsDelCatalogo(await catalogo(query))).toEqual(["evento-noche-de-rock"]);
+  });
+
+  it("texto=clasico → el Clásico (nombre) y Hamlet (descripción)", async () => {
+    expect(idsDelCatalogo(await catalogo("texto=clasico"))).toEqual([
+      "evento-clasico-de-basquet",
+      "evento-hamlet",
+    ]);
+  });
+
+  it("categoriaId=categoria-musica → solo Noche de Rock (Jazz en el Patio ya se realizó)", async () => {
+    expect(idsDelCatalogo(await catalogo("categoriaId=categoria-musica"))).toEqual(["evento-noche-de-rock"]);
+  });
+
+  it.each(["categoriaId=categoria-stand-up", "texto=rock&categoriaId=categoria-deportes"])(
+    "%s → vacío con hayEventosProximos: true",
+    async (query) => {
+      const respuesta = await catalogo(query);
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+    },
+  );
+
+  it("una categoría que no existe → 400 sobre query.categoriaId (no la lista vacía)", async () => {
+    expect(detalles(await catalogo("categoriaId=categoria-inexistente"))).toEqual({
+      "query.categoriaId": "No existe la categoría.",
+    });
+  });
+
+  it("categoriaId de solo espacios → sin filtro", async () => {
+    const respuesta = await catalogo("categoriaId=%20%20");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("un texto de 101 caracteres → 400; 100 con espacios alrededor → 200", async () => {
+    expect(detalles(await catalogo(`texto=${"a".repeat(101)}`))).toEqual({
+      "query.texto": "Debe tener como máximo 100 caracteres.",
+    });
+    const respuesta = await catalogo(`texto=%20%20${"a".repeat(100)}%20%20`);
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+  });
+
+  it.each([
+    ["texto=a&texto=b", "query.texto"],
+    ["categoriaId=a&categoriaId=b", "query.categoriaId"],
+  ])("%s repetido → 400 Debe ser un texto.", async (query, campo) => {
+    expect(detalles(await catalogo(query))).toEqual({ [campo]: "Debe ser un texto." });
+  });
+});
+
 describe("GET /api/eventos/mios", () => {
   it("responde 401 sin X-Usuario-Id", async () => {
     esperarError(await request(nuevaApp()).get("/api/eventos/mios"), 401, "USUARIO_NO_IDENTIFICADO");

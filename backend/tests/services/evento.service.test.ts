@@ -405,3 +405,71 @@ describe("EventoService.listar (catálogo)", () => {
     expect(listarPorOrganizador).not.toHaveBeenCalled();
   });
 });
+
+describe("EventoService.listar: texto y categoría (US3)", () => {
+  const ids = (vista: { eventos: { id: string }[] }) => vista.eventos.map((e) => e.id);
+  const eventos = [
+    evento({ id: "evento-rock", nombre: "Noche de Rock", categoriaId: musica.id, en: DIA }),
+    evento({ id: "evento-hamlet", nombre: "Hamlet", categoriaId: teatro.id, en: 2 * DIA }),
+    evento({ id: "evento-jazz", nombre: "Jazz en el Club", categoriaId: musica.id, en: 3 * DIA }),
+    evento({ id: "evento-viejo", nombre: "Rock viejo", categoriaId: musica.id, en: -DIA }),
+  ];
+
+  it("filtra por categoría (igualdad exacta) y por texto (palabras ya normalizadas)", async () => {
+    const { eventoService: service } = crearServicesDeEventos({ eventos });
+    expect(ids(await service.listar({ texto: "", categoriaId: teatro.id, orden: "fecha" }))).toEqual([
+      "evento-hamlet",
+    ]);
+    expect(ids(await service.listar({ texto: "ROCK", orden: "fecha" }))).toEqual(["evento-rock"]);
+    expect(ids(await service.listar({ texto: "club   jazz", orden: "fecha" }))).toEqual(["evento-jazz"]);
+  });
+
+  it("texto y categoría se combinan", async () => {
+    const { eventoService: service } = crearServicesDeEventos({ eventos });
+    const catalogo = await service.listar({ texto: "rock", categoriaId: teatro.id, orden: "fecha" });
+    expect(catalogo).toEqual({ eventos: [], hayEventosProximos: true });
+  });
+
+  it("una categoría que no existe rechaza sobre la consulta, sin leer eventos ni el reloj", async () => {
+    const reloj = relojFijo();
+    const ahora = vi.spyOn(reloj, "ahora");
+    const servicios = crearServicesDeEventos({ eventos, reloj });
+    const listar = vi.spyOn(servicios.repositorioEventos, "listar");
+    await expect(
+      servicios.eventoService.listar({ texto: "", categoriaId: "categoria-nada", orden: "fecha" }),
+    ).rejects.toMatchObject({
+      constructor: ReferenciaInvalidaError,
+      campo: "categoriaId",
+      origen: "consulta",
+      mensaje: "No existe la categoría.",
+    });
+    expect(listar).not.toHaveBeenCalled();
+    expect(ahora).not.toHaveBeenCalled();
+  });
+
+  it("una categoría que existe pero sin eventos próximos da vacío con hayEventosProximos: true, sin lotes", async () => {
+    const servicios = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-rock", categoriaId: musica.id })],
+    });
+    const usuarios = vi.spyOn(servicios.repositorioUsuarios, "listarPorIds");
+    const resenias = vi.spyOn(servicios.repositorioResenias, "listarPorEventos");
+    expect(
+      await servicios.eventoService.listar({ texto: "", categoriaId: teatro.id, orden: "fecha" }),
+    ).toEqual({
+      eventos: [],
+      hayEventosProximos: true,
+    });
+    expect(usuarios).not.toHaveBeenCalled();
+    expect(resenias).not.toHaveBeenCalled();
+  });
+
+  it("sin próximos, hayEventosProximos: false aunque haya texto o categoría", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-viejo", nombre: "Rock viejo", en: -DIA })],
+    });
+    expect(await service.listar({ texto: "rock", categoriaId: musica.id, orden: "fecha" })).toEqual({
+      eventos: [],
+      hayEventosProximos: false,
+    });
+  });
+});

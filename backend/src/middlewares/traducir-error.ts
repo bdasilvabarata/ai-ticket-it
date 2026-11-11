@@ -5,11 +5,17 @@ import {
   EntradaInvalidaError,
   ErrorAplicacion,
   JsonInvalidoError,
+  type OrigenDeReferencia,
   NoEncontradoError,
   ReferenciaInvalidaError,
   SinPermisoError,
   UsuarioNoIdentificadoError,
 } from "../errors/index";
+
+/**
+ * La parte del pedido de cada origen de una referencia: un origen nuevo no compila sin su prefijo.
+ */
+const PREFIJO: Record<OrigenDeReferencia, string> = { datos: "body", consulta: "query" };
 
 /** Tipo que `express.json()` pone en sus errores (`entity.parse.failed`, `entity.too.large`). */
 function tipoDeErrorDelParser(error: unknown): string | undefined {
@@ -26,9 +32,12 @@ function tipoDeErrorDelParser(error: unknown): string | undefined {
  * Lo usan los dos middlewares de error, así clasifican igual.
  */
 export function aErrorAplicacion(error: unknown): ErrorAplicacion | undefined {
-  // El campo de una referencia inválida viene del cuerpo: el detalle lo nombra como los de zod.
+  // El campo de una referencia inválida viene del cuerpo (datos) o de la query (consulta): el
+  // detalle lo nombra como los de zod.
   if (error instanceof ReferenciaInvalidaError) {
-    return new EntradaInvalidaError([{ campo: `body.${error.campo}`, mensaje: error.mensaje }]);
+    return new EntradaInvalidaError([
+      { campo: `${PREFIJO[error.origen]}.${error.campo}`, mensaje: error.mensaje },
+    ]);
   }
   if (error instanceof ErrorAplicacion) return error;
   if (error instanceof DatosInvalidosError) return new EntradaInvalidaError([...error.detalles]);
