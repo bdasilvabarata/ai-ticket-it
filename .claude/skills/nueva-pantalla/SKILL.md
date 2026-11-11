@@ -134,16 +134,21 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
 - Botones con `Boton` (`variante` `"primario"`, `"aviso"` o `"texto"`; `enCurso` + `textoEnCurso`
   para "Guardando…"; `deshabilitado`). Una fila tocable de una lista puede ser su propio `Pressable`
   (como `FilaUsuario`).
-- Estilos con `tema` de `src/componentes` (`tema.colores`, `tema.espacio`, `tema.texto`,
-  `tema.peso`, `tema.radio`, `tema.opacidadApagado`): ni hex ni números sueltos. Si falta un valor,
-  agregalo al tema.
+- Estilos con `tema` de `src/componentes` (`tema.colores`, `tema.espacio`, `tema.tipografia`,
+  `tema.radio`, `tema.grosor`, `tema.tamano`, `tema.sombra`, `tema.opacidadApagado`): ni hex ni
+  números sueltos. Si falta un valor, agregalo al tema.
+  - Todo texto parte de un estilo de `tema.tipografia` (`{ ...tema.tipografia.cuerpo, color: … }`),
+    así usa la fuente Archivo. Nunca `fontWeight`: el peso es la familia (`tema.fuente.*`).
+  - Fondo de pantalla `fondo` (crema); tarjetas y campos sobre `superficie`, con borde `borde` de
+    `tema.grosor.normal` y `boxShadow: tema.sombra.nivel1`. Un elemento con sombra, al presionarlo,
+    se hunde: sin sombra y con `hundido` (ver `FilaEvento`).
   - `primario` / `sobrePrimario` para acciones; `marca` (verde exacto del logo) solo para acentos sin
-    texto encima, porque con texto no llega al contraste mínimo.
+    texto encima. `resaltado` (amarillo) siempre con `texto` encima: el primario no llega al contraste.
   - Estados de compra: `exito` / `sobreExito` → `CONFIRMADA` y `UTILIZADA`; `peligro` /
     `sobrePeligro` → `CANCELADA` y `REEMBOLSADA`; `advertencia` / `sobreAdvertencia` → `PENDIENTE`.
-    Siempre con la etiqueta del estado escrita (ver Accesibilidad): `exito` y `primario` son verdes.
+    Siempre con la etiqueta del estado escrita (ver Accesibilidad), como badge (ver `MarcaRealizado`).
   - El logo es el componente `Logo` (ya tiene su `accessibilityLabel`); no importes el `.png` suelto.
-- Sombras, bordes, transiciones y demás pulido visual **no** se agregan pantalla por pantalla: van en
+- Animaciones, transiciones y demás pulido visual **no** se agregan pantalla por pantalla: van en
   la feature 013 (pulido estético), de forma global en `tema.ts` y en los componentes base.
 
 ## Accesibilidad y 360 px

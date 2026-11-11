@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { tema } from "../../../componentes";
@@ -31,6 +32,7 @@ export function CampoDeTexto({
   keyboardType,
   autoCapitalize,
 }: PropsCampoDeTexto) {
+  const [enfocado, setEnfocado] = useState(false);
   return (
     <View style={estilos.campo}>
       <Text style={estilos.etiqueta}>{etiqueta}</Text>
@@ -43,7 +45,15 @@ export function CampoDeTexto({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         textAlignVertical={multiline ? "top" : "center"}
-        style={[estilos.entrada, error ? estilos.conError : null]}
+        placeholderTextColor={tema.colores.textoSecundario}
+        onFocus={() => setEnfocado(true)}
+        onBlur={() => setEnfocado(false)}
+        style={[
+          estilos.entrada,
+          multiline && estilos.multilinea,
+          enfocado && estilos.enfocado,
+          error ? estilos.conError : null,
+        ]}
       />
       {nota ? <Text style={estilos.nota}>{nota}</Text> : null}
       <MensajeDeCampo mensaje={error} />
@@ -52,23 +62,26 @@ export function CampoDeTexto({
 }
 
 export const estilosDeCampo = StyleSheet.create({
-  etiqueta: { fontSize: tema.texto.chico, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
-  nota: { fontSize: tema.texto.chico, color: tema.colores.textoSecundario },
+  etiqueta: { ...tema.tipografia.etiqueta, color: tema.colores.texto },
+  nota: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario },
 });
 
 const estilos = StyleSheet.create({
-  campo: { gap: tema.espacio.minimo, flexShrink: 1 },
+  campo: { gap: tema.espacio.chico, flexShrink: 1 },
   etiqueta: estilosDeCampo.etiqueta,
   nota: estilosDeCampo.nota,
   entrada: {
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: tema.colores.textoSecundario,
+    ...tema.tipografia.cuerpo,
+    minHeight: tema.tamano.campo,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
     borderRadius: tema.radio.normal,
     paddingVertical: tema.espacio.chico,
     paddingHorizontal: tema.espacio.medio,
-    fontSize: tema.texto.normal,
     color: tema.colores.texto,
-    backgroundColor: tema.colores.fondo,
+    backgroundColor: tema.colores.superficie,
   },
-  conError: { borderColor: tema.colores.peligro },
+  multilinea: { minHeight: tema.tamano.campo * 2, paddingVertical: tema.espacio.medio },
+  enfocado: { borderColor: tema.colores.primario, boxShadow: tema.sombra.nivel1 },
+  conError: { borderColor: tema.colores.error },
 });

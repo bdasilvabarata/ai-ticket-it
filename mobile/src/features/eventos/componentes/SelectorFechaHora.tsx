@@ -75,7 +75,7 @@ export function SelectorFechaHora({ valor, alCambiar, error }: PropsSelectorFech
 
 const estilos = StyleSheet.create({
   contenedor: { gap: tema.espacio.minimo },
-  valor: { fontSize: tema.texto.normal, color: tema.colores.texto },
+  valor: { ...tema.tipografia.cuerpoFuerte, color: tema.colores.texto },
   botones: { flexDirection: "row", flexWrap: "wrap", gap: tema.espacio.chico, marginTop: tema.espacio.chico },
   selector: { alignItems: "flex-end" },
 });

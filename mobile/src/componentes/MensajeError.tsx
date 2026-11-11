@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View } from "react-native";
 
 import { Boton } from "./Boton";
+import { Ilustracion } from "./Ilustracion";
 import { tema } from "./tema";
 
 export interface PropsMensajeError {
@@ -14,6 +15,7 @@ export interface PropsMensajeError {
 export function MensajeError({ mensaje, titulo, alReintentar, reintentando = false }: PropsMensajeError) {
   return (
     <View style={estilos.contenedor}>
+      <Ilustracion icono="alert-circle-outline" tono="peligro" />
       {titulo ? (
         <Text style={estilos.titulo} accessibilityRole="header">
           {titulo}
@@ -26,6 +28,7 @@ export function MensajeError({ mensaje, titulo, alReintentar, reintentando = fal
           textoEnCurso="Reintentando…"
           enCurso={reintentando}
           alPresionar={alReintentar}
+          style={estilos.boton}
         />
       ) : null}
     </View>
@@ -40,11 +43,7 @@ const estilos = StyleSheet.create({
     padding: tema.espacio.amplio,
     gap: tema.espacio.medio,
   },
-  titulo: {
-    fontSize: tema.texto.subtitulo,
-    fontWeight: tema.peso.fuerte,
-    textAlign: "center",
-    color: tema.colores.texto,
-  },
-  mensaje: { fontSize: tema.texto.normal, textAlign: "center", color: tema.colores.texto },
+  titulo: { ...tema.tipografia.subtitulo, textAlign: "center", color: tema.colores.texto },
+  mensaje: { ...tema.tipografia.cuerpo, textAlign: "center", color: tema.colores.textoSecundario },
+  boton: { marginTop: tema.espacio.chico },
 });

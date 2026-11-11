@@ -82,13 +82,18 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
-    - `src/componentes/` — `tema` (colores, espacios, textos, pesos, radio, opacidad: nada suelto),
-      `Boton` (`primario` · `aviso` · `texto`), `SegunConsulta` (los cuatro estados), `Cargando`,
+    - `src/componentes/` — `tema` (sistema visual "Pop Brutal": colores, espacios, `tipografia`,
+      fuentes, radios, grosores, `tamano`, `sombra` dura con `boxShadow`, opacidad: nada suelto),
+      `fuentes` (Archivo y Archivo Black, que `RaizDeLaApp` carga con `useFonts`), `hundido` (lo que
+      se desplaza al presionar un elemento con sombra), `Boton` (`primario` · `aviso` = secundaria
+      sobre superficie · `texto`), `Ilustracion`, `SegunConsulta` (los cuatro estados), `Cargando`,
       `MensajeError`, `ListaVacia`, `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
       apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
       campo; úsenla en vez de un `ScrollView` suelto), la franja, `Logo` y `CargandoInicio`
-      (la ruta `cargando`); todo por `index.ts`. El primario es el verde del logo oscurecido
-      (`marca` es el verde exacto, solo para acentos sin texto encima); los estados de compra usan
+      (la ruta `cargando`); todo por `index.ts`. Los textos usan un estilo de `tema.tipografia`
+      (`...tema.tipografia.cuerpo, color: …`): con fuentes propias el peso es la familia, nunca
+      `fontWeight`. El primario es azul (`marca`, el verde exacto del logo, solo para acentos sin
+      texto encima); el `resaltado` amarillo lleva siempre `texto` encima; los estados de compra usan
       `exito` (CONFIRMADA, UTILIZADA), `peligro` (CANCELADA, REEMBOLSADA) y `advertencia`
       (PENDIENTE), cada uno con su `sobre…`, y siempre junto a la etiqueta del estado.
   - **Features** — `src/features/<dominio>/` con `pantallas/`, `componentes/`, hooks de consulta,

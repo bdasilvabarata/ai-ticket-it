@@ -1,7 +1,7 @@
 import { router } from "expo-router";
 import { FlatList, StyleSheet, Text, View } from "react-native";
 
-import { Boton, SegunConsulta, tema } from "../../../componentes";
+import { Boton, Ilustracion, SegunConsulta, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { FilaEvento } from "../componentes/FilaEvento";
 import { useMisEventos } from "../useMisEventos";
@@ -24,6 +24,7 @@ function ListaDeMisEventos({ usuarioId }: { usuarioId: string }) {
         {(eventos) =>
           eventos.length === 0 ? (
             <View style={estilos.vacio}>
+              <Ilustracion icono="calendar-outline" />
               <Text style={estilos.textoVacio}>Todavía no organizás eventos.</Text>
               <Boton texto="Crear tu primer evento" alPresionar={crearEvento} />
             </View>
@@ -31,11 +32,8 @@ function ListaDeMisEventos({ usuarioId }: { usuarioId: string }) {
             <FlatList
               data={eventos}
               keyExtractor={(evento) => evento.id}
-              ListHeaderComponent={
-                <View style={estilos.acciones}>
-                  <Boton texto="Crear evento" alPresionar={crearEvento} />
-                </View>
-              }
+              contentContainerStyle={estilos.lista}
+              ListHeaderComponent={<Boton texto="Crear evento" alPresionar={crearEvento} />}
               renderItem={({ item }) => <FilaEvento evento={item} />}
             />
           )
@@ -47,13 +45,14 @@ function ListaDeMisEventos({ usuarioId }: { usuarioId: string }) {
 
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  acciones: { padding: tema.espacio.normal },
+  // Entre tarjetas, más que su sombra; abajo, aire sobre la barra de pestañas.
+  lista: { padding: tema.espacio.normal, paddingBottom: tema.espacio.amplio, gap: tema.espacio.medio },
   vacio: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: tema.espacio.amplio,
-    gap: tema.espacio.medio,
+    gap: tema.espacio.normal,
   },
-  textoVacio: { fontSize: tema.texto.normal, textAlign: "center", color: tema.colores.textoSecundario },
+  textoVacio: { ...tema.tipografia.cuerpo, textAlign: "center", color: tema.colores.textoSecundario },
 });

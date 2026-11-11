@@ -48,8 +48,8 @@ export function SelectorCategoria({ valor, alCambiar, error }: PropsSelectorCate
                 onPress={() => alCambiar(categoria.id)}
                 style={({ pressed }) => [
                   estilos.opcion,
-                  elegida && estilos.elegida,
                   pressed && estilos.presionada,
+                  elegida && estilos.elegida,
                 ]}
               >
                 <Text style={[estilos.textoOpcion, elegida && estilos.textoElegida]}>{categoria.nombre}</Text>
@@ -67,17 +67,18 @@ const estilos = StyleSheet.create({
   contenedor: { gap: tema.espacio.chico },
   opciones: { flexDirection: "row", flexWrap: "wrap", gap: tema.espacio.chico },
   opcion: {
-    paddingVertical: tema.espacio.chico,
+    minHeight: tema.tamano.chip,
+    justifyContent: "center",
     paddingHorizontal: tema.espacio.medio,
-    borderRadius: tema.radio.normal,
-    borderWidth: 1,
-    borderColor: tema.colores.primario,
-    backgroundColor: tema.colores.fondo,
+    borderRadius: tema.radio.pildora,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
+    backgroundColor: tema.colores.superficie,
   },
   elegida: { backgroundColor: tema.colores.primario },
-  presionada: { opacity: tema.opacidadApagado },
-  textoOpcion: { fontSize: tema.texto.chico, fontWeight: tema.peso.medio, color: tema.colores.primario },
+  presionada: { backgroundColor: tema.colores.neutro },
+  textoOpcion: { ...tema.tipografia.botonChico, color: tema.colores.texto },
   textoElegida: { color: tema.colores.sobrePrimario },
   error: { gap: tema.espacio.chico, alignItems: "flex-start" },
-  textoError: { fontSize: tema.texto.chico, color: tema.colores.texto },
+  textoError: { ...tema.tipografia.mensaje, color: tema.colores.texto },
 });

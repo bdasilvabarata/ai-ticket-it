@@ -2,7 +2,7 @@ import type { EventoResumenVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { tema } from "../../../componentes";
+import { hundido, tema } from "../../../componentes";
 import { textoCantidadTipos, textoFechaHora } from "../formato";
 import { MarcaRealizado } from "./MarcaRealizado";
 
@@ -21,7 +21,7 @@ export function FilaEvento({ evento }: PropsFilaEvento) {
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
       onPress={() => router.push({ pathname: "/eventos/[eventoId]", params: { eventoId: evento.id } })}
-      style={({ pressed }) => [estilos.fila, pressed && estilos.presionada]}
+      style={({ pressed }) => [estilos.tarjeta, pressed ? hundido : estilos.sombra]}
     >
       <View style={estilos.textos}>
         <Text style={estilos.nombre}>{evento.nombre}</Text>
@@ -34,15 +34,15 @@ export function FilaEvento({ evento }: PropsFilaEvento) {
 }
 
 const estilos = StyleSheet.create({
-  fila: {
-    paddingVertical: tema.espacio.fila,
-    paddingHorizontal: tema.espacio.normal,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: tema.colores.borde,
-    backgroundColor: tema.colores.fondo,
+  tarjeta: {
+    padding: tema.espacio.normal,
+    borderRadius: tema.radio.tarjeta,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
+    backgroundColor: tema.colores.superficie,
   },
-  presionada: { opacity: tema.opacidadApagado },
+  sombra: { boxShadow: tema.sombra.nivel1 },
   textos: { gap: tema.espacio.minimo },
-  nombre: { fontSize: tema.texto.destacado, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
-  detalle: { fontSize: tema.texto.chico, color: tema.colores.textoSecundario },
+  nombre: { ...tema.tipografia.tituloTarjeta, color: tema.colores.texto },
+  detalle: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario },
 });

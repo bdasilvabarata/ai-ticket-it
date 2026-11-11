@@ -44,9 +44,9 @@ export function VerEventoRealizado({ evento, aviso }: { evento: EventoVista; avi
 }
 
 const estilos = StyleSheet.create({
-  nombre: { fontSize: tema.texto.titulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
+  nombre: { ...tema.tipografia.titulo, color: tema.colores.texto },
   datos: { gap: tema.espacio.minimo },
-  dato: { fontSize: tema.texto.normal, color: tema.colores.textoSecundario },
-  descripcion: { fontSize: tema.texto.normal, color: tema.colores.texto },
-  titulo: { fontSize: tema.texto.subtitulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
+  dato: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
+  descripcion: { ...tema.tipografia.cuerpo, color: tema.colores.texto },
+  titulo: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
 });

@@ -103,14 +103,16 @@ function FormularioCrearEvento({ usuarioId }: { usuarioId: string }) {
 
 const estilos = StyleSheet.create({
   seccion: { gap: tema.espacio.medio },
-  titulo: { fontSize: tema.texto.subtitulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
+  titulo: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
   tarjeta: {
     gap: tema.espacio.medio,
-    padding: tema.espacio.medio,
-    borderRadius: tema.radio.normal,
-    borderWidth: 1,
+    padding: tema.espacio.normal,
+    borderRadius: tema.radio.tarjeta,
+    borderWidth: tema.grosor.normal,
     borderColor: tema.colores.borde,
+    backgroundColor: tema.colores.superficie,
+    boxShadow: tema.sombra.nivel1,
   },
   encabezadoTarjeta: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  subtitulo: { fontSize: tema.texto.normal, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
+  subtitulo: { ...tema.tipografia.tituloTarjeta, color: tema.colores.texto },
 });

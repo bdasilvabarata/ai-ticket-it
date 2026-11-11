@@ -43,11 +43,10 @@ const estilos = StyleSheet.create({
     gap: tema.espacio.medio,
   },
   nombre: {
-    fontSize: tema.texto.titulo,
-    fontWeight: tema.peso.fuerte,
+    ...tema.tipografia.titulo,
     color: tema.colores.texto,
     textAlign: "center",
   },
-  aviso: { fontSize: tema.texto.aviso, color: tema.colores.textoSecundario, textAlign: "center" },
+  aviso: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario, textAlign: "center" },
   boton: { marginTop: tema.espacio.chico },
 });

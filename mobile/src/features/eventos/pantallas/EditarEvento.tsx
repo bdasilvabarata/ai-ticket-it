@@ -148,5 +148,5 @@ export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuar
 
 const estilos = StyleSheet.create({
   seccion: { gap: tema.espacio.medio },
-  titulo: { fontSize: tema.texto.subtitulo, fontWeight: tema.peso.fuerte, color: tema.colores.texto },
+  titulo: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
 });

@@ -16,9 +16,9 @@ const estilos = StyleSheet.create({
   aviso: {
     padding: tema.espacio.medio,
     borderRadius: tema.radio.normal,
-    borderWidth: 1,
-    borderColor: tema.colores.avisoTexto,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
     backgroundColor: tema.colores.avisoFondo,
   },
-  texto: { fontSize: tema.texto.aviso, color: tema.colores.avisoTexto },
+  texto: { ...tema.tipografia.mensaje, color: tema.colores.avisoTexto },
 });

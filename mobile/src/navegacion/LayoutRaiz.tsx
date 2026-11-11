@@ -4,11 +4,12 @@ import { useEffect, useMemo } from "react";
 import { StyleSheet, View } from "react-native";
 import { SafeAreaInsetsContext, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { Boton, FranjaServidorNoDisponible } from "../componentes";
+import { Boton, FranjaServidorNoDisponible, tema } from "../componentes";
 import type { Dependencias } from "../composicion";
 import { useConexion } from "../conexion";
 import { conectarFocoDeLaApp } from "../consultas/query-client";
 import { SesionProvider, useSesion, type EstadoSesion } from "../features/sesion";
+import { opcionesDeEncabezado } from "./encabezado";
 
 /**
  * Layout raíz de la app (R3). Vive fuera de `app/` para que los tests lo rendericen con
@@ -65,7 +66,7 @@ function Navegacion() {
 function Pila({ estado }: { estado: EstadoSesion }) {
   const conUsuario = estado.fase === "con-usuario";
   return (
-    <Stack>
+    <Stack screenOptions={{ ...opcionesDeEncabezado, contentStyle: estilos.contenido }}>
       <Stack.Protected guard={estado.fase === "iniciando"}>
         <Stack.Screen name="cargando" options={{ headerShown: false }} />
       </Stack.Protected>
@@ -121,5 +122,6 @@ function BotonCerrar() {
 }
 
 const estilos = StyleSheet.create({
-  raiz: { flex: 1 },
+  raiz: { flex: 1, backgroundColor: tema.colores.fondo },
+  contenido: { backgroundColor: tema.colores.fondo },
 });
