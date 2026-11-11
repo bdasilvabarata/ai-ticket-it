@@ -18,6 +18,8 @@ export interface RepositorioCategorias {
 }
 
 export interface RepositorioEventos {
+  /** Un id nuevo, para un evento o para un tipo de entrada (únicos en todo el sistema). */
+  siguienteId(): string;
   listar(): Promise<Evento[]>;
   buscarPorId(id: string): Promise<Evento | null>;
   /** Cantidad de eventos (pasados y futuros) por id de organizador; los que no organizan no aparecen. */

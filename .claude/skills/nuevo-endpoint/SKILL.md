@@ -35,9 +35,14 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 ## Nombres (convención de AGENTS.md)
 - Repository: `listar`, `buscarPorId` (null si no existe), `buscarPor<Criterio>`, `contarPor<Criterio>`,
   `guardar`, `eliminarPorId`.
-- Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `#obtenerOFallar(id)`.
+- Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `obtenerOFallar(id)`
+  por entidad, en **su** service: si otro service necesita la entidad, se la pide a ese (no repite la
+  búsqueda ni el 404). Una referencia de la entrada (ej.: `categoriaId`) se valida con
+  `buscarReferenciada` del service dueño. Los ids nuevos salen de `repositorio.siguienteId()`.
+- Errores de `errors/` sin status: si agregás uno, sumalo a la tabla de `statusDe`
+  (`middlewares/traducir-error.ts`); un test verifica que ninguno quede en 500.
 - Si agregás un método al repository, agregá su test en `tests/repositories/`.
-- Ids: `crypto.randomUUID()` para lo que se crea; ids legibles `<tipo>-<slug>` solo en los datos de ejemplo.
+- Ids: `crypto.randomUUID()` en el `siguienteId()` del repositorio para lo que se crea; ids legibles `<tipo>-<slug>` solo en los datos de ejemplo.
   Validá ids con `idSchema` (`validations/comunes.ts`).
 
 ## Contrato (principio V)

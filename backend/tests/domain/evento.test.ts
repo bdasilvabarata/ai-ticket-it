@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Evento, mismoNombreDeTipo, TipoEntrada } from "../../src/domain/evento";
+import { Evento, mismoNombreDeTipo, ordenDeMisEventos, TipoEntrada } from "../../src/domain/evento";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
 
 const datosTipo = { id: "t1", nombre: "General", descripcion: "Campo", precio: 15000, cupo: 3 };
@@ -394,5 +394,21 @@ describe("Evento: operaciones (devuelven un Evento nuevo y no cambian el origina
         original().verificarQueSePuedeEliminar({ ahora: antes, tieneCompras: false }),
       ).not.toThrow();
     });
+  });
+});
+
+describe("ordenDeMisEventos", () => {
+  it("primero los próximos (ascendente) y después los realizados (descendente), según ahora", () => {
+    const ahora = new Date("2026-12-01T00:00:00Z");
+    const en = (dias: number, nombre: string) =>
+      evento([tipo()], { nombre, fechaHora: new Date(ahora.getTime() + dias * 24 * 60 * 60 * 1000) });
+    const eventos = [en(-5, "hace 5"), en(3, "en 3"), en(0, "ahora"), en(1, "en 1"), en(-1, "ayer")];
+    expect(eventos.toSorted(ordenDeMisEventos(ahora)).map((e) => e.nombre)).toEqual([
+      "en 1",
+      "en 3",
+      "ahora",
+      "ayer",
+      "hace 5",
+    ]);
   });
 });

@@ -55,6 +55,16 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - Orden de los chequeos de una escritura: 401 → 400 de forma → 404 evento → 403 → 404 tipo →
     400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Los 404/403 los lanza el service con
     `errors/`; los 409, `domain/`.
+  - **Services que se apoyan en otros** (como la referencia `2026-2c-lu-sa-grupo-1`): cada entidad
+    tiene **un** service que la busca por id y lanza su 404 (`obtenerOFallar`, público); los demás
+    se lo piden a él en vez de repetir la búsqueda. `TipoEntradaService` recibe `EventoService` y
+    usa `obtenerDelOrganizador(id, usuarioId)` (404 + 403); `EventoService` recibe
+    `CategoriaService` y valida la categoría elegida con `buscarReferenciada` (si no existe,
+    `ReferenciaInvalidaError` → 400 sobre `body.categoriaId`). Los ids nuevos los da el
+    repositorio (`siguienteId()`), y los órdenes son comparadores del dominio
+    (`ordenDeMisEventos`, `compararPorNombre`).
+  - `errors/` no conoce HTTP: cada error lleva código y mensaje, y el status lo asigna
+    `statusDe` (tabla clase → status) en `middlewares/traducir-error.ts`.
   - `domain/errores.ts`: `DatosInvalidosError` y `ReglaDeNegocioError` (sin HTTP); el
     error handler los traduce a 400 y 409. `domain/` no importa `errors/` (lo controla el lint).
 - `backend/tests/{domain,repositories,services,api}` — Vitest; `services/` usa los
@@ -168,6 +178,8 @@ su re-export, el hook o la función con su firma real).
 | Repository | `listarPor<Criterio>(...)` | las entidades que cumplen el criterio (arreglo, posiblemente vacío) |
 | Repository | `contarPor<Criterio>(...)` · `existe<Algo>(...)` | números / booleanos |
 | Repository | `guardar(entidad)` · `eliminarPorId(id)` | persistencia |
-| Service | `listar()` · `obtener(id)` · `crear(datos)` · `actualizar(id, datos)` · `eliminar(id)` | casos de uso; `obtener` lanza 404 |
-| Service | `#obtenerOFallar(id)` (privado) | **único** lugar del service que busca por id y lanza 404 |
+| Repository | `siguienteId()` | un id nuevo para una entidad (el service no genera ids) |
+| Service | `listar()` · `obtener(id)` · `crear(datos)` · `actualizar(id, datos)` · `eliminar(id)` | casos de uso para el controller (devuelven vistas); `obtener` lanza 404 |
+| Service | `obtenerOFallar(id)` | la **entidad**; **único** lugar que la busca por id y lanza 404. Público si otro service la necesita (si no, `#obtenerOFallar`) |
+| Service | `buscarReferenciada(id)` | la entidad a la que apunta un dato de la entrada; si no existe, `ReferenciaInvalidaError` (400 sobre el campo) |
 

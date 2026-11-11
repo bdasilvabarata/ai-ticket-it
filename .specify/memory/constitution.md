@@ -112,12 +112,12 @@ El backend respeta estas capas; las dependencias van siempre hacia abajo:
 backend/src/
   routes/        ← declara endpoints y encadena middlewares + controller
   controllers/   ← HTTP: toma la request ya validada, llama al service, arma la response
-  services/      ← casos de uso: orquesta repositories y domain, verifica permisos
-  repositories/  ← único acceso a los datos (en memoria); guarda y devuelve entidades
+  services/      ← casos de uso: orquesta repositories, domain y otros services, verifica permisos
+  repositories/  ← único acceso a los datos (en memoria); guarda y devuelve entidades, da ids nuevos
   domain/        ← entidades con comportamiento y reglas de negocio puras
   middlewares/   ← identificación de usuario, logging, 404, registro y respuesta de errores
   validations/   ← esquemas de entrada (zod) y su middleware de validación
-  errors/        ← errores de aplicación tipados
+  errors/        ← errores de aplicación tipados, sin status (lo asigna el error handler)
   config/        ← entorno, arranque y logging
   docs/          ← especificación OpenAPI de la API
   app.ts         ← composition root: instancia y conecta repositories → services → controllers
