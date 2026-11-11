@@ -359,16 +359,16 @@ realizado, con compras, ajeno o inexistente.
 
 **Purpose**: documentación, convenciones, validación de punta a punta y cierre.
 
-- [ ] T083 [P] Corregir los comentarios con la numeración vieja de features en `backend/src/repositories/evento.repository.ts` y `backend/src/domain/evento.ts` (quickstart, "Cierre").
-- [ ] T084 [P] Actualizar `AGENTS.md`:
+- [X] T083 [P] Corregir los comentarios con la numeración vieja de features en `backend/src/repositories/evento.repository.ts` y `backend/src/domain/evento.ts` (quickstart, "Cierre").
+- [X] T084 [P] Actualizar `AGENTS.md`:
   - en la tabla de convención de nombres, `listarPor<Criterio>(...)` (R6);
   - el `Reloj` inyectado (`domain/reloj.ts`, `config/reloj.ts`, `crearApp({ reloj })`);
   - `CerrojoPorClave` y sus cuatro reglas de uso (R2);
   - los recursos `categorias`, `eventos`, `tipos-entrada` y `compras` (mínimo);
   - las features mobile `eventos` y `categorias`, y `useConfirmarDescarte`.
-- [ ] T085 [P] En `docs/backlog.md`, pasar la 004 a `en PR` y sumar la 004 a las dependencias de la 006 (tabla y grafo).
+- [X] T085 [P] En `docs/backlog.md`, pasar la 004 a `en PR` y sumar la 004 a las dependencias de la 006 (tabla y grafo).
 - [ ] T086 Revisar en 360 px y con TalkBack: sin desplazamiento horizontal, etiquetas en todos los controles, errores anunciados y sin valores sueltos fuera del `tema` (SC-007). Ajustar lo que haga falta en `mobile/src/features/eventos/`.
-- [ ] T087 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz, y dejar las cuatro en verde.
+- [X] T087 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz, y dejar las cuatro en verde.
 - [ ] T088 Validar a mano las secciones 2 (API) y 3 (app en el celular) de `specs/004-crear-evento/quickstart.md` y anotar cualquier desvío. En el paso 2 de la app, cronometrar la creación de un evento con dos tipos: menos de 3 minutos y sin escribir la fecha ni la hora (SC-001).
 - [ ] T089 Abrir el PR de `feature/004-crear-evento` a `development` con las cuatro verificaciones del CI en verde.
 
