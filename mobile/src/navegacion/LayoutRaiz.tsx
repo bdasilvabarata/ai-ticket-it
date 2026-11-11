@@ -71,6 +71,8 @@ function Pila({ estado }: { estado: EstadoSesion }) {
       </Stack.Protected>
       <Stack.Protected guard={conUsuario}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        {/* Formularios y pantallas apiladas de la feature 004 (contracts/app.md, "Rutas"). */}
+        <Stack.Screen name="eventos/nuevo" options={{ title: "Crear evento" }} />
       </Stack.Protected>
       {/* Expo Router no admite declarar dos veces la misma pantalla: el selector va una sola vez.
           Sin usuario es la única ruta disponible, a pantalla completa. Con usuario, (tabs) está
