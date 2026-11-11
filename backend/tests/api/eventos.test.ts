@@ -119,6 +119,7 @@ describe("POST /api/eventos", () => {
           cupo: 30,
         },
       ],
+      organizador: { id: LUCIA, nombre: "Lucía", apellido: "Álvarez", puntaje: null, cantidadResenias: 0 },
     });
   });
 
@@ -276,12 +277,37 @@ describe("GET /api/eventos/:eventoId", () => {
     });
   });
 
+  it("suma el organizador con su puntaje (sin reseñas en el seed), sin X-Usuario-Id", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos/evento-hamlet");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      id: "evento-hamlet",
+      organizadorId: "usuario-martin",
+      cantidadTiposEntrada: 2,
+      organizador: {
+        id: "usuario-martin",
+        nombre: "Martín",
+        apellido: "Benítez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+    });
+  });
+
+  it("sigue sirviendo un evento realizado", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos/evento-noche-de-risas");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({ realizado: true, organizador: { id: SOFIA } });
+  });
+
   it("responde 400 con un id mal formado y 404 si no existe", async () => {
     const app = nuevaApp();
     expect(detalles(await request(app).get("/api/eventos/123"))).toEqual({
       "params.eventoId": "Debe ser un identificador válido.",
     });
-    esperarError(await request(app).get("/api/eventos/evento-inexistente"), 404, "EVENTO_NO_ENCONTRADO");
+    const respuesta = await request(app).get("/api/eventos/evento-inexistente");
+    esperarError(respuesta, 404, "EVENTO_NO_ENCONTRADO");
+    expect(respuesta.body.error.mensaje).toBe("No existe el evento.");
   });
 });
 
@@ -309,6 +335,7 @@ describe("PUT /api/eventos/:eventoId", () => {
       fechaHoraLocal: "2026-12-20T21:30",
       multimedia: [],
       tiposEntrada: [{ id: "tipo-noche-de-rock-general" }],
+      organizador: { id: LUCIA, puntaje: null, cantidadResenias: 0 },
     });
     // En Mis eventos pasa a su nueva posición (después del Festival).
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);

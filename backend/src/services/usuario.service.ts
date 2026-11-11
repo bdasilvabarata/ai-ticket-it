@@ -32,7 +32,7 @@ export class UsuarioService {
 
   /** Vista del usuario; 404 si no existe. */
   async obtener(id: string): Promise<UsuarioVista> {
-    const usuario = await this.#obtenerOFallar(id);
+    const usuario = await this.obtenerOFallar(id);
     const cantidades = await this.#eventos.contarPorOrganizador([id]);
     return aVista(usuario, cantidades.get(id) ?? 0);
   }
@@ -42,8 +42,20 @@ export class UsuarioService {
     return this.#usuarios.buscarPorId(id);
   }
 
-  /** Único lugar del service que busca por id y lanza 404 si no existe. */
-  async #obtenerOFallar(id: string): Promise<Usuario> {
+  /**
+   * Búsqueda en lote (sin N+1): los usuarios de esos ids en una sola lectura, por id. Todos tienen
+   * que existir: si falta alguno, 404 como `obtenerOFallar`.
+   */
+  async obtenerPorIds(ids: readonly string[]): Promise<Map<string, Usuario>> {
+    const usuarios = new Map((await this.#usuarios.listarPorIds(ids)).map((u) => [u.id, u]));
+    if (ids.some((id) => !usuarios.has(id))) {
+      throw new NoEncontradoError("USUARIO_NO_ENCONTRADO", "No existe el usuario.");
+    }
+    return usuarios;
+  }
+
+  /** Único lugar que busca un usuario por id y lanza 404 si no existe. Lo usa `EventoService`. */
+  async obtenerOFallar(id: string): Promise<Usuario> {
     const usuario = await this.#usuarios.buscarPorId(id);
     if (!usuario) throw new NoEncontradoError("USUARIO_NO_ENCONTRADO", "No existe el usuario.");
     return usuario;

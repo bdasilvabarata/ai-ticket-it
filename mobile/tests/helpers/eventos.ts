@@ -1,4 +1,4 @@
-import type { CategoriaVista, EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type { CategoriaVista, EventoResumenVista, EventoVista, OrganizadorVista } from "@ai-ticket-it/shared";
 
 // Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
 
@@ -7,6 +7,15 @@ export const categorias: CategoriaVista[] = [
   { id: "categoria-musica", nombre: "Música", descripcion: "Recitales." },
   { id: "categoria-teatro", nombre: "Teatro", descripcion: "Obras." },
 ];
+
+/** Lucía como organizadora, sin reseñas (como en el seed). */
+export const luciaOrganizadora: OrganizadorVista = {
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  puntaje: null,
+  cantidadResenias: 0,
+};
 
 export const nocheDeRock: EventoResumenVista = {
   id: "evento-noche-de-rock",
@@ -68,6 +77,7 @@ export const festivalCompleto: EventoVista = {
     { id: "tipo-festival-vip", nombre: "VIP", descripcion: "Con barra.", precio: 120000, cupo: 0 },
     { id: "tipo-festival-backstage", nombre: "Backstage", descripcion: "", precio: 0, cupo: 3 },
   ],
+  organizador: luciaOrganizadora,
 };
 
 export const nocheDeRisasCompleta: EventoVista = {
@@ -77,6 +87,7 @@ export const nocheDeRisasCompleta: EventoVista = {
   tiposEntrada: [
     { id: "tipo-risas-general", nombre: "General", descripcion: "Libre.", precio: 12000, cupo: 80 },
   ],
+  organizador: luciaOrganizadora,
 };
 
 export function errorApi(codigo: string, mensaje: string, detalles?: { campo: string; mensaje: string }[]) {

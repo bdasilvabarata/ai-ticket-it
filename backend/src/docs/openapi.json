@@ -690,12 +690,29 @@
           "cantidadTiposEntrada": { "type": "integer", "minimum": 1, "example": 1 }
         }
       },
+      "OrganizadorVista": {
+        "type": "object",
+        "description": "Organizador con el puntaje de las reseñas de todos sus eventos (próximos y realizados).",
+        "required": ["id", "nombre", "apellido", "puntaje", "cantidadResenias"],
+        "properties": {
+          "id": { "type": "string", "example": "usuario-martin" },
+          "nombre": { "type": "string", "example": "Martín" },
+          "apellido": { "type": "string", "example": "Benítez" },
+          "puntaje": {
+            "type": "number",
+            "nullable": true,
+            "description": "Promedio sin redondear de las puntuaciones; `null` sin reseñas (nunca 0).",
+            "example": null
+          },
+          "cantidadResenias": { "type": "integer", "minimum": 0, "example": 0 }
+        }
+      },
       "EventoVista": {
         "allOf": [
           { "$ref": "#/components/schemas/EventoResumenVista" },
           {
             "type": "object",
-            "required": ["descripcion", "multimedia", "tiposEntrada"],
+            "required": ["descripcion", "multimedia", "tiposEntrada", "organizador"],
             "properties": {
               "descripcion": {
                 "type": "string",
@@ -710,7 +727,8 @@
                 "type": "array",
                 "description": "En el orden en que se agregaron",
                 "items": { "$ref": "#/components/schemas/TipoEntradaVista" }
-              }
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
             }
           }
         ]

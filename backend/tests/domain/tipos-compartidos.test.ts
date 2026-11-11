@@ -1,7 +1,10 @@
 import {
   EstadoCompra,
+  LIMITES_BUSQUEDA,
   LIMITES_EVENTO,
   LIMITES_TIPO_ENTRADA,
+  ORDENES_CATALOGO,
+  type OrdenCatalogo,
   type CategoriaVista,
   type DatosEvento,
   type DatosNuevoEvento,
@@ -50,6 +53,12 @@ describe("tipos compartidos", () => {
   it("los límites de evento y de tipo de entrada son los del contrato", () => {
     expect(LIMITES_EVENTO).toEqual({ nombre: 100, descripcion: 2000, multimedia: 5 });
     expect(LIMITES_TIPO_ENTRADA).toEqual({ nombre: 50, descripcion: 300 });
+  });
+
+  it("los órdenes y el límite de búsqueda del catálogo son los del contrato", () => {
+    expect(ORDENES_CATALOGO).toEqual(["fecha", "precio", "puntaje"]);
+    expectTypeOf<OrdenCatalogo>().toEqualTypeOf<"fecha" | "precio" | "puntaje">();
+    expect(LIMITES_BUSQUEDA.texto).toBe(100);
   });
 
   it("EventoVista amplía EventoResumenVista con descripción, multimedia y tipos", () => {

@@ -27,6 +27,12 @@ describe("crearRepositoriosDeEjemplo", () => {
     expect(await compras.existePorEvento("evento-noche-de-rock")).toBe(false);
   });
 
+  it("no carga reseñas: todos los organizadores salen sin puntaje", async () => {
+    const { resenias } = crearRepositoriosDeEjemplo(ahora);
+    const ids = crearDatosEjemplo(ahora).eventos.map((e) => e.id);
+    expect(await resenias.listarPorEventos(ids)).toEqual([]);
+  });
+
   it("es determinista: dos llamadas con el mismo instante dan los mismos datos", async () => {
     const primero = crearRepositoriosDeEjemplo(ahora);
     const segundo = crearRepositoriosDeEjemplo(ahora);
@@ -39,5 +45,6 @@ describe("crearRepositoriosDeEjemplo", () => {
     expect(segundo.usuarios).not.toBe(primero.usuarios);
     expect(segundo.eventos).not.toBe(primero.eventos);
     expect(segundo.compras).not.toBe(primero.compras);
+    expect(segundo.resenias).not.toBe(primero.resenias);
   });
 });

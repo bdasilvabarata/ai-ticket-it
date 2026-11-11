@@ -4,7 +4,7 @@ import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
-import { AHORA, DIA, compra, evento, musica, teatro, tipo } from "../helpers/eventos";
+import { AHORA, DIA, compra, evento, musica, resenia, teatro, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // Sin servidor: el service recibe los repositorios en memoria de producción, construidos con los
@@ -36,6 +36,34 @@ describe("EventoService.obtener", () => {
     });
   });
 
+  it("suma el organizador sin puntaje cuando no tiene reseñas, sin quitar organizadorId", async () => {
+    const { service } = crearService([evento({ id: "evento-a" })]);
+    const vista = await service.obtener("evento-a");
+    expect(vista.organizadorId).toBe("usuario-lucia");
+    expect(vista.organizador).toEqual({
+      id: "usuario-lucia",
+      nombre: "Lucía",
+      apellido: "Álvarez",
+      puntaje: null,
+      cantidadResenias: 0,
+    });
+  });
+
+  it("el puntaje del organizador cuenta las reseñas de todos sus eventos, también los realizados", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a" }),
+        evento({ id: "evento-pasado", en: -3 * DIA }),
+        evento({ id: "evento-de-martin", organizadorId: "usuario-martin" }),
+      ],
+      resenias: [resenia("evento-a", 5), resenia("evento-pasado", 4), resenia("evento-de-martin", 1)],
+    });
+    expect((await service.obtener("evento-a")).organizador).toMatchObject({
+      puntaje: 4.5,
+      cantidadResenias: 2,
+    });
+  });
+
   it("lanza 404 EVENTO_NO_ENCONTRADO si no existe", async () => {
     const { service } = crearService();
     await expect(service.obtener("evento-x")).rejects.toMatchObject({
@@ -56,6 +84,7 @@ describe("EventoService.actualizar", () => {
       tiposEntrada: [{ id: "tipo-evento-a-general" }],
     });
     expect((await repositorioEventos.buscarPorId("evento-a"))?.nombre).toBe("Nombre nuevo");
+    expect(vista.organizador).toMatchObject({ id: "usuario-lucia", puntaje: null, cantidadResenias: 0 });
   });
 
   it("verifica en orden: 404 → 403 → 400 categoría → 409 realizado → 409 fecha, sin guardar nada", async () => {
@@ -236,6 +265,13 @@ describe("EventoService.crear", () => {
       ],
     });
     expect((await repositorioEventos.buscarPorId(vista.id))?.organizadorId).toBe("usuario-lucia");
+    expect(vista.organizador).toEqual({
+      id: "usuario-lucia",
+      nombre: "Lucía",
+      apellido: "Álvarez",
+      puntaje: null,
+      cantidadResenias: 0,
+    });
   });
 
   it("con una categoría inexistente lanza una referencia inválida a categoriaId, sin guardar", async () => {

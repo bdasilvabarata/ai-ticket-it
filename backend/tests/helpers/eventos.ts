@@ -3,6 +3,8 @@ import { Categoria } from "../../src/domain/categoria";
 import { Compra } from "../../src/domain/compra";
 import { Evento, TipoEntrada, type PropiedadesTipoEntrada } from "../../src/domain/evento";
 import type { Reloj } from "../../src/domain/reloj";
+import { Resenia } from "../../src/domain/resenia";
+import { Usuario } from "../../src/domain/usuario";
 
 // Constructores de datos para los tests de services: cada caso arma solo lo que necesita.
 
@@ -14,6 +16,26 @@ export const relojFijo = (instante: Date = AHORA): Reloj => ({ ahora: () => new 
 
 export const musica = new Categoria({ id: "categoria-musica", nombre: "Música", descripcion: "Recitales." });
 export const teatro = new Categoria({ id: "categoria-teatro", nombre: "Teatro", descripcion: "Obras." });
+
+export const lucia = new Usuario({
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  favoritos: [],
+});
+export const martin = new Usuario({
+  id: "usuario-martin",
+  nombre: "Martín",
+  apellido: "Benítez",
+  favoritos: [],
+});
+export const sofia = new Usuario({ id: "usuario-sofia", nombre: "Sofía", apellido: "Castro", favoritos: [] });
+export const diego = new Usuario({
+  id: "usuario-diego",
+  nombre: "Diego",
+  apellido: "Fernández",
+  favoritos: [],
+});
 
 export function tipo(cambios: Partial<PropiedadesTipoEntrada> = {}): TipoEntrada {
   return new TipoEntrada({
@@ -70,4 +92,12 @@ export function compra(
     total: 1000,
     estado,
   });
+}
+
+let numeroResenia = 0;
+
+/** Una reseña de Diego a ese evento. */
+export function resenia(eventoId: string, puntuacion: number): Resenia {
+  numeroResenia += 1;
+  return new Resenia({ id: `resenia-${numeroResenia}`, compradorId: diego.id, eventoId, puntuacion });
 }

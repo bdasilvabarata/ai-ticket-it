@@ -1,4 +1,4 @@
-import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type { EventoResumenVista, EventoVista, OrganizadorVista } from "@ai-ticket-it/shared";
 import {
   Evento,
   ordenDeMisEventos,
@@ -11,12 +11,16 @@ import type { RepositorioCompras, RepositorioEventos } from "../domain/repositor
 import { NoEncontradoError, SinPermisoError } from "../errors/index";
 import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aEventoResumenVista, aEventoVista } from "./evento.vistas";
+import { aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
+import type { ReseniaService } from "./resenia.service";
+import type { UsuarioService } from "./usuario.service";
 
 export interface DependenciasEventoService {
   eventos: RepositorioEventos;
   compras: RepositorioCompras;
   categoriaService: CategoriaService;
+  usuarioService: UsuarioService;
+  reseniaService: ReseniaService;
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
@@ -35,13 +39,25 @@ export class EventoService {
   readonly #eventos: RepositorioEventos;
   readonly #compras: RepositorioCompras;
   readonly #categoriaService: CategoriaService;
+  readonly #usuarioService: UsuarioService;
+  readonly #reseniaService: ReseniaService;
   readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
-  constructor({ eventos, compras, categoriaService, cerrojo, reloj }: DependenciasEventoService) {
+  constructor({
+    eventos,
+    compras,
+    categoriaService,
+    usuarioService,
+    reseniaService,
+    cerrojo,
+    reloj,
+  }: DependenciasEventoService) {
     this.#eventos = eventos;
     this.#compras = compras;
     this.#categoriaService = categoriaService;
+    this.#usuarioService = usuarioService;
+    this.#reseniaService = reseniaService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
   }
@@ -76,14 +92,15 @@ export class EventoService {
       ahora,
     );
     await this.#eventos.guardar(evento);
-    return aEventoVista(evento, categoria, ahora);
+    return aEventoVista(evento, categoria, await this.#organizadorVista(usuarioId), ahora);
   }
 
   /** Público: lo usan editar, la vista de solo lectura y, en la 005, el detalle (R8). Sin cerrojo (R2.4). */
   async obtener(id: string): Promise<EventoVista> {
     const evento = await this.obtenerOFallar(id);
     const categoria = await this.#categoriaService.obtenerOFallar(evento.categoriaId);
-    return aEventoVista(evento, categoria, this.#reloj.ahora());
+    const organizador = await this.#organizadorVista(evento.organizadorId);
+    return aEventoVista(evento, categoria, organizador, this.#reloj.ahora());
   }
 
   /**
@@ -97,7 +114,7 @@ export class EventoService {
       const ahora = this.#reloj.ahora();
       const actualizado = evento.actualizar(datos, ahora);
       await this.#eventos.guardar(actualizado);
-      return aEventoVista(actualizado, categoria, ahora);
+      return aEventoVista(actualizado, categoria, await this.#organizadorVista(usuarioId), ahora);
     });
   }
 
@@ -128,5 +145,15 @@ export class EventoService {
       throw new SinPermisoError("Solo el organizador puede modificar este evento.");
     }
     return evento;
+  }
+
+  /**
+   * El organizador con el puntaje de **todos** sus eventos (próximos y realizados; R7). El usuario
+   * se lo pide a su dueño: si no existiera, el 404 es el de `UsuarioService`.
+   */
+  async #organizadorVista(organizadorId: string): Promise<OrganizadorVista> {
+    const usuario = await this.#usuarioService.obtenerOFallar(organizadorId);
+    const susEventos = await this.#eventos.listarPorOrganizador(organizadorId);
+    return aOrganizadorVista(usuario, await this.#reseniaService.puntajeDe(susEventos));
   }
 }
