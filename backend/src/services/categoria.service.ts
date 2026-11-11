@@ -26,6 +26,18 @@ export class CategoriaService {
   }
 
   /**
+   * Búsqueda en lote (sin N+1): las categorías de esos ids en una sola lectura, por id. Todas tienen
+   * que existir: si falta alguna, 404 como `obtenerOFallar`.
+   */
+  async obtenerPorIds(ids: readonly string[]): Promise<Map<string, Categoria>> {
+    const categorias = new Map((await this.#categorias.listarPorIds(ids)).map((c) => [c.id, c]));
+    if (ids.some((id) => !categorias.has(id))) {
+      throw new NoEncontradoError("CATEGORIA_NO_ENCONTRADA", "No existe la categoría.");
+    }
+    return categorias;
+  }
+
+  /**
    * La categoría que eligió el usuario (el `categoriaId` de la entrada): si no existe, no es un 404
    * del recurso pedido sino un dato inválido del cuerpo (400 sobre `body.categoriaId`).
    */

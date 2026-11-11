@@ -38,7 +38,10 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 - Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `obtenerOFallar(id)`
   por entidad, en **su** service: si otro service necesita la entidad, se la pide a ese (no repite la
   búsqueda ni el 404). Una referencia de la entrada (ej.: `categoriaId`) se valida con
-  `buscarReferenciada` del service dueño. Los ids nuevos salen de `repositorio.siguienteId()`.
+  `buscarReferenciada` del service dueño. Si necesitás varias entidades de otro agregado, pedilas en
+  lote al dueño (`obtenerPorIds(ids)` → `Map` por id, sobre `listarPorIds` del repositorio): nada de
+  una lectura por elemento ni de armar el cruce en tu service. Sin ciclos entre services. Los ids
+  nuevos salen de `repositorio.siguienteId()`.
 - Errores de `errors/` sin status: si agregás uno, sumalo a la tabla de `statusDe`
   (`middlewares/traducir-error.ts`); un test verifica que ninguno quede en 500.
 - Si agregás un método al repository, agregá su test en `tests/repositories/`.

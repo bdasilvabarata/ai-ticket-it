@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Categoria } from "../../src/domain/categoria";
 import { CategoriaRepository } from "../../src/repositories/categoria.repository";
 import { NoEncontradoError, ReferenciaInvalidaError } from "../../src/errors/index";
@@ -47,6 +47,36 @@ describe("CategoriaService: búsqueda por id", () => {
       constructor: ReferenciaInvalidaError,
       campo: "categoriaId",
       mensaje: "No existe la categoría.",
+    });
+  });
+});
+
+describe("CategoriaService.obtenerPorIds", () => {
+  const musica = categoria("categoria-musica", "Música");
+  const teatro = categoria("categoria-teatro", "Teatro");
+
+  it("devuelve las categorías por id, en una sola lectura, aunque los ids se repitan", async () => {
+    const repositorio = new CategoriaRepository([musica, teatro]);
+    const lecturas = vi.spyOn(repositorio, "listarPorIds");
+    const service = new CategoriaService({ categorias: repositorio });
+    const porId = await service.obtenerPorIds(["categoria-teatro", "categoria-musica", "categoria-teatro"]);
+    expect([...porId]).toEqual([
+      ["categoria-teatro", teatro],
+      ["categoria-musica", musica],
+    ]);
+    expect(lecturas).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin ids devuelve un Map vacío", async () => {
+    const service = new CategoriaService({ categorias: new CategoriaRepository([musica]) });
+    expect((await service.obtenerPorIds([])).size).toBe(0);
+  });
+
+  it("si falta alguna lanza 404 CATEGORIA_NO_ENCONTRADA", async () => {
+    const service = new CategoriaService({ categorias: new CategoriaRepository([musica]) });
+    await expect(service.obtenerPorIds(["categoria-musica", "categoria-x"])).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "CATEGORIA_NO_ENCONTRADA",
     });
   });
 });

@@ -136,6 +136,25 @@ backend/src/
   sus colaboradores por constructor. Los services dependen de interfaces de repositorio
   (`domain/repositorios.ts`), no de una implementación. Solo el composition root instancia y
   conecta las piezas; ningún módulo usa instancias globales de otra capa.
+- **Services que se apoyan en el dueño de cada entidad** (referencia: `2026-2c-lu-sa-grupo-1`,
+  rama `develop`):
+  - Cada entidad tiene **un** service dueño, el único que la busca por id y lanza su 404
+    (`obtenerOFallar`). Los demás services se la piden a ese service: NO DEBEN repetir la
+    búsqueda ni el 404.
+  - Una referencia que llega en la entrada (por ejemplo, `categoriaId`) se valida con
+    `buscarReferenciada` del service dueño: si no existe, es un dato inválido (400 sobre el
+    campo), no un 404 del recurso pedido.
+  - Las dependencias entre services NO DEBEN formar ciclos y van del que usa al dueño de la
+    entidad; las conecta `app.ts`, en orden.
+  - Un service usa directamente los repositorios de **su agregado** (por ejemplo,
+    `TipoEntradaService` guarda con `RepositorioEventos`, porque `TipoEntrada` vive dentro de
+    `Evento`). Sobre otro agregado solo hace consultas de existencia o conteo (`existePor…`,
+    `contarPor…`).
+  - **Búsquedas en lote, sin N+1**: cuando un caso de uso necesita varias entidades de otro
+    agregado, se las pide en **una** llamada al service dueño (`obtenerPorIds(ids)`, que
+    devuelve un `Map` por id y se apoya en `listarPorIds` del repositorio). El cruce lo hace el
+    dueño, no el service que lo usa.
+- Los **ids nuevos los da el repositorio** (`siguienteId()`); los services NO DEBEN generar ids.
 - Los controllers NO DEBEN contener reglas de negocio ni acceder a repositories.
 - Cómo se almacenan los datos (estructuras internas de los repositorios) NO DEBE filtrarse
   por encima de `repositories/`: los repositories reciben y devuelven entidades de dominio y no
@@ -143,11 +162,17 @@ backend/src/
 - Los controllers NO usan `try/catch` para responder errores: los services lanzan errores de
   `errors/`; un middleware **registra** los errores y el **error handler** centralizado los
   traduce a HTTP (dos responsabilidades, dos middlewares).
+- `errors/` NO DEBE conocer HTTP: cada error de aplicación lleva código y mensaje, y el status
+  lo asigna el error handler con una tabla clase → status. Ningún error de aplicación queda
+  sin status (lo verifica un test).
 - La validación de forma de la entrada vive en `validations/` (esquemas y su middleware);
   las reglas de negocio viven en `domain/` y `services/`.
 
 **Rationale**: la lógica se testea sin servidor ni base, y cada capa tiene una sola razón
-para cambiar.
+para cambiar. Que cada entidad tenga un único service dueño evita repetir búsquedas y errores
+en varios services, y prohibir los ciclos mantiene el grafo de dependencias legible. Esto
+revoca el anti-patrón "un service que llama a otro service" de la investigación de la 004
+(`specs/004-crear-evento/research.md`, R1), que se conserva como registro histórico.
 
 ### IV. Persistencia en Memoria
 
@@ -292,4 +317,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.1.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-10
+**Version**: 2.2.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-11

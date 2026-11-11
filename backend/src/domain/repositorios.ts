@@ -15,6 +15,8 @@ export interface RepositorioUsuarios {
 export interface RepositorioCategorias {
   listar(): Promise<Categoria[]>;
   buscarPorId(id: string): Promise<Categoria | null>;
+  /** Las que existen de esos ids (posiblemente ninguna), sin repetir. */
+  listarPorIds(ids: readonly string[]): Promise<Categoria[]>;
 }
 
 export interface RepositorioEventos {

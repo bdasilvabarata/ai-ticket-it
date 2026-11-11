@@ -50,11 +50,9 @@ export class EventoService {
   async listarMios(usuarioId: string): Promise<EventoResumenVista[]> {
     const ahora = this.#reloj.ahora();
     const eventos = (await this.#eventos.listarPorOrganizador(usuarioId)).toSorted(ordenDeMisEventos(ahora));
-    return Promise.all(
-      eventos.map(async (evento) =>
-        aEventoResumenVista(evento, await this.#categoriaService.obtenerOFallar(evento.categoriaId), ahora),
-      ),
-    );
+    const categorias = await this.#categoriaService.obtenerPorIds(eventos.map((e) => e.categoriaId));
+    // `obtenerPorIds` garantiza que están todas (si falta una, ya lanzó).
+    return eventos.map((evento) => aEventoResumenVista(evento, categorias.get(evento.categoriaId)!, ahora));
   }
 
   /**
