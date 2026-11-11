@@ -9,3 +9,12 @@ export const valida: Href = "/seleccionar-usuario";
 
 // @ts-expect-error la ruta no existe: las rutas tipadas deben rechazarla (FR-009)
 export const invalida: Href = "/seleccionar-usuarios";
+
+// La primera ruta dinámica (feature 004): con su parámetro compila, sin él no.
+export const conParametro: Href = {
+  pathname: "/eventos/[eventoId]",
+  params: { eventoId: "evento-festival" },
+};
+
+// @ts-expect-error la ruta dinámica necesita su parámetro eventoId (R16)
+export const sinParametro: Href = { pathname: "/eventos/[eventoId]" };

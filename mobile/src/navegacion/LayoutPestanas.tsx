@@ -1,5 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Tabs } from "expo-router";
+import { PlatformPressable } from "expo-router/react-navigation";
+import type { BottomTabBarButtonProps } from "expo-router/tabs";
 import type { ColorValue } from "react-native";
 
 type NombreIcono = keyof typeof Ionicons.glyphMap;
@@ -21,10 +23,18 @@ function icono(nombre: NombreIcono) {
   return IconoDePestana;
 }
 
+/**
+ * Botón de cada pestaña. El de React Navigation usa en Android un ripple `borderless`, que se
+ * dibuja como un círculo más alto que la barra; acá el ripple queda recortado al botón.
+ */
+function BotonDePestana(props: BottomTabBarButtonProps) {
+  return <PlatformPressable {...props} android_ripple={{ borderless: false }} />;
+}
+
 /** Navegación principal (FR-017). */
 export function LayoutPestanas() {
   return (
-    <Tabs>
+    <Tabs screenOptions={{ tabBarButton: BotonDePestana }}>
       <Tabs.Screen
         name="index"
         options={{ title: "Explorar", tabBarLabel: "Explorar", tabBarIcon: icono("compass-outline") }}

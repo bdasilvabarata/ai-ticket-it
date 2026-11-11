@@ -1,5 +1,11 @@
-import type { RepositorioCategorias, RepositorioEventos, RepositorioUsuarios } from "../domain/repositorios";
+import type {
+  RepositorioCategorias,
+  RepositorioCompras,
+  RepositorioEventos,
+  RepositorioUsuarios,
+} from "../domain/repositorios";
 import { CategoriaRepository } from "../repositories/categoria.repository";
+import { CompraRepository } from "../repositories/compra.repository";
 import { EventoRepository } from "../repositories/evento.repository";
 import { UsuarioRepository } from "../repositories/usuario.repository";
 import { crearDatosEjemplo } from "./datos-ejemplo";
@@ -8,6 +14,7 @@ export interface Repositorios {
   usuarios: RepositorioUsuarios;
   categorias: RepositorioCategorias;
   eventos: RepositorioEventos;
+  compras: RepositorioCompras;
 }
 
 /**
@@ -15,10 +22,11 @@ export interface Repositorios {
  * crea su propio estado: el servidor arranca con una y cada test puede pedir la suya.
  */
 export function crearRepositoriosDeEjemplo(ahora: Date = new Date()): Repositorios {
-  const { usuarios, categorias, eventos } = crearDatosEjemplo(ahora);
+  const { usuarios, categorias, eventos, compras } = crearDatosEjemplo(ahora);
   return {
     usuarios: new UsuarioRepository(usuarios),
     categorias: new CategoriaRepository(categorias),
     eventos: new EventoRepository(eventos),
+    compras: new CompraRepository(compras),
   };
 }

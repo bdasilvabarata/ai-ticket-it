@@ -21,8 +21,9 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 - `backend/src/services/` — clase con el caso de uso: permisos, orquestación, errores de `errors/`. Recibe
   **interfaces** de repositorio (`domain/repositorios.ts`) por constructor.
 - `backend/src/repositories/` — repositorio **en memoria** (`Map` privado) que implementa la interfaz; recibe y
-  devuelve entidades de dominio y nunca expone el `Map`. Si la operación verifica y modifica (cupo, estado),
-  hacelo sin `await` en el medio (constitución, "Cupo atómico").
+  devuelve entidades de dominio y nunca expone el `Map`. Si la operación verifica y modifica un evento, sus
+  tipos o sus compras (cupo, estado), el service la corre bajo `cerrojo.ejecutar(eventoId, …)`, relee
+  adentro y recién después guarda (constitución, "Operaciones atómicas por evento"; ver AGENTS.md).
 - `backend/src/domain/` — clases con comportamiento e invariantes (`hayCupoPara`, transiciones de estado,
   días restantes...). Sin IO y sin `errors/`: lanzá `DatosInvalidosError` (→ 400) o
   `ReglaDeNegocioError("CODIGO", "mensaje")` (→ 409) de `domain/errores.ts`.
@@ -47,7 +48,8 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
   dominio o el service.
 
 ## Invariantes que no se negocian
-- Cupo nunca negativo, con actualización atómica (verificar y descontar sin `await` en el medio).
+- Cupo nunca negativo, con actualización atómica (verificar y descontar bajo el cerrojo del evento, o en un
+  mismo tramo síncrono).
 - Total calculado en el servidor.
 - Transiciones de estado solo las de la constitución, con `CambioEstadoCompra`.
 

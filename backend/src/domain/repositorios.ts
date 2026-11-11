@@ -1,4 +1,5 @@
 import type { Categoria } from "./categoria";
+import type { Compra } from "./compra";
 import type { Evento } from "./evento";
 import type { Usuario } from "./usuario";
 
@@ -21,4 +22,17 @@ export interface RepositorioEventos {
   buscarPorId(id: string): Promise<Evento | null>;
   /** Cantidad de eventos (pasados y futuros) por id de organizador; los que no organizan no aparecen. */
   contarPorOrganizador(ids: string[]): Promise<Map<string, number>>;
+  /** Los eventos que organiza el usuario (posiblemente ninguno). */
+  listarPorOrganizador(organizadorId: string): Promise<Evento[]>;
+  /** Alta o reemplazo por id: guarda la instancia nueva, nunca modifica la guardada. */
+  guardar(evento: Evento): Promise<void>;
+  eliminarPorId(id: string): Promise<void>;
+}
+
+/** Compras (mínimo de la feature 004): alcanza para saber si algo tiene compras, en cualquier estado. */
+export interface RepositorioCompras {
+  existePorEvento(eventoId: string): Promise<boolean>;
+  /** Los ids de tipo son únicos en todo el sistema: no hace falta el evento. */
+  existePorTipoEntrada(tipoEntradaId: string): Promise<boolean>;
+  guardar(compra: Compra): Promise<void>;
 }

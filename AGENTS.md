@@ -35,8 +35,26 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     repositorio de las que dependen los services.
   - `repositories/` son repositorios **en memoria** (un `Map` privado por repositorio); no hay
     base de datos. `seed/` arma los datos de ejemplo y `crearRepositoriosDeEjemplo()`;
-    `crearApp()` los usa por defecto. Las operaciones que toquen cupo o estados no pueden
-    tener un `await` entre verificar y modificar (constitución, "Cupo atómico").
+    `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
+    instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
+  - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
+    `eventos/:eventoId/tipos-entrada` (`TipoEntrada` vive dentro del agregado `Evento`: tiene
+    controller y service, pero se guarda con `RepositorioEventos`), y `compras` **mínimo**
+    (entidad y `RepositorioCompras` con `existePorEvento` / `existePorTipoEntrada`, sin
+    endpoints; lo amplía la 006).
+  - **Reloj**: `domain/reloj.ts` (interfaz `Reloj { ahora() }`) y `config/reloj.ts`
+    (`relojDelSistema`). Es la única referencia de "ahora": llega a los services por constructor
+    y `crearApp({ reloj })` permite fijarlo en los tests. `domain/` recibe `ahora` como
+    argumento. La hora de pared de Buenos Aires (UTC−3) vive solo en `domain/hora-buenos-aires.ts`.
+  - **Cerrojo por evento** (constitución, "Operaciones atómicas por evento"):
+    `services/cerrojo-por-clave.ts`. `app.ts` crea **una** instancia y la comparten los services
+    que modifican eventos. Reglas: (1) adentro de `cerrojo.ejecutar(eventoId, …)` se **vuelve a
+    leer** el evento y el reloj, se verifica y recién después se guarda; (2) se libera siempre
+    (`finally`) y el error llega al que llamó; (3) sin cerrojos anidados; (4) las lecturas no lo
+    usan. Crear un evento no lo usa (su id es nuevo).
+  - Orden de los chequeos de una escritura: 401 → 400 de forma → 404 evento → 403 → 404 tipo →
+    400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Los 404/403 los lanza el service con
+    `errors/`; los 409, `domain/`.
   - `domain/errores.ts`: `DatosInvalidosError` y `ReglaDeNegocioError` (sin HTTP); el
     error handler los traduce a 400 y 409. `domain/` no importa `errors/` (lo controla el lint).
 - `backend/tests/{domain,repositories,services,api}` — Vitest; `services/` usa los
@@ -66,7 +84,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       la sesión y lo leen la franja y `SegunConsulta`.
     - `src/componentes/` — `tema` (colores, espacios, textos, pesos, radio, opacidad: nada suelto),
       `Boton` (`primario` · `aviso` · `texto`), `SegunConsulta` (los cuatro estados), `Cargando`,
-      `MensajeError`, `ListaVacia`, `SeccionPendiente`, la franja, `Logo` y `CargandoInicio`
+      `MensajeError`, `ListaVacia`, `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
+      apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
+      campo; úsenla en vez de un `ScrollView` suelto), la franja, `Logo` y `CargandoInicio`
       (la ruta `cargando`); todo por `index.ts`. El primario es el verde del logo oscurecido
       (`marca` es el verde exacto, solo para acentos sin texto encima); los estados de compra usan
       `exito` (CONFIRMADA, UTILIZADA), `peligro` (CANCELADA, REEMBOLSADA) y `advertencia`
@@ -76,7 +96,15 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     - `usuarios/` — `useUsuarios`, `FilaUsuario`, `nombreCompleto`, `textoEventosOrganizados`;
     - `sesion/` — usuario actual (reducer puro + controlador sin React + `SesionProvider`), usuario
       recordado en AsyncStorage y su validación, la secuencia única de reintentos (1, 2, 4, 8, 16,
-      32 s), `useSesion()` y las pantallas `SeleccionarUsuario` y `Perfil`.
+      32 s), `useSesion()` y las pantallas `SeleccionarUsuario` y `Perfil`;
+    - `categorias/` — `useCategorias`;
+    - `eventos/` — Mis eventos, Crear evento, `EventoDelOrganizador` (edita o muestra en solo
+      lectura según el `realizado` del servidor), los formularios de tipo de entrada,
+      `useMisEventos`/`useEvento`, las mutations de `mutaciones.ts` (en nombre del usuario **del
+      formulario**, invalidan al terminar), `fecha-de-pared.ts` (selector ⇄ `"YYYY-MM-DDTHH:mm"`,
+      sin convertir zonas), `errores-de-formulario.ts` (la app no valida: muestra los detalles del
+      400 junto a cada campo) y `useConfirmarDescarte` ("¿Descartar los cambios?" al salir de un
+      formulario, con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la
@@ -132,6 +160,7 @@ su re-export, el hook o la función con su firma real).
 |---|---|---|
 | Repository | `listar()` | todas las entidades |
 | Repository | `buscarPorId(id)` · `buscarPor<Criterio>(...)` | la entidad o `null` (nunca lanza 404) |
+| Repository | `listarPor<Criterio>(...)` | las entidades que cumplen el criterio (arreglo, posiblemente vacío) |
 | Repository | `contarPor<Criterio>(...)` · `existe<Algo>(...)` | números / booleanos |
 | Repository | `guardar(entidad)` · `eliminarPorId(id)` | persistencia |
 | Service | `listar()` · `obtener(id)` · `crear(datos)` · `actualizar(id, datos)` · `eliminar(id)` | casos de uso; `obtener` lanza 404 |

@@ -7,4 +7,18 @@ export {
 } from "./cliente";
 export { resolverUrlBase } from "./direccion";
 export { ErrorDeApi, ServidorNoDisponibleError } from "./errores";
+export { listarCategorias } from "./categorias";
+export {
+  actualizarEvento,
+  agregarTipoEntrada,
+  crearEvento,
+  editarTipoEntrada,
+  eliminarEvento,
+  listarMisEventos,
+  obtenerEvento,
+  quitarTipoEntrada,
+  type CuerpoEvento,
+  type CuerpoNuevoEvento,
+  type CuerpoTipoEntrada,
+} from "./eventos";
 export { listarUsuarios, obtenerUsuarioActual } from "./usuarios";

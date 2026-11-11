@@ -1,17 +1,18 @@
+import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria, type DatosCategoria } from "../domain/categoria";
-import { Evento, TipoEntrada, type DatosEvento, type DatosTipoEntrada } from "../domain/evento";
+import { Compra } from "../domain/compra";
+import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
+import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../domain/hora-buenos-aires";
 import { Usuario, type DatosUsuario } from "../domain/usuario";
 
 export interface DatosEjemplo {
   categorias: Categoria[];
   usuarios: Usuario[];
   eventos: Evento[];
+  compras: Compra[];
 }
 
 const HORA_MS = 60 * 60 * 1000;
-const ZONA = "America/Argentina/Buenos_Aires";
-/** Argentina es UTC−3 todo el año (sin horario de verano). */
-const DESFASE_UTC_HORAS = 3;
 
 /** "Entrada general" → "entrada-general", "Inscripción" → "inscripcion". */
 function slug(texto: string): string {
@@ -26,28 +27,21 @@ function slug(texto: string): string {
 // Ids legibles y fijos de los datos de ejemplo: `<tipo>-<slug>` (constitución, principio IV).
 const categoriaId = (nombre: string) => `categoria-${slug(nombre)}`;
 
-function diaEnBuenosAires(ahora: Date): { anio: number; mes: number; dia: number } {
-  const partes = new Intl.DateTimeFormat("en-US", {
-    timeZone: ZONA,
-    year: "numeric",
-    month: "numeric",
-    day: "numeric",
-  }).formatToParts(ahora);
-  const valor = (tipo: string) => Number(partes.find((parte) => parte.type === tipo)?.value);
-  return { anio: valor("year"), mes: valor("month"), dia: valor("day") };
-}
-
 /** Día de `ahora` en Buenos Aires + `dias`, a la `hora` local indicada. */
 function fechaLocal(ahora: Date, dias: number, hora: number): Date {
-  const { anio, mes, dia } = diaEnBuenosAires(ahora);
-  return new Date(Date.UTC(anio, mes - 1, dia + dias, hora + DESFASE_UTC_HORAS));
+  const [anio = NaN, mes = NaN, dia = NaN] = horaDeBuenosAires(ahora).slice(0, 10).split("-").map(Number);
+  const fecha = new Date(Date.UTC(anio, mes - 1, dia + dias)).toISOString().slice(0, 10);
+  return instanteDesdeHoraDeBuenosAires(`${fecha}T${String(hora).padStart(2, "0")}:00`);
 }
 
 const imagen = (slug: string) => `https://picsum.photos/seed/${slug}/800/450`;
 
-type TipoSinId = Omit<DatosTipoEntrada, "id">;
+type TipoSinId = Omit<PropiedadesTipoEntrada, "id">;
 /** `slug` da el id del evento (`evento-<slug>`) y el de sus tipos (`tipo-<slug>-<tipo>`). */
-type EventoSinIds = Omit<DatosEvento, "id" | "tiposEntrada"> & { slug: string; tiposEntrada: TipoSinId[] };
+type EventoSinIds = Omit<PropiedadesEvento, "id" | "tiposEntrada"> & {
+  slug: string;
+  tiposEntrada: TipoSinId[];
+};
 
 /**
  * Datos de ejemplo deterministas (data-model.md, "Datos de ejemplo"). Puro: sin IO.
@@ -193,9 +187,34 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       }),
   );
 
+  // Compras sobre el Festival (de Lucía y próximo) para mostrar las reglas de la 004 (R17): el
+  // evento no se elimina y VIP y General no se quitan (la cancelada también cuenta); Backstage, sí.
+  const festival = "festival-sonidos-del-sur";
+  const compras = [
+    new Compra({
+      id: "compra-martin-festival-vip",
+      compradorId: martin,
+      eventoId: `evento-${festival}`,
+      tipoEntradaId: `tipo-${festival}-vip`,
+      cantidad: 2,
+      total: 240000,
+      estado: EstadoCompra.CONFIRMADA,
+    }),
+    new Compra({
+      id: "compra-diego-festival-general",
+      compradorId: "usuario-diego",
+      eventoId: `evento-${festival}`,
+      tipoEntradaId: `tipo-${festival}-general`,
+      cantidad: 1,
+      total: 45000,
+      estado: EstadoCompra.CANCELADA,
+    }),
+  ];
+
   return {
     categorias: datosCategorias.map((datos) => new Categoria(datos)),
     usuarios: datosUsuarios.map((datos) => new Usuario(datos)),
     eventos,
+    compras,
   };
 }

@@ -19,6 +19,14 @@ describe("crearRepositoriosDeEjemplo", () => {
     );
   });
 
+  it("carga las compras de ejemplo", async () => {
+    const { compras } = crearRepositoriosDeEjemplo(ahora);
+    expect(await compras.existePorEvento("evento-festival-sonidos-del-sur")).toBe(true);
+    expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-general")).toBe(true);
+    expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-backstage")).toBe(false);
+    expect(await compras.existePorEvento("evento-noche-de-rock")).toBe(false);
+  });
+
   it("es determinista: dos llamadas con el mismo instante dan los mismos datos", async () => {
     const primero = crearRepositoriosDeEjemplo(ahora);
     const segundo = crearRepositoriosDeEjemplo(ahora);
@@ -30,5 +38,6 @@ describe("crearRepositoriosDeEjemplo", () => {
     const segundo = crearRepositoriosDeEjemplo(ahora);
     expect(segundo.usuarios).not.toBe(primero.usuarios);
     expect(segundo.eventos).not.toBe(primero.eventos);
+    expect(segundo.compras).not.toBe(primero.compras);
   });
 });

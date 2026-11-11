@@ -137,11 +137,11 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.browser, __DEV__: "readonly" } },
   },
   {
-    files: ["mobile/*.config.js", "mobile/jest.setup.ts"],
+    files: ["mobile/*.config.js", "mobile/jest.global-setup.js", "mobile/jest.setup.ts"],
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ["mobile/*.config.js"],
+    files: ["mobile/*.config.js", "mobile/jest.global-setup.js"],
     languageOptions: { sourceType: "commonjs" },
   },
   // Regla 4: app/ solo expone pantallas o layouts de src/, sin lógica, estado ni estilos (SC-003).

@@ -8,7 +8,10 @@
   "servers": [{ "url": "/api", "description": "Mismo servidor que sirve esta documentación" }],
   "tags": [
     { "name": "Salud", "description": "Estado del servicio" },
-    { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" }
+    { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" },
+    { "name": "Categorías", "description": "Catálogo de categorías de eventos" },
+    { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
+    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" }
   ],
   "paths": {
     "/salud": {
@@ -73,6 +76,471 @@
           "404": { "$ref": "#/components/responses/NoEncontrado" }
         }
       }
+    },
+    "/categorias": {
+      "get": {
+        "tags": ["Categorías"],
+        "summary": "Catálogo de categorías, por nombre (público)",
+        "responses": {
+          "200": {
+            "description": "Las categorías",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CategoriaVista" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos": {
+      "post": {
+        "tags": ["Eventos"],
+        "summary": "Crear un evento con sus tipos de entrada (requiere usuario)",
+        "description": "El organizador es siempre el usuario actual: un `organizadorId` en el cuerpo se ignora. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosNuevoEvento" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "El evento creado, con UUIDs nuevos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": {
+            "description": "Forma inválida o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      {
+                        "campo": "body.fechaHora",
+                        "mensaje": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."
+                      },
+                      {
+                        "campo": "body.tiposEntrada.1.precio",
+                        "mensaje": "Debe ser un entero mayor o igual a 0."
+                      },
+                      { "campo": "body.categoriaId", "mensaje": "No existe la categoría." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "409": {
+            "description": "Fecha no futura o nombres de tipo repetidos",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "FECHA_NO_FUTURA": {
+                    "value": {
+                      "error": {
+                        "codigo": "FECHA_NO_FUTURA",
+                        "mensaje": "La fecha y hora del evento deben ser futuras."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/mios": {
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Eventos del usuario actual (requiere usuario)",
+        "description": "Primero los próximos por fecha ascendente; después los realizados, del más reciente al más antiguo.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Sus eventos (o `[]`)",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EventoResumenVista" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
+    "/eventos/{eventoId}": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Un evento con sus tipos de entrada (público)",
+        "responses": {
+          "200": {
+            "description": "El evento",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Eventos"],
+        "summary": "Editar los datos de un evento (organizador)",
+        "description": "Reemplaza nombre, descripción, categoría, fecha y multimedia; no toca los tipos. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosEvento" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "El evento editado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": {
+            "description": "Forma inválida o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      {
+                        "campo": "body.fechaHora",
+                        "mensaje": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."
+                      },
+                      {
+                        "campo": "body.tiposEntrada.1.precio",
+                        "mensaje": "Debe ser un entero mayor o igual a 0."
+                      },
+                      { "campo": "body.categoriaId", "mensaje": "No existe la categoría." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o fecha no futura",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "FECHA_NO_FUTURA": {
+                    "value": {
+                      "error": {
+                        "codigo": "FECHA_NO_FUTURA",
+                        "mensaje": "La fecha y hora del evento deben ser futuras."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Eventos"],
+        "summary": "Eliminar un evento (organizador)",
+        "description": "Solo si no se realizó y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "204": { "description": "Eliminado, sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o con compras",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "EVENTO_CON_COMPRAS": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_CON_COMPRAS",
+                        "mensaje": "El evento tiene compras: no se puede eliminar."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/tipos-entrada": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Agregar un tipo de entrada (organizador)",
+        "description": "El cupo inicial es ≥ 1. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosTipoEntrada" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "El tipo creado",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TipoEntradaVista" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o nombre repetido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/tipos-entrada/{tipoEntradaId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EventoId" },
+        { "$ref": "#/components/parameters/TipoEntradaId" }
+      ],
+      "put": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Editar un tipo de entrada (organizador)",
+        "description": "El cupo es el **disponible** (≥ 0). Conservar el propio nombre se acepta. Cambiar el precio no modifica el total de ninguna compra. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosTipoEntrada" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "El tipo editado",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TipoEntradaVista" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento, o el tipo no es de este evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_NO_ENCONTRADO": {
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "TIPO_ENTRADA_NO_ENCONTRADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_NO_ENCONTRADO",
+                        "mensaje": "No existe el tipo de entrada en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o nombre repetido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Quitar un tipo de entrada (organizador)",
+        "description": "Solo si no es el último y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "204": { "description": "Quitado, sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento, o el tipo no es de este evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_NO_ENCONTRADO": {
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "TIPO_ENTRADA_NO_ENCONTRADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_NO_ENCONTRADO",
+                        "mensaje": "No existe el tipo de entrada en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado, último tipo o tipo con compras",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "ULTIMO_TIPO_ENTRADA": {
+                    "value": {
+                      "error": {
+                        "codigo": "ULTIMO_TIPO_ENTRADA",
+                        "mensaje": "El evento debe conservar al menos un tipo de entrada."
+                      }
+                    }
+                  },
+                  "TIPO_ENTRADA_CON_COMPRAS": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_CON_COMPRAS",
+                        "mensaje": "El tipo de entrada tiene compras: no se puede quitar."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -91,6 +559,20 @@
         "required": true,
         "description": "UUID (lo que crean los usuarios) o id legible `<tipo>-<slug>` (datos de ejemplo)",
         "schema": { "type": "string", "example": "usuario-lucia" }
+      },
+      "EventoId": {
+        "name": "eventoId",
+        "in": "path",
+        "required": true,
+        "description": "UUID (lo que crean los usuarios) o id legible `evento-<slug>` (datos de ejemplo)",
+        "schema": { "type": "string", "example": "evento-festival-sonidos-del-sur" }
+      },
+      "TipoEntradaId": {
+        "name": "tipoEntradaId",
+        "in": "path",
+        "required": true,
+        "description": "Id del tipo de entrada; tiene que ser de **este** evento",
+        "schema": { "type": "string", "example": "tipo-festival-sonidos-del-sur-backstage" }
       }
     },
     "schemas": {
@@ -140,6 +622,172 @@
             }
           }
         }
+      },
+      "CategoriaVista": {
+        "type": "object",
+        "required": ["id", "nombre", "descripcion"],
+        "properties": {
+          "id": { "type": "string", "example": "categoria-conferencias" },
+          "nombre": { "type": "string", "example": "Conferencias" },
+          "descripcion": { "type": "string", "example": "Charlas, congresos y talleres." }
+        }
+      },
+      "TipoEntradaVista": {
+        "type": "object",
+        "required": ["id", "nombre", "descripcion", "precio", "cupo"],
+        "properties": {
+          "id": { "type": "string", "example": "tipo-festival-sonidos-del-sur-general" },
+          "nombre": { "type": "string", "example": "General" },
+          "descripcion": { "type": "string", "example": "Acceso al predio." },
+          "precio": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros; 0 = gratis",
+            "example": 45000
+          },
+          "cupo": { "type": "integer", "minimum": 0, "description": "Cupo **disponible**", "example": 500 }
+        }
+      },
+      "EventoResumenVista": {
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "categoria",
+          "fechaHora",
+          "fechaHoraLocal",
+          "organizadorId",
+          "realizado",
+          "cantidadTiposEntrada"
+        ],
+        "properties": {
+          "id": { "type": "string", "example": "evento-noche-de-rock" },
+          "nombre": { "type": "string", "example": "Noche de Rock en el Club" },
+          "categoria": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": {
+              "id": { "type": "string", "example": "categoria-musica" },
+              "nombre": { "type": "string", "example": "Música" }
+            }
+          },
+          "fechaHora": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante ISO UTC",
+            "example": "2026-11-11T23:00:00.000Z"
+          },
+          "fechaHoraLocal": {
+            "type": "string",
+            "description": "`YYYY-MM-DDTHH:mm`, hora de pared de Buenos Aires: lo que muestra la app",
+            "example": "2026-11-11T20:00"
+          },
+          "organizadorId": { "type": "string", "example": "usuario-lucia" },
+          "realizado": {
+            "type": "boolean",
+            "description": "El reloj del servidor llegó a `fechaHora` (inclusive); se calcula al consultar"
+          },
+          "cantidadTiposEntrada": { "type": "integer", "minimum": 1, "example": 1 }
+        }
+      },
+      "EventoVista": {
+        "allOf": [
+          { "$ref": "#/components/schemas/EventoResumenVista" },
+          {
+            "type": "object",
+            "required": ["descripcion", "multimedia", "tiposEntrada"],
+            "properties": {
+              "descripcion": {
+                "type": "string",
+                "example": "Un día entero de música con artistas de todo el país."
+              },
+              "multimedia": {
+                "type": "array",
+                "items": { "type": "string", "format": "uri" },
+                "example": ["https://picsum.photos/seed/sonidos-del-sur/800/450"]
+              },
+              "tiposEntrada": {
+                "type": "array",
+                "description": "En el orden en que se agregaron",
+                "items": { "$ref": "#/components/schemas/TipoEntradaVista" }
+              }
+            }
+          }
+        ]
+      },
+      "DatosTipoEntrada": {
+        "type": "object",
+        "required": ["nombre", "precio", "cupo"],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Se recorta; único en el evento sin distinguir mayúsculas ni tildes",
+            "example": "Platea"
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 300,
+            "default": "",
+            "example": "Butacas numeradas."
+          },
+          "precio": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros; 0 = gratis",
+            "example": 0
+          },
+          "cupo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Al crear el tipo, ≥ 1. Al editarlo es el cupo **disponible**, ≥ 0 (0 = agotado)",
+            "example": 100
+          }
+        }
+      },
+      "DatosEvento": {
+        "type": "object",
+        "required": ["nombre", "categoriaId", "fechaHora"],
+        "properties": {
+          "nombre": { "type": "string", "minLength": 1, "maxLength": 100, "example": "Noche de Tango" },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 2000,
+            "default": "",
+            "example": "Milonga con orquesta en vivo."
+          },
+          "categoriaId": { "type": "string", "example": "categoria-musica" },
+          "fechaHora": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+            "description": "Fecha y hora de pared **en Buenos Aires**, sin zona. Tiene que ser futura según el reloj del servidor (si no, 409 `FECHA_NO_FUTURA`)",
+            "example": "2026-12-01T20:00"
+          },
+          "multimedia": {
+            "type": "array",
+            "maxItems": 5,
+            "default": [],
+            "items": { "type": "string", "format": "uri", "description": "URL http o https" },
+            "example": ["https://example.com/tango.jpg"]
+          }
+        }
+      },
+      "DatosNuevoEvento": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DatosEvento" },
+          {
+            "type": "object",
+            "required": ["tiposEntrada"],
+            "properties": {
+              "tiposEntrada": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/components/schemas/DatosTipoEntrada" }
+              }
+            }
+          }
+        ]
       }
     },
     "responses": {
@@ -178,6 +826,20 @@
           "application/json": {
             "schema": { "$ref": "#/components/schemas/ErrorApi" },
             "example": { "error": { "codigo": "USUARIO_NO_ENCONTRADO", "mensaje": "No existe el usuario." } }
+          }
+        }
+      },
+      "SinPermiso": {
+        "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorApi" },
+            "example": {
+              "error": {
+                "codigo": "SIN_PERMISO",
+                "mensaje": "Solo el organizador puede modificar este evento."
+              }
+            }
           }
         }
       }

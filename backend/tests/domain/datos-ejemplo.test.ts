@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { crearDatosEjemplo } from "../../src/seed/datos-ejemplo";
+import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
+import { Compra } from "../../src/domain/compra";
 import { Evento, TipoEntrada } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
 
@@ -8,7 +10,7 @@ const HORA = 60 * 60 * 1000;
 const DIA = 24 * HORA;
 const ahora = new Date("2026-11-03T15:30:00.000Z");
 const datos = crearDatosEjemplo(ahora);
-const { categorias, usuarios, eventos } = datos;
+const { categorias, usuarios, eventos, compras } = datos;
 const tipos = eventos.flatMap((evento) => evento.tiposEntrada);
 
 function contarPorOrganizador(): Map<string, number> {
@@ -117,6 +119,40 @@ describe("crearDatosEjemplo", () => {
     for (const evento of eventos) {
       expect(idsUsuarios.has(evento.organizadorId)).toBe(true);
       expect(idsCategorias.has(evento.categoriaId)).toBe(true);
+    }
+  });
+
+  it("tiene dos compras sobre el Festival (de Lucía y próximo): una confirmada y una cancelada", () => {
+    expect(compras.map((c) => [c.id, c.compradorId, c.tipoEntradaId, c.cantidad, c.total, c.estado])).toEqual(
+      [
+        [
+          "compra-martin-festival-vip",
+          "usuario-martin",
+          "tipo-festival-sonidos-del-sur-vip",
+          2,
+          240000,
+          EstadoCompra.CONFIRMADA,
+        ],
+        [
+          "compra-diego-festival-general",
+          "usuario-diego",
+          "tipo-festival-sonidos-del-sur-general",
+          1,
+          45000,
+          EstadoCompra.CANCELADA,
+        ],
+      ],
+    );
+    const festival = eventos.find((e) => e.id === "evento-festival-sonidos-del-sur");
+    expect(festival?.organizadorId).toBe("usuario-lucia");
+    expect(festival?.estaRealizado(ahora)).toBe(false);
+    const idsUsuarios = new Set(usuarios.map((u) => u.id));
+    for (const compra of compras) {
+      expect(compra).toBeInstanceOf(Compra);
+      expect(compra.id).toMatch(/^compra(-[a-z0-9]+)+$/);
+      expect(compra.eventoId).toBe("evento-festival-sonidos-del-sur");
+      expect(festival?.buscarTipoEntrada(compra.tipoEntradaId)).not.toBeNull();
+      expect(idsUsuarios.has(compra.compradorId)).toBe(true);
     }
   });
 
