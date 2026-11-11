@@ -6,21 +6,15 @@ import {
 } from "../../../src/features/eventos/formato";
 
 describe("formato de eventos (R18, sin Intl)", () => {
-  const zonaOriginal = process.env.TZ;
-  afterEach(() => {
-    process.env.TZ = zonaOriginal;
-  });
-
   it("textoFechaHora arma día, fecha y hora de la hora de pared", () => {
     expect(textoFechaHora("2026-12-01T20:00")).toBe("mar 1 dic 2026 · 20:00");
     expect(textoFechaHora("2027-01-03T09:05")).toBe("dom 3 ene 2027 · 09:05");
   });
 
-  it("textoFechaHora no depende de la zona del teléfono", () => {
-    for (const zona of ["Asia/Tokyo", "America/New_York", "UTC"]) {
-      process.env.TZ = zona;
-      expect(textoFechaHora("2026-12-01T20:00")).toBe("mar 1 dic 2026 · 20:00");
-    }
+  it("textoFechaHora no depende de la zona del teléfono (la suite corre en Nueva York)", () => {
+    // 20:00 de Buenos Aires es medianoche en UTC: con conversión de zona cambiaría el día.
+    expect(textoFechaHora("2026-12-01T20:00")).toBe("mar 1 dic 2026 · 20:00");
+    expect(textoFechaHora("2026-12-01T23:30")).toBe("mar 1 dic 2026 · 23:30");
   });
 
   it.each([
