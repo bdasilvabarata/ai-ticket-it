@@ -1,6 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
+import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
 import { relojFijo } from "../helpers/eventos";
 
 // Repositorios de ejemplo nuevos por app, armados con el instante del reloj fijo.
@@ -15,6 +16,67 @@ function esperarError(respuesta: request.Response, status: number, codigo: strin
   expect(respuesta.status).toBe(status);
   expect(respuesta.body).toMatchObject({ error: { codigo, mensaje: expect.any(String) } });
 }
+
+/** Los ids del catálogo, en el orden de la respuesta. */
+const idsDelCatalogo = (respuesta: request.Response) =>
+  (respuesta.body.eventos as { id: string }[]).map((e) => e.id);
+
+const PROXIMOS_POR_FECHA = [
+  "evento-noche-de-rock",
+  "evento-clasico-de-basquet",
+  "evento-hamlet",
+  "evento-charla-ia-aplicada",
+  "evento-festival-sonidos-del-sur",
+  "evento-maraton-10k",
+];
+
+describe("GET /api/eventos (catálogo)", () => {
+  it("es público: los 6 próximos del seed por fecha, con hayEventosProximos", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+    expect(respuesta.body.hayEventosProximos).toBe(true);
+  });
+
+  it("un X-Usuario-Id inválido se ignora", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos").set("X-Usuario-Id", "nadie");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("Hamlet sale agotado, la Maratón gratis y todos sin puntaje", async () => {
+    const { body } = await request(nuevaApp()).get("/api/eventos");
+    const porId = new Map((body.eventos as { id: string }[]).map((e) => [e.id, e]));
+    expect(porId.get("evento-hamlet")).toMatchObject({ agotado: true, precioDesde: 18000 });
+    expect(porId.get("evento-maraton-10k")).toMatchObject({ agotado: false, precioDesde: 0 });
+    expect(porId.get("evento-clasico-de-basquet")).toEqual({
+      id: "evento-clasico-de-basquet",
+      nombre: "Clásico de básquet",
+      categoria: { id: "categoria-deportes", nombre: "Deportes" },
+      fechaHora: expect.any(String),
+      fechaHoraLocal: expect.any(String),
+      organizadorId: SOFIA,
+      realizado: false,
+      cantidadTiposEntrada: 2,
+      precioDesde: 8000,
+      agotado: false,
+      organizador: { id: SOFIA, nombre: "Sofía", apellido: "Castro", puntaje: null, cantidadResenias: 0 },
+    });
+    for (const evento of body.eventos) {
+      expect(evento.organizador).toMatchObject({ puntaje: null, cantidadResenias: 0 });
+    }
+  });
+
+  it("con todo el seed realizado responde vacío con hayEventosProximos: false", async () => {
+    const app = crearApp({
+      repositorios: crearRepositoriosDeEjemplo(new Date("2026-11-10T15:00:00.000Z")),
+      reloj: relojFijo(new Date("2027-06-01T00:00:00.000Z")),
+    });
+    const respuesta = await request(app).get("/api/eventos");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: false });
+  });
+});
 
 describe("GET /api/eventos/mios", () => {
   it("responde 401 sin X-Usuario-Id", async () => {

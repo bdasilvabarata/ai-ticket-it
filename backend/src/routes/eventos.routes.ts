@@ -1,7 +1,7 @@
 import { Router, type RequestHandler } from "express";
 import type { EventoController } from "../controllers/evento.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
-import { eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
+import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 import {
   tipoEntradaEditado,
   tipoEntradaNuevo,
@@ -23,6 +23,8 @@ export function crearEventosRouter(
 ): Router {
   const { eventos: controller } = controllers;
   const router = Router();
+  // Público: el catálogo de Explorar (un X-Usuario-Id inválido se ignora).
+  router.get("/", consultaCatalogo.middleware, controller.listar);
   // Requiere usuario. Declarada antes que /:eventoId ("mios" tampoco es un id válido).
   router.get("/mios", requerirUsuario, controller.listarMios);
   router.post("/", requerirUsuario, eventoNuevo.middleware, controller.crear);

@@ -114,6 +114,38 @@ describe("Evento", () => {
   });
 });
 
+describe("Evento: consultas del catálogo (feature 005)", () => {
+  it("precioDesde es el menor precio entre todos los tipos, también uno agotado", () => {
+    const e = evento([
+      tipo({ id: "t1", nombre: "General", precio: 15000, cupo: 10 }),
+      tipo({ id: "t2", nombre: "Anticipada", precio: 9000, cupo: 0 }),
+      tipo({ id: "t3", nombre: "VIP", precio: 40000, cupo: 5 }),
+    ]);
+    expect(e.precioDesde()).toBe(9000);
+  });
+
+  it("precioDesde es 0 si algún tipo es gratis", () => {
+    const e = evento([tipo({ id: "t1", precio: 15000 }), tipo({ id: "t2", nombre: "Kids", precio: 0 })]);
+    expect(e.precioDesde()).toBe(0);
+  });
+
+  it("estaAgotado solo si todos los tipos tienen cupo 0", () => {
+    const agotado = evento([tipo({ id: "t1", cupo: 0 }), tipo({ id: "t2", nombre: "VIP", cupo: 0 })]);
+    const parcial = evento([tipo({ id: "t1", cupo: 0 }), tipo({ id: "t2", nombre: "VIP", cupo: 1 })]);
+    expect(agotado.estaAgotado()).toBe(true);
+    expect(parcial.estaAgotado()).toBe(false);
+    expect(evento().estaAgotado()).toBe(false);
+  });
+
+  it("ninguna de las dos modifica el evento", () => {
+    const e = evento([tipo({ id: "t1", precio: 5000, cupo: 0 })]);
+    const antes = structuredClone({ ...e, tiposEntrada: e.tiposEntrada.map((t) => ({ ...t })) });
+    e.precioDesde();
+    e.estaAgotado();
+    expect({ ...e, tiposEntrada: e.tiposEntrada.map((t) => ({ ...t })) }).toEqual(antes);
+  });
+});
+
 describe("mismoNombreDeTipo", () => {
   it("no distingue mayúsculas, tildes ni espacios de los extremos", () => {
     expect(mismoNombreDeTipo("VIP", " vip ")).toBe(true);

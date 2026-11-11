@@ -1,14 +1,19 @@
-import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type { CatalogoVista, EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { EventoService } from "../services/evento.service";
-import { eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
+import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 
 /** HTTP de eventos: lee la entrada ya validada, llama al service y arma la respuesta. */
 export class EventoController {
   constructor(private readonly eventoService: EventoService) {}
 
   // Métodos como propiedades flecha: se pasan a las rutas sin perder `this`.
+  /** Público: el catálogo de Explorar con la consulta ya validada. */
+  listar = async (req: Request, res: Response<CatalogoVista>): Promise<void> => {
+    res.json(await this.eventoService.listar(consultaCatalogo.leer(req, "query")));
+  };
+
   listarMios = async (req: Request, res: Response<EventoResumenVista[]>): Promise<void> => {
     res.json(await this.eventoService.listarMios(usuarioActual(req).id));
   };

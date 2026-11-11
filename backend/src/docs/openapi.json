@@ -94,6 +94,19 @@
       }
     },
     "/eventos": {
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Catálogo de eventos próximos (público)",
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Sin paginación.",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "El catálogo y si hay eventos próximos antes de aplicar los filtros",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" }
+        }
+      },
       "post": {
         "tags": ["Eventos"],
         "summary": "Crear un evento con sus tipos de entrada (requiere usuario)",
@@ -705,6 +718,41 @@
             "example": null
           },
           "cantidadResenias": { "type": "integer", "minimum": 0, "example": 0 }
+        }
+      },
+      "EventoCatalogoVista": {
+        "description": "Evento en Explorar.",
+        "allOf": [
+          { "$ref": "#/components/schemas/EventoResumenVista" },
+          {
+            "type": "object",
+            "required": ["precioDesde", "agotado", "organizador"],
+            "properties": {
+              "precioDesde": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Menor precio de todos sus tipos, con o sin cupo; 0 = gratis.",
+                "example": 8000
+              },
+              "agotado": {
+                "type": "boolean",
+                "description": "Todos sus tipos con cupo 0.",
+                "example": false
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
+            }
+          }
+        ]
+      },
+      "CatalogoVista": {
+        "type": "object",
+        "required": ["eventos", "hayEventosProximos"],
+        "properties": {
+          "eventos": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } },
+          "hayEventosProximos": {
+            "type": "boolean",
+            "description": "Hay eventos no realizados antes de aplicar texto y categoría: decide el vacío de la app."
+          }
         }
       },
       "EventoVista": {

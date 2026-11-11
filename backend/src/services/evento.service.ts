@@ -1,4 +1,11 @@
-import type { EventoResumenVista, EventoVista, OrganizadorVista } from "@ai-ticket-it/shared";
+import type {
+  CatalogoVista,
+  EventoCatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  OrdenCatalogo,
+  OrganizadorVista,
+} from "@ai-ticket-it/shared";
 import {
   Evento,
   ordenDeMisEventos,
@@ -6,12 +13,13 @@ import {
   type DatosDeEvento,
   type DatosDeTipoEntrada,
 } from "../domain/evento";
+import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
 import { NoEncontradoError, SinPermisoError } from "../errors/index";
 import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
+import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
 import type { ReseniaService } from "./resenia.service";
 import type { UsuarioService } from "./usuario.service";
 
@@ -24,6 +32,19 @@ export interface DependenciasEventoService {
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
+
+/** Consulta ya validada de `GET /eventos` (texto recortado, `""` = sin filtro). */
+export interface ConsultaCatalogoValidada {
+  texto: string;
+  categoriaId?: string;
+  orden: OrdenCatalogo;
+}
+
+/**
+ * Lo que se ordena del catálogo: los datos de la entidad (`fechaHora` como `Date`, el puntaje sin
+ * redondear) y su vista, que sale tal cual. Las vistas no se ordenan: no cumplen `Ordenable`.
+ */
+type ElementoDelCatalogo = Ordenable & { vista: EventoCatalogoVista };
 
 /** Datos ya validados de `POST /eventos`. */
 export type DatosNuevoEventoValidados = DatosDeEvento & { tiposEntrada: DatosDeTipoEntrada[] };
@@ -60,6 +81,44 @@ export class EventoService {
     this.#reseniaService = reseniaService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
+  }
+
+  /**
+   * El catálogo de Explorar (UC-05): los eventos no realizados de todos los organizadores. Lectura:
+   * sin cerrojo y con un único `ahora` por pedido. Hace un número fijo de lecturas (sin N+1): los
+   * eventos y un lote por dueño (categorías, organizadores y sus puntajes).
+   */
+  async listar(consulta: ConsultaCatalogoValidada): Promise<CatalogoVista> {
+    const ahora = this.#reloj.ahora();
+    const todos = await this.#eventos.listar();
+    const proximos = todos.filter((evento) => !evento.estaRealizado(ahora));
+    const hayEventosProximos = proximos.length > 0;
+    if (proximos.length === 0) return { eventos: [], hayEventosProximos };
+
+    const organizadorIds = new Set(proximos.map((e) => e.organizadorId));
+    const [categorias, organizadores, puntajes] = await Promise.all([
+      this.#categoriaService.obtenerPorIds(proximos.map((e) => e.categoriaId)),
+      this.#usuarioService.obtenerPorIds([...organizadorIds]),
+      // Todos sus eventos, próximos y realizados: solo se reseñan los realizados (R7).
+      this.#reseniaService.puntajesPorOrganizador(todos.filter((e) => organizadorIds.has(e.organizadorId))),
+    ]);
+    // `obtenerPorIds` y `puntajesPorOrganizador` garantizan que están todos (si falta uno, lanzan).
+    const elementos = proximos.map((evento): ElementoDelCatalogo => {
+      const puntaje = puntajes.get(evento.organizadorId)!;
+      const organizador = aOrganizadorVista(organizadores.get(evento.organizadorId)!, puntaje);
+      return {
+        id: evento.id,
+        nombre: evento.nombre,
+        fechaHora: evento.fechaHora,
+        precioDesde: evento.precioDesde(),
+        puntaje: puntaje.promedio,
+        vista: aEventoCatalogoVista(evento, categorias.get(evento.categoriaId)!, organizador, ahora),
+      };
+    });
+    return {
+      eventos: ordenarCatalogo(elementos, "fecha").map((elemento) => elemento.vista),
+      hayEventosProximos,
+    };
   }
 
   /** Los eventos que organiza el usuario actual, en el orden de Mis eventos. */

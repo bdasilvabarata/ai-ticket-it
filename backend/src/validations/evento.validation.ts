@@ -76,3 +76,10 @@ export const eventoEditado = crearValidacion({
   params: paramsEvento,
   body: z.object(camposDelEvento, { error: MENSAJE_CUERPO }),
 });
+
+/**
+ * `GET /eventos`: la consulta del catálogo. Un `z.object`: las claves desconocidas se descartan.
+ */
+export const consultaCatalogo = crearValidacion({
+  query: z.object({}).transform(() => ({ texto: "", orden: "fecha" as const })),
+});

@@ -1,10 +1,10 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
-import { AHORA, DIA, compra, evento, musica, resenia, teatro, tipo } from "../helpers/eventos";
+import { AHORA, DIA, compra, evento, musica, relojFijo, resenia, teatro, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // Sin servidor: el service recibe los repositorios en memoria de producción, construidos con los
@@ -295,5 +295,113 @@ describe("EventoService.crear", () => {
       },
     );
     expect(await repositorioEventos.listar()).toEqual([]);
+  });
+});
+
+describe("EventoService.listar (catálogo)", () => {
+  const sinFiltros = { texto: "", orden: "fecha" } as const;
+  const ids = (vista: { eventos: { id: string }[] }) => vista.eventos.map((e) => e.id);
+
+  it("solo los no realizados, de cualquier organizador y agotados incluidos, por fecha", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-lejano", en: 9 * DIA }),
+        evento({ id: "evento-ahora", en: 0 }),
+        evento({ id: "evento-pasado", en: -DIA }),
+        evento({ id: "evento-recien", en: 1 }),
+        evento({
+          id: "evento-agotado",
+          organizadorId: "usuario-martin",
+          en: 2 * DIA,
+          tiposEntrada: [tipo({ id: "tipo-agotado", cupo: 0 })],
+        }),
+      ],
+    });
+    const catalogo = await service.listar(sinFiltros);
+    expect(ids(catalogo)).toEqual(["evento-recien", "evento-agotado", "evento-lejano"]);
+    expect(catalogo.hayEventosProximos).toBe(true);
+  });
+
+  it("cada evento trae precioDesde, agotado y el organizador con su puntaje (con reseñas de uno realizado)", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [
+        evento({
+          id: "evento-a",
+          tiposEntrada: [
+            tipo({ id: "tipo-a-general", precio: 8000, cupo: 0 }),
+            tipo({ id: "tipo-a-kids", nombre: "Kids", precio: 0, cupo: 0 }),
+          ],
+        }),
+        evento({ id: "evento-pasado", en: -DIA }),
+      ],
+      resenias: [resenia("evento-pasado", 4), resenia("evento-pasado", 5)],
+    });
+    const { eventos } = await service.listar(sinFiltros);
+    expect(eventos).toEqual([
+      {
+        id: "evento-a",
+        nombre: "Evento evento-a",
+        categoria: { id: "categoria-musica", nombre: "Música" },
+        fechaHora: "2026-11-15T15:00:00.000Z",
+        fechaHoraLocal: "2026-11-15T12:00",
+        organizadorId: "usuario-lucia",
+        realizado: false,
+        cantidadTiposEntrada: 2,
+        precioDesde: 0,
+        agotado: true,
+        organizador: {
+          id: "usuario-lucia",
+          nombre: "Lucía",
+          apellido: "Álvarez",
+          puntaje: 4.5,
+          cantidadResenias: 2,
+        },
+      },
+    ]);
+  });
+
+  it("sin próximos responde vacío con hayEventosProximos: false, sin pedir lotes", async () => {
+    const servicios = crearServicesDeEventos({ eventos: [evento({ id: "evento-pasado", en: -DIA })] });
+    const categorias = vi.spyOn(servicios.repositorioCategorias, "listarPorIds");
+    const usuarios = vi.spyOn(servicios.repositorioUsuarios, "listarPorIds");
+    const resenias = vi.spyOn(servicios.repositorioResenias, "listarPorEventos");
+    expect(await servicios.eventoService.listar(sinFiltros)).toEqual({
+      eventos: [],
+      hayEventosProximos: false,
+    });
+    expect(categorias).not.toHaveBeenCalled();
+    expect(usuarios).not.toHaveBeenCalled();
+    expect(resenias).not.toHaveBeenCalled();
+  });
+
+  it("lee el reloj una vez, sin cerrojo, y pide cada lote una sola vez (sin N+1)", async () => {
+    const reloj = relojFijo();
+    const ahora = vi.spyOn(reloj, "ahora");
+    const servicios = crearServicesDeEventos({
+      reloj,
+      eventos: [
+        evento({ id: "evento-a" }),
+        evento({ id: "evento-b", organizadorId: "usuario-martin", categoriaId: teatro.id }),
+        evento({ id: "evento-c", organizadorId: "usuario-sofia" }),
+        evento({ id: "evento-d", organizadorId: "usuario-martin", en: -DIA }),
+      ],
+    });
+    const cerrojo = vi.spyOn(servicios.cerrojo, "ejecutar");
+    const categorias = vi.spyOn(servicios.repositorioCategorias, "listarPorIds");
+    const usuarios = vi.spyOn(servicios.repositorioUsuarios, "listarPorIds");
+    const resenias = vi.spyOn(servicios.repositorioResenias, "listarPorEventos");
+    const listarPorOrganizador = vi.spyOn(servicios.repositorioEventos, "listarPorOrganizador");
+
+    const catalogo = await servicios.eventoService.listar(sinFiltros);
+
+    expect(ids(catalogo)).toEqual(["evento-a", "evento-b", "evento-c"]);
+    expect(ahora).toHaveBeenCalledTimes(1);
+    expect(cerrojo).not.toHaveBeenCalled();
+    expect(categorias).toHaveBeenCalledTimes(1);
+    expect(usuarios).toHaveBeenCalledTimes(1);
+    expect(resenias).toHaveBeenCalledTimes(1);
+    // El puntaje usa todos los eventos de esos organizadores, también el realizado.
+    expect(resenias.mock.calls[0]?.[0]).toEqual(expect.arrayContaining(["evento-d"]));
+    expect(listarPorOrganizador).not.toHaveBeenCalled();
   });
 });

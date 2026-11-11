@@ -1,4 +1,5 @@
 import type {
+  EventoCatalogoVista,
   EventoResumenVista,
   EventoVista,
   OrganizadorVista,
@@ -51,6 +52,21 @@ export function aEventoVista(
     descripcion: evento.descripcion,
     multimedia: [...evento.multimedia],
     tiposEntrada: evento.tiposEntrada.map(aTipoEntradaVista),
+    organizador,
+  };
+}
+
+/** El resumen más lo que muestra la tarjeta de Explorar: precio "desde", agotado y organizador. */
+export function aEventoCatalogoVista(
+  evento: Evento,
+  categoria: Categoria,
+  organizador: OrganizadorVista,
+  ahora: Date,
+): EventoCatalogoVista {
+  return {
+    ...aEventoResumenVista(evento, categoria, ahora),
+    precioDesde: evento.precioDesde(),
+    agotado: evento.estaAgotado(),
     organizador,
   };
 }

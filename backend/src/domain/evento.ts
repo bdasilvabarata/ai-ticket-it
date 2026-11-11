@@ -134,6 +134,17 @@ export class Evento {
     return ahora.getTime() >= this.fechaHora.getTime();
   }
 
+  /** El menor precio entre **todos** los tipos, con o sin cupo (FR-004). 0 = gratis. */
+  precioDesde(): number {
+    // Siempre hay al menos un tipo (invariante del constructor).
+    return Math.min(...this.tiposEntrada.map((tipo) => tipo.precio));
+  }
+
+  /** Todos los tipos sin cupo (FR-005). Un agotado parcial no cuenta. */
+  estaAgotado(): boolean {
+    return this.tiposEntrada.every((tipo) => tipo.cupo === 0);
+  }
+
   esOrganizadoPor(usuarioId: string): boolean {
     return this.organizadorId === usuarioId;
   }

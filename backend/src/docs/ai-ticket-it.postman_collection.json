@@ -61,6 +61,15 @@
       ]
     },
     {
+      "name": "Explorar eventos",
+      "item": [
+        {
+          "name": "Catálogo sin filtros (público)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos" } }
+        }
+      ]
+    },
+    {
       "name": "Eventos",
       "item": [
         {
