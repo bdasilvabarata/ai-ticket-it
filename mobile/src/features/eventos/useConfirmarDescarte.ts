@@ -1,4 +1,4 @@
-import { usePreventRemove } from "expo-router";
+import { useIsFocused, usePreventRemove } from "expo-router";
 import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
@@ -10,6 +10,8 @@ import { useSesion } from "../sesion";
  * cambios?", **siempre**, haya cambios o no.
  *
  * No pregunta:
+ * - si la pantalla no es la que se está viendo: una salida que la saca de abajo del Stack (volver a
+ *   Mis eventos desde un formulario de tipo) la decide la pantalla de arriba;
  * - si la sesión ya no es la del formulario (un 401 olvidó al usuario o cambió el usuario): esa
  *   salida la provoca el guard de la sesión;
  * - después de `salirSinConfirmar(navegar)`, que se usa tras guardar o eliminar con éxito y ante un
@@ -22,8 +24,10 @@ export function useConfirmarDescarte({ habilitado = true }: { habilitado?: boole
   const [salida, setSalida] = useState<{ navegar: () => void } | null>(null);
   const [descartado, setDescartado] = useState(false);
 
+  const enfocada = useIsFocused();
+
   const mismaSesion = estado.fase === "con-usuario" && estado.usuarioId === usuarioDelFormulario;
-  const retener = habilitado && mismaSesion && salida === null && !descartado;
+  const retener = habilitado && enfocada && mismaSesion && salida === null && !descartado;
 
   usePreventRemove(retener, ({ repeat }) => {
     Alert.alert("¿Descartar los cambios?", undefined, [

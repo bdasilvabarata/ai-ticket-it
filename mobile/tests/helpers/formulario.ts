@@ -38,3 +38,24 @@ export async function tocarEnAlerta(espia: jest.SpyInstance, titulo: string, tex
 export async function escribir(etiqueta: string, texto: string) {
   await fireEvent.changeText(screen.getByLabelText(etiqueta), texto);
 }
+
+/**
+ * Título del header de la pantalla de arriba del Stack. El header del Stack es nativo: en jest su
+ * título no es un texto, sino la prop `title` de su configuración.
+ */
+export function tituloDelHeader(): string | undefined {
+  const titulos: string[] = [];
+  const recorrer = (nodo: unknown) => {
+    if (Array.isArray(nodo)) return nodo.forEach(recorrer);
+    if (typeof nodo !== "object" || nodo === null) return;
+    const { type, props, children } = nodo as {
+      type?: string;
+      props?: { title?: unknown };
+      children?: unknown;
+    };
+    if (type === "RNSScreenStackHeaderConfig" && typeof props?.title === "string") titulos.push(props.title);
+    recorrer(children);
+  };
+  recorrer(screen.toJSON());
+  return titulos.at(-1);
+}

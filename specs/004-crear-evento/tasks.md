@@ -292,10 +292,10 @@ compras, último tipo, nombre repetido, sin permiso, no encontrado).
 
 ### Mobile
 
-- [ ] T064 [P] [US3] Test de `obtenerEvento`, `actualizarEvento`, `agregarTipoEntrada`, `editarTipoEntrada` y `quitarTipoEntrada` (método, ruta, cuerpo y `X-Usuario-Id` del `usuarioId` recibido; `DELETE` → `undefined`) en `mobile/tests/api/eventos.test.ts`, con los stubs en `mobile/src/api/eventos.ts`.
-- [ ] T065 [US3] Implementar esas cinco funciones en `mobile/src/api/eventos.ts`.
-- [ ] T066 [US3] Rutas: los stubs de `EventoDelOrganizador`, `AgregarTipoEntrada` y `EditarTipoEntrada` en `mobile/src/features/eventos/pantallas/` (export por `index.ts`), y sus re-exports en `mobile/app/eventos/[eventoId]/index.tsx`, `mobile/app/eventos/[eventoId]/tipos-entrada/nuevo.tsx` y `mobile/app/eventos/[eventoId]/tipos-entrada/[tipoEntradaId].tsx`. Sumar los `Stack.Screen` (títulos "Evento" como inicial de `eventos/[eventoId]/index`, que `EventoDelOrganizador` cambia en T068; "Agregar tipo de entrada" y "Editar tipo de entrada") al `Stack.Protected` de `con-usuario` de `mobile/src/navegacion/LayoutRaiz.tsx`. En `mobile/tests/tipos/rutas-tipadas.ts`, sumar el caso `@ts-expect-error` del `pathname` `/eventos/[eventoId]` sin `params`.
-- [ ] T067 [US3] Test de `mobile/tests/pantallas/editar-evento.test.tsx`, con los stubs de `useEvento(usuarioId, eventoId)` en `mobile/src/features/eventos/useEvento.ts`, de las mutations `useActualizarEvento` y `useQuitarTipoEntrada` en `mutaciones.ts`, y de `EditarEvento` y `ListaTiposEntrada`. Casos:
+- [X] T064 [P] [US3] Test de `obtenerEvento`, `actualizarEvento`, `agregarTipoEntrada`, `editarTipoEntrada` y `quitarTipoEntrada` (método, ruta, cuerpo y `X-Usuario-Id` del `usuarioId` recibido; `DELETE` → `undefined`) en `mobile/tests/api/eventos.test.ts`, con los stubs en `mobile/src/api/eventos.ts`.
+- [X] T065 [US3] Implementar esas cinco funciones en `mobile/src/api/eventos.ts`.
+- [X] T066 [US3] Rutas: los stubs de `EventoDelOrganizador`, `AgregarTipoEntrada` y `EditarTipoEntrada` en `mobile/src/features/eventos/pantallas/` (export por `index.ts`), y sus re-exports en `mobile/app/eventos/[eventoId]/index.tsx`, `mobile/app/eventos/[eventoId]/tipos-entrada/nuevo.tsx` y `mobile/app/eventos/[eventoId]/tipos-entrada/[tipoEntradaId].tsx`. Sumar los `Stack.Screen` (títulos "Evento" como inicial de `eventos/[eventoId]/index`, que `EventoDelOrganizador` cambia en T068; "Agregar tipo de entrada" y "Editar tipo de entrada") al `Stack.Protected` de `con-usuario` de `mobile/src/navegacion/LayoutRaiz.tsx`. En `mobile/tests/tipos/rutas-tipadas.ts`, sumar el caso `@ts-expect-error` del `pathname` `/eventos/[eventoId]` sin `params`.
+- [X] T067 [US3] Test de `mobile/tests/pantallas/editar-evento.test.tsx`, con los stubs de `useEvento(usuarioId, eventoId)` en `mobile/src/features/eventos/useEvento.ts`, de las mutations `useActualizarEvento` y `useQuitarTipoEntrada` en `mutaciones.ts`, y de `EditarEvento` y `ListaTiposEntrada`. Casos:
   - tocar una fila de Mis eventos lleva a `/eventos/[eventoId]`;
   - el header dice "Editar evento", y tras un `409 EVENTO_REALIZADO` pasa a "Evento realizado";
   - datos precargados desde `fechaHoraLocal`;
@@ -308,10 +308,10 @@ compras, último tipo, nombre repetido, sin permiso, no encontrado).
   - `404` → `Alert` "El evento ya no existe." y vuelta a Mis eventos con `router.dismissTo("/mis-eventos")`, sin diálogo de descarte;
   - `fetch` rechazado al guardar → franja "Servidor no disponible", sin un segundo `PUT` y con los campos cargados;
   - atrás → "¿Descartar los cambios?".
-- [ ] T068 [US3] Implementar `useEvento` (`claves.evento(usuarioId, eventoId)`), `useActualizarEvento` y `useQuitarTipoEntrada` (invalidan `misEventos` y `evento` al terminar), `ListaTiposEntrada` ("Editar <nombre>", "Quitar <nombre>" y "Agregar tipo de entrada"), `EditarEvento` (secciones "Datos del evento" y "Tipos de entrada" con `accessibilityRole="header"`, reutilizando `CamposEvento` y `useConfirmarDescarte`) y `EventoDelOrganizador` (elige `EditarEvento` o `VerEventoRealizado` según el `realizado` del servidor, nunca el reloj del teléfono, y fija el título con `<Stack.Screen options={{ title }} />`: "Editar evento" / "Evento realizado") en `mobile/src/features/eventos/`. En `FilaEvento`, el `onPress` navega a `/eventos/[eventoId]`.
-- [ ] T069 [P] [US3] Test de `mobile/tests/pantallas/evento-realizado.test.tsx` con el stub de `VerEventoRealizado`. El header dice "Evento realizado". Muestra "Realizado", la categoría, la fecha, la descripción, las URLs como texto y los tipos con precio y cupo disponible; no tiene acciones de editar, agregar, quitar ni eliminar; al salir no pregunta (FR-006a).
-- [ ] T070 [US3] Implementar `VerEventoRealizado` en `mobile/src/features/eventos/pantallas/`.
-- [ ] T071 [US3] Test de `mobile/tests/pantallas/tipo-entrada.test.tsx` con los stubs de `useAgregarTipoEntrada` y `useEditarTipoEntrada`. Casos:
+- [X] T068 [US3] Implementar `useEvento` (`claves.evento(usuarioId, eventoId)`), `useActualizarEvento` y `useQuitarTipoEntrada` (invalidan `misEventos` y `evento` al terminar), `ListaTiposEntrada` ("Editar <nombre>", "Quitar <nombre>" y "Agregar tipo de entrada"), `EditarEvento` (secciones "Datos del evento" y "Tipos de entrada" con `accessibilityRole="header"`, reutilizando `CamposEvento` y `useConfirmarDescarte`) y `EventoDelOrganizador` (elige `EditarEvento` o `VerEventoRealizado` según el `realizado` del servidor, nunca el reloj del teléfono, y fija el título con `<Stack.Screen options={{ title }} />`: "Editar evento" / "Evento realizado") en `mobile/src/features/eventos/`. En `FilaEvento`, el `onPress` navega a `/eventos/[eventoId]`.
+- [X] T069 [P] [US3] Test de `mobile/tests/pantallas/evento-realizado.test.tsx` con el stub de `VerEventoRealizado`. El header dice "Evento realizado". Muestra "Realizado", la categoría, la fecha, la descripción, las URLs como texto y los tipos con precio y cupo disponible; no tiene acciones de editar, agregar, quitar ni eliminar; al salir no pregunta (FR-006a).
+- [X] T070 [US3] Implementar `VerEventoRealizado` en `mobile/src/features/eventos/pantallas/`.
+- [X] T071 [US3] Test de `mobile/tests/pantallas/tipo-entrada.test.tsx` con los stubs de `useAgregarTipoEntrada` y `useEditarTipoEntrada`. Casos:
   - agregar → `POST` y vuelta a Editar evento con el tipo nuevo;
   - editar con la etiqueta "Cupo disponible", precargado → `PUT`, y "Guardar cambios" vuelve;
   - `NOMBRE_TIPO_ENTRADA_REPETIDO` debajo de Nombre;
@@ -320,7 +320,7 @@ compras, último tipo, nombre repetido, sin permiso, no encontrado).
   - `404` del tipo o del evento vuelve a Mis eventos sin diálogo;
   - `fetch` rechazado al guardar → franja "Servidor no disponible", sin reenviar y con los campos cargados;
   - atrás → "¿Descartar los cambios?".
-- [ ] T072 [US3] Implementar `useAgregarTipoEntrada` y `useEditarTipoEntrada` en `mutaciones.ts`, y las pantallas `AgregarTipoEntrada` y `EditarTipoEntrada` (reutilizando `CamposTipoEntrada` y `useConfirmarDescarte`) en `mobile/src/features/eventos/pantallas/`.
+- [X] T072 [US3] Implementar `useAgregarTipoEntrada` y `useEditarTipoEntrada` en `mutaciones.ts`, y las pantallas `AgregarTipoEntrada` y `EditarTipoEntrada` (reutilizando `CamposTipoEntrada` y `useConfirmarDescarte`) en `mobile/src/features/eventos/pantallas/`.
 
 **Checkpoint**: US1, US2 y US3 funcionan solas y juntas.
 
@@ -341,15 +341,15 @@ realizado, con compras, ajeno o inexistente.
 - [X] T076 [US4] Implementar `EventoService.eliminar` en `backend/src/services/evento.service.ts` (bajo el cerrojo: relectura, `compras.existePorEvento`, `verificarQueSePuedeEliminar` y `eventos.eliminarPorId`). Sumar `compras` al constructor de `EventoService` y a su conexión en `backend/src/app.ts`.
 - [X] T077 [US4] Test de `DELETE /api/eventos/:eventoId` en `backend/tests/api/eventos.test.ts`: `204` (Noche de Rock; después, `GET` → `404`); `401`; `400`; `403`; `404`; `409 EVENTO_REALIZADO`; `409 EVENTO_CON_COMPRAS` (Festival).
 - [X] T078 [US4] Implementar `EventoController.eliminar` (`204`) y `DELETE /:eventoId` con `requerirUsuario` en `backend/src/routes/eventos.routes.ts`. Documentarlo en `backend/src/docs/openapi.json` y en la colección de Postman.
-- [ ] T079 [P] [US4] Test de `eliminarEvento(cliente, eventoId, { usuarioId })` (`DELETE /eventos/:eventoId` → `undefined`) en `mobile/tests/api/eventos.test.ts`, con el stub en `mobile/src/api/eventos.ts`.
-- [ ] T080 [US4] Implementar `eliminarEvento` en `mobile/src/api/eventos.ts`.
-- [ ] T081 [US4] Test en `mobile/tests/pantallas/editar-evento.test.tsx` (se amplía) con el stub de `useEliminarEvento`. Casos:
+- [X] T079 [P] [US4] Test de `eliminarEvento(cliente, eventoId, { usuarioId })` (`DELETE /eventos/:eventoId` → `undefined`) en `mobile/tests/api/eventos.test.ts`, con el stub en `mobile/src/api/eventos.ts`.
+- [X] T080 [US4] Implementar `eliminarEvento` en `mobile/src/api/eventos.ts`.
+- [X] T081 [US4] Test en `mobile/tests/pantallas/editar-evento.test.tsx` (se amplía) con el stub de `useEliminarEvento`. Casos:
   - "Eliminar evento" (variante `aviso`) → "¿Eliminar "<nombre>"?" / "Esta acción no se puede deshacer.";
   - Cancelar no envía nada;
   - Eliminar → `DELETE`, vuelve a Mis eventos sin diálogo de descarte y el evento ya no está;
   - `EVENTO_CON_COMPRAS` → aviso con el mensaje del servidor;
   - el botón queda deshabilitado mientras se elimina.
-- [ ] T082 [US4] Implementar `useEliminarEvento` en `mobile/src/features/eventos/mutaciones.ts` (invalida `misEventos`, `evento` y `usuarios`) y la sección final con "Eliminar evento" en `EditarEvento`.
+- [X] T082 [US4] Implementar `useEliminarEvento` en `mobile/src/features/eventos/mutaciones.ts` (invalida `misEventos`, `evento` y `usuarios`) y la sección final con "Eliminar evento" en `EditarEvento`.
 
 **Checkpoint**: las cuatro historias están completas.
 

@@ -1,4 +1,5 @@
 import type { EventoResumenVista } from "@ai-ticket-it/shared";
+import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { tema } from "../../../componentes";
@@ -9,7 +10,7 @@ export interface PropsFilaEvento {
   evento: EventoResumenVista;
 }
 
-/** Una fila de Mis eventos (contracts/app.md, "Mis eventos"). */
+/** Una fila de Mis eventos (contracts/app.md, "Mis eventos"): lleva al evento, para editarlo o verlo. */
 export function FilaEvento({ evento }: PropsFilaEvento) {
   const fechaHora = textoFechaHora(evento.fechaHoraLocal);
   const etiqueta = evento.realizado
@@ -19,6 +20,7 @@ export function FilaEvento({ evento }: PropsFilaEvento) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={etiqueta}
+      onPress={() => router.push({ pathname: "/eventos/[eventoId]", params: { eventoId: evento.id } })}
       style={({ pressed }) => [estilos.fila, pressed && estilos.presionada]}
     >
       <View style={estilos.textos}>

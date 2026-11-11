@@ -41,6 +41,16 @@ export function erroresDeFormulario(error: unknown, formulario: "evento" | "tipo
   return { campos, mensajeGeneral: fueraDelCuerpo || sinCampos ? error.mensaje : null };
 }
 
+/** 404 del evento o del tipo: la pantalla vuelve a Mis eventos (research R15). */
+export function esNoEncontrado(error: unknown): error is ErrorDeApi {
+  return error instanceof ErrorDeApi && error.status === 404;
+}
+
+/** 409 `EVENTO_REALIZADO`: la ruta del evento pasa a solo lectura. */
+export function esEventoRealizado(error: unknown): error is ErrorDeApi {
+  return error instanceof ErrorDeApi && error.codigo === "EVENTO_REALIZADO";
+}
+
 /**
  * Texto de precio o cupo → lo que se envía: un entero sin signo como número, vacío como `null` y
  * cualquier otra cosa tal cual, para que el servidor responda su mensaje (R13).

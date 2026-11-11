@@ -116,3 +116,22 @@ export function porRuta(
     return typeof elegida === "function" ? elegida(url, init) : elegida;
   };
 }
+
+/**
+ * Respuestas por método para una misma ruta (para usar dentro de `porRuta`): cada método consume su
+ * propia lista y, cuando se acaba, repite la última.
+ */
+export function porMetodo(
+  mapa: Partial<Record<"GET" | "POST" | "PUT" | "DELETE", ReadonlyArray<RespuestaFalsa | FuncionRespuesta>>>,
+): FuncionRespuesta {
+  const indices = new Map<string, number>();
+  return (url, init) => {
+    const metodo = (init?.method ?? "GET") as keyof typeof mapa;
+    const lista = mapa[metodo];
+    if (!lista) throw new Error(`porMetodo: no hay respuestas para ${metodo} ${url}`);
+    const indice = indices.get(metodo) ?? 0;
+    indices.set(metodo, indice + 1);
+    const elegida = lista[Math.min(indice, lista.length - 1)];
+    return typeof elegida === "function" ? elegida(url, init) : elegida;
+  };
+}
