@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback } from "react";
 
 import { listarEventos } from "../../api";
 import { claves, type ClaveCatalogo } from "../../consultas/claves";
@@ -24,4 +25,10 @@ export function useCatalogo(consulta: ClaveCatalogo) {
         { signal },
       ),
   });
+}
+
+/** Invalida todas las consultas del catálogo (el prefijo `["catalogo"]`), por ejemplo ante un 404. */
+export function useInvalidarCatalogo(): () => Promise<void> {
+  const queryClient = useQueryClient();
+  return useCallback(() => queryClient.invalidateQueries({ queryKey: ["catalogo"] }), [queryClient]);
 }

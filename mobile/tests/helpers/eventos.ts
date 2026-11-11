@@ -168,3 +168,33 @@ export function catalogo(
 
 /** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */
 export const CATALOGO_INICIAL = "/eventos?orden=fecha";
+
+/** Detalle de la Maratón: dos imágenes y un tipo gratis (feature 005). */
+export const maratonCompleta: EventoVista = {
+  ...maratonEnCatalogo,
+  descripcion: "Carrera de 10 km por las calles de la ciudad.",
+  multimedia: ["https://example.com/maraton.jpg", "https://example.com/llegada.jpg"],
+  tiposEntrada: [
+    {
+      id: "tipo-maraton-inscripcion",
+      nombre: "Inscripción",
+      descripcion: "Kit del corredor incluido.",
+      precio: 30000,
+      cupo: 1000,
+    },
+    { id: "tipo-maraton-kids", nombre: "Carrera kids", descripcion: "", precio: 0, cupo: 200 },
+  ],
+  organizador: luciaOrganizadora,
+};
+
+/** Detalle de Hamlet: agotado, de Martín, con puntaje. */
+export const hamletCompleto: EventoVista = {
+  ...hamletDeMartin,
+  descripcion: "",
+  multimedia: [],
+  tiposEntrada: [
+    { id: "tipo-hamlet-platea", nombre: "Platea", descripcion: "Butacas de platea.", precio: 25000, cupo: 0 },
+    { id: "tipo-hamlet-pullman", nombre: "Pullman", descripcion: "", precio: 18000, cupo: 0 },
+  ],
+  organizador: { ...hamletEnCatalogo.organizador, puntaje: 4.5, cantidadResenias: 12 },
+};

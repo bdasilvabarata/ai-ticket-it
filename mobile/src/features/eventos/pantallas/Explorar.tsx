@@ -1,9 +1,14 @@
+import { router } from "expo-router";
 import { FlatList, StyleSheet, View } from "react-native";
 
 import { ListaVacia, SegunConsulta, tema } from "../../../componentes";
 import { TarjetaEvento } from "../componentes/TarjetaEvento";
 import { TarjetaSkeleton } from "../componentes/TarjetaSkeleton";
 import { useCatalogo } from "../useCatalogo";
+
+/** El mismo detalle público para cualquier evento, también uno propio. */
+const abrirDetalle = (eventoId: string) =>
+  router.push({ pathname: "/explorar/[eventoId]", params: { eventoId } });
 
 /** Tres tarjetas de relleno, anunciadas una sola vez. */
 function CargandoEventos() {
@@ -39,7 +44,9 @@ export function Explorar() {
             data={catalogo.eventos}
             keyExtractor={(evento) => evento.id}
             contentContainerStyle={estilos.lista}
-            renderItem={({ item }) => <TarjetaEvento evento={item} />}
+            renderItem={({ item }) => (
+              <TarjetaEvento evento={item} alPresionar={() => abrirDetalle(item.id)} />
+            )}
           />
         )}
       </SegunConsulta>

@@ -171,6 +171,8 @@ export const tema = {
     /** Alto de las líneas de relleno del skeleton (texto normal y título de tarjeta). */
     lineaSkeleton: 14,
     lineaSkeletonTitulo: 20,
+    /** Cada imagen de la fila del detalle de un evento (proporción 16:9). */
+    imagenDetalle: { ancho: 240, alto: 135 },
   },
   /** Anchos relativos de las líneas del skeleton: imitan la forma de una tarjeta. */
   anchoSkeleton: {

@@ -84,6 +84,8 @@ function Pila({ estado }: { estado: EstadoSesion }) {
           name="eventos/[eventoId]/tipos-entrada/[tipoEntradaId]"
           options={{ title: "Editar tipo de entrada" }}
         />
+        {/* El detalle público desde Explorar (feature 005), también para un evento propio. */}
+        <Stack.Screen name="explorar/[eventoId]" options={{ title: "Evento" }} />
       </Stack.Protected>
       {/* Expo Router no admite declarar dos veces la misma pantalla: el selector va una sola vez.
           Sin usuario es la única ruta disponible, a pantalla completa. Con usuario, (tabs) está

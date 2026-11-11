@@ -18,12 +18,17 @@ import { esNoEncontrado } from "./errores-de-formulario";
 // Una mutation por escritura (research R15). Van en nombre del usuario **del formulario** (R12), no
 // se reintentan solas (`mutations.retry: false` del QueryClient) y, con éxito o error, invalidan lo
 // que pudo cambiar: la única fuente de verdad es el servidor (orden de Mis eventos, `realizado`).
+// Todas invalidan además el catálogo de Explorar (feature 005, R15): un cambio de nombre, fecha,
+// precio o cupo, o un evento nuevo o eliminado, cambia lo que se ve ahí.
+
+/** El prefijo de todas las consultas del catálogo (`claves.catalogo`). */
+const CATALOGO: QueryKey = ["catalogo"];
 
 function useInvalidar() {
   const queryClient = useQueryClient();
   return (clavesAInvalidar: QueryKey[], sinVolverAPedir: QueryKey[] = []) =>
     Promise.all([
-      ...clavesAInvalidar.map((queryKey) => queryClient.invalidateQueries({ queryKey })),
+      ...[...clavesAInvalidar, CATALOGO].map((queryKey) => queryClient.invalidateQueries({ queryKey })),
       ...sinVolverAPedir.map((queryKey) => queryClient.invalidateQueries({ queryKey, refetchType: "none" })),
     ]);
 }

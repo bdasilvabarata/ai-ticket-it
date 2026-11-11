@@ -18,3 +18,12 @@ export const conParametro: Href = {
 
 // @ts-expect-error la ruta dinámica necesita su parámetro eventoId (R16)
 export const sinParametro: Href = { pathname: "/eventos/[eventoId]" };
+
+// El detalle público de Explorar (feature 005): con su parámetro compila, sin él no.
+export const detallePublico: Href = {
+  pathname: "/explorar/[eventoId]",
+  params: { eventoId: "evento-maraton-10k" },
+};
+
+// @ts-expect-error el detalle público necesita su parámetro eventoId
+export const detalleSinParametro: Href = { pathname: "/explorar/[eventoId]" };
