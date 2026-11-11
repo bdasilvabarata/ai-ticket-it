@@ -64,7 +64,7 @@ function puntajesPorOrganizador(eventos: readonly Evento[], resenias: readonly R
 - `promedio` sin redondear (`[5, 4, 4]` → `4.333…`); el redondeo al décimo es de la app.
 - `puntajesPorOrganizador` agrupa cada reseña por el `organizadorId` de su evento; una reseña de
   un evento que no está en `eventos` se ignora. Un organizador sin reseñas no aparece en el
-  `Map` (el service usa `calcularPuntaje([])`).
+  `Map` (`ReseniaService` lo completa con `calcularPuntaje([])`).
 
 ### Interfaces de repositorio (`domain/repositorios.ts`)
 
@@ -76,29 +76,58 @@ interface RepositorioResenias {
 }
 ```
 
-`RepositorioEventos`, `RepositorioUsuarios` y `RepositorioCategorias` no cambian
-(`listar`, `listarPorOrganizador`, `buscarPorId` alcanzan).
+```ts
+interface RepositorioUsuarios {
+  // … lo de antes
+  /** Los que existen de esos ids (posiblemente ninguno), sin repetir: para `obtenerPorIds`. */
+  listarPorIds(ids: readonly string[]): Promise<Usuario[]>;
+}
+```
+
+`RepositorioEventos` (`listar`, `listarPorOrganizador`, `buscarPorId`, `siguienteId`) y
+`RepositorioCategorias` (con el `listarPorIds` del refactor de la 004) no cambian.
 
 ## Repositorios (`repositories/`)
 
 | Clase | Cambio |
 |---|---|
 | `ReseniaRepository` (nuevo) | `Map<string, Resenia>` privado, construido con `Resenia[]` (por defecto `[]`); `listarPorEventos` |
+| `UsuarioRepository` | + `listarPorIds` |
 | `Repositorios` / `crearRepositoriosDeEjemplo()` | suman `resenias: new ReseniaRepository([])` (vacío en el seed) |
 
 ## Services
 
-### EventoService (ampliado)
+Cada agregado tiene su service dueño (constitución 2.2.0, principio III). Dependencias, sin
+ciclos: `TipoEntradaService` → `EventoService` → `CategoriaService`, `UsuarioService`,
+`ReseniaService`.
 
-Dependencias: `eventos`, `categorias`, `compras`, **`usuarios`**, **`resenias`**, `cerrojo`,
-`reloj`.
+### UsuarioService (ampliado)
 
 | Método | Cambio |
 |---|---|
-| `listar(consulta: ConsultaCatalogoValidada)` (nuevo) | `{ texto: string; categoriaId?: string; orden: OrdenCatalogo }` → `CatalogoVista`. Sin cerrojo. Un `ahora` por pedido. Lecturas fijas por pedido (R7): `eventos.listar`, `categorias.listar`, `usuarios.listar`, `resenias.listarPorEventos` |
+| `obtenerOFallar(id)` | pasa a ser público (lo usa `EventoService` para el organizador del detalle) |
+| `obtenerPorIds(ids)` (nuevo) | `Map<string, Usuario>` en una lectura (`listarPorIds`); si falta alguno, `404 USUARIO_NO_ENCONTRADO` |
+
+### ReseniaService (nuevo)
+
+Dependencias: `resenias: RepositorioResenias`. No depende de otros services.
+
+| Método | Devuelve |
+|---|---|
+| `puntajesPorOrganizador(eventos)` | `Map<string, Puntaje>` con **todos** los organizadores de `eventos` (los sin reseñas, con `calcularPuntaje([])`); **un** `listarPorEventos` |
+| `puntajeDe(eventosDelOrganizador)` | el `Puntaje` de las reseñas de esos eventos; un `listarPorEventos` |
+
+### EventoService (ampliado)
+
+Dependencias: `eventos`, `compras`, `categoriaService`, **`usuarioService`**,
+**`reseniaService`**, `cerrojo`, `reloj`.
+
+| Método | Cambio |
+|---|---|
+| `listar(consulta: ConsultaCatalogoValidada)` (nuevo) | `{ texto: string; categoriaId?: string; orden: OrdenCatalogo }` → `CatalogoVista`. Sin cerrojo. Un `ahora` por pedido. Lecturas fijas por pedido (R7): `eventos.listar` y una llamada en lote a cada dueño: `categoriaService.obtenerPorIds`, `usuarioService.obtenerPorIds`, `reseniaService.puntajesPorOrganizador` |
 | `obtener(id)` | suma `organizador` a la vista |
 | `crear` / `actualizar` | su `EventoVista` también trae `organizador` (mismo tipo) |
-| `#organizadorVista(organizadorId)` (privado) | usuario + `listarPorOrganizador` + `listarPorEventos` → `OrganizadorVista` |
+| `#organizadorVista(organizadorId)` (privado) | `usuarioService.obtenerOFallar` + `eventos.listarPorOrganizador` + `reseniaService.puntajeDe` → `OrganizadorVista` |
 
 Flujo de `listar`:
 
@@ -106,7 +135,9 @@ Flujo de `listar`:
 ahora ─┐
 eventos.listar() ──► proximos (no realizados) ──► filtrados (categoría ∧ palabras)
                          │                              │
-                         └─ hayEventosProximos           ├─ organizadores ─► sus eventos (todos) ─► resenias.listarPorEventos ─► puntajes
+                         └─ hayEventosProximos           ├─ categoriaService.obtenerPorIds ─► categorías
+                                                         ├─ usuarioService.obtenerPorIds ─► organizadores
+                                                         ├─ sus eventos (todos) ─► reseniaService.puntajesPorOrganizador ─► puntajes
                                                          └─► vistas ─► ordenarCatalogo ─► { eventos, hayEventosProximos }
 ```
 

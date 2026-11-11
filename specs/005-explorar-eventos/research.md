@@ -164,10 +164,21 @@ dice lo contrario.
     - `puntajesPorOrganizador(eventos: readonly Evento[], resenias: readonly Resenia[]):
       Map<string, Puntaje>`: agrupa las reseñas por el organizador del evento reseñado. Un
       organizador sin reseñas no aparece y el service usa `calcularPuntaje([])`.
+  - **Service dueño** `services/resenia.service.ts` (constitución 2.2.0, principio III): las
+    reseñas son otro agregado, así que `EventoService` no lee su repositorio sino que le pide los
+    puntajes a `ReseniaService`:
+    - `puntajesPorOrganizador(eventos: readonly Evento[]): Promise<Map<string, Puntaje>>`, la
+      búsqueda en lote: **un** `listarPorEventos` con los ids de esos eventos y el cálculo de
+      `domain/`; el `Map` trae **todos** los organizadores de `eventos`, con
+      `calcularPuntaje([])` para los que no tienen reseñas;
+    - `puntajeDe(eventosDelOrganizador: readonly Evento[]): Promise<Puntaje>`, para el detalle.
+    - Recibe los eventos por parámetro y depende solo de `RepositorioResenias`: no conoce a
+      `EventoService`, así que no hay ciclo.
   - **Sin N+1**: el listado hace un número fijo de lecturas por pedido, sin importar cuántos
-    eventos haya: `eventos.listar()`, `categorias.listar()`, `usuarios.listar()` y **un**
-    `resenias.listarPorEventos(ids)` con los ids de **todos** los eventos (próximos y realizados)
-    de los organizadores que aparecen en la lista.
+    eventos haya: `eventos.listar()` (su agregado), `categoriaService.obtenerPorIds`,
+    `usuarioService.obtenerPorIds` y `reseniaService.puntajesPorOrganizador`, que hace **un**
+    `listarPorEventos` con **todos** los eventos (próximos y realizados) de los organizadores que
+    aparecen en la lista.
 - **Por qué todos los eventos del organizador**: el puntaje es el de "las reseñas de sus eventos"
   y solo se reseñan eventos realizados (constitución): filtrar por próximos dejaría todo puntaje
   vacío para siempre.
@@ -181,14 +192,21 @@ dice lo contrario.
     guarda").
   - Devolver siempre `null` sin repositorio (constante): cumple hoy, pero obliga a la 011 a
     cambiar la 005 (FR-010).
-  - Un `ReseniaService` que llame `EventoService` o al revés: un service no llama a otro (R1 de
-    la 004, anti-patrones).
+  - Que `EventoService` lea `RepositorioResenias` y `RepositorioUsuarios` directamente (la
+    versión anterior de este plan): la enmienda 2.2.0 lo descarta, porque son otros agregados y
+    su cruce le corresponde al dueño.
+  - Un `ReseniaService` que dependa de `EventoService` para buscar los eventos del organizador:
+    `EventoService` ya depende de él, y se formaría un ciclo. Por eso recibe los eventos.
 
 ## R8. `EventoService.listar(consulta)` y el organizador en `EventoVista` (FR-002, FR-030)
 
 - **Decision**:
-  - `EventoService` recibe por constructor también `usuarios: RepositorioUsuarios` y
-    `resenias: RepositorioResenias` (conectados en `app.ts`).
+  - `EventoService` recibe por constructor también `usuarioService: UsuarioService` y
+    `reseniaService: ReseniaService`. `app.ts` los conecta en orden (usuarios, categorías y
+    reseñas antes que eventos, y eventos antes que tipos de entrada).
+  - `UsuarioService` es el dueño de los usuarios: `obtenerOFallar(id)` pasa a ser público y suma
+    `obtenerPorIds(ids): Promise<Map<string, Usuario>>`, sobre `RepositorioUsuarios.listarPorIds`
+    (igual que `CategoriaService.obtenerPorIds`; si falta alguno, 404).
   - `listar({ texto, categoriaId, orden }): Promise<CatalogoVista>`, sin cerrojo (lectura, R2.4
     de la 004):
     1. `ahora = reloj.ahora()` **una vez** por pedido (todos los eventos se juzgan con el mismo
@@ -196,16 +214,20 @@ dice lo contrario.
     2. `proximos = todos.filter((e) => !e.estaRealizado(ahora))`;
     3. `palabras = palabrasDeBusqueda(texto)`; filtra por `categoriaId` (si viene) y por
        `coincideCon(palabras)`;
-    4. arma los puntajes de los organizadores de la lista en una pasada (R7) y las vistas
+    4. pide en lote las categorías (`categoriaService.obtenerPorIds`), los organizadores
+       (`usuarioService.obtenerPorIds`) y sus puntajes (`reseniaService.puntajesPorOrganizador`
+       con todos los eventos de esos organizadores; R7), y arma las vistas
        (`aEventoCatalogoVista`);
     5. ordena con `ordenarCatalogo` (R6) y responde `{ eventos, hayEventosProximos:
        proximos.length > 0 }`.
   - **Toda** `EventoVista` (la de `GET /:eventoId` y también las respuestas de `POST` y `PUT`)
     suma `organizador: OrganizadorVista`; ningún campo se quita ni cambia (`organizadorId`
-    sigue). Un helper privado `#organizadorVista(organizadorId)` lee el usuario, los eventos del
-    organizador (`listarPorOrganizador`) y sus reseñas.
-  - El organizador de un evento guardado siempre existe (los usuarios son fijos): si no, es un
-    error de programación (`Error`, 500), igual que `categoriaDe`.
+    sigue). Un helper privado `#organizadorVista(organizadorId)` pide el usuario
+    (`usuarioService.obtenerOFallar`), lee los eventos del organizador (`listarPorOrganizador`, su
+    agregado) y pide su puntaje (`reseniaService.puntajeDe`).
+  - El organizador de un evento guardado siempre existe (los usuarios son fijos). Si no
+    existiera, `usuarioService.obtenerOFallar` respondería `404 USUARIO_NO_ENCONTRADO`, igual que
+    la categoría con `categoriaService.obtenerOFallar`: el service no repite la búsqueda.
 - **Rationale**: una sola vista de detalle para todos (R8 de la 004): el detalle público no
   necesita otra ruta ni otro tipo. Las pantallas de la 004 ignoran el campo nuevo (SC-008).
 - **Alternatives considered**: `organizador` solo en el `GET` (dos formas de `EventoVista`, o un

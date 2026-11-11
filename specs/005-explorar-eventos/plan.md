@@ -15,15 +15,20 @@ que no se realizaron, lo busca por texto, lo filtra por categoría, lo ordena po
   query (zod con `crearValidacion`). Responde `CatalogoVista { eventos, hayEventosProximos }`:
   el segundo dato le dice a la app qué vacío mostrar sin pedir de más (R2).
 - `EventoService.listar(consulta)`: un `ahora` por pedido, filtra no realizados, categoría y
-  texto, arma los puntajes en una pasada y ordena. Sin cerrojo (lectura).
+  texto y ordena. Las categorías, los organizadores y los puntajes los pide **en lote** a sus
+  services dueños (`CategoriaService`, `UsuarioService`, `ReseniaService`; constitución 2.2.0,
+  principio III). Sin cerrojo (lectura).
 - Dominio puro: `Evento.precioDesde()`, `estaAgotado()` y `coincideCon(palabras)`;
   `domain/busqueda.ts` (normalización NFD que quita solo acento y diéresis de las vocales y
   conserva la ñ, coherente con `mismoNombreDeTipo`; R3); `domain/orden-catalogo.ts` (criterio
   y desempates fecha → nombre → id; R6).
 - **Reseña mínima**, como la `Compra` de la 004: entidad `Resenia` (puntuación 1..5),
   `RepositorioResenias.listarPorEventos` y `ReseniaRepository` vacío en el seed; el puntaje es
-  un cálculo puro (`calcularPuntaje`, `puntajesPorOrganizador`). Hoy todos salen "sin puntaje";
-  con la 011, el puntaje y el orden funcionan sin tocar la 005 (R7).
+  un cálculo puro (`calcularPuntaje`, `puntajesPorOrganizador`) y `ReseniaService`, su dueño, lo
+  sirve en lote. Hoy todos salen "sin puntaje"; con la 011, el puntaje y el orden funcionan sin
+  tocar la 005 (R7).
+- `UsuarioService` suma `obtenerOFallar` (público) y la búsqueda en lote `obtenerPorIds`, sobre
+  `RepositorioUsuarios.listarPorIds` (R8).
 - Toda `EventoVista` suma `organizador` (nombre, apellido, puntaje, cantidad de reseñas) sin
   quitar campos (R8).
 - Seed: Hamlet agotado y la Maratón con un tipo gratis, sin agregar eventos (R9).
@@ -63,7 +68,8 @@ seed)
 
 **Performance Goals**: SC-004 (la lista refleja un cambio en < 1 s después de dejar de
 escribir): 500 ms de debounce + un pedido en la red local. El listado hace un número fijo de
-lecturas de repositorio por pedido (sin N+1).
+lecturas de repositorio por pedido (sin N+1): cada service dueño responde su lote en una
+lectura.
 
 **Constraints**:
 - El servidor decide "realizado", la búsqueda, el filtro y el orden (FR-023); la app no usa el
@@ -91,7 +97,7 @@ lecturas de repositorio por pedido (sin N+1).
 | Dominio · zona horaria | "Realizado" con el reloj del servidor, un `ahora` por pedido; la app muestra `fechaHoraLocal` | ✅ |
 | I. Spec-Driven | Spec con 4 clarificaciones. Plan → tasks → implement. Backlog: 005 → `plan` | ✅ |
 | II. Test-First | Cada regla (no realizado, búsqueda, texto vacío, 100 caracteres, categoría inexistente, orden desconocido, precio "desde", gratis, agotado, puntaje ausente, desempates, 404) con su test y caso borde (SC-006), en domain, repositories, services y api; en mobile, api, formato, piezas base y pantallas. Cada test con su stub de firma real | ✅ |
-| III. Capas | `domain/` (búsqueda, orden, puntaje, `Resenia`, operaciones de `Evento`) sin Express ni `errors/`. El service orquesta y arma vistas; el controller solo lee la query validada; la forma va en `validations/`. `app.ts` conecta los repositorios nuevos. Ningún service llama a otro | ✅ |
+| III. Capas (2.2.0) | `domain/` (búsqueda, orden, puntaje, `Resenia`, operaciones de `Evento`) sin Express ni `errors/`. `EventoService` orquesta y arma vistas, y pide lo de otros agregados a su dueño: categorías a `CategoriaService`, organizadores a `UsuarioService` y puntajes a `ReseniaService`, en lote (`obtenerPorIds`, `puntajesPorOrganizador`). Sin ciclos: `ReseniaService` recibe los eventos y no depende de `EventoService`. El controller solo lee la query validada; la forma va en `validations/`. `app.ts` conecta los services en orden | ✅ |
 | IV. Persistencia en memoria | `ReseniaRepository` con `Map` privado, vacío en el seed; estado por instancia de app y de test; seed con ids legibles (`tipo-maraton-10k-carrera-kids`) | ✅ |
 | V. Contrato de API | `GET /api/eventos` en plural, JSON, formato único de error (400 con detalle en `query.*`); `contracts/api.md`, OpenAPI con su test de cobertura y Postman | ✅ |
 | VI. Identidad simulada | El listado y el detalle son públicos (no exponen nada privado; R8 de la 004). Vistas explícitas: `OrganizadorVista` solo con id, nombre, apellido y puntaje | ✅ |
@@ -104,7 +110,8 @@ lecturas de repositorio por pedido (sin N+1).
 **Post-design re-check (Phase 1)**: el diseño no agrega violaciones. Puntos que se registran en
 AGENTS.md al terminar la implementación (como hizo la 004):
 - `GET /eventos` público y `EventoVista` con `organizador`;
-- `Resenia` mínima y `RepositorioResenias.listarPorEventos` (lo amplía la 011);
+- `Resenia` mínima, `RepositorioResenias.listarPorEventos` y `ReseniaService` (lo amplía la 011);
+- `UsuarioService.obtenerOFallar` (público) y `obtenerPorIds`, sobre `RepositorioUsuarios.listarPorIds`;
 - Explorar y el detalle público en la feature `eventos`, la ruta `explorar/[eventoId]` y la
   clave `catalogo` **sin usuario** (la excepción documentada en `claves.ts`);
 - las props nuevas de `SegunConsulta` (`cargando`, `vacio`) y `ListaVacia` (`accion`).
@@ -148,10 +155,14 @@ backend/src/
 │   ├── busqueda.ts              # normalizarParaBuscar, palabrasDeBusqueda (nuevo)
 │   ├── orden-catalogo.ts        # ordenarCatalogo (nuevo)
 │   ├── resenia.ts               # Resenia, Puntaje, calcularPuntaje, puntajesPorOrganizador (nuevo)
-│   └── repositorios.ts          # + RepositorioResenias
-├── repositories/resenia.repository.ts   # ReseniaRepository (nuevo)
+│   └── repositorios.ts          # + RepositorioResenias; RepositorioUsuarios + listarPorIds
+├── repositories/
+│   ├── resenia.repository.ts    # ReseniaRepository (nuevo)
+│   └── usuario.repository.ts    # + listarPorIds
 ├── services/
-│   ├── evento.service.ts        # + listar; obtener/crear/actualizar con organizador; + usuarios, resenias
+│   ├── resenia.service.ts       # ReseniaService: puntajesPorOrganizador, puntajeDe (nuevo)
+│   ├── usuario.service.ts       # obtenerOFallar público + obtenerPorIds
+│   ├── evento.service.ts        # + listar; obtener/crear/actualizar con organizador; + usuarioService, reseniaService
 │   └── evento.vistas.ts         # + aOrganizadorVista, aEventoCatalogoVista; aEventoVista + organizador
 ├── controllers/evento.controller.ts     # + listar
 ├── routes/eventos.routes.ts             # + GET / (público)
@@ -160,12 +171,14 @@ backend/src/
 ├── seed/repositorios-de-ejemplo.ts      # Repositorios + resenias
 ├── docs/openapi.json                    # + GET /eventos y esquemas
 ├── docs/ai-ticket-it.postman_collection.json
-└── app.ts                               # ReseniaRepository y EventoService con usuarios y resenias
+└── app.ts                               # ReseniaRepository, ReseniaService y EventoService con usuarioService y reseniaService
 
 backend/tests/
 ├── domain/{busqueda,orden-catalogo,resenia}.test.ts (nuevos) + evento, datos-ejemplo
-├── repositories/resenia.repository.test.ts (nuevo) + repositorios-de-ejemplo
+├── repositories/resenia.repository.test.ts (nuevo) + repositorios, repositorios-de-ejemplo
+├── services/resenia.service.test.ts (nuevo) + usuario.service.test.ts (obtenerPorIds)
 ├── services/evento.service.test.ts      # + listar y organizador
+├── helpers/services-de-eventos.ts       # + usuarios y resenias
 └── api/eventos.test.ts                  # + GET /eventos y detalle ampliado (+ docs)
 
 mobile/
@@ -203,8 +216,8 @@ AGENTS.md                        # al cerrar: GET /eventos, Resenia mínima, Exp
 
 **Structure Decision**: la estructura de la 001/004 (backend en capas) y de la 003/004 (mobile
 en base, features y conectores), sin carpetas nuevas de primer nivel:
-- la búsqueda, el orden y el puntaje son módulos puros de `domain/` (como
-  `hora-buenos-aires.ts`), no services;
+- la búsqueda, el orden y el cálculo del puntaje son módulos puros de `domain/` (como
+  `hora-buenos-aires.ts`); `ReseniaService` solo lee las reseñas y delega el cálculo;
 - `Resenia` sigue el camino de `Compra`: entidad, interfaz y repositorio mínimos, sin endpoints;
 - Explorar va en la feature `eventos` por las reglas de dependencia (R11).
 
