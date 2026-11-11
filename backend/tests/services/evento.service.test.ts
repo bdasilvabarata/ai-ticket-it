@@ -1,23 +1,140 @@
+import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
+import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
-import { EntradaInvalidaError } from "../../src/errors/index";
+import { EntradaInvalidaError, NoEncontradoError, SinPermisoError } from "../../src/errors/index";
 import { CategoriaRepository } from "../../src/repositories/categoria.repository";
+import { CompraRepository } from "../../src/repositories/compra.repository";
 import { EventoRepository } from "../../src/repositories/evento.repository";
+import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
 import { EventoService } from "../../src/services/evento.service";
-import { AHORA, DIA, evento, musica, relojFijo, teatro, tipo } from "../helpers/eventos";
+import { AHORA, DIA, compra, evento, musica, relojFijo, teatro, tipo } from "../helpers/eventos";
 
 // Sin servidor: el service recibe los repositorios en memoria de producción, construidos con los
-// datos de cada caso, y un reloj fijo.
-function crearService(eventos: Evento[] = []) {
+// datos de cada caso, un reloj fijo y su cerrojo.
+function crearService(eventos: Evento[] = [], compras: Compra[] = []) {
   const repositorioEventos = new EventoRepository(eventos);
   const service = new EventoService({
     eventos: repositorioEventos,
     categorias: new CategoriaRepository([musica, teatro]),
+    compras: new CompraRepository(compras),
+    cerrojo: new CerrojoPorClave(),
     reloj: relojFijo(),
   });
   return { service, repositorioEventos };
 }
+
+/** Datos validados de `PUT /eventos/:id`. */
+const datosEditados = (cambios: { categoriaId?: string; fechaHora?: Date } = {}) => ({
+  nombre: "Nombre nuevo",
+  descripcion: "Descripción nueva.",
+  categoriaId: cambios.categoriaId ?? teatro.id,
+  fechaHora: cambios.fechaHora ?? new Date(AHORA.getTime() + 2 * DIA),
+  multimedia: [],
+});
+
+describe("EventoService.obtener", () => {
+  it("devuelve la vista completa del evento", async () => {
+    const { service } = crearService([evento({ id: "evento-a" })]);
+    expect(await service.obtener("evento-a")).toMatchObject({
+      id: "evento-a",
+      descripcion: "Descripción.",
+      multimedia: ["https://example.com/a.jpg"],
+      tiposEntrada: [
+        { id: "tipo-evento-a-general", nombre: "General", descripcion: "", precio: 1000, cupo: 10 },
+      ],
+    });
+  });
+
+  it("lanza 404 EVENTO_NO_ENCONTRADO si no existe", async () => {
+    const { service } = crearService();
+    await expect(service.obtener("evento-x")).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+  });
+});
+
+describe("EventoService.actualizar", () => {
+  it("reemplaza los datos, no toca los tipos y devuelve la vista", async () => {
+    const { service, repositorioEventos } = crearService([evento({ id: "evento-a" })]);
+    const vista = await service.actualizar("evento-a", "usuario-lucia", datosEditados());
+    expect(vista).toMatchObject({
+      nombre: "Nombre nuevo",
+      categoria: { id: "categoria-teatro", nombre: "Teatro" },
+      multimedia: [],
+      tiposEntrada: [{ id: "tipo-evento-a-general" }],
+    });
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.nombre).toBe("Nombre nuevo");
+  });
+
+  it("verifica en orden: 404 → 403 → 400 categoría → 409 realizado → 409 fecha, sin guardar nada", async () => {
+    const realizadoDeLucia = evento({ id: "evento-pasado", en: 0 });
+    const { service, repositorioEventos } = crearService([evento({ id: "evento-a" }), realizadoDeLucia]);
+    const original = await repositorioEventos.buscarPorId("evento-a");
+    const pasada = new Date(AHORA.getTime() - DIA);
+    const inexistente = "categoria-inexistente";
+
+    await expect(service.actualizar("evento-x", "usuario-martin", datosEditados())).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+    await expect(
+      service.actualizar("evento-a", "usuario-martin", datosEditados({ categoriaId: inexistente })),
+    ).rejects.toMatchObject({
+      constructor: SinPermisoError,
+      status: 403,
+      mensaje: "Solo el organizador puede modificar este evento.",
+    });
+    await expect(
+      service.actualizar(
+        "evento-pasado",
+        "usuario-lucia",
+        datosEditados({ categoriaId: inexistente, fechaHora: pasada }),
+      ),
+    ).rejects.toMatchObject({ constructor: EntradaInvalidaError });
+    await expect(
+      service.actualizar("evento-pasado", "usuario-lucia", datosEditados({ fechaHora: pasada })),
+    ).rejects.toMatchObject({ codigo: "EVENTO_REALIZADO" });
+    await expect(
+      service.actualizar("evento-a", "usuario-lucia", datosEditados({ fechaHora: pasada })),
+    ).rejects.toMatchObject({ codigo: "FECHA_NO_FUTURA" });
+    expect(await repositorioEventos.buscarPorId("evento-a")).toBe(original);
+    expect(await repositorioEventos.buscarPorId("evento-pasado")).toBe(realizadoDeLucia);
+  });
+});
+
+describe("EventoService.eliminar", () => {
+  it("elimina un evento propio, próximo y sin compras", async () => {
+    const { service, repositorioEventos } = crearService([evento({ id: "evento-a" })]);
+    await service.eliminar("evento-a", "usuario-lucia");
+    expect(await repositorioEventos.buscarPorId("evento-a")).toBeNull();
+  });
+
+  it("verifica en orden: 404 → 403 → 409, y no elimina nada si falla", async () => {
+    const conCompra = evento({ id: "evento-a" });
+    const realizado = evento({ id: "evento-pasado", en: -DIA });
+    const { service, repositorioEventos } = crearService(
+      [conCompra, realizado],
+      [compra("evento-a", "tipo-evento-a-general", EstadoCompra.CANCELADA)],
+    );
+
+    await expect(service.eliminar("evento-x", "usuario-lucia")).rejects.toMatchObject({
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+    await expect(service.eliminar("evento-a", "usuario-martin")).rejects.toMatchObject({ status: 403 });
+    await expect(service.eliminar("evento-pasado", "usuario-lucia")).rejects.toMatchObject({
+      codigo: "EVENTO_REALIZADO",
+    });
+    // Una compra cancelada también cuenta.
+    await expect(service.eliminar("evento-a", "usuario-lucia")).rejects.toMatchObject({
+      constructor: ReglaDeNegocioError,
+      codigo: "EVENTO_CON_COMPRAS",
+    });
+    expect((await repositorioEventos.listar()).map((e) => e.id)).toEqual(["evento-a", "evento-pasado"]);
+  });
+});
 
 describe("EventoService.listarMios", () => {
   it("devuelve solo los eventos que organiza el usuario (FR-002)", async () => {

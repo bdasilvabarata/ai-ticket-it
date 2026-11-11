@@ -134,7 +134,7 @@ Maratón en ese orden, sin eventos de otros; elegir a Sofía y ver Noche de risa
 - [X] T021 [US2] Implementar `aEventoResumenVista(evento, categoria, ahora)` en `backend/src/services/evento.vistas.ts` (con `horaDeBuenosAires`) y `EventoService.listarMios` en `backend/src/services/evento.service.ts`.
 - [X] T022 [US2] Test de `GET /api/eventos/mios` en `backend/tests/api/eventos.test.ts` (supertest con `crearApp({ reloj })`), con los stubs de `backend/src/controllers/evento.controller.ts` y `backend/src/routes/eventos.routes.ts`. Casos: `401 USUARIO_NO_IDENTIFICADO` sin `X-Usuario-Id`; Lucía → Noche de Rock, Festival y Maratón en ese orden; Sofía → Clásico de básquet y, al final, Noche de risas con `realizado: true`; un usuario sin eventos → `[]`.
 - [X] T023 [US2] Implementar `EventoController.listarMios` en `backend/src/controllers/evento.controller.ts` y `crearEventosRouter` en `backend/src/routes/eventos.routes.ts` (`GET /mios` con `requerirUsuario`, declarada antes de `/:eventoId`). Montarlo en `/eventos` en `backend/src/routes/index.ts` (`ControllersApi` suma `eventos`) y conectar `EventoService` y `EventoController` en `backend/src/app.ts`.
-- [ ] T024 [US2] Documentar `GET /api/eventos/mios` en `backend/src/docs/openapi.json` (tag **Eventos**, esquema `EventoResumenVista`, `401`) y sumar el pedido a `backend/src/docs/ai-ticket-it.postman_collection.json`. `backend/tests/api/docs.test.ts` en verde.
+- [X] T024 [US2] Documentar `GET /api/eventos/mios` en `backend/src/docs/openapi.json` (tag **Eventos**, esquema `EventoResumenVista`, `401`) y sumar el pedido a `backend/src/docs/ai-ticket-it.postman_collection.json`. `backend/tests/api/docs.test.ts` en verde.
 
 ### Mobile
 
@@ -169,7 +169,7 @@ actual como organizador, y cada dato inválido → `400` con su detalle por camp
 - [X] T029 [P] [US1] Test de `CategoriaService.listar()` en `backend/tests/services/categoria.service.test.ts` (las `CategoriaVista` ordenadas por nombre con el collator `es`), con el stub de `backend/src/services/categoria.service.ts`.
 - [X] T030 [US1] Implementar `CategoriaService` en `backend/src/services/categoria.service.ts`.
 - [X] T031 [US1] Test de `GET /api/categorias` (público, 6 categorías por nombre) en `backend/tests/api/categorias.test.ts`, con los stubs de `backend/src/controllers/categoria.controller.ts` y `backend/src/routes/categorias.routes.ts`.
-- [ ] T032 [US1] Implementar `CategoriaController` y `crearCategoriasRouter`, montarlo en `/categorias` en `backend/src/routes/index.ts` y conectarlo en `backend/src/app.ts`. Documentarlo en `backend/src/docs/openapi.json` (tag **Categorías**) y en la colección de Postman.
+- [X] T032 [US1] Implementar `CategoriaController` y `crearCategoriasRouter`, montarlo en `/categorias` en `backend/src/routes/index.ts` y conectarlo en `backend/src/app.ts`. Documentarlo en `backend/src/docs/openapi.json` (tag **Categorías**) y en la colección de Postman.
 
 ### Backend: crear evento
 
@@ -202,7 +202,7 @@ actual como organizador, y cada dato inválido → `400` con su detalle por camp
   - `409 NOMBRE_TIPO_ENTRADA_REPETIDO` con "VIP" y " vip ", y con "Platea" y "Plátea";
   - `"organizadorId": "usuario-sofia"` en el cuerpo se ignora;
   - el evento creado aparece en `GET /api/eventos/mios`.
-- [ ] T039 [US1] Implementar `EventoController.crear` (`201`) y `POST /` con `requerirUsuario` y la validación en `backend/src/routes/eventos.routes.ts`. Documentar en `backend/src/docs/openapi.json` (esquemas `DatosNuevoEvento`, `EventoVista`, `TipoEntradaVista` y los errores) y en la colección de Postman.
+- [X] T039 [US1] Implementar `EventoController.crear` (`201`) y `POST /` con `requerirUsuario` y la validación en `backend/src/routes/eventos.routes.ts`. Documentar en `backend/src/docs/openapi.json` (esquemas `DatosNuevoEvento`, `EventoVista`, `TipoEntradaVista` y los errores) y en la colección de Postman.
 
 ### Mobile
 
@@ -255,28 +255,28 @@ compras, último tipo, nombre repetido, sin permiso, no encontrado).
 
 ### Backend: dominio
 
-- [ ] T052 [US3] Test de las operaciones en `backend/tests/domain/evento.test.ts`. Cada una devuelve un `Evento` **nuevo** y el original no cambia. Casos:
+- [X] T052 [US3] Test de las operaciones en `backend/tests/domain/evento.test.ts`. Cada una devuelve un `Evento` **nuevo** y el original no cambia. Casos:
   - `actualizar(datos, ahora)`: `EVENTO_REALIZADO` (en el borde) antes que `FECHA_NO_FUTURA`; conserva `id`, `organizadorId` y `tiposEntrada`;
   - `agregarTipoEntrada(tipo, ahora)`: `EVENTO_REALIZADO`; cupo 0 → `DatosInvalidosError`; nombre repetido sin mayúsculas ni tildes → `NOMBRE_TIPO_ENTRADA_REPETIDO`; queda al final;
   - `editarTipoEntrada(tipoId, datos, ahora)`: `EVENTO_REALIZADO`; conservar el propio nombre (o cambiarle solo mayúsculas o tildes) se acepta; el nombre de **otro** tipo → `NOMBRE_TIPO_ENTRADA_REPETIDO`; cupo 0 se acepta (agotado); tipo inexistente → error (red de seguridad);
   - `quitarTipoEntrada(tipoId, { ahora, tieneCompras })`: `EVENTO_REALIZADO`, después `ULTIMO_TIPO_ENTRADA` y después `TIPO_ENTRADA_CON_COMPRAS`, en ese orden.
-- [ ] T053 [US3] Implementar `actualizar`, `agregarTipoEntrada`, `editarTipoEntrada` y `quitarTipoEntrada` en `backend/src/domain/evento.ts`, construyendo siempre con el constructor para volver a verificar las invariantes (R7).
+- [X] T053 [US3] Implementar `actualizar`, `agregarTipoEntrada`, `editarTipoEntrada` y `quitarTipoEntrada` en `backend/src/domain/evento.ts`, construyendo siempre con el constructor para volver a verificar las invariantes (R7).
 
 ### Backend: validaciones y services
 
-- [ ] T054 [US3] Validaciones:
+- [X] T054 [US3] Validaciones:
   - en `backend/src/validations/evento.validation.ts`, `params.eventoId` con `idSchema` y el cuerpo de editar (`DatosEvento`, las mismas reglas de crear sin `tiposEntrada`);
   - en `backend/src/validations/tipo-entrada.validation.ts` (nuevo), `params.eventoId` y `params.tipoEntradaId` con `idSchema`, y los cuerpos de crear (`cupo` entero ≥ 1: "Debe ser un entero mayor o igual a 1.") y de editar (`cupo` entero ≥ 0: "Debe ser un entero mayor o igual a 0."), con `nombre` (`trim`, 1–50), `descripcion` (opcional, `trim`, ≤ 300) y `precio` (entero ≥ 0).
-- [ ] T055 [US3] Test de `EventoService.obtener(id)` (404 `EVENTO_NO_ENCONTRADO`) y `actualizar(id, usuarioId, datos)` en `backend/tests/services/evento.service.test.ts`. El orden es `404 → 403 → 400 categoría → 409 EVENTO_REALIZADO → 409 FECHA_NO_FUTURA`, y nada se guarda cuando falla. Los tipos no se tocan.
-- [ ] T056 [US3] Implementar `obtener`, `actualizar` y `#obtenerOFallar` en `backend/src/services/evento.service.ts`. `actualizar` corre bajo `cerrojo.ejecutar(id, …)`, con la relectura y `reloj.ahora()` adentro. Los errores 404 y 403 salen de `errors/` (403 "Solo el organizador puede modificar este evento."). Sumar `cerrojo` al constructor de `EventoService`, y crear en `backend/src/app.ts` la **única** instancia de `CerrojoPorClave` para pasársela (T062 le pasa la misma a `TipoEntradaService`).
-- [ ] T057 [US3] Test de `backend/tests/services/tipo-entrada.service.test.ts` con el stub de `backend/src/services/tipo-entrada.service.ts` (constructor `{ eventos, compras, cerrojo, reloj }`; `crear(eventoId, usuarioId, datos)`, `actualizar(eventoId, tipoId, usuarioId, datos)`, `eliminar(eventoId, tipoId, usuarioId)`). Casos:
+- [X] T055 [US3] Test de `EventoService.obtener(id)` (404 `EVENTO_NO_ENCONTRADO`) y `actualizar(id, usuarioId, datos)` en `backend/tests/services/evento.service.test.ts`. El orden es `404 → 403 → 400 categoría → 409 EVENTO_REALIZADO → 409 FECHA_NO_FUTURA`, y nada se guarda cuando falla. Los tipos no se tocan.
+- [X] T056 [US3] Implementar `obtener`, `actualizar` y `#obtenerOFallar` en `backend/src/services/evento.service.ts`. `actualizar` corre bajo `cerrojo.ejecutar(id, …)`, con la relectura y `reloj.ahora()` adentro. Los errores 404 y 403 salen de `errors/` (403 "Solo el organizador puede modificar este evento."). Sumar `cerrojo` al constructor de `EventoService`, y crear en `backend/src/app.ts` la **única** instancia de `CerrojoPorClave` para pasársela (T062 le pasa la misma a `TipoEntradaService`).
+- [X] T057 [US3] Test de `backend/tests/services/tipo-entrada.service.test.ts` con el stub de `backend/src/services/tipo-entrada.service.ts` (constructor `{ eventos, compras, cerrojo, reloj }`; `crear(eventoId, usuarioId, datos)`, `actualizar(eventoId, tipoId, usuarioId, datos)`, `eliminar(eventoId, tipoId, usuarioId)`). Casos:
   - orden `404 evento → 403 → 404 TIPO_ENTRADA_NO_ENCONTRADO` (también para un tipo que existe en **otro** evento, FR-023) `→ 409`;
   - `TIPO_ENTRADA_CON_COMPRAS` con una compra `CANCELADA`;
   - cambiar el precio de un tipo con compras se acepta y el `total` de la compra no cambia (FR-015);
   - crear devuelve un UUID nuevo;
   - nada se guarda cuando falla.
-- [ ] T058 [US3] Implementar `TipoEntradaService` en `backend/src/services/tipo-entrada.service.ts`, con `#obtenerEventoOFallar` y `#obtenerTipoOFallar(evento, tipoId)`, y cada escritura bajo el cerrojo del evento (flujo de data-model, "Services").
-- [ ] T059 [US3] Test de concurrencia en `backend/tests/services/concurrencia.test.ts` (`Promise.all`, con los dos services compartiendo un `CerrojoPorClave`). Casos:
+- [X] T058 [US3] Implementar `TipoEntradaService` en `backend/src/services/tipo-entrada.service.ts`, con `#obtenerEventoOFallar` y `#obtenerTipoOFallar(evento, tipoId)`, y cada escritura bajo el cerrojo del evento (flujo de data-model, "Services").
+- [X] T059 [US3] Test de concurrencia en `backend/tests/services/concurrencia.test.ts` (`Promise.all`, con los dos services compartiendo un `CerrojoPorClave`). Casos:
   - dos tipos "VIP" agregados a la vez → uno se crea y el otro da `NOMBRE_TIPO_ENTRADA_REPETIDO`;
   - dos tipos distintos agregados a la vez → quedan los dos (sin actualización perdida);
   - dos tipos renombrados a la vez al mismo nombre → uno da `200` y el otro `NOMBRE_TIPO_ENTRADA_REPETIDO`;
@@ -285,10 +285,10 @@ compras, último tipo, nombre repetido, sin permiso, no encontrado).
 
 ### Backend: API
 
-- [ ] T060 [US3] Test de `GET /api/eventos/:eventoId` (público: `200` con `EventoVista`, `400` con un id mal formado, `404`) y `PUT /api/eventos/:eventoId` en `backend/tests/api/eventos.test.ts`. Para el `PUT`: `200`; `401`; `400`; `403` (Lucía sobre `evento-hamlet`); `404`; `409 EVENTO_REALIZADO` (Sofía sobre `evento-noche-de-risas`); `409 FECHA_NO_FUTURA`. Además, un pedido rechazado no deja nada modificado (`GET` posterior igual).
-- [ ] T061 [US3] Test de `POST`, `PUT` y `DELETE /api/eventos/:eventoId/tipos-entrada[/:tipoEntradaId]` en `backend/tests/api/tipos-entrada.test.ts`, con los stubs de `backend/src/controllers/tipo-entrada.controller.ts` y del router hijo. Casos: `201` / `200` / `204`; `401`; `400` (cupo 0 al crear, −1 al editar, ids mal formados); `403`; `404 EVENTO_NO_ENCONTRADO`; `404 TIPO_ENTRADA_NO_ENCONTRADO` (`tipo-hamlet-platea` en Noche de Rock); `409 EVENTO_REALIZADO`; `NOMBRE_TIPO_ENTRADA_REPETIDO`; `ULTIMO_TIPO_ENTRADA` (General de Noche de Rock); `TIPO_ENTRADA_CON_COMPRAS` (General del Festival, con compra `CANCELADA`); `204` al quitar Backstage del Festival.
-- [ ] T062 [US3] Implementar `EventoController.obtener` y `actualizar`, y las rutas `GET /:eventoId` (público) y `PUT /:eventoId` (`requerirUsuario`) en `backend/src/routes/eventos.routes.ts`. Implementar `TipoEntradaController` en `backend/src/controllers/tipo-entrada.controller.ts` y el router hijo `Router({ mergeParams: true })` montado en `/:eventoId/tipos-entrada` (todas las rutas con `requerirUsuario`). Conectar `TipoEntradaService` y `TipoEntradaController` en `backend/src/app.ts`, con el **mismo** cerrojo que `EventoService`.
-- [ ] T063 [US3] Documentar `GET` y `PUT /api/eventos/{eventoId}` y los tres endpoints de **Tipos de entrada** en `backend/src/docs/openapi.json` (esquemas `DatosEvento` y `DatosTipoEntrada`, y cada código de error de `contracts/api.md`), y sumarlos a la colección de Postman. `backend/tests/api/docs.test.ts` en verde.
+- [X] T060 [US3] Test de `GET /api/eventos/:eventoId` (público: `200` con `EventoVista`, `400` con un id mal formado, `404`) y `PUT /api/eventos/:eventoId` en `backend/tests/api/eventos.test.ts`. Para el `PUT`: `200`; `401`; `400`; `403` (Lucía sobre `evento-hamlet`); `404`; `409 EVENTO_REALIZADO` (Sofía sobre `evento-noche-de-risas`); `409 FECHA_NO_FUTURA`. Además, un pedido rechazado no deja nada modificado (`GET` posterior igual).
+- [X] T061 [US3] Test de `POST`, `PUT` y `DELETE /api/eventos/:eventoId/tipos-entrada[/:tipoEntradaId]` en `backend/tests/api/tipos-entrada.test.ts`, con los stubs de `backend/src/controllers/tipo-entrada.controller.ts` y del router hijo. Casos: `201` / `200` / `204`; `401`; `400` (cupo 0 al crear, −1 al editar, ids mal formados); `403`; `404 EVENTO_NO_ENCONTRADO`; `404 TIPO_ENTRADA_NO_ENCONTRADO` (`tipo-hamlet-platea` en Noche de Rock); `409 EVENTO_REALIZADO`; `NOMBRE_TIPO_ENTRADA_REPETIDO`; `ULTIMO_TIPO_ENTRADA` (General de Noche de Rock); `TIPO_ENTRADA_CON_COMPRAS` (General del Festival, con compra `CANCELADA`); `204` al quitar Backstage del Festival.
+- [X] T062 [US3] Implementar `EventoController.obtener` y `actualizar`, y las rutas `GET /:eventoId` (público) y `PUT /:eventoId` (`requerirUsuario`) en `backend/src/routes/eventos.routes.ts`. Implementar `TipoEntradaController` en `backend/src/controllers/tipo-entrada.controller.ts` y el router hijo `Router({ mergeParams: true })` montado en `/:eventoId/tipos-entrada` (todas las rutas con `requerirUsuario`). Conectar `TipoEntradaService` y `TipoEntradaController` en `backend/src/app.ts`, con el **mismo** cerrojo que `EventoService`.
+- [X] T063 [US3] Documentar `GET` y `PUT /api/eventos/{eventoId}` y los tres endpoints de **Tipos de entrada** en `backend/src/docs/openapi.json` (esquemas `DatosEvento` y `DatosTipoEntrada`, y cada código de error de `contracts/api.md`), y sumarlos a la colección de Postman. `backend/tests/api/docs.test.ts` en verde.
 
 ### Mobile
 
@@ -335,12 +335,12 @@ confirmar.
 cancelar la confirmación y ver que sigue; por el lado del servidor, el rechazo de un evento
 realizado, con compras, ajeno o inexistente.
 
-- [ ] T073 [US4] Test de `verificarQueSePuedeEliminar({ ahora, tieneCompras })` en `backend/tests/domain/evento.test.ts`: `EVENTO_REALIZADO` (en el borde) antes que `EVENTO_CON_COMPRAS`, y sin error si se puede eliminar.
-- [ ] T074 [US4] Implementar `verificarQueSePuedeEliminar` en `backend/src/domain/evento.ts`.
-- [ ] T075 [US4] Test de `EventoService.eliminar(id, usuarioId)` en `backend/tests/services/evento.service.test.ts`: orden `404 → 403 → 409`; `EVENTO_CON_COMPRAS` con una compra `CANCELADA`; nada se elimina cuando falla. Sumar a `backend/tests/services/concurrencia.test.ts` el caso de eliminar el evento mientras una operación simulada de la 006 guarda una compra bajo el **mismo** cerrojo: o se elimina y la compra ve el evento inexistente, o la compra entra primero y eliminar da `EVENTO_CON_COMPRAS`.
-- [ ] T076 [US4] Implementar `EventoService.eliminar` en `backend/src/services/evento.service.ts` (bajo el cerrojo: relectura, `compras.existePorEvento`, `verificarQueSePuedeEliminar` y `eventos.eliminarPorId`). Sumar `compras` al constructor de `EventoService` y a su conexión en `backend/src/app.ts`.
-- [ ] T077 [US4] Test de `DELETE /api/eventos/:eventoId` en `backend/tests/api/eventos.test.ts`: `204` (Noche de Rock; después, `GET` → `404`); `401`; `400`; `403`; `404`; `409 EVENTO_REALIZADO`; `409 EVENTO_CON_COMPRAS` (Festival).
-- [ ] T078 [US4] Implementar `EventoController.eliminar` (`204`) y `DELETE /:eventoId` con `requerirUsuario` en `backend/src/routes/eventos.routes.ts`. Documentarlo en `backend/src/docs/openapi.json` y en la colección de Postman.
+- [X] T073 [US4] Test de `verificarQueSePuedeEliminar({ ahora, tieneCompras })` en `backend/tests/domain/evento.test.ts`: `EVENTO_REALIZADO` (en el borde) antes que `EVENTO_CON_COMPRAS`, y sin error si se puede eliminar.
+- [X] T074 [US4] Implementar `verificarQueSePuedeEliminar` en `backend/src/domain/evento.ts`.
+- [X] T075 [US4] Test de `EventoService.eliminar(id, usuarioId)` en `backend/tests/services/evento.service.test.ts`: orden `404 → 403 → 409`; `EVENTO_CON_COMPRAS` con una compra `CANCELADA`; nada se elimina cuando falla. Sumar a `backend/tests/services/concurrencia.test.ts` el caso de eliminar el evento mientras una operación simulada de la 006 guarda una compra bajo el **mismo** cerrojo: o se elimina y la compra ve el evento inexistente, o la compra entra primero y eliminar da `EVENTO_CON_COMPRAS`.
+- [X] T076 [US4] Implementar `EventoService.eliminar` en `backend/src/services/evento.service.ts` (bajo el cerrojo: relectura, `compras.existePorEvento`, `verificarQueSePuedeEliminar` y `eventos.eliminarPorId`). Sumar `compras` al constructor de `EventoService` y a su conexión en `backend/src/app.ts`.
+- [X] T077 [US4] Test de `DELETE /api/eventos/:eventoId` en `backend/tests/api/eventos.test.ts`: `204` (Noche de Rock; después, `GET` → `404`); `401`; `400`; `403`; `404`; `409 EVENTO_REALIZADO`; `409 EVENTO_CON_COMPRAS` (Festival).
+- [X] T078 [US4] Implementar `EventoController.eliminar` (`204`) y `DELETE /:eventoId` con `requerirUsuario` en `backend/src/routes/eventos.routes.ts`. Documentarlo en `backend/src/docs/openapi.json` y en la colección de Postman.
 - [ ] T079 [P] [US4] Test de `eliminarEvento(cliente, eventoId, { usuarioId })` (`DELETE /eventos/:eventoId` → `undefined`) en `mobile/tests/api/eventos.test.ts`, con el stub en `mobile/src/api/eventos.ts`.
 - [ ] T080 [US4] Implementar `eliminarEvento` en `mobile/src/api/eventos.ts`.
 - [ ] T081 [US4] Test en `mobile/tests/pantallas/editar-evento.test.tsx` (se amplía) con el stub de `useEliminarEvento`. Casos:

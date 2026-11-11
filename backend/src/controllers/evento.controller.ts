@@ -2,7 +2,7 @@ import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { EventoService } from "../services/evento.service";
-import { eventoNuevo } from "../validations/evento.validation";
+import { eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 
 /** HTTP de eventos: lee la entrada ya validada, llama al service y arma la respuesta. */
 export class EventoController {
@@ -16,5 +16,22 @@ export class EventoController {
   crear = async (req: Request, res: Response<EventoVista>): Promise<void> => {
     const datos = eventoNuevo.leer(req, "body");
     res.status(201).json(await this.eventoService.crear(usuarioActual(req).id, datos));
+  };
+
+  obtener = async (req: Request, res: Response<EventoVista>): Promise<void> => {
+    const { eventoId } = eventoPorId.leer(req, "params");
+    res.json(await this.eventoService.obtener(eventoId));
+  };
+
+  actualizar = async (req: Request, res: Response<EventoVista>): Promise<void> => {
+    const { eventoId } = eventoEditado.leer(req, "params");
+    const datos = eventoEditado.leer(req, "body");
+    res.json(await this.eventoService.actualizar(eventoId, usuarioActual(req).id, datos));
+  };
+
+  eliminar = async (req: Request, res: Response): Promise<void> => {
+    const { eventoId } = eventoPorId.leer(req, "params");
+    await this.eventoService.eliminar(eventoId, usuarioActual(req).id);
+    res.status(204).end();
   };
 }

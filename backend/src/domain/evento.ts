@@ -142,6 +142,93 @@ export class Evento {
     return this.tiposEntrada.find((tipo) => tipo.id === tipoId) ?? null;
   }
 
+  // Operaciones (research R7): verifican sus reglas y devuelven un Evento **nuevo**, construido con
+  // el constructor para volver a verificar las invariantes; `this` no cambia. `ahora` lo pasa el
+  // service, que lo lee del reloj dentro del cerrojo del evento.
+
+  /** Reemplaza los datos del evento; conserva id, organizador y tipos. */
+  actualizar(datos: DatosDeEvento, ahora: Date): Evento {
+    this.#exigirNoRealizado(ahora);
+    exigirFechaFutura(datos.fechaHora, ahora);
+    return this.#con(datos);
+  }
+
+  /** Agrega un tipo al final; al crearlo el cupo es ≥ 1 (un tipo agotado solo se llega a tener). */
+  agregarTipoEntrada(tipo: TipoEntrada, ahora: Date): Evento {
+    this.#exigirNoRealizado(ahora);
+    new Invariantes().exigir(tipo.cupo >= 1, "cupo", "Debe ser un entero mayor o igual a 1.").verificar();
+    return this.#con({ tiposEntrada: [...this.tiposEntrada, tipo] });
+  }
+
+  /** Edita un tipo en su lugar; el nombre se compara contra los **otros** tipos (constructor). */
+  editarTipoEntrada(tipoId: string, datos: DatosDeTipoEntrada, ahora: Date): Evento {
+    this.#exigirNoRealizado(ahora);
+    const editado = this.#tipoOFallar(tipoId).con(datos);
+    return this.#con({
+      tiposEntrada: this.tiposEntrada.map((tipo) => (tipo.id === tipoId ? editado : tipo)),
+    });
+  }
+
+  /** Quita un tipo: no realizado, no el último y sin compras (en ese orden; R5). */
+  quitarTipoEntrada(tipoId: string, { ahora, tieneCompras }: { ahora: Date; tieneCompras: boolean }): Evento {
+    this.#exigirNoRealizado(ahora);
+    this.#tipoOFallar(tipoId);
+    if (this.tiposEntrada.length === 1) {
+      throw new ReglaDeNegocioError(
+        "ULTIMO_TIPO_ENTRADA",
+        "El evento debe conservar al menos un tipo de entrada.",
+      );
+    }
+    if (tieneCompras) {
+      throw new ReglaDeNegocioError(
+        "TIPO_ENTRADA_CON_COMPRAS",
+        "El tipo de entrada tiene compras: no se puede quitar.",
+      );
+    }
+    return this.#con({ tiposEntrada: this.tiposEntrada.filter((tipo) => tipo.id !== tipoId) });
+  }
+
+  /** Un evento se elimina si no se realizó y no tiene compras (en ningún estado). No devuelve nada. */
+  verificarQueSePuedeEliminar({ ahora, tieneCompras }: { ahora: Date; tieneCompras: boolean }): void {
+    this.#exigirNoRealizado(ahora);
+    if (tieneCompras) {
+      throw new ReglaDeNegocioError("EVENTO_CON_COMPRAS", "El evento tiene compras: no se puede eliminar.");
+    }
+  }
+
+  #exigirNoRealizado(ahora: Date): void {
+    if (this.estaRealizado(ahora)) {
+      throw new ReglaDeNegocioError("EVENTO_REALIZADO", "El evento ya se realizó: no se puede modificar.");
+    }
+  }
+
+  /** Red de seguridad: el service ya respondió 404 si el tipo no es de este evento (R5). */
+  #tipoOFallar(tipoId: string): TipoEntrada {
+    const tipo = this.buscarTipoEntrada(tipoId);
+    if (!tipo) {
+      throw new ReglaDeNegocioError(
+        "TIPO_ENTRADA_NO_ENCONTRADO",
+        "No existe el tipo de entrada en este evento.",
+      );
+    }
+    return tipo;
+  }
+
+  /** Un Evento nuevo con estos cambios, verificado por el constructor. */
+  #con(cambios: Partial<PropiedadesEvento>): Evento {
+    return new Evento({
+      id: this.id,
+      nombre: this.nombre,
+      descripcion: this.descripcion,
+      categoriaId: this.categoriaId,
+      fechaHora: this.fechaHora,
+      multimedia: [...this.multimedia],
+      organizadorId: this.organizadorId,
+      tiposEntrada: [...this.tiposEntrada],
+      ...cambios,
+    });
+  }
+
   /**
    * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
    * consigna; lo usa la búsqueda por precio de la feature 005).

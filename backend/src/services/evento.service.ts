@@ -3,13 +3,17 @@ import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import type { Categoria } from "../domain/categoria";
 import { Evento, TipoEntrada, type DatosDeEvento, type DatosDeTipoEntrada } from "../domain/evento";
 import type { Reloj } from "../domain/reloj";
-import type { RepositorioCategorias, RepositorioEventos } from "../domain/repositorios";
-import { EntradaInvalidaError } from "../errors/index";
+import type { RepositorioCategorias, RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
+import type { Cerrojo } from "./cerrojo-por-clave";
+import { EntradaInvalidaError, NoEncontradoError } from "../errors/index";
 import { aEventoResumenVista, aEventoVista } from "./evento.vistas";
+import { exigirOrganizador } from "./organizador";
 
 export interface DependenciasEventoService {
   eventos: RepositorioEventos;
   categorias: RepositorioCategorias;
+  compras: RepositorioCompras;
+  cerrojo: Cerrojo;
   reloj: Reloj;
 }
 
@@ -25,16 +29,22 @@ function compararParaMisEventos(a: EventoResumenVista, b: EventoResumenVista): n
 
 /**
  * Casos de uso de eventos (UC-04). Recibe sus dependencias por constructor (principio III): las
- * interfaces de repositorio y el reloj, la única referencia de "ahora".
+ * interfaces de repositorio, el cerrojo compartido y el reloj, la única referencia de "ahora".
+ * Toda escritura sobre un evento existente corre bajo `cerrojo.ejecutar(id, …)`: relee el evento
+ * y lee el reloj adentro (constitución, "Operaciones atómicas por evento").
  */
 export class EventoService {
   readonly #eventos: RepositorioEventos;
   readonly #categorias: RepositorioCategorias;
+  readonly #compras: RepositorioCompras;
+  readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
-  constructor({ eventos, categorias, reloj }: DependenciasEventoService) {
+  constructor({ eventos, categorias, compras, cerrojo, reloj }: DependenciasEventoService) {
     this.#eventos = eventos;
     this.#categorias = categorias;
+    this.#compras = compras;
+    this.#cerrojo = cerrojo;
     this.#reloj = reloj;
   }
 
@@ -70,6 +80,51 @@ export class EventoService {
     );
     await this.#eventos.guardar(evento);
     return aEventoVista(evento, categoria, ahora);
+  }
+
+  /** Público: lo usan editar, la vista de solo lectura y, en la 005, el detalle (R8). Sin cerrojo (R2.4). */
+  async obtener(id: string): Promise<EventoVista> {
+    const evento = await this.#obtenerOFallar(id);
+    return aEventoVista(evento, await this.#categoriaDe(evento), this.#reloj.ahora());
+  }
+
+  /**
+   * Reemplaza los datos del evento (no toca los tipos). Bajo el cerrojo del evento, relee y verifica
+   * en el orden de R5: 404 → 403 → 400 categoría → 409 realizado → 409 fecha.
+   */
+  async actualizar(id: string, usuarioId: string, datos: DatosDeEvento): Promise<EventoVista> {
+    return this.#cerrojo.ejecutar(id, async () => {
+      const evento = await this.#obtenerOFallar(id);
+      exigirOrganizador(evento, usuarioId);
+      const categoria = await this.#categoriaOFallar(datos.categoriaId);
+      const ahora = this.#reloj.ahora();
+      const actualizado = evento.actualizar(datos, ahora);
+      await this.#eventos.guardar(actualizado);
+      return aEventoVista(actualizado, categoria, ahora);
+    });
+  }
+
+  /** Elimina un evento propio, no realizado y sin compras (en ningún estado). Bajo el cerrojo del evento. */
+  async eliminar(id: string, usuarioId: string): Promise<void> {
+    await this.#cerrojo.ejecutar(id, async () => {
+      const evento = await this.#obtenerOFallar(id);
+      exigirOrganizador(evento, usuarioId);
+      const tieneCompras = await this.#compras.existePorEvento(id);
+      evento.verificarQueSePuedeEliminar({ ahora: this.#reloj.ahora(), tieneCompras });
+      await this.#eventos.eliminarPorId(id);
+    });
+  }
+
+  /** Único lugar del service que busca un evento por id y lanza 404 si no existe. */
+  async #obtenerOFallar(id: string): Promise<Evento> {
+    const evento = await this.#eventos.buscarPorId(id);
+    if (!evento) throw new NoEncontradoError("EVENTO_NO_ENCONTRADO", "No existe el evento.");
+    return evento;
+  }
+
+  async #categoriaDe(evento: Evento): Promise<Categoria> {
+    const categoria = await this.#categorias.buscarPorId(evento.categoriaId);
+    return categoriaDe(evento, new Map(categoria ? [[categoria.id, categoria]] : []));
   }
 
   /** La categoría elegida tiene que existir: si no, 400 con detalle en `body.categoriaId` (R5). */

@@ -3,6 +3,7 @@ import { relojDelSistema } from "./config/reloj";
 import { CategoriaController } from "./controllers/categoria.controller";
 import { EventoController } from "./controllers/evento.controller";
 import { SaludController } from "./controllers/salud.controller";
+import { TipoEntradaController } from "./controllers/tipo-entrada.controller";
 import { UsuarioController } from "./controllers/usuario.controller";
 import { manejarErrores } from "./middlewares/manejar-errores";
 import { registrarError } from "./middlewares/registrar-error";
@@ -14,7 +15,9 @@ import type { Reloj } from "./domain/reloj";
 import { crearRouterApi } from "./routes/index";
 import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
 import { CategoriaService } from "./services/categoria.service";
+import { CerrojoPorClave } from "./services/cerrojo-por-clave";
 import { EventoService } from "./services/evento.service";
+import { TipoEntradaService } from "./services/tipo-entrada.service";
 import { UsuarioService } from "./services/usuario.service";
 
 export interface OpcionesApp {
@@ -33,17 +36,24 @@ export interface OpcionesApp {
  * (y los tests usan supertest).
  */
 export function crearApp({ repositorios = {}, reloj = relojDelSistema }: OpcionesApp = {}): Express {
-  const { usuarios, categorias, eventos } = { ...crearRepositoriosDeEjemplo(reloj.ahora()), ...repositorios };
+  const { usuarios, categorias, eventos, compras } = {
+    ...crearRepositoriosDeEjemplo(reloj.ahora()),
+    ...repositorios,
+  };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
   const categoriaService = new CategoriaService({ categorias });
-  const eventoService = new EventoService({ eventos, categorias, reloj });
+  // Una sola instancia: los services que modifican eventos comparten el cerrojo (research R2).
+  const cerrojo = new CerrojoPorClave();
+  const eventoService = new EventoService({ eventos, categorias, compras, cerrojo, reloj });
+  const tipoEntradaService = new TipoEntradaService({ eventos, compras, cerrojo, reloj });
 
   const controllers = {
     salud: new SaludController(),
     usuarios: new UsuarioController(usuarioService),
     categorias: new CategoriaController(categoriaService),
     eventos: new EventoController(eventoService),
+    tiposEntrada: new TipoEntradaController(tipoEntradaService),
   };
   const requerirUsuario = crearRequerirUsuario(usuarioService);
 

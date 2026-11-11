@@ -247,3 +247,156 @@ describe("POST /api/eventos", () => {
     expect(deSofia.body.map((e: { id: string }) => e.id)).not.toContain(respuesta.body.id);
   });
 });
+
+const ROCK = "/api/eventos/evento-noche-de-rock";
+
+describe("GET /api/eventos/:eventoId", () => {
+  it("es público y devuelve la vista completa", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos/evento-festival-sonidos-del-sur");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      id: "evento-festival-sonidos-del-sur",
+      descripcion: "Un día entero de música con artistas de todo el país.",
+      fechaHoraLocal: "2026-12-10T14:00",
+      organizadorId: LUCIA,
+      realizado: false,
+      cantidadTiposEntrada: 3,
+    });
+    expect(respuesta.body.tiposEntrada.map((t: { nombre: string }) => t.nombre)).toEqual([
+      "General",
+      "VIP",
+      "Backstage",
+    ]);
+    expect(respuesta.body.tiposEntrada[0]).toEqual({
+      id: "tipo-festival-sonidos-del-sur-general",
+      nombre: "General",
+      descripcion: "Acceso al predio.",
+      precio: 45000,
+      cupo: 500,
+    });
+  });
+
+  it("responde 400 con un id mal formado y 404 si no existe", async () => {
+    const app = nuevaApp();
+    expect(detalles(await request(app).get("/api/eventos/123"))).toEqual({
+      "params.eventoId": "Debe ser un identificador válido.",
+    });
+    esperarError(await request(app).get("/api/eventos/evento-inexistente"), 404, "EVENTO_NO_ENCONTRADO");
+  });
+});
+
+/** Datos de edición válidos para Noche de Rock. */
+function cuerpoEditado(cambios: Record<string, unknown> = {}) {
+  return {
+    nombre: "Noche de Rock (reprogramada)",
+    descripcion: "Nueva fecha.",
+    categoriaId: "categoria-musica",
+    fechaHora: "2026-12-20T21:30",
+    multimedia: [],
+    ...cambios,
+  };
+}
+
+describe("PUT /api/eventos/:eventoId", () => {
+  it("responde 200, reemplaza los datos y conserva los tipos", async () => {
+    const app = nuevaApp();
+    const respuesta = await request(app).put(ROCK).set("X-Usuario-Id", LUCIA).send(cuerpoEditado());
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      nombre: "Noche de Rock (reprogramada)",
+      descripcion: "Nueva fecha.",
+      fechaHora: "2026-12-21T00:30:00.000Z",
+      fechaHoraLocal: "2026-12-20T21:30",
+      multimedia: [],
+      tiposEntrada: [{ id: "tipo-noche-de-rock-general" }],
+    });
+    // En Mis eventos pasa a su nueva posición (después del Festival).
+    const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
+    expect(mios.body.map((e: { id: string }) => e.id)).toEqual([
+      "evento-festival-sonidos-del-sur",
+      "evento-noche-de-rock",
+      "evento-maraton-10k",
+    ]);
+  });
+
+  it("responde 401, 400, 403, 404, 409 EVENTO_REALIZADO y 409 FECHA_NO_FUTURA, sin modificar nada", async () => {
+    const app = nuevaApp();
+    const antes = (await request(app).get(ROCK)).body;
+    esperarError(await request(app).put(ROCK).send(cuerpoEditado()), 401, "USUARIO_NO_IDENTIFICADO");
+    expect(
+      detalles(
+        await request(app)
+          .put(ROCK)
+          .set("X-Usuario-Id", LUCIA)
+          .send(cuerpoEditado({ nombre: "" })),
+      ),
+    ).toEqual({ "body.nombre": "Es obligatorio." });
+    esperarError(
+      await request(app).put("/api/eventos/evento-hamlet").set("X-Usuario-Id", LUCIA).send(cuerpoEditado()),
+      403,
+      "SIN_PERMISO",
+    );
+    esperarError(
+      await request(app).put("/api/eventos/evento-x").set("X-Usuario-Id", LUCIA).send(cuerpoEditado()),
+      404,
+      "EVENTO_NO_ENCONTRADO",
+    );
+    esperarError(
+      await request(app)
+        .put("/api/eventos/evento-noche-de-risas")
+        .set("X-Usuario-Id", SOFIA)
+        .send(cuerpoEditado()),
+      409,
+      "EVENTO_REALIZADO",
+    );
+    esperarError(
+      await request(app)
+        .put(ROCK)
+        .set("X-Usuario-Id", LUCIA)
+        .send(cuerpoEditado({ fechaHora: "2026-11-10T11:00" })),
+      409,
+      "FECHA_NO_FUTURA",
+    );
+    expect((await request(app).get(ROCK)).body).toEqual(antes);
+  });
+});
+
+describe("DELETE /api/eventos/:eventoId", () => {
+  it("responde 204 y el evento deja de existir", async () => {
+    const app = nuevaApp();
+    const respuesta = await request(app).delete(ROCK).set("X-Usuario-Id", LUCIA);
+    expect(respuesta.status).toBe(204);
+    expect(respuesta.text).toBe("");
+    esperarError(await request(app).get(ROCK), 404, "EVENTO_NO_ENCONTRADO");
+  });
+
+  it("responde 401, 400, 403, 404, 409 EVENTO_REALIZADO y 409 EVENTO_CON_COMPRAS, sin eliminar nada", async () => {
+    const app = nuevaApp();
+    esperarError(await request(app).delete(ROCK), 401, "USUARIO_NO_IDENTIFICADO");
+    expect(detalles(await request(app).delete("/api/eventos/123").set("X-Usuario-Id", LUCIA))).toEqual({
+      "params.eventoId": "Debe ser un identificador válido.",
+    });
+    esperarError(
+      await request(app).delete("/api/eventos/evento-hamlet").set("X-Usuario-Id", LUCIA),
+      403,
+      "SIN_PERMISO",
+    );
+    esperarError(
+      await request(app).delete("/api/eventos/evento-x").set("X-Usuario-Id", LUCIA),
+      404,
+      "EVENTO_NO_ENCONTRADO",
+    );
+    esperarError(
+      await request(app).delete("/api/eventos/evento-noche-de-risas").set("X-Usuario-Id", SOFIA),
+      409,
+      "EVENTO_REALIZADO",
+    );
+    esperarError(
+      await request(app).delete("/api/eventos/evento-festival-sonidos-del-sur").set("X-Usuario-Id", LUCIA),
+      409,
+      "EVENTO_CON_COMPRAS",
+    );
+    const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
+    expect(mios.body).toHaveLength(3);
+  });
+});
