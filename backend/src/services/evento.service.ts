@@ -116,7 +116,7 @@ export class EventoService {
       };
     });
     return {
-      eventos: ordenarCatalogo(elementos, "fecha").map((elemento) => elemento.vista),
+      eventos: ordenarCatalogo(elementos, consulta.orden).map((elemento) => elemento.vista),
       hayEventosProximos,
     };
   }
