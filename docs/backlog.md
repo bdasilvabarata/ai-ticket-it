@@ -56,8 +56,11 @@ graph LR
 
 - Con el **contrato de usuarios de 001** definido (`specs/001-base-backend/contracts/`), **002**
   puede arrancar antes de que 001 se integre.
-- Con **001** integrada, el backend de **004** y **005** avanza en paralelo con **002** y
-  **003**; sus pantallas se suman cuando 003 se integre. 005 trabaja con eventos del seed.
+- Con **001** integrada, el backend de **004** avanza en paralelo con **002** y **003**; sus
+  pantallas se suman cuando 003 se integre.
+- **005** va después de **004**: reusa su catálogo de categorías, el detalle público del evento
+  (`GET /api/eventos/:eventoId`), el cupo de los tipos y el reloj inyectado. Sus datos de ejemplo
+  son los eventos del seed de 004 (con un evento agotado y un tipo gratis).
 - **005** ordena por puntaje del organizador antes de que exista **011**: el puntaje sale `null`
   (sin reseñas) y esos eventos van al final. Cuando 011 se integre, el orden se completa solo.
 - Con **006** integrada, **007**, **008** y **009** pueden avanzar a la vez; **010** necesita
