@@ -237,3 +237,16 @@ export class Evento {
     return this.tiposEntrada.some((tipo) => tipo.precio >= min && tipo.precio <= max);
   }
 }
+
+/**
+ * Orden de Mis eventos (FR-004) según `ahora`: primero los próximos, del más cercano al más lejano;
+ * después los realizados, del más reciente al más antiguo.
+ */
+export function ordenDeMisEventos(ahora: Date): (a: Evento, b: Evento) => number {
+  return (a, b) => {
+    const aRealizado = a.estaRealizado(ahora);
+    if (aRealizado !== b.estaRealizado(ahora)) return aRealizado ? 1 : -1;
+    const diferencia = a.fechaHora.getTime() - b.fechaHora.getTime();
+    return aRealizado ? -diferencia : diferencia;
+  };
+}

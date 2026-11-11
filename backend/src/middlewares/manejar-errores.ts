@@ -1,6 +1,6 @@
 import type { ErrorApi } from "@ai-ticket-it/shared";
 import type { NextFunction, Request, Response } from "express";
-import { aErrorAplicacion } from "./traducir-error";
+import { aErrorAplicacion, statusDe } from "./traducir-error";
 
 /**
  * Único punto que traduce errores a HTTP con el formato `ErrorApi` (FR-018). No registra:
@@ -21,6 +21,8 @@ export function manejarErrores(
     res.status(500).json({ error: { codigo: "ERROR_INTERNO", mensaje: "Ocurrió un error inesperado." } });
     return;
   }
-  const { status, codigo, mensaje, detalles } = esperado;
-  res.status(status).json({ error: detalles ? { codigo, mensaje, detalles } : { codigo, mensaje } });
+  const { codigo, mensaje, detalles } = esperado;
+  res
+    .status(statusDe(esperado))
+    .json({ error: detalles ? { codigo, mensaje, detalles } : { codigo, mensaje } });
 }

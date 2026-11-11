@@ -1,44 +1,45 @@
-import { randomUUID } from "node:crypto";
 import type { TipoEntradaVista } from "@ai-ticket-it/shared";
 import { TipoEntrada, type DatosDeTipoEntrada, type Evento } from "../domain/evento";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
 import { NoEncontradoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
+import type { EventoService } from "./evento.service";
 import { aTipoEntradaVista } from "./evento.vistas";
-import { exigirOrganizador } from "./organizador";
 
 export interface DependenciasTipoEntradaService {
   eventos: RepositorioEventos;
   compras: RepositorioCompras;
+  eventoService: EventoService;
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
 
 /**
  * Casos de uso de los tipos de entrada de un evento. `TipoEntrada` vive dentro del agregado
- * `Evento`: se lee y se guarda con `RepositorioEventos`. Cada escritura corre bajo el cerrojo del
- * evento (el mismo que usa `EventoService`), relee el evento y verifica en el orden de R5:
- * 404 evento → 403 → 404 tipo → 409.
+ * `Evento`: el evento se lo pide a `EventoService` (que responde el 404 y el 403) y se guarda con
+ * `RepositorioEventos`. Cada escritura corre bajo el cerrojo del evento (el mismo que usa
+ * `EventoService`), relee el evento y verifica en el orden de R5: 404 evento → 403 → 404 tipo → 409.
  */
 export class TipoEntradaService {
   readonly #eventos: RepositorioEventos;
   readonly #compras: RepositorioCompras;
+  readonly #eventoService: EventoService;
   readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
-  constructor({ eventos, compras, cerrojo, reloj }: DependenciasTipoEntradaService) {
+  constructor({ eventos, compras, eventoService, cerrojo, reloj }: DependenciasTipoEntradaService) {
     this.#eventos = eventos;
     this.#compras = compras;
+    this.#eventoService = eventoService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
   }
 
   async crear(eventoId: string, usuarioId: string, datos: DatosDeTipoEntrada): Promise<TipoEntradaVista> {
     return this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#obtenerEventoOFallar(eventoId);
-      exigirOrganizador(evento, usuarioId);
-      const tipo = new TipoEntrada({ ...datos, id: randomUUID() });
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
+      const tipo = new TipoEntrada({ ...datos, id: this.#eventos.siguienteId() });
       await this.#eventos.guardar(evento.agregarTipoEntrada(tipo, this.#reloj.ahora()));
       return aTipoEntradaVista(tipo);
     });
@@ -52,8 +53,7 @@ export class TipoEntradaService {
     datos: DatosDeTipoEntrada,
   ): Promise<TipoEntradaVista> {
     return this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#obtenerEventoOFallar(eventoId);
-      exigirOrganizador(evento, usuarioId);
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
       this.#obtenerTipoOFallar(evento, tipoId);
       const actualizado = evento.editarTipoEntrada(tipoId, datos, this.#reloj.ahora());
       await this.#eventos.guardar(actualizado);
@@ -63,21 +63,13 @@ export class TipoEntradaService {
 
   async eliminar(eventoId: string, tipoId: string, usuarioId: string): Promise<void> {
     await this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#obtenerEventoOFallar(eventoId);
-      exigirOrganizador(evento, usuarioId);
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
       this.#obtenerTipoOFallar(evento, tipoId);
       const tieneCompras = await this.#compras.existePorTipoEntrada(tipoId);
       await this.#eventos.guardar(
         evento.quitarTipoEntrada(tipoId, { ahora: this.#reloj.ahora(), tieneCompras }),
       );
     });
-  }
-
-  /** Único lugar del service que busca el evento por id y lanza 404 si no existe. */
-  async #obtenerEventoOFallar(eventoId: string): Promise<Evento> {
-    const evento = await this.#eventos.buscarPorId(eventoId);
-    if (!evento) throw new NoEncontradoError("EVENTO_NO_ENCONTRADO", "No existe el evento.");
-    return evento;
   }
 
   /** 404 si el tipo no es de **este** evento (FR-023), aunque exista en otro. */

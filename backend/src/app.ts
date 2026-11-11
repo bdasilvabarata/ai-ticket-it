@@ -45,8 +45,8 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
   const categoriaService = new CategoriaService({ categorias });
   // Una sola instancia: los services que modifican eventos comparten el cerrojo (research R2).
   const cerrojo = new CerrojoPorClave();
-  const eventoService = new EventoService({ eventos, categorias, compras, cerrojo, reloj });
-  const tipoEntradaService = new TipoEntradaService({ eventos, compras, cerrojo, reloj });
+  const eventoService = new EventoService({ eventos, compras, categoriaService, cerrojo, reloj });
+  const tipoEntradaService = new TipoEntradaService({ eventos, compras, eventoService, cerrojo, reloj });
 
   const controllers = {
     salud: new SaludController(),

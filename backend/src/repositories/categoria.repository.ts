@@ -16,4 +16,8 @@ export class CategoriaRepository implements RepositorioCategorias {
   async buscarPorId(id: string): Promise<Categoria | null> {
     return this.#categorias.get(id) ?? null;
   }
+
+  async listarPorIds(ids: readonly string[]): Promise<Categoria[]> {
+    return [...new Set(ids)].flatMap((id) => this.#categorias.get(id) ?? []);
+  }
 }
