@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Evento } from "../domain/evento";
 import type { RepositorioEventos } from "../domain/repositorios";
 
@@ -12,6 +13,10 @@ export class EventoRepository implements RepositorioEventos {
 
   constructor(eventos: Evento[] = []) {
     this.#eventos = new Map(eventos.map((evento) => [evento.id, evento]));
+  }
+
+  siguienteId(): string {
+    return randomUUID();
   }
 
   async listar(): Promise<Evento[]> {

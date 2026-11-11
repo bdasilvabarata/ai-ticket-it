@@ -62,6 +62,14 @@ describe("CategoriaRepository (en memoria)", () => {
     expect(await repositorio.buscarPorId("categoria-musica")).toBe(musica);
     expect(await repositorio.buscarPorId("categoria-teatro")).toBeNull();
   });
+
+  it("listarPorIds devuelve las que existen, sin repetir, o []", async () => {
+    const repositorio = new CategoriaRepository([musica]);
+    expect(
+      await repositorio.listarPorIds(["categoria-musica", "categoria-teatro", "categoria-musica"]),
+    ).toEqual([musica]);
+    expect(await repositorio.listarPorIds([])).toEqual([]);
+  });
 });
 
 describe("EventoRepository (en memoria)", () => {

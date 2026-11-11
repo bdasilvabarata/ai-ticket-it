@@ -3,11 +3,9 @@ import { describe, expect, it } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import type { Evento } from "../../src/domain/evento";
 import { NoEncontradoError, SinPermisoError } from "../../src/errors/index";
-import { CompraRepository } from "../../src/repositories/compra.repository";
-import { EventoRepository } from "../../src/repositories/evento.repository";
-import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
-import { TipoEntradaService } from "../../src/services/tipo-entrada.service";
-import { compra, DIA, evento, relojFijo, tipo } from "../helpers/eventos";
+import type { TipoEntradaService } from "../../src/services/tipo-entrada.service";
+import { compra, DIA, evento, tipo } from "../helpers/eventos";
+import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -16,18 +14,18 @@ const vip = tipo({ id: "tipo-a-vip", nombre: "VIP", precio: 5000, cupo: 2 });
 const deOtroEvento = tipo({ id: "tipo-b-platea", nombre: "Platea" });
 
 function crearService(compras: Compra[] = [], eventos: Evento[] = []) {
-  const repositorioEventos = new EventoRepository([
-    evento({ id: "evento-a", tiposEntrada: [general, vip] }),
-    evento({ id: "evento-b", organizadorId: "usuario-martin", tiposEntrada: [deOtroEvento] }),
-    evento({ id: "evento-pasado", en: -DIA, tiposEntrada: [tipo({ id: "tipo-pasado-general" })] }),
-    ...eventos,
-  ]);
-  const repositorioCompras = new CompraRepository(compras);
-  const service = new TipoEntradaService({
-    eventos: repositorioEventos,
-    compras: repositorioCompras,
-    cerrojo: new CerrojoPorClave(),
-    reloj: relojFijo(),
+  const {
+    tipoEntradaService: service,
+    repositorioEventos,
+    repositorioCompras,
+  } = crearServicesDeEventos({
+    eventos: [
+      evento({ id: "evento-a", tiposEntrada: [general, vip] }),
+      evento({ id: "evento-b", organizadorId: "usuario-martin", tiposEntrada: [deOtroEvento] }),
+      evento({ id: "evento-pasado", en: -DIA, tiposEntrada: [tipo({ id: "tipo-pasado-general" })] }),
+      ...eventos,
+    ],
+    compras,
   });
   return { service, repositorioEventos, repositorioCompras };
 }

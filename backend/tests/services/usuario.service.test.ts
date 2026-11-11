@@ -81,7 +81,6 @@ describe("UsuarioService.obtener", () => {
     const { service } = crearService([lucia]);
     await expect(service.obtener("u9")).rejects.toMatchObject({
       constructor: NoEncontradoError,
-      status: 404,
       codigo: "USUARIO_NO_ENCONTRADO",
     });
   });

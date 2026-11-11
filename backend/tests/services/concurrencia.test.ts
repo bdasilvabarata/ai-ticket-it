@@ -3,13 +3,9 @@ import { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import type { RepositorioCompras, RepositorioEventos } from "../../src/domain/repositorios";
-import { CategoriaRepository } from "../../src/repositories/categoria.repository";
-import { CompraRepository } from "../../src/repositories/compra.repository";
-import { EventoRepository } from "../../src/repositories/evento.repository";
-import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
-import { EventoService } from "../../src/services/evento.service";
-import { TipoEntradaService } from "../../src/services/tipo-entrada.service";
-import { evento, musica, relojFijo, tipo } from "../helpers/eventos";
+import type { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
+import { evento, tipo } from "../helpers/eventos";
+import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // FR-029 / SC-008: pedidos simultáneos sobre un mismo evento dan el mismo resultado que de a uno.
 // Los repositorios devuelven promesas y cada `await` cede el turno: sin cerrojo, las operaciones de
@@ -19,24 +15,9 @@ const general = tipo({ id: "tipo-a-general", nombre: "General" });
 const vip = tipo({ id: "tipo-a-vip", nombre: "VIP" });
 
 function armar(eventos: Evento[] = [evento({ id: "evento-a", tiposEntrada: [general, vip] })]) {
-  const repositorioEventos = new EventoRepository(eventos);
-  const repositorioCompras = new CompraRepository();
-  const cerrojo = new CerrojoPorClave();
-  const reloj = relojFijo();
-  const eventosService = new EventoService({
-    eventos: repositorioEventos,
-    categorias: new CategoriaRepository([musica]),
-    compras: repositorioCompras,
-    cerrojo,
-    reloj,
-  });
-  const tipos = new TipoEntradaService({
-    eventos: repositorioEventos,
-    compras: repositorioCompras,
-    cerrojo,
-    reloj,
-  });
-  return { eventosService, tipos, cerrojo, repositorioEventos, repositorioCompras };
+  const servicios = crearServicesDeEventos({ eventos });
+  const { eventoService: eventosService, tipoEntradaService: tipos } = servicios;
+  return { ...servicios, eventosService, tipos };
 }
 
 const datosTipo = (nombre: string) => ({ nombre, descripcion: "", precio: 100, cupo: 5 });

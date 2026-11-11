@@ -3,25 +3,14 @@ import { describe, expect, it } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
-import { EntradaInvalidaError, NoEncontradoError, SinPermisoError } from "../../src/errors/index";
-import { CategoriaRepository } from "../../src/repositories/categoria.repository";
-import { CompraRepository } from "../../src/repositories/compra.repository";
-import { EventoRepository } from "../../src/repositories/evento.repository";
-import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
-import { EventoService } from "../../src/services/evento.service";
-import { AHORA, DIA, compra, evento, musica, relojFijo, teatro, tipo } from "../helpers/eventos";
+import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
+import { AHORA, DIA, compra, evento, musica, teatro, tipo } from "../helpers/eventos";
+import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // Sin servidor: el service recibe los repositorios en memoria de producción, construidos con los
 // datos de cada caso, un reloj fijo y su cerrojo.
 function crearService(eventos: Evento[] = [], compras: Compra[] = []) {
-  const repositorioEventos = new EventoRepository(eventos);
-  const service = new EventoService({
-    eventos: repositorioEventos,
-    categorias: new CategoriaRepository([musica, teatro]),
-    compras: new CompraRepository(compras),
-    cerrojo: new CerrojoPorClave(),
-    reloj: relojFijo(),
-  });
+  const { eventoService: service, repositorioEventos } = crearServicesDeEventos({ eventos, compras });
   return { service, repositorioEventos };
 }
 
@@ -84,7 +73,6 @@ describe("EventoService.actualizar", () => {
       service.actualizar("evento-a", "usuario-martin", datosEditados({ categoriaId: inexistente })),
     ).rejects.toMatchObject({
       constructor: SinPermisoError,
-      status: 403,
       mensaje: "Solo el organizador puede modificar este evento.",
     });
     await expect(
@@ -93,7 +81,7 @@ describe("EventoService.actualizar", () => {
         "usuario-lucia",
         datosEditados({ categoriaId: inexistente, fechaHora: pasada }),
       ),
-    ).rejects.toMatchObject({ constructor: EntradaInvalidaError });
+    ).rejects.toMatchObject({ constructor: ReferenciaInvalidaError });
     await expect(
       service.actualizar("evento-pasado", "usuario-lucia", datosEditados({ fechaHora: pasada })),
     ).rejects.toMatchObject({ codigo: "EVENTO_REALIZADO" });
@@ -123,7 +111,9 @@ describe("EventoService.eliminar", () => {
     await expect(service.eliminar("evento-x", "usuario-lucia")).rejects.toMatchObject({
       codigo: "EVENTO_NO_ENCONTRADO",
     });
-    await expect(service.eliminar("evento-a", "usuario-martin")).rejects.toMatchObject({ status: 403 });
+    await expect(service.eliminar("evento-a", "usuario-martin")).rejects.toMatchObject({
+      constructor: SinPermisoError,
+    });
     await expect(service.eliminar("evento-pasado", "usuario-lucia")).rejects.toMatchObject({
       codigo: "EVENTO_REALIZADO",
     });
@@ -248,13 +238,14 @@ describe("EventoService.crear", () => {
     expect((await repositorioEventos.buscarPorId(vista.id))?.organizadorId).toBe("usuario-lucia");
   });
 
-  it("con una categoría inexistente responde 400 con detalle en body.categoriaId, sin guardar", async () => {
+  it("con una categoría inexistente lanza una referencia inválida a categoriaId, sin guardar", async () => {
     const { service, repositorioEventos } = crearService();
     await expect(
       service.crear("usuario-lucia", datos({ categoriaId: "categoria-inexistente" })),
     ).rejects.toMatchObject({
-      constructor: EntradaInvalidaError,
-      detalles: [{ campo: "body.categoriaId", mensaje: "No existe la categoría." }],
+      constructor: ReferenciaInvalidaError,
+      campo: "categoriaId",
+      mensaje: "No existe la categoría.",
     });
     expect(await repositorioEventos.listar()).toEqual([]);
   });
