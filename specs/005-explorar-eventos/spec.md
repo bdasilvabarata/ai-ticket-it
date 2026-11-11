@@ -34,7 +34,7 @@ sigue en Mis eventos, 004); pulido estético (013).
 
 - Q: ¿El precio "desde" se calcula sobre todos los tipos de entrada o solo sobre los que tienen cupo? → A: Sobre todos, agotados o no: el precio mostrado y el orden por precio no cambian a medida que se venden entradas (FR-004).
 - Q: Con varias palabras ("rock club"), ¿coincide la frase tal cual o cada palabra por separado? → A: Cada palabra por separado: un evento coincide si contiene todas las palabras, en cualquier orden y lugar del nombre o la descripción; los espacios repetidos entre palabras no cuentan (FR-011).
-- Q: Mientras la lista se vuelve a pedir, ¿qué ve el comprador? → A: Un skeleton (tarjetas de relleno con la forma de las tarjetas reales), siempre: en la primera carga y en cada cambio de texto, categoría u orden; los resultados anteriores no quedan a la vista y el campo de búsqueda y los selectores siguen visibles y usables (FR-007, FR-014).
+- Q: Mientras la lista se vuelve a pedir, ¿qué ve el comprador? → A: Un skeleton (tarjetas de relleno con la forma de las tarjetas reales), siempre: en la primera carga y en cada cambio de texto, categoría u orden; los resultados anteriores no quedan a la vista y el campo de búsqueda y los selectores siguen visibles y usables (FR-007, FR-014). Volver a una combinación de texto, categoría y orden que ya se respondió mientras la app está abierta muestra la respuesta de **esa** combinación (no la de la anterior) mientras se revalida; no cuenta como "resultados anteriores".
 - Q: Junto al puntaje del organizador, ¿se muestra cuántas reseñas tiene? → A: Sí, en la tarjeta y en el detalle: "4,5 · 12 reseñas" ("1 reseña" en singular); sin reseñas, "Sin reseñas". El servidor informa la cantidad (0 hasta la 011) junto al puntaje (FR-006, FR-009).
 
 ## User Scenarios & Testing *(mandatory)*
@@ -112,8 +112,8 @@ encontrado".
    tiene), nombre de la categoría, fecha y hora en hora de Buenos Aires, el organizador (nombre,
    apellido y puntaje con el mismo formato que la tarjeta) y la lista de tipos de entrada.
 3. **Given** cada tipo de entrada del detalle, **When** se muestra, **Then** se ven su nombre,
-   su descripción (si tiene), su precio ("Gratis" si es 0) y su cupo disponible ("Quedan 30" o
-   similar), o "Agotado" si el cupo disponible es 0.
+   su descripción (si tiene), su precio ("Gratis" si es 0) y su cupo disponible ("30
+   disponibles", el formato de cupo que ya usa la app), o "Agotado" si el cupo disponible es 0.
 4. **Given** un evento con URLs de multimedia, **When** se muestra el detalle, **Then** las
    imágenes aparecen en una fila horizontal que se desliza; una imagen que no se puede cargar
    no se muestra (sin hueco ni ícono roto), y si no queda ninguna, la fila no aparece.
@@ -291,7 +291,8 @@ sus desempates y que un criterio desconocido se rechaza.
   vacío y éxito). El estado cargando DEBE mostrarse como tarjetas skeleton (de relleno, con la
   forma de las tarjetas reales y anunciadas como "Cargando eventos" al lector de pantalla), en
   la primera carga y cada vez que cambian el texto, la categoría o el orden; los resultados
-  anteriores NO DEBEN quedar a la vista y el campo de búsqueda y los selectores DEBEN seguir
+  anteriores NO DEBEN quedar a la vista (volver a una combinación ya respondida en la sesión
+  puede mostrar su propia respuesta mientras se revalida) y el campo de búsqueda y los selectores DEBEN seguir
   visibles y usables. Hay dos vacíos distintos: uno para "no hay eventos próximos" y otro para
   "ningún evento coincide con la búsqueda", este último con una acción para limpiar la
   búsqueda y el filtro.
