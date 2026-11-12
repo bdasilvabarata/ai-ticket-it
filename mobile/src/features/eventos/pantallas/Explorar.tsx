@@ -1,9 +1,10 @@
-import { LIMITES_BUSQUEDA, type OrdenCatalogo } from "@ai-ticket-it/shared";
+import { LIMITES_BUSQUEDA, type OrdenCatalogo, type SentidoCatalogo } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { FlatList, StyleSheet, TextInput, View } from "react-native";
 
 import { ListaVacia, SegunConsulta, tema } from "../../../componentes";
+import { BotonCategoria } from "../componentes/BotonCategoria";
 import { SelectorCategoria } from "../componentes/SelectorCategoria";
 import { SelectorOrden } from "../componentes/SelectorOrden";
 import { TarjetaEvento } from "../componentes/TarjetaEvento";
@@ -36,17 +37,28 @@ function CargandoEventos() {
 
 /**
  * Explorar: el catálogo de eventos próximos (contracts/app.md, "Explorar"). La consulta (texto,
- * categoría y orden) vive acá: la pestaña no se desmonta al apilar el detalle, así que se conserva (FR-024).
+ * categoría, orden y sentido) vive acá: la pestaña no se desmonta al apilar el detalle, así que se
+ * conserva (FR-024). La categoría es un desplegable a la derecha del buscador: cerrado no ocupa lugar.
  */
 export function Explorar() {
   const [texto, setTexto] = useState("");
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
-  const [orden, setOrden] = useState<OrdenCatalogo>("fecha");
+  const [categoriasAbiertas, setCategoriasAbiertas] = useState(false);
+  const [{ orden, sentido }, setOrden] = useState<{ orden: OrdenCatalogo; sentido: SentidoCatalogo }>({
+    orden: "fecha",
+    sentido: "asc",
+  });
   const textoDemorado = useValorDemorado(texto.trim(), DEMORA_DEL_BUSCADOR_MS);
-  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden });
+  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden, sentido });
   // Desde la primera tecla hasta que llega la respuesta del texto nuevo, el skeleton: nunca quedan a
   // la vista los resultados del texto anterior (FR-007).
   const escribiendo = texto.trim() !== textoDemorado;
+
+  // Elegir una categoría cierra el desplegable.
+  const elegirCategoria = (id: string | null) => {
+    setCategoriaId(id);
+    setCategoriasAbiertas(false);
+  };
 
   // El orden queda: no es parte de la búsqueda.
   const limpiarBusqueda = () => {
@@ -58,20 +70,35 @@ export function Explorar() {
     <View style={estilos.pantalla}>
       {/* Los controles, fuera de los estados: no se desmontan ni pierden lo escrito. */}
       <View style={estilos.controles}>
-        <TextInput
-          value={texto}
-          onChangeText={setTexto}
-          placeholder="Buscar por nombre o descripción"
-          placeholderTextColor={tema.colores.textoSecundario}
-          accessibilityLabel="Buscar eventos"
-          maxLength={LIMITES_BUSQUEDA.texto}
-          returnKeyType="search"
-          clearButtonMode="while-editing"
-          autoCorrect={false}
-          style={estilos.buscador}
+        <View style={estilos.filaBuscador}>
+          <TextInput
+            value={texto}
+            onChangeText={setTexto}
+            placeholder="Buscar por nombre o descripción"
+            placeholderTextColor={tema.colores.textoSecundario}
+            accessibilityLabel="Buscar eventos"
+            maxLength={LIMITES_BUSQUEDA.texto}
+            returnKeyType="search"
+            clearButtonMode="while-editing"
+            autoCorrect={false}
+            style={estilos.buscador}
+          />
+          <BotonCategoria
+            categoriaId={categoriaId}
+            abierto={categoriasAbiertas}
+            alPresionar={() => setCategoriasAbiertas((abiertas) => !abiertas)}
+          />
+        </View>
+        {categoriasAbiertas && (
+          <View style={estilos.desplegable}>
+            <SelectorCategoria conTodas valor={categoriaId} alCambiar={elegirCategoria} />
+          </View>
+        )}
+        <SelectorOrden
+          orden={orden}
+          sentido={sentido}
+          alCambiar={(nuevoOrden, nuevoSentido) => setOrden({ orden: nuevoOrden, sentido: nuevoSentido })}
         />
-        <SelectorCategoria conTodas valor={categoriaId} alCambiar={setCategoriaId} />
-        <SelectorOrden valor={orden} alCambiar={setOrden} />
       </View>
       <SegunConsulta
         consulta={{ ...consulta, isPending: consulta.isPending || escribiendo }}
@@ -108,11 +135,21 @@ export function Explorar() {
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
   controles: {
-    gap: tema.espacio.medio,
+    gap: tema.espacio.chico,
     paddingHorizontal: tema.espacio.normal,
-    paddingTop: tema.espacio.normal,
+    paddingTop: tema.espacio.minimo,
+  },
+  filaBuscador: { flexDirection: "row", gap: tema.espacio.chico },
+  desplegable: {
+    padding: tema.espacio.medio,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
+    borderRadius: tema.radio.normal,
+    backgroundColor: tema.colores.superficie,
+    boxShadow: tema.sombra.nivel1,
   },
   buscador: {
+    flex: 1,
     ...tema.tipografia.cuerpo,
     minHeight: tema.tamano.campo,
     borderWidth: tema.grosor.normal,
@@ -123,5 +160,10 @@ const estilos = StyleSheet.create({
     color: tema.colores.texto,
     backgroundColor: tema.colores.superficie,
   },
-  lista: { padding: tema.espacio.normal, paddingBottom: tema.espacio.amplio, gap: tema.espacio.medio },
+  lista: {
+    paddingHorizontal: tema.espacio.normal,
+    paddingTop: tema.espacio.medio,
+    paddingBottom: tema.espacio.amplio,
+    gap: tema.espacio.medio,
+  },
 });

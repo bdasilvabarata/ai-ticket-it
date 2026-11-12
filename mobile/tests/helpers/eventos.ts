@@ -167,7 +167,7 @@ export function catalogo(
 }
 
 /** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */
-export const CATALOGO_INICIAL = "/eventos?orden=fecha";
+export const CATALOGO_INICIAL = "/eventos?orden=fecha&sentido=asc";
 
 /** Detalle de la Maratón: dos imágenes y un tipo gratis (feature 005). */
 export const maratonCompleta: EventoVista = {

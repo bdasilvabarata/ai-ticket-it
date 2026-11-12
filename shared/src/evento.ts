@@ -67,6 +67,18 @@ export const ORDENES_CATALOGO = ["fecha", "precio", "puntaje"] as const;
 
 export type OrdenCatalogo = (typeof ORDENES_CATALOGO)[number];
 
+/** Sentido del criterio principal del orden (los desempates no se invierten). */
+export const SENTIDOS_CATALOGO = ["asc", "desc"] as const;
+
+export type SentidoCatalogo = (typeof SENTIDOS_CATALOGO)[number];
+
+/** El sentido de cada criterio si no se pide otro: lo más próximo, lo más barato, lo mejor calificado. */
+export const SENTIDO_INICIAL: Readonly<Record<OrdenCatalogo, SentidoCatalogo>> = {
+  fecha: "asc",
+  precio: "asc",
+  puntaje: "desc",
+};
+
 /** Límites de la búsqueda del catálogo: los valida el servidor y la app los usa en `maxLength`. */
 export const LIMITES_BUSQUEDA = { texto: 100 } as const;
 
@@ -75,6 +87,8 @@ export interface ConsultaCatalogo {
   texto?: string;
   categoriaId?: string;
   orden?: OrdenCatalogo;
+  /** Sin valor: `SENTIDO_INICIAL[orden]`. */
+  sentido?: SentidoCatalogo;
 }
 
 /** Organizador de un evento con su puntaje (las reseñas de todos sus eventos). */

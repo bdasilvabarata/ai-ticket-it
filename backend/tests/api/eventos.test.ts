@@ -162,6 +162,29 @@ describe("GET /api/eventos: orden (US4)", () => {
     expect(idsDelCatalogo(await catalogo("orden=fecha"))).toEqual(PROXIMOS_POR_FECHA);
   });
 
+  it("sentido=desc invierte el criterio: orden=precio&sentido=desc → el más caro primero", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=precio&sentido=desc"))).toEqual([
+      "evento-festival-sonidos-del-sur",
+      "evento-hamlet",
+      "evento-noche-de-rock",
+      "evento-clasico-de-basquet",
+      "evento-charla-ia-aplicada",
+      "evento-maraton-10k",
+    ]);
+    expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=desc"))).toEqual(
+      PROXIMOS_POR_FECHA.toReversed(),
+    );
+    expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("orden=puntaje&sentido=asc sin reseñas → igual que por fecha (sin puntaje siempre al final)", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=puntaje&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it.each(["sentido=arriba", "sentido=asc&sentido=desc"])("%s → 400 sobre query.sentido", async (query) => {
+    expect(detalles(await catalogo(query))).toEqual({ "query.sentido": "Debe ser asc o desc." });
+  });
+
   it("orden=nombre → 400 sobre query.orden", async () => {
     expect(detalles(await catalogo("orden=nombre"))).toEqual({
       "query.orden": "Debe ser fecha, precio o puntaje.",

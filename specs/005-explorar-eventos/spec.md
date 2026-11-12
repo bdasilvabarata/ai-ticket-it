@@ -44,6 +44,7 @@ sigue en Mis eventos, 004); pulido estético (013).
 ### Session 2026-11-11
 
 - Alineación con la constitución 2.2.0 (principio III, "Una referencia que llega en la entrada (por ejemplo, `categoriaId`) se valida con `buscarReferenciada` del service dueño: si no existe, es un dato inválido (400 sobre el campo)"): un pedido con una categoría que no existe en el catálogo ya **no** responde una lista vacía, sino entrada inválida (400) con el detalle en la categoría. Reemplaza el default "una categoría inexistente da una lista vacía" de la descripción inicial (FR-016, US3 escenario 10, caso borde "Categoría inexistente"). En la app no cambia nada: solo se pueden elegir categorías del catálogo.
+- Revisión del front (pedido del usuario): (1) el filtro de categoría pasa a ser un **desplegable** que se abre con un botón a la derecha del buscador, para que no ocupe lugar si no interesa; elegir una categoría lo cierra y el botón muestra cuál filtra. (2) Cada criterio de orden tiene **dos sentidos**: tocar el criterio ya elegido lo invierte y una flecha (↑/↓) lo señala; al elegir otro criterio arranca en su sentido inicial (fecha y precio ascendentes, puntaje descendente). Lo resuelve el servidor con el parámetro `sentido` (`asc` | `desc`): solo se invierte el criterio principal, los desempates no, y los organizadores sin puntaje van al final en los dos sentidos. Reemplaza el default "un solo sentido por criterio" (FR-018, US4 escenarios 9 y 10). (3) Menos espacio entre el título y el buscador.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -231,6 +232,11 @@ sus desempates y que un criterio desconocido se rechaza.
    **Then** todos los organizadores están "sin puntaje" y la lista queda en orden de fecha por
    el desempate; cuando la 011 agregue reseñas, el orden por puntaje funciona sin cambios en
    esta feature.
+9. **Given** un criterio de orden elegido, **When** el comprador lo toca de nuevo, **Then** el
+   sentido se invierte (por ejemplo, de la fecha más próxima a la más lejana), una flecha lo
+   indica y la lista se vuelve a pedir; los organizadores sin puntaje siguen al final.
+10. **Given** un criterio con el sentido invertido, **When** el comprador elige otro criterio,
+    **Then** el nuevo arranca en su sentido inicial.
 
 ---
 
@@ -344,8 +350,8 @@ sus desempates y que un criterio desconocido se rechaza.
 
 - **FR-018**: El comprador DEBE poder ordenar por **fecha** (la más próxima primero), por
   **precio** (el precio "desde" más bajo primero) o por **puntaje del organizador** (el más
-  alto primero, con los organizadores sin puntaje al final). Cada criterio tiene un único
-  sentido.
+  alto primero, con los organizadores sin puntaje al final), y DEBE poder invertir el sentido
+  del criterio elegido (los sin puntaje siguen al final; los desempates no se invierten).
 - **FR-019**: El orden inicial DEBE ser por fecha.
 - **FR-020**: Los empates en el criterio elegido DEBEN desempatarse por fecha (la más próxima
   primero) y, si persisten, por nombre en orden alfabético sin distinguir mayúsculas ni

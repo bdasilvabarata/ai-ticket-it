@@ -122,6 +122,14 @@
             "description": "`fecha` ascendente · `precio` (\"desde\") ascendente · `puntaje` del organizador descendente, sin puntaje al final. Desempates: fecha → nombre (sin mayúsculas ni tildes) → id. Se aplica sobre lo filtrado.",
             "schema": { "type": "string", "enum": ["fecha", "precio", "puntaje"], "default": "fecha" },
             "example": "precio"
+          },
+          {
+            "name": "sentido",
+            "in": "query",
+            "required": false,
+            "description": "Sentido del criterio principal: `asc` o `desc`. Sin valor, el inicial de cada criterio (`fecha` y `precio` ascendentes, `puntaje` descendente). Los desempates no se invierten y los organizadores sin puntaje van al final en los dos sentidos.",
+            "schema": { "type": "string", "enum": ["asc", "desc"] },
+            "example": "desc"
           }
         ],
         "responses": {
@@ -130,7 +138,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
           },
           "400": {
-            "description": "Texto de más de 100 caracteres, orden desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },

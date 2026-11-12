@@ -21,12 +21,12 @@ buscan los tests.
 
 | Función | Pedido |
 |---|---|
-| `listarEventos(cliente, consulta, { signal })` **(nueva)** | `GET /eventos?…` sin `X-Usuario-Id`; solo los parámetros con valor, `orden` siempre |
+| `listarEventos(cliente, consulta, { signal })` **(nueva)** | `GET /eventos?…` sin `X-Usuario-Id`; solo los parámetros con valor, `orden` y `sentido` siempre |
 | `obtenerEvento(cliente, eventoId, { signal })` | sin cambios (la vista suma `organizador`) |
 
 | Hook (feature `eventos`) | Clave |
 |---|---|
-| `useCatalogo(consulta)` **(nuevo)** | `claves.catalogo(consulta)` = `["catalogo", { texto, categoriaId, orden }]` (sin usuario) |
+| `useCatalogo(consulta)` **(nuevo)** | `claves.catalogo(consulta)` = `["catalogo", { texto, categoriaId, orden, sentido }]` (sin usuario) |
 | `useInvalidarCatalogo()` **(nuevo)** | invalida el prefijo `["catalogo"]` |
 | `useValorDemorado(valor, ms)` **(nuevo)** | — (debounce de 500 ms del texto) |
 | `useEvento(usuarioId, eventoId)` | `claves.evento(usuarioId, eventoId)` (reusado) |
@@ -40,8 +40,9 @@ Arriba (fuera de los estados, siempre visible y usable):
 | Control | Accesibilidad | Comportamiento |
 |---|---|---|
 | Buscador, placeholder "Buscar por nombre o descripción" | `accessibilityLabel="Buscar eventos"` | `maxLength = LIMITES_BUSQUEDA.texto` (100); la lista se actualiza 500 ms después de la última tecla; el skeleton aparece desde la primera tecla |
-| Categoría: "Todas" + las del catálogo | `radiogroup` "Categoría"; cada opción `radio` con `checked` | una sola; "Todas" al abrir; cambio inmediato |
-| Orden: "Fecha" · "Precio" · "Puntaje" | `radiogroup` "Ordenar por"; `radio` con `checked` | "Fecha" al abrir; cambio inmediato |
+| Botón de categoría (`BotonCategoria`), a la derecha del buscador | `button` "Categoría: Todas" / "Categoría: Música", con `expanded` | abre y cierra el desplegable; con una categoría elegida se rellena y muestra su nombre |
+| Desplegable de categoría: "Todas" + las del catálogo | `radiogroup` "Categoría"; cada opción `radio` con `checked` | cerrado al abrir Explorar; una sola; "Todas" al abrir; cambio inmediato y se cierra |
+| Orden: "Fecha" · "Precio" · "Puntaje", en una fila | `radiogroup` "Ordenar por"; `radio` con `checked`; el elegido con `accessibilityValue` ("Más próximos primero", "Más caros primero"…, `textoSentido`) | "Fecha" ↑ al abrir; otro criterio → su sentido inicial; el elegido otra vez → invierte el sentido; flecha ↑/↓ en el elegido |
 
 Debajo, los estados:
 
@@ -54,7 +55,7 @@ Debajo, los estados:
 | Vacío, `hayEventosProximos: true` | "Ningún evento coincide con tu búsqueda." + botón "Limpiar búsqueda" (texto `""`, categoría "Todas"; el orden queda) |
 | Éxito | `FlatList` de `TarjetaEvento`, en el orden del servidor |
 
-Las categorías tienen sus propios estados dentro del selector (como en la 004): "Cargando
+Las categorías tienen sus propios estados dentro del desplegable (como en la 004): "Cargando
 categorías…" y el error con "Reintentar"; mientras tanto el catálogo funciona con "Todas".
 
 ### TarjetaEvento

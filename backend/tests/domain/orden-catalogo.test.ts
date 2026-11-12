@@ -111,3 +111,39 @@ describe("ordenarCatalogo: puntaje", () => {
     expect(lista).toEqual(copia);
   });
 });
+
+describe("ordenarCatalogo: sentido", () => {
+  const lista = [
+    elemento("a", { dia: 1, precio: 8000, puntaje: 3 }),
+    elemento("b", { dia: 2, precio: 0, puntaje: null }),
+    elemento("c", { dia: 3, precio: 2000, puntaje: 5 }),
+  ];
+
+  it("sin sentido usa el inicial de cada criterio: fecha y precio ascendentes, puntaje descendente", () => {
+    expect(ids(ordenarCatalogo(lista, "fecha"))).toEqual(ids(ordenarCatalogo(lista, "fecha", "asc")));
+    expect(ids(ordenarCatalogo(lista, "precio"))).toEqual(ids(ordenarCatalogo(lista, "precio", "asc")));
+    expect(ids(ordenarCatalogo(lista, "puntaje"))).toEqual(ids(ordenarCatalogo(lista, "puntaje", "desc")));
+  });
+
+  it("fecha desc: la más lejana primero", () => {
+    expect(ids(ordenarCatalogo(lista, "fecha", "desc"))).toEqual(["c", "b", "a"]);
+  });
+
+  it("precio desc: el más caro primero", () => {
+    expect(ids(ordenarCatalogo(lista, "precio", "desc"))).toEqual(["a", "c", "b"]);
+  });
+
+  it("puntaje asc: el más bajo primero y sin puntaje igual al final", () => {
+    expect(ids(ordenarCatalogo(lista, "puntaje", "asc"))).toEqual(["a", "c", "b"]);
+  });
+
+  it("los desempates no se invierten: fecha ascendente → nombre → id", () => {
+    const empatados = [
+      elemento("d", { precio: 1000, dia: 2, nombre: "Zeta" }),
+      elemento("c", { precio: 1000, dia: 1, nombre: "Zeta" }),
+      elemento("b", { precio: 1000, dia: 2, nombre: "Alfa" }),
+      elemento("a", { precio: 1000, dia: 2, nombre: "zeta" }),
+    ];
+    expect(ids(ordenarCatalogo(empatados, "precio", "desc"))).toEqual(["c", "b", "a", "d"]);
+  });
+});

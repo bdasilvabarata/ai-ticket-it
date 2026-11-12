@@ -180,6 +180,8 @@ export const tema = {
     detalle: "55%",
     corto: "35%",
   },
+  /** Lo más que ocupa el botón del filtro de categoría junto al buscador: el campo conserva el resto. */
+  anchoMaximoFiltro: "45%",
   sombra,
   /** Lo que se "hunde" un elemento con sombra al presionarlo (lo mismo que mide su sombra). */
   desplazamientoPresionado: 3,

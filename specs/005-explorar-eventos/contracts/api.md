@@ -23,6 +23,7 @@ Query (todos opcionales; las claves desconocidas se ignoran):
 | `texto` | string, `trim`, ≤ 100 caracteres después del `trim` | `""` (sin filtro) | "Debe tener como máximo 100 caracteres." · repetido → "Debe ser un texto." |
 | `categoriaId` | string, `trim`; vacío = sin filtro; debe ser una categoría del catálogo | sin filtro | repetido → "Debe ser un texto." · inexistente → "No existe la categoría." |
 | `orden` | `fecha` \| `precio` \| `puntaje` | `fecha` | "Debe ser fecha, precio o puntaje." |
+| `sentido` | `asc` \| `desc` | el inicial del criterio (`SENTIDO_INICIAL`: `fecha` y `precio` `asc`, `puntaje` `desc`) | "Debe ser asc o desc." (también repetido) |
 
 Reglas:
 - Solo eventos **no realizados** (`ahora < fechaHora`, con un único `ahora` por pedido), de
@@ -36,7 +37,8 @@ Reglas:
   vacía. Se verifica después de la forma y antes de leer los eventos.
 - Texto y categoría se combinan (deben cumplirse los dos); el orden se aplica después.
 - Orden y desempates: `fecha` ↑ · `precio` ("desde") ↑ · `puntaje` ↓ con `null` al final; los
-  empates, por fecha ↑, después nombre (sin mayúsculas ni tildes) y por último `id`.
+  empates, por fecha ↑, después nombre (sin mayúsculas ni tildes) y por último `id`. `sentido`
+  invierte solo el criterio principal: los desempates no cambian y `null` sigue al final.
 - Sin paginación.
 
 Respuesta:

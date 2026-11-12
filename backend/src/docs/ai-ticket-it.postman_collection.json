@@ -80,6 +80,10 @@
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio" } }
         },
         {
+          "name": "Ordenar orden=precio&sentido=desc (el más caro primero)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio&sentido=desc" } }
+        },
+        {
           "name": "Ordenar orden=puntaje (sin puntaje al final)",
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=puntaje" } }
         },

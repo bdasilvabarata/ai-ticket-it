@@ -5,6 +5,7 @@ import {
   textoPrecio,
   textoPrecioDesde,
   textoPuntaje,
+  textoSentido,
 } from "../../../src/features/eventos/formato";
 
 describe("formato de eventos (R18, sin Intl)", () => {
@@ -59,5 +60,18 @@ describe("textos del catálogo (R18)", () => {
     expect(textoPuntaje({ puntaje: 5, cantidadResenias: 1 })).toBe("5,0 · 1 reseña");
     expect(textoPuntaje({ puntaje: 4.45, cantidadResenias: 2 })).toBe("4,5 · 2 reseñas");
     expect(textoPuntaje({ puntaje: 4.04, cantidadResenias: 3 })).toBe("4,0 · 3 reseñas");
+  });
+});
+
+describe("textoSentido", () => {
+  it.each([
+    ["fecha", "asc", "Más próximos primero"],
+    ["fecha", "desc", "Más lejanos primero"],
+    ["precio", "asc", "Más baratos primero"],
+    ["precio", "desc", "Más caros primero"],
+    ["puntaje", "desc", "Mejor puntaje primero"],
+    ["puntaje", "asc", "Menor puntaje primero"],
+  ] as const)("%s %s → %s", (orden, sentido, texto) => {
+    expect(textoSentido(orden, sentido)).toBe(texto);
   });
 });

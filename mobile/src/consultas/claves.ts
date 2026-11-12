@@ -1,10 +1,11 @@
-import type { OrdenCatalogo } from "@ai-ticket-it/shared";
+import type { OrdenCatalogo, SentidoCatalogo } from "@ai-ticket-it/shared";
 
 /** La consulta del catálogo ya normalizada: texto recortado y `categoriaId` `null` = "Todas". */
 export interface ClaveCatalogo {
   texto: string;
   categoriaId: string | null;
   orden: OrdenCatalogo;
+  sentido: SentidoCatalogo;
 }
 
 /**

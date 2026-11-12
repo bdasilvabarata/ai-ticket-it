@@ -5,6 +5,7 @@ import type {
   EventoVista,
   OrdenCatalogo,
   OrganizadorVista,
+  SentidoCatalogo,
 } from "@ai-ticket-it/shared";
 import {
   Evento,
@@ -39,6 +40,8 @@ export interface ConsultaCatalogoValidada {
   texto: string;
   categoriaId?: string;
   orden: OrdenCatalogo;
+  /** Sin valor: el inicial del criterio. */
+  sentido?: SentidoCatalogo;
 }
 
 /**
@@ -91,7 +94,7 @@ export class EventoService {
    * organizadores y sus puntajes).
    */
   async listar(consulta: ConsultaCatalogoValidada): Promise<CatalogoVista> {
-    const { texto, categoriaId, orden } = consulta;
+    const { texto, categoriaId, orden, sentido } = consulta;
     // Una referencia de la entrada (principio III): si no existe, 400 sobre query.categoriaId, antes
     // de leer los eventos. El error lo lanza el dueño de las categorías.
     if (categoriaId !== undefined) await this.#categoriaService.buscarReferenciada(categoriaId, "consulta");
@@ -128,7 +131,7 @@ export class EventoService {
       };
     });
     return {
-      eventos: ordenarCatalogo(elementos, orden).map((elemento) => elemento.vista),
+      eventos: ordenarCatalogo(elementos, orden, sentido).map((elemento) => elemento.vista),
       hayEventosProximos,
     };
   }

@@ -1,6 +1,8 @@
 // Textos derivados de un evento, sin React y sin `Intl` (research R18): el resultado es el mismo
 // en Node (tests) y en Hermes (teléfono), y no depende de la zona del teléfono.
 
+import type { OrdenCatalogo, SentidoCatalogo } from "@ai-ticket-it/shared";
+
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"] as const;
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"] as const;
 
@@ -47,4 +49,15 @@ export function textoPuntaje({
   if (puntaje === null) return "Sin reseñas";
   const redondeado = (Math.round(puntaje * 10) / 10).toFixed(1).replace(".", ",");
   return `${redondeado} · ${cantidadResenias === 1 ? "1 reseña" : `${cantidadResenias} reseñas`}`;
+}
+
+const TEXTOS_SENTIDO: Record<OrdenCatalogo, Record<SentidoCatalogo, string>> = {
+  fecha: { asc: "Más próximos primero", desc: "Más lejanos primero" },
+  precio: { asc: "Más baratos primero", desc: "Más caros primero" },
+  puntaje: { asc: "Menor puntaje primero", desc: "Mejor puntaje primero" },
+};
+
+/** Qué queda primero con ese orden y sentido: ("precio", "desc") → "Más caros primero". */
+export function textoSentido(orden: OrdenCatalogo, sentido: SentidoCatalogo): string {
+  return TEXTOS_SENTIDO[orden][sentido];
 }

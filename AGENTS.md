@@ -45,7 +45,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
     `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
-    los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden`, más
+    los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden` y `sentido`, más
     `hayEventosProximos`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae
     `organizador` (`OrganizadorVista` con `puntaje` sin redondear o `null` y `cantidadResenias`).
     Módulos puros del dominio: `domain/busqueda.ts` (`normalizarParaBuscar`, `palabrasDeBusqueda`:
@@ -129,7 +129,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       32 s), `useSesion()` y las pantallas `SeleccionarUsuario` y `Perfil`;
     - `categorias/` — `useCategorias`;
     - `eventos/` — Explorar (la pestaña de inicio: buscador con `useValorDemorado` de 500 ms,
-      `SelectorCategoria` en modo `conTodas`, `SelectorOrden`, `TarjetaEvento`/`TarjetaSkeleton` y
+      `BotonCategoria` (a la derecha del buscador) que abre `SelectorCategoria` en modo `conTodas` como
+      desplegable, `SelectorOrden` (tocar el elegido invierte el `sentido`), `TarjetaEvento`/`TarjetaSkeleton` y
       `useCatalogo`), el detalle público `DetalleEvento` (ruta `explorar/[eventoId]`, `FilaImagenes`;
       ante un 404 llama a `useInvalidarCatalogo`), Mis eventos, Crear evento, `EventoDelOrganizador`
       (edita o muestra en solo lectura según el `realizado` del servidor), los formularios de tipo

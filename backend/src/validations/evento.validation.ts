@@ -3,6 +3,7 @@ import {
   LIMITES_EVENTO,
   LIMITES_TIPO_ENTRADA,
   ORDENES_CATALOGO,
+  SENTIDOS_CATALOGO,
 } from "@ai-ticket-it/shared";
 import { z } from "zod";
 import {
@@ -85,6 +86,7 @@ export const eventoEditado = crearValidacion({
 const MENSAJE_TEXTO = "Debe ser un texto.";
 const MENSAJE_MAXIMO_BUSQUEDA = `Debe tener como máximo ${LIMITES_BUSQUEDA.texto} caracteres.`;
 const MENSAJE_ORDEN = "Debe ser fecha, precio o puntaje.";
+const MENSAJE_SENTIDO = "Debe ser asc o desc.";
 
 /**
  * `GET /eventos`: la consulta del catálogo (contracts/api.md). Un `z.object`: las claves desconocidas
@@ -105,5 +107,7 @@ export const consultaCatalogo = crearValidacion({
       .optional()
       .transform((valor) => (valor === "" ? undefined : valor)),
     orden: z.enum(ORDENES_CATALOGO, { error: MENSAJE_ORDEN }).default("fecha"),
+    // Sin valor, el inicial del criterio (lo decide el dominio).
+    sentido: z.enum(SENTIDOS_CATALOGO, { error: MENSAJE_SENTIDO }).optional(),
   }),
 });

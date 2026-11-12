@@ -43,6 +43,12 @@ async function avanzar(ms: number) {
 
 const tarjetas = () => screen.findAllByRole("button", { name: /, organiza / });
 
+/** El botón del filtro de categoría, a la derecha del buscador ("Categoría: Todas"). */
+const botonCategoria = () => screen.findByRole("button", { name: /^Categoría: / });
+async function abrirCategorias() {
+  await fireEvent.press(await botonCategoria());
+}
+
 describe("Explorar (US1)", () => {
   it("pide el catálogo por fecha sin X-Usuario-Id y muestra el skeleton mientras carga", async () => {
     const { falso } = await abrirExplorar({ [CATALOGO_INICIAL]: ["colgar"] });
@@ -147,9 +153,9 @@ describe("Explorar (US1)", () => {
 });
 
 describe("Explorar: buscar y filtrar (US3)", () => {
-  const BASQUET = "/eventos?texto=basquet&orden=fecha";
-  const MUSICA = "/eventos?categoriaId=categoria-musica&orden=fecha";
-  const BASQUET_MUSICA = "/eventos?texto=basquet&categoriaId=categoria-musica&orden=fecha";
+  const BASQUET = "/eventos?texto=basquet&orden=fecha&sentido=asc";
+  const MUSICA = "/eventos?categoriaId=categoria-musica&orden=fecha&sentido=asc";
+  const BASQUET_MUSICA = "/eventos?texto=basquet&categoriaId=categoria-musica&orden=fecha&sentido=asc";
   const inicial = { status: 200, json: catalogo([rockEnCatalogo, clasicoEnCatalogo]) } as const;
 
   const buscador = () => screen.getByLabelText("Buscar eventos");
@@ -205,6 +211,26 @@ describe("Explorar: buscar y filtrar (US3)", () => {
     await waitFor(() => expect(falso.pedidosA(BASQUET)).toHaveLength(1));
   });
 
+  it("el filtro de categoría arranca cerrado a la derecha del buscador y se abre y cierra al tocarlo", async () => {
+    await abrirExplorar({
+      "/categorias": [{ status: 200, json: categorias }],
+      [CATALOGO_INICIAL]: [inicial],
+    });
+    await screen.findByText("Noche de Rock en el Club");
+
+    const boton = await botonCategoria();
+    expect(boton).toHaveAccessibleName("Categoría: Todas");
+    expect(boton).toBeCollapsed();
+    expect(screen.queryByRole("radio", { name: "Todas" })).toBeNull();
+
+    await fireEvent.press(boton);
+    expect(await screen.findByRole("radio", { name: "Música" })).toBeOnTheScreen();
+    expect(await botonCategoria()).toBeExpanded();
+
+    await fireEvent.press(await botonCategoria());
+    expect(screen.queryByRole("radio", { name: "Música" })).toBeNull();
+  });
+
   it("elegir Música pide al instante con la categoría y muestra el skeleton", async () => {
     const { falso } = await abrirExplorar({
       "/categorias": [{ status: 200, json: categorias }],
@@ -213,10 +239,14 @@ describe("Explorar: buscar y filtrar (US3)", () => {
     });
     await screen.findByText("Noche de Rock en el Club");
 
+    await abrirCategorias();
     expect(await screen.findByRole("radio", { name: "Todas" })).toBeChecked();
     await fireEvent.press(screen.getByRole("radio", { name: "Música" }));
 
     expect(falso.pedidosA(MUSICA)).toHaveLength(1);
+    // Elegir cierra el desplegable y el botón dice qué categoría filtra.
+    expect(screen.queryByRole("radio", { name: "Todas" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Categoría: Música" })).toBeOnTheScreen();
     expect(screen.getByLabelText("Cargando eventos")).toBeOnTheScreen();
     expect(screen.queryByText("Noche de Rock en el Club")).toBeNull();
   });
@@ -228,6 +258,7 @@ describe("Explorar: buscar y filtrar (US3)", () => {
       [BASQUET_MUSICA]: [{ status: 200, json: catalogo([], true) }],
     });
     await screen.findByText("Noche de Rock en el Club");
+    await abrirCategorias();
     await fireEvent.press(await screen.findByRole("radio", { name: "Música" }));
     await fireEvent.changeText(buscador(), "basquet");
     await avanzar(600);
@@ -236,7 +267,7 @@ describe("Explorar: buscar y filtrar (US3)", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Limpiar búsqueda" }));
 
     expect(buscador().props.value).toBe("");
-    expect(screen.getByRole("radio", { name: "Todas" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Categoría: Todas" })).toBeOnTheScreen();
     expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
   });
 
@@ -255,7 +286,9 @@ describe("Explorar: buscar y filtrar (US3)", () => {
 
   it("las categorías tienen sus propios estados mientras el catálogo funciona con Todas", async () => {
     await abrirExplorar({
+      // Las pide el botón al entrar y otra vez el desplegable al abrirse (el error no queda guardado).
       "/categorias": [
+        { status: 500, json: errorApi("ERROR_INTERNO", "No hay categorías.") },
         { status: 500, json: errorApi("ERROR_INTERNO", "No hay categorías.") },
         { status: 200, json: categorias },
       ],
@@ -263,6 +296,7 @@ describe("Explorar: buscar y filtrar (US3)", () => {
     });
 
     expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
+    await abrirCategorias();
     expect(await screen.findByText("No hay categorías.")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
     expect(await screen.findByRole("radio", { name: "Música" })).toBeOnTheScreen();
@@ -270,6 +304,7 @@ describe("Explorar: buscar y filtrar (US3)", () => {
 
   it("mientras cargan las categorías dice Cargando categorías…", async () => {
     await abrirExplorar({ "/categorias": ["colgar"], [CATALOGO_INICIAL]: [inicial] });
+    await abrirCategorias();
     expect(await screen.findByText("Cargando categorías…")).toBeOnTheScreen();
     expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
   });
@@ -282,6 +317,7 @@ describe("Explorar: buscar y filtrar (US3)", () => {
       "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }],
     });
     await screen.findByText("Noche de Rock en el Club");
+    await abrirCategorias();
     await fireEvent.press(await screen.findByRole("radio", { name: "Música" }));
     await fireEvent.changeText(buscador(), "basquet");
     await avanzar(600);
@@ -292,13 +328,14 @@ describe("Explorar: buscar y filtrar (US3)", () => {
 
     expect(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / })).toBeOnTheScreen();
     expect(buscador().props.value).toBe("basquet");
-    expect(screen.getByRole("radio", { name: "Música" })).toBeChecked();
+    expect(screen.getByRole("button", { name: "Categoría: Música" })).toBeOnTheScreen();
   });
 });
 
 describe("Explorar: ordenar (US4)", () => {
-  const POR_PRECIO = "/eventos?orden=precio";
-  const BASQUET_MUSICA_PRECIO = "/eventos?texto=basquet&categoriaId=categoria-musica&orden=precio";
+  const POR_PRECIO = "/eventos?orden=precio&sentido=asc";
+  const BASQUET_MUSICA_PRECIO =
+    "/eventos?texto=basquet&categoriaId=categoria-musica&orden=precio&sentido=asc";
   const porFecha = {
     status: 200,
     json: catalogo([rockEnCatalogo, clasicoEnCatalogo, maratonEnCatalogo]),
@@ -339,6 +376,7 @@ describe("Explorar: ordenar (US4)", () => {
       [POR_PRECIO]: [porPrecio],
     });
     await screen.findByText("Noche de Rock en el Club");
+    await abrirCategorias();
     await fireEvent.press(await screen.findByRole("radio", { name: "Música" }));
     await fireEvent.changeText(screen.getByLabelText("Buscar eventos"), "basquet");
     await avanzar(600);
@@ -361,6 +399,51 @@ describe("Explorar: ordenar (US4)", () => {
     await fireEvent.press(screen.getByRole("radio", { name: "Fecha" }));
 
     expect(await nombres()).toEqual(["Noche de Rock en el Club", "Clásico de básquet", "Maratón Ciudad 10K"]);
+  });
+
+  it("el orden elegido muestra su sentido y tocarlo de nuevo lo invierte", async () => {
+    const FECHA_DESC = "/eventos?orden=fecha&sentido=desc";
+    const { falso } = await abrirExplorar({
+      [CATALOGO_INICIAL]: [porFecha],
+      [FECHA_DESC]: [{ status: 200, json: catalogo([maratonEnCatalogo, clasicoEnCatalogo, rockEnCatalogo]) }],
+    });
+    await screen.findByText("Noche de Rock en el Club");
+    expect(screen.getByRole("radio", { name: "Fecha" })).toHaveAccessibilityValue({
+      text: "Más próximos primero",
+    });
+
+    await fireEvent.press(screen.getByRole("radio", { name: "Fecha" }));
+
+    expect(falso.pedidosA(FECHA_DESC)).toHaveLength(1);
+    expect(await nombres()).toEqual(["Maratón Ciudad 10K", "Clásico de básquet", "Noche de Rock en el Club"]);
+    expect(screen.getByRole("radio", { name: "Fecha" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Fecha" })).toHaveAccessibilityValue({
+      text: "Más lejanos primero",
+    });
+  });
+
+  it("elegir otro criterio arranca en su sentido inicial; Puntaje invertido pide sentido=asc", async () => {
+    const POR_PUNTAJE = "/eventos?orden=puntaje&sentido=desc";
+    const PUNTAJE_ASC = "/eventos?orden=puntaje&sentido=asc";
+    const { falso } = await abrirExplorar({
+      [CATALOGO_INICIAL]: [porFecha],
+      "/eventos?orden=fecha&sentido=desc": [porFecha],
+      [POR_PUNTAJE]: [porFecha],
+      [PUNTAJE_ASC]: [porFecha],
+    });
+    await screen.findByText("Noche de Rock en el Club");
+    await fireEvent.press(screen.getByRole("radio", { name: "Fecha" }));
+    await screen.findByText("Noche de Rock en el Club");
+
+    await fireEvent.press(screen.getByRole("radio", { name: "Puntaje" }));
+    expect(falso.pedidosA(POR_PUNTAJE)).toHaveLength(1);
+    expect(screen.getByRole("radio", { name: "Puntaje" })).toHaveAccessibilityValue({
+      text: "Mejor puntaje primero",
+    });
+    await screen.findByText("Noche de Rock en el Club");
+
+    await fireEvent.press(screen.getByRole("radio", { name: "Puntaje" }));
+    expect(falso.pedidosA(PUNTAJE_ASC)).toHaveLength(1);
   });
 
   it("volver del detalle conserva el orden", async () => {

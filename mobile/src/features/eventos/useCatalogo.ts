@@ -21,6 +21,7 @@ export function useCatalogo(consulta: ClaveCatalogo) {
           texto: consulta.texto,
           categoriaId: consulta.categoriaId ?? undefined,
           orden: consulta.orden,
+          sentido: consulta.sentido,
         },
         { signal },
       ),
