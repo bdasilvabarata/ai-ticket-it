@@ -295,3 +295,87 @@ describe("Explorar: buscar y filtrar (US3)", () => {
     expect(screen.getByRole("radio", { name: "Música" })).toBeChecked();
   });
 });
+
+describe("Explorar: ordenar (US4)", () => {
+  const POR_PRECIO = "/eventos?orden=precio";
+  const BASQUET_MUSICA_PRECIO = "/eventos?texto=basquet&categoriaId=categoria-musica&orden=precio";
+  const porFecha = {
+    status: 200,
+    json: catalogo([rockEnCatalogo, clasicoEnCatalogo, maratonEnCatalogo]),
+  } as const;
+  const porPrecio = {
+    status: 200,
+    json: catalogo([maratonEnCatalogo, clasicoEnCatalogo, rockEnCatalogo]),
+  } as const;
+  const nombres = async () =>
+    (await tarjetas()).map((t) => (t.props.accessibilityLabel as string).split(",")[0]);
+
+  it("un radiogroup Ordenar por con Fecha, Precio y Puntaje, y Fecha elegido al abrir", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [porFecha] });
+
+    expect((await screen.findByLabelText("Ordenar por")).props.accessibilityRole).toBe("radiogroup");
+    expect(screen.getByRole("radio", { name: "Fecha" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Precio" })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: "Puntaje" })).not.toBeChecked();
+  });
+
+  it("elegir Precio pide al instante, muestra el skeleton y después la lista en el orden del servidor", async () => {
+    const { falso } = await abrirExplorar({ [CATALOGO_INICIAL]: [porFecha], [POR_PRECIO]: [porPrecio] });
+    expect(await nombres()).toEqual(["Noche de Rock en el Club", "Clásico de básquet", "Maratón Ciudad 10K"]);
+
+    await fireEvent.press(screen.getByRole("radio", { name: "Precio" }));
+
+    expect(falso.pedidosA(POR_PRECIO)).toHaveLength(1);
+    expect(screen.getByLabelText("Cargando eventos")).toBeOnTheScreen();
+    expect(await nombres()).toEqual(["Maratón Ciudad 10K", "Clásico de básquet", "Noche de Rock en el Club"]);
+    expect(screen.getByRole("radio", { name: "Precio" })).toBeChecked();
+  });
+
+  it("se combina con el texto y la categoría; Limpiar búsqueda deja el orden", async () => {
+    const { falso } = await abrirExplorar({
+      "/categorias": [{ status: 200, json: categorias }],
+      [CATALOGO_INICIAL]: [porFecha],
+      [BASQUET_MUSICA_PRECIO]: [{ status: 200, json: catalogo([], true) }],
+      [POR_PRECIO]: [porPrecio],
+    });
+    await screen.findByText("Noche de Rock en el Club");
+    await fireEvent.press(await screen.findByRole("radio", { name: "Música" }));
+    await fireEvent.changeText(screen.getByLabelText("Buscar eventos"), "basquet");
+    await avanzar(600);
+    await fireEvent.press(screen.getByRole("radio", { name: "Precio" }));
+
+    expect(await screen.findByText("Ningún evento coincide con tu búsqueda.")).toBeOnTheScreen();
+    expect(falso.pedidosA(BASQUET_MUSICA_PRECIO)).toHaveLength(1);
+    await fireEvent.press(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+
+    expect(screen.getByRole("radio", { name: "Precio" })).toBeChecked();
+    expect(await nombres()).toEqual(["Maratón Ciudad 10K", "Clásico de básquet", "Noche de Rock en el Club"]);
+  });
+
+  it("Fecha → Precio → Fecha muestra la respuesta cacheada de esa consulta", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [porFecha], [POR_PRECIO]: [porPrecio] });
+    await screen.findByText("Noche de Rock en el Club");
+
+    await fireEvent.press(screen.getByRole("radio", { name: "Precio" }));
+    expect(await nombres()).toEqual(["Maratón Ciudad 10K", "Clásico de básquet", "Noche de Rock en el Club"]);
+    await fireEvent.press(screen.getByRole("radio", { name: "Fecha" }));
+
+    expect(await nombres()).toEqual(["Noche de Rock en el Club", "Clásico de básquet", "Maratón Ciudad 10K"]);
+  });
+
+  it("volver del detalle conserva el orden", async () => {
+    await abrirExplorar({
+      [CATALOGO_INICIAL]: [porFecha],
+      [POR_PRECIO]: [porPrecio],
+      "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }],
+    });
+    await screen.findByText("Noche de Rock en el Club");
+    await fireEvent.press(screen.getByRole("radio", { name: "Precio" }));
+    await fireEvent.press(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / }));
+    await screen.findByRole("header", { name: "Maratón Ciudad 10K" });
+
+    await act(() => router.back());
+
+    expect(await screen.findByRole("radio", { name: "Precio" })).toBeChecked();
+  });
+});

@@ -1,10 +1,11 @@
-import { LIMITES_BUSQUEDA } from "@ai-ticket-it/shared";
+import { LIMITES_BUSQUEDA, type OrdenCatalogo } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { useState } from "react";
 import { FlatList, StyleSheet, TextInput, View } from "react-native";
 
 import { ListaVacia, SegunConsulta, tema } from "../../../componentes";
 import { SelectorCategoria } from "../componentes/SelectorCategoria";
+import { SelectorOrden } from "../componentes/SelectorOrden";
 import { TarjetaEvento } from "../componentes/TarjetaEvento";
 import { TarjetaSkeleton } from "../componentes/TarjetaSkeleton";
 import { useCatalogo } from "../useCatalogo";
@@ -35,17 +36,19 @@ function CargandoEventos() {
 
 /**
  * Explorar: el catálogo de eventos próximos (contracts/app.md, "Explorar"). La consulta (texto,
- * categoría) vive acá: la pestaña no se desmonta al apilar el detalle, así que se conserva (FR-024).
+ * categoría y orden) vive acá: la pestaña no se desmonta al apilar el detalle, así que se conserva (FR-024).
  */
 export function Explorar() {
   const [texto, setTexto] = useState("");
   const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const [orden, setOrden] = useState<OrdenCatalogo>("fecha");
   const textoDemorado = useValorDemorado(texto.trim(), DEMORA_DEL_BUSCADOR_MS);
-  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden: "fecha" });
+  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden });
   // Desde la primera tecla hasta que llega la respuesta del texto nuevo, el skeleton: nunca quedan a
   // la vista los resultados del texto anterior (FR-007).
   const escribiendo = texto.trim() !== textoDemorado;
 
+  // El orden queda: no es parte de la búsqueda.
   const limpiarBusqueda = () => {
     setTexto("");
     setCategoriaId(null);
@@ -68,6 +71,7 @@ export function Explorar() {
           style={estilos.buscador}
         />
         <SelectorCategoria conTodas valor={categoriaId} alCambiar={setCategoriaId} />
+        <SelectorOrden valor={orden} alCambiar={setOrden} />
       </View>
       <SegunConsulta
         consulta={{ ...consulta, isPending: consulta.isPending || escribiendo }}

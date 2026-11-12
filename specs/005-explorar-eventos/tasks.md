@@ -236,8 +236,8 @@ Noche de Rock (15000), Hamlet (18000), Festival (45000); `?orden=puntaje` → ig
 
 ### Mobile
 
-- [ ] T049 [US4] Test en `mobile/tests/pantallas/explorar.test.tsx` (se amplía) con el stub de `SelectorOrden` en `mobile/src/features/eventos/componentes/SelectorOrden.tsx` (`valor: OrdenCatalogo`, `alCambiar(orden: OrdenCatalogo)`). Casos: `radiogroup` "Ordenar por" con "Fecha" · "Precio" · "Puntaje" como `radio` y "Fecha" `checked` al abrir; elegir "Precio" pide al instante `orden=precio` (combinado con el texto y la categoría elegidos) y muestra el skeleton; la lista sale en el orden del servidor; "Limpiar búsqueda" deja el orden; volver del detalle conserva el orden; Fecha → Precio → Fecha muestra la respuesta cacheada de **esa** consulta.
-- [ ] T050 [US4] Implementar `SelectorOrden` (mismo estilo de chips que `SelectorCategoria`, con `flexWrap`) y sumar a `Explorar` el `useState` de `orden` (`"fecha"`), el selector en el `View` fijo y `orden` en la clave.
+- [X] T049 [US4] Test en `mobile/tests/pantallas/explorar.test.tsx` (se amplía) con el stub de `SelectorOrden` en `mobile/src/features/eventos/componentes/SelectorOrden.tsx` (`valor: OrdenCatalogo`, `alCambiar(orden: OrdenCatalogo)`). Casos: `radiogroup` "Ordenar por" con "Fecha" · "Precio" · "Puntaje" como `radio` y "Fecha" `checked` al abrir; elegir "Precio" pide al instante `orden=precio` (combinado con el texto y la categoría elegidos) y muestra el skeleton; la lista sale en el orden del servidor; "Limpiar búsqueda" deja el orden; volver del detalle conserva el orden; Fecha → Precio → Fecha muestra la respuesta cacheada de **esa** consulta.
+- [X] T050 [US4] Implementar `SelectorOrden` (mismo estilo de chips que `SelectorCategoria`, con `flexWrap`) y sumar a `Explorar` el `useState` de `orden` (`"fecha"`), el selector en el `View` fijo y `orden` en la clave.
 
 **Checkpoint**: las cuatro historias funcionan; el orden por puntaje queda listo para la 011
 (FR-010).
