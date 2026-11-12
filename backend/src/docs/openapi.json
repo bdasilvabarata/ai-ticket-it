@@ -553,6 +553,170 @@
         }
       }
     },
+    "/compras/{compraId}": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Ver una compra",
+        "description": "La compra con su estado al día: una PENDIENTE vencida se ve CANCELADA, con un último cambio del sistema fechado en el vencimiento, aunque todavía no se haya guardado así. Solo la ve su comprador. Lectura: no guarda nada.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La compra, al día",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompraVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/UsuarioNoIdentificado"
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/pago": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Pagar una compra (pago simulado)",
+        "description": "Sin cuerpo (si viene uno, se ignora). Bajo el cerrojo del evento de la compra: vence las pendientes vencidas del evento, verifica que el usuario sea el comprador y pasa la compra de PENDIENTE a CONFIRMADA. A los 15 minutos exactos del alta ya venció. Que el evento haya empezado no impide pagar. No es idempotente: pagar dos veces da 409 TRANSICION_INVALIDA.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La compra CONFIRMADA, con `venceEn: null` y el historial [PENDIENTE, CONFIRMADA]",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompraVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/UsuarioNoIdentificado"
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "yaPagada": {
+                    "summary": "Ya está CONFIRMADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra no está pendiente de pago."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/eventos/{eventoId}/tipos-entrada": {
       "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
       "post": {
@@ -783,6 +947,16 @@
         "required": true,
         "description": "UUID (lo que crean los usuarios) o id legible `evento-<slug>` (datos de ejemplo)",
         "schema": { "type": "string", "example": "evento-festival-sonidos-del-sur" }
+      },
+      "CompraId": {
+        "name": "compraId",
+        "in": "path",
+        "required": true,
+        "description": "UUID (las compras nuevas) o id legible `compra-<slug>` (datos de ejemplo)",
+        "schema": {
+          "type": "string",
+          "example": "compra-martin-festival-vip"
+        }
       },
       "TipoEntradaId": {
         "name": "tipoEntradaId",

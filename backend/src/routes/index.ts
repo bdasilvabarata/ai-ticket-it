@@ -6,6 +6,7 @@ import type { SaludController } from "../controllers/salud.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
 import type { UsuarioController } from "../controllers/usuario.controller";
 import { crearCategoriasRouter } from "./categorias.routes";
+import { crearComprasRouter } from "./compras.routes";
 import { crearEventosRouter } from "./eventos.routes";
 import { crearSaludRouter } from "./salud.routes";
 import { crearUsuariosRouter } from "./usuarios.routes";
@@ -26,5 +27,6 @@ export function crearRouterApi(controllers: ControllersApi, requerirUsuario: Req
   router.use("/usuarios", crearUsuariosRouter(controllers.usuarios, requerirUsuario));
   router.use("/categorias", crearCategoriasRouter(controllers.categorias));
   router.use("/eventos", crearEventosRouter(controllers, requerirUsuario));
+  router.use("/compras", crearComprasRouter(controllers.compras, requerirUsuario));
   return router;
 }

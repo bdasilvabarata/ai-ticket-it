@@ -305,3 +305,51 @@ describe("Compra.registrar (alta, feature 006)", () => {
     expect(() => alta(vip, 0)).toThrow(DatosInvalidosError);
   });
 });
+
+describe("Compra.pagar (feature 006)", () => {
+  const porSofia = { tipo: "usuario", usuarioId: "usuario-sofia" } as const;
+
+  it("PENDIENTE → CONFIRMADA por el usuario en `ahora`; la original no cambia", () => {
+    const original = compraPendiente();
+    const pagada = original.pagar("usuario-sofia", despues(PLAZO - 1));
+    expect(pagada).not.toBe(original);
+    expect(pagada.estado).toBe(EstadoCompra.CONFIRMADA);
+    expect(pagada.historial).toEqual([
+      pendiente,
+      { estado: EstadoCompra.CONFIRMADA, autor: porSofia, fechaHora: despues(PLAZO - 1) },
+    ]);
+    expect(pagada).toMatchObject({ id: datos.id, cantidad: datos.cantidad, total: datos.total });
+    expect(original.estado).toBe(EstadoCompra.PENDIENTE);
+    expect(original.historial).toHaveLength(1);
+  });
+
+  it("una vez pagada, ya no vence pasado el plazo", () => {
+    const pagada = compraPendiente().pagar("usuario-martin", despues(MINUTO));
+    expect(pagada.estaVencida(despues(PLAZO * 2))).toBe(false);
+  });
+
+  const vencida = expect.objectContaining({
+    codigo: "COMPRA_VENCIDA",
+    message: "La compra venció: pasaron 15 minutos sin pagarla.",
+  });
+
+  it("a los 15 minutos exactos lanza COMPRA_VENCIDA", () => {
+    const compra = compraPendiente();
+    expect(() => compra.pagar("usuario-martin", despues(PLAZO))).toThrow(ReglaDeNegocioError);
+    expect(() => compra.pagar("usuario-martin", despues(PLAZO))).toThrow(vencida);
+  });
+
+  it("una CANCELADA por el sistema (fueVencida) lanza COMPRA_VENCIDA", () => {
+    const cancelada = compraPendiente().vencer();
+    expect(() => cancelada.pagar("usuario-martin", despues(MINUTO))).toThrow(vencida);
+  });
+
+  it("ya CONFIRMADA lanza TRANSICION_INVALIDA", () => {
+    expect(() => compraConfirmada().pagar("usuario-martin", despues(10 * MINUTO))).toThrow(
+      expect.objectContaining({
+        codigo: "TRANSICION_INVALIDA",
+        message: "La compra no está pendiente de pago.",
+      }),
+    );
+  });
+});

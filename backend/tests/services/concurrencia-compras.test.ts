@@ -182,3 +182,68 @@ describe("Concurrencia: compras simultáneas (feature 006, SC-002)", () => {
     expect([2000, 6000]).toContain(compraHecha.total);
   });
 });
+
+describe("Concurrencia: pago de una compra (feature 006)", () => {
+  /** Un evento de Lucía con VIP en 48 y una compra PENDIENTE de 2 VIP de Sofía, recién hecha. */
+  function armarPago({ en = 5 * DIA } = {}) {
+    const reloj = relojMovible();
+    const servicios = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", en, tiposEntrada: [tipo({ id: "tipo-a-vip", nombre: "VIP", cupo: 48 })] }),
+      ],
+      compras: [
+        compra("evento-a", "tipo-a-vip", EstadoCompra.PENDIENTE, {
+          id: "compra-sofia",
+          compradorId: "usuario-sofia",
+          cantidad: 2,
+        }),
+      ],
+      reloj,
+    });
+    return { ...servicios, reloj };
+  }
+
+  it("pago con el reloj exactamente en venceEn → COMPRA_VENCIDA y el cupo vuelve una sola vez", async () => {
+    const { compraService, eventoService, repositorioEventos, repositorioCompras, reloj } = armarPago();
+    reloj.avanzar(15 * MINUTO);
+
+    const resultados = await Promise.allSettled([
+      compraService.pagar("compra-sofia", "usuario-sofia"),
+      compraService.pagar("compra-sofia", "usuario-sofia"),
+    ]);
+
+    expect(resultados.map((r) => r.status)).toEqual(["rejected", "rejected"]);
+    for (const r of resultados) {
+      expect(r.status === "rejected" && r.reason).toMatchObject({ codigo: "COMPRA_VENCIDA" });
+    }
+    expect((await repositorioCompras.buscarPorId("compra-sofia"))?.fueVencida()).toBe(true);
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
+      50,
+    );
+    expect((await eventoService.obtener("evento-a")).tiposEntrada[0]?.cupo).toBe(50);
+  });
+
+  it("dos pagos simultáneos de la misma compra → uno cumplido, otro TRANSICION_INVALIDA y un solo CONFIRMADA (FR-013)", async () => {
+    const { compraService, repositorioCompras } = armarPago();
+
+    const resultados = await Promise.allSettled([
+      compraService.pagar("compra-sofia", "usuario-sofia"),
+      compraService.pagar("compra-sofia", "usuario-sofia"),
+    ]);
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    const rechazado = resultados.find((r) => r.status === "rejected");
+    expect(rechazado?.status === "rejected" && rechazado.reason).toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+    });
+    const guardada = await repositorioCompras.buscarPorId("compra-sofia");
+    expect(guardada?.historial.filter((c) => c.estado === EstadoCompra.CONFIRMADA)).toHaveLength(1);
+  });
+
+  it("pago con el evento ya empezado y la compra sin vencer → CONFIRMADA (R9)", async () => {
+    const { compraService, reloj } = armarPago({ en: 5 * MINUTO });
+    reloj.avanzar(10 * MINUTO);
+    const vista = await compraService.pagar("compra-sofia", "usuario-sofia");
+    expect(vista.estado).toBe(EstadoCompra.CONFIRMADA);
+  });
+});

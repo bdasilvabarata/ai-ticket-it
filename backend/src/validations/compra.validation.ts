@@ -28,3 +28,6 @@ export const compraNueva = crearValidacion({ params: paramsEvento, body: datosCo
 
 /** `GET /eventos/:eventoId/mis-compras`. */
 export const comprasDelEvento = crearValidacion({ params: paramsEvento });
+
+/** `GET /compras/:compraId` y `POST /compras/:compraId/pago`. */
+export const compraPorId = crearValidacion({ params: z.object({ compraId: idSchema }) });

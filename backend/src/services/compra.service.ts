@@ -8,11 +8,18 @@ import { Compra } from "../domain/compra";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
 import { entradasRestantes, exigirTopePorPersona } from "../domain/tope-por-persona";
-import { CompraNoEncontradaError } from "../errors/index";
+import { CompraNoEncontradaError, SinPermisoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import { aCompraVista } from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import type { TipoEntradaService } from "./tipo-entrada.service";
+
+/** Solo quien hizo la compra puede verla o pagarla (403). */
+function exigirQueEsSuya(compra: Compra, usuarioId: string): void {
+  if (compra.compradorId !== usuarioId) {
+    throw new SinPermisoError("Solo quien hizo la compra puede verla o pagarla.");
+  }
+}
 
 export interface DependenciasCompraService {
   compras: RepositorioCompras;
@@ -78,6 +85,38 @@ export class CompraService {
       });
       await this.#compras.guardar(compra);
       return aCompraVista(compra, descontado, ahora);
+    });
+  }
+
+  /**
+   * La compra **al día** (una PENDIENTE vencida se ve CANCELADA por el sistema), solo para su
+   * comprador: 404 → 403. Lectura: sin cerrojo y sin guardar nada.
+   */
+  async obtener(compraId: string, usuarioId: string): Promise<CompraVista> {
+    const ahora = this.#reloj.ahora();
+    const compra = await this.obtenerOFallar(compraId);
+    exigirQueEsSuya(compra, usuarioId);
+    const evento = await this.#eventoService.obtenerOFallar(compra.eventoId);
+    return aCompraVista(compra.alDia(ahora), evento, ahora);
+  }
+
+  /**
+   * Pago simulado (data-model, "`CompraService.pagar`"). La compra se lee una vez afuera solo para
+   * saber qué cerrojo tomar (su `eventoId` no cambia). Bajo el cerrojo de **su evento**, con un
+   * único `ahora`: materializa los vencimientos del evento (también el de esta, que devuelve su
+   * cupo), relee la compra, 403 si no es suya, y `compra.pagar` decide entre 409 vencida, 409
+   * transición inválida o CONFIRMADA. Que el evento haya empezado no importa (R9).
+   */
+  async pagar(compraId: string, usuarioId: string): Promise<CompraVista> {
+    const { eventoId } = await this.obtenerOFallar(compraId);
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerAlDia(eventoId, ahora);
+      const compra = await this.obtenerOFallar(compraId);
+      exigirQueEsSuya(compra, usuarioId);
+      const pagada = compra.pagar(usuarioId, ahora);
+      await this.#compras.guardar(pagada);
+      return aCompraVista(pagada, evento, ahora);
     });
   }
 

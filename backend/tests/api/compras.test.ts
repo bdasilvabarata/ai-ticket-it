@@ -2,7 +2,7 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
-import { relojFijo } from "../helpers/eventos";
+import { relojFijo, relojMovible } from "../helpers/eventos";
 
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
 const nuevaApp = () => crearApp({ reloj });
@@ -146,5 +146,126 @@ describe("GET /api/eventos/:eventoId/mis-compras", () => {
     const inexistente = await misCompras(app, "usuario-sofia", "/api/eventos/evento-inexistente");
     expect(inexistente.status).toBe(404);
     expect(inexistente.body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+});
+
+const verCompra = (app: App, compraId: string, usuarioId = "usuario-sofia") =>
+  request(app).get(`/api/compras/${compraId}`).set("X-Usuario-Id", usuarioId);
+const pagar = (app: App, compraId: string, usuarioId = "usuario-sofia") =>
+  request(app).post(`/api/compras/${compraId}/pago`).set("X-Usuario-Id", usuarioId);
+
+describe("GET /api/compras/:compraId y POST /api/compras/:compraId/pago", () => {
+  it("Sofía compra, la ve PENDIENTE y la paga → 200 CONFIRMADA con el historial", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
+
+    const vista = await verCompra(app, compra.id);
+    expect(vista.status).toBe(200);
+    expect(vista.body).toMatchObject({ id: compra.id, estado: EstadoCompra.PENDIENTE, total: 240000 });
+
+    const pago = await pagar(app, compra.id);
+    expect(pago.status).toBe(200);
+    expect(pago.body).toMatchObject({ estado: EstadoCompra.CONFIRMADA, venceEn: null, venceEnLocal: null });
+    expect(pago.body.historial).toEqual([
+      expect.objectContaining({
+        estado: EstadoCompra.PENDIENTE,
+        autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+      }),
+      {
+        estado: EstadoCompra.CONFIRMADA,
+        autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+        fechaHora: "2026-11-10T15:00:00.000Z",
+        fechaHoraLocal: "2026-11-10T12:00",
+      },
+    ]);
+    expect((await verCompra(app, compra.id)).body.estado).toBe(EstadoCompra.CONFIRMADA);
+  });
+
+  it("pagar de nuevo → 409 TRANSICION_INVALIDA", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
+    await pagar(app, compra.id);
+    const otra = await pagar(app, compra.id);
+    expect(otra.status).toBe(409);
+    expect(otra.body.error).toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "La compra no está pendiente de pago.",
+    });
+  });
+
+  it("Diego sobre la compra de Sofía → 403 SIN_PERMISO en las dos rutas", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
+    const respuestas = [
+      await verCompra(app, compra.id, "usuario-diego"),
+      await pagar(app, compra.id, "usuario-diego"),
+    ];
+    for (const respuesta of respuestas) {
+      expect(respuesta.status).toBe(403);
+      expect(respuesta.body.error).toMatchObject({
+        codigo: "SIN_PERMISO",
+        mensaje: "Solo quien hizo la compra puede verla o pagarla.",
+      });
+    }
+    expect((await verCompra(app, compra.id)).body.estado).toBe(EstadoCompra.PENDIENTE);
+  });
+
+  it("la compra vencida del seed: Sofía → 403; Diego la paga → 409 COMPRA_VENCIDA", async () => {
+    const app = nuevaApp();
+    expect((await verCompra(app, "compra-diego-festival-general")).status).toBe(403);
+    expect((await pagar(app, "compra-diego-festival-general")).status).toBe(403);
+    const pago = await pagar(app, "compra-diego-festival-general", "usuario-diego");
+    expect(pago.status).toBe(409);
+    expect(pago.body.error).toMatchObject({
+      codigo: "COMPRA_VENCIDA",
+      mensaje: "La compra venció: pasaron 15 minutos sin pagarla.",
+    });
+  });
+
+  it("compra inexistente → 404 COMPRA_NO_ENCONTRADA en las dos rutas", async () => {
+    const app = nuevaApp();
+    const respuestas = [await verCompra(app, "compra-inexistente"), await pagar(app, "compra-inexistente")];
+    for (const respuesta of respuestas) {
+      expect(respuesta.status).toBe(404);
+      expect(respuesta.body.error).toMatchObject({
+        codigo: "COMPRA_NO_ENCONTRADA",
+        mensaje: "No existe la compra.",
+      });
+    }
+  });
+
+  it("sin X-Usuario-Id → 401 en las dos rutas", async () => {
+    const app = nuevaApp();
+    expect((await request(app).get("/api/compras/compra-martin-festival-vip")).status).toBe(401);
+    expect((await request(app).post("/api/compras/compra-martin-festival-vip/pago")).status).toBe(401);
+  });
+
+  it("un cuerpo en el pago se ignora", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
+    const pago = await request(app)
+      .post(`/api/compras/${compra.id}/pago`)
+      .set("X-Usuario-Id", "usuario-sofia")
+      .send({ estado: "UTILIZADA", total: 1 });
+    expect(pago.status).toBe(200);
+    expect(pago.body).toMatchObject({ estado: EstadoCompra.CONFIRMADA, total: 120000 });
+  });
+
+  it("con el reloj 15 minutos después del alta, el GET la muestra CANCELADA y mis-compras ya no la lista", async () => {
+    const movible = relojMovible(new Date("2026-11-10T15:00:00.000Z"));
+    const app = crearApp({ reloj: movible });
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
+
+    const antes = await misCompras(app, "usuario-sofia");
+    expect(antes.body.pendientes).toEqual([
+      expect.objectContaining({ id: compra.id, venceEnLocal: "2026-11-10T12:15" }),
+    ]);
+
+    movible.avanzar(15 * 60 * 1000);
+    const vista = await verCompra(app, compra.id);
+    expect(vista.body).toMatchObject({ estado: EstadoCompra.CANCELADA, venceEn: null });
+    expect(vista.body.historial.at(-1)).toMatchObject({ autor: { tipo: "sistema" } });
+    expect((await misCompras(app, "usuario-sofia")).body.pendientes).toEqual([]);
+    expect(await cupoDe(app, VIP)).toBe(50);
   });
 });

@@ -1,12 +1,13 @@
 {
   "info": {
     "name": "AI Ticket It API",
-    "description": "Pedidos de ejemplo, incluidos los casos de error. Variables: `baseUrl` (cambiala por la dirección `Red` para probar desde otro dispositivo) y `usuarioId` (Lucía Álvarez). La especificación completa está en {{baseUrl}}/docs.",
+    "description": "Pedidos de ejemplo, incluidos los casos de error. Variables: `baseUrl` (cambiala por la dirección `Red` para probar desde otro dispositivo), `usuarioId` (Lucía Álvarez) y `compraId` (la última compra de \"Sofía compra 2 VIP del Festival\" la guarda sola). La especificación completa está en {{baseUrl}}/docs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000/api" },
-    { "key": "usuarioId", "value": "usuario-lucia" }
+    { "key": "usuarioId", "value": "usuario-lucia" },
+    { "key": "compraId", "value": "compra-martin-festival-vip" }
   ],
   "item": [
     {
@@ -362,6 +363,17 @@
       "item": [
         {
           "name": "Sofía compra 2 VIP del Festival",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"compraId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "url": {
@@ -389,6 +401,51 @@
             "method": "GET",
             "url": {
               "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/mis-compras"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Ver compra de Sofía (la última que compró)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/{{compraId}}"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Pagar la compra de Sofía",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/{{compraId}}/pago"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Pagar de nuevo → 409 TRANSICION_INVALIDA",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/{{compraId}}/pago"
             },
             "header": [
               {

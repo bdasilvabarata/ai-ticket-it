@@ -2,7 +2,12 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import type { Evento } from "../../src/domain/evento";
-import { CompraNoEncontradaError, NoEncontradoError, ReferenciaInvalidaError } from "../../src/errors/index";
+import {
+  CompraNoEncontradaError,
+  NoEncontradoError,
+  ReferenciaInvalidaError,
+  SinPermisoError,
+} from "../../src/errors/index";
 import { AHORA, DIA, compra, evento, relojFijo, relojMovible, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
@@ -337,5 +342,179 @@ describe("CompraService.misComprasDelEvento", () => {
     expect(ejecutar).not.toHaveBeenCalled();
     expect(guardarEvento).not.toHaveBeenCalled();
     expect(guardarCompra).not.toHaveBeenCalled();
+  });
+});
+
+describe("CompraService.obtener", () => {
+  const deSofia = (estado = EstadoCompra.PENDIENTE) =>
+    compra("evento-a", "tipo-a-vip", estado, {
+      id: "compra-sofia",
+      compradorId: "usuario-sofia",
+      cantidad: 2,
+    });
+
+  it("404 COMPRA_NO_ENCONTRADA si no existe", async () => {
+    await expect(armar().compraService.obtener("compra-x", "usuario-sofia")).rejects.toBeInstanceOf(
+      CompraNoEncontradaError,
+    );
+  });
+
+  it("403 SIN_PERMISO si no es su comprador", async () => {
+    const { compraService } = armar({ compras: [deSofia()] });
+    await expect(compraService.obtener("compra-sofia", "usuario-diego")).rejects.toBeInstanceOf(
+      SinPermisoError,
+    );
+    await expect(compraService.obtener("compra-sofia", "usuario-diego")).rejects.toMatchObject({
+      codigo: "SIN_PERMISO",
+      mensaje: "Solo quien hizo la compra puede verla o pagarla.",
+    });
+  });
+
+  it("su comprador la ve con el evento y el tipo", async () => {
+    const vista = await armar({ compras: [deSofia()] }).compraService.obtener(
+      "compra-sofia",
+      "usuario-sofia",
+    );
+    expect(vista).toMatchObject({
+      id: "compra-sofia",
+      estado: EstadoCompra.PENDIENTE,
+      evento: { id: "evento-a", nombre: "Festival", realizado: false },
+      tipoEntrada: { id: "tipo-a-vip", nombre: "VIP" },
+      venceEn: "2026-11-10T15:15:00.000Z",
+    });
+  });
+
+  it("al día: una pendiente vencida se ve CANCELADA por el sistema en venceEn, sin guardar nada", async () => {
+    const reloj = relojMovible();
+    const { compraService, repositorioCompras, repositorioEventos, cerrojo } = armar({
+      reloj,
+      compras: [deSofia()],
+    });
+    reloj.avanzar(20 * MINUTO);
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+
+    const vista = await compraService.obtener("compra-sofia", "usuario-sofia");
+
+    expect(vista.estado).toBe(EstadoCompra.CANCELADA);
+    expect(vista.venceEn).toBeNull();
+    expect(vista.venceEnLocal).toBeNull();
+    expect(vista.historial.at(-1)).toEqual({
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "sistema" },
+      fechaHora: "2026-11-10T15:15:00.000Z",
+      fechaHoraLocal: "2026-11-10T12:15",
+    });
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect((await repositorioCompras.buscarPorId("compra-sofia"))?.estado).toBe(EstadoCompra.PENDIENTE);
+  });
+});
+
+describe("CompraService.pagar", () => {
+  const deSofia = () =>
+    compra("evento-a", "tipo-a-vip", EstadoCompra.PENDIENTE, {
+      id: "compra-sofia",
+      compradorId: "usuario-sofia",
+      cantidad: 2,
+      total: 240000,
+    });
+
+  it("404 COMPRA_NO_ENCONTRADA si no existe", async () => {
+    await expect(armar().compraService.pagar("compra-x", "usuario-sofia")).rejects.toBeInstanceOf(
+      CompraNoEncontradaError,
+    );
+  });
+
+  it("403 SIN_PERMISO si no es su comprador, sin cambiar nada", async () => {
+    const { compraService, repositorioCompras } = armar({ compras: [deSofia()] });
+    await expect(compraService.pagar("compra-sofia", "usuario-diego")).rejects.toMatchObject({
+      codigo: "SIN_PERMISO",
+      mensaje: "Solo quien hizo la compra puede verla o pagarla.",
+    });
+    const guardada = await repositorioCompras.buscarPorId("compra-sofia");
+    expect(guardada?.estado).toBe(EstadoCompra.PENDIENTE);
+    expect(guardada?.historial).toHaveLength(1);
+  });
+
+  it("la pasa a CONFIRMADA por el comprador, la guarda y devuelve la vista", async () => {
+    const reloj = relojMovible();
+    const { compraService, repositorioCompras } = armar({ reloj, compras: [deSofia()] });
+    reloj.avanzar(5 * MINUTO);
+
+    const vista = await compraService.pagar("compra-sofia", "usuario-sofia");
+
+    expect(vista).toMatchObject({ estado: EstadoCompra.CONFIRMADA, venceEn: null, venceEnLocal: null });
+    expect(vista.historial).toEqual([
+      expect.objectContaining({ estado: EstadoCompra.PENDIENTE }),
+      {
+        estado: EstadoCompra.CONFIRMADA,
+        autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+        fechaHora: "2026-11-10T15:05:00.000Z",
+        fechaHoraLocal: "2026-11-10T12:05",
+      },
+    ]);
+    expect((await repositorioCompras.buscarPorId("compra-sofia"))?.estado).toBe(EstadoCompra.CONFIRMADA);
+  });
+
+  it("pagar dos veces → TRANSICION_INVALIDA la segunda", async () => {
+    const { compraService } = armar({ compras: [deSofia()] });
+    await compraService.pagar("compra-sofia", "usuario-sofia");
+    await expect(compraService.pagar("compra-sofia", "usuario-sofia")).rejects.toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+    });
+  });
+
+  it("con el reloj 15 minutos después → COMPRA_VENCIDA; queda CANCELADA del sistema y su cupo vuelve", async () => {
+    const reloj = relojMovible();
+    const { compraService, repositorioCompras, repositorioEventos } = armar({ reloj, compras: [deSofia()] });
+    reloj.avanzar(15 * MINUTO);
+
+    await expect(compraService.pagar("compra-sofia", "usuario-sofia")).rejects.toMatchObject({
+      codigo: "COMPRA_VENCIDA",
+      message: "La compra venció: pasaron 15 minutos sin pagarla.",
+    });
+    expect((await repositorioCompras.buscarPorId("compra-sofia"))?.fueVencida()).toBe(true);
+    expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(52);
+  });
+
+  it("con el evento ya empezado y la compra sin vencer → CONFIRMADA (R9)", async () => {
+    const empieza = new Date(AHORA.getTime() + 5 * MINUTO);
+    const reloj = relojMovible();
+    const { compraService } = armar({
+      reloj,
+      eventos: [evento({ id: "evento-c", en: 5 * MINUTO, tiposEntrada: [tipo({ id: "tipo-c-general" })] })],
+      compras: [
+        compra("evento-c", "tipo-c-general", EstadoCompra.PENDIENTE, {
+          id: "compra-c",
+          compradorId: "usuario-sofia",
+        }),
+      ],
+    });
+    reloj.avanzar(10 * MINUTO);
+    expect(reloj.ahora().getTime()).toBeGreaterThan(empieza.getTime());
+
+    const vista = await compraService.pagar("compra-c", "usuario-sofia");
+
+    expect(vista.estado).toBe(EstadoCompra.CONFIRMADA);
+    expect(vista.evento.realizado).toBe(true);
+  });
+
+  it("toma el cerrojo del evento de la compra y relee la compra adentro", async () => {
+    const { compraService, cerrojo, repositorioCompras } = armar({ compras: [deSofia()] });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    const buscar = vi.spyOn(repositorioCompras, "buscarPorId");
+
+    await compraService.pagar("compra-sofia", "usuario-sofia");
+
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar).toHaveBeenCalledWith("evento-a", expect.any(Function));
+    // Una lectura afuera (para saber qué cerrojo tomar) y la relectura adentro.
+    const [afuera, adentro] = buscar.mock.invocationCallOrder;
+    expect(afuera!).toBeLessThan(ejecutar.mock.invocationCallOrder[0]!);
+    expect(adentro!).toBeGreaterThan(ejecutar.mock.invocationCallOrder[0]!);
+    expect(buscar).toHaveBeenCalledTimes(2);
   });
 });
