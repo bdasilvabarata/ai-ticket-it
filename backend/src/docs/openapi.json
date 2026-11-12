@@ -94,6 +94,66 @@
       }
     },
     "/eventos": {
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Catálogo de eventos próximos (público)",
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Sin paginación.",
+        "parameters": [
+          {
+            "name": "texto",
+            "in": "query",
+            "required": false,
+            "description": "Palabras separadas por espacios: cada una tiene que estar en el nombre o en la descripción, sin distinguir mayúsculas, acentos ni diéresis (la ñ es distinta de la n). Hasta 100 caracteres después de recortar.",
+            "schema": { "type": "string", "maxLength": 100 },
+            "example": "basquet"
+          },
+          {
+            "name": "categoriaId",
+            "in": "query",
+            "required": false,
+            "description": "Una categoría del catálogo (igualdad exacta). Vacío = sin filtro; si no existe, 400 sobre `query.categoriaId`.",
+            "schema": { "type": "string" },
+            "example": "categoria-musica"
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "description": "`fecha` ascendente · `precio` (\"desde\") ascendente · `puntaje` del organizador descendente, sin puntaje al final. Desempates: fecha → nombre (sin mayúsculas ni tildes) → id. Se aplica sobre lo filtrado.",
+            "schema": { "type": "string", "enum": ["fecha", "precio", "puntaje"], "default": "fecha" },
+            "example": "precio"
+          },
+          {
+            "name": "sentido",
+            "in": "query",
+            "required": false,
+            "description": "Sentido del criterio principal: `asc` o `desc`. Sin valor, el inicial de cada criterio (`fecha` y `precio` ascendentes, `puntaje` descendente). Los desempates no se invierten y los organizadores sin puntaje van al final en los dos sentidos.",
+            "schema": { "type": "string", "enum": ["asc", "desc"] },
+            "example": "desc"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El catálogo y si hay eventos próximos antes de aplicar los filtros",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
+          },
+          "400": {
+            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [{ "campo": "query.categoriaId", "mensaje": "No existe la categoría." }]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "tags": ["Eventos"],
         "summary": "Crear un evento con sus tipos de entrada (requiere usuario)",
@@ -690,12 +750,64 @@
           "cantidadTiposEntrada": { "type": "integer", "minimum": 1, "example": 1 }
         }
       },
+      "OrganizadorVista": {
+        "type": "object",
+        "description": "Organizador con el puntaje de las reseñas de todos sus eventos (próximos y realizados).",
+        "required": ["id", "nombre", "apellido", "puntaje", "cantidadResenias"],
+        "properties": {
+          "id": { "type": "string", "example": "usuario-martin" },
+          "nombre": { "type": "string", "example": "Martín" },
+          "apellido": { "type": "string", "example": "Benítez" },
+          "puntaje": {
+            "type": "number",
+            "nullable": true,
+            "description": "Promedio sin redondear de las puntuaciones; `null` sin reseñas (nunca 0).",
+            "example": null
+          },
+          "cantidadResenias": { "type": "integer", "minimum": 0, "example": 0 }
+        }
+      },
+      "EventoCatalogoVista": {
+        "description": "Evento en Explorar.",
+        "allOf": [
+          { "$ref": "#/components/schemas/EventoResumenVista" },
+          {
+            "type": "object",
+            "required": ["precioDesde", "agotado", "organizador"],
+            "properties": {
+              "precioDesde": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Menor precio de todos sus tipos, con o sin cupo; 0 = gratis.",
+                "example": 8000
+              },
+              "agotado": {
+                "type": "boolean",
+                "description": "Todos sus tipos con cupo 0.",
+                "example": false
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
+            }
+          }
+        ]
+      },
+      "CatalogoVista": {
+        "type": "object",
+        "required": ["eventos", "hayEventosProximos"],
+        "properties": {
+          "eventos": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } },
+          "hayEventosProximos": {
+            "type": "boolean",
+            "description": "Hay eventos no realizados antes de aplicar texto y categoría: decide el vacío de la app."
+          }
+        }
+      },
       "EventoVista": {
         "allOf": [
           { "$ref": "#/components/schemas/EventoResumenVista" },
           {
             "type": "object",
-            "required": ["descripcion", "multimedia", "tiposEntrada"],
+            "required": ["descripcion", "multimedia", "tiposEntrada", "organizador"],
             "properties": {
               "descripcion": {
                 "type": "string",
@@ -710,7 +822,8 @@
                 "type": "array",
                 "description": "En el orden en que se agregaron",
                 "items": { "$ref": "#/components/schemas/TipoEntradaVista" }
-              }
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
             }
           }
         ]

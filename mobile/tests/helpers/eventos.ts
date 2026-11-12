@@ -1,4 +1,11 @@
-import type { CategoriaVista, EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type {
+  CatalogoVista,
+  CategoriaVista,
+  EventoCatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  OrganizadorVista,
+} from "@ai-ticket-it/shared";
 
 // Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
 
@@ -7,6 +14,15 @@ export const categorias: CategoriaVista[] = [
   { id: "categoria-musica", nombre: "Música", descripcion: "Recitales." },
   { id: "categoria-teatro", nombre: "Teatro", descripcion: "Obras." },
 ];
+
+/** Lucía como organizadora, sin reseñas (como en el seed). */
+export const luciaOrganizadora: OrganizadorVista = {
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  puntaje: null,
+  cantidadResenias: 0,
+};
 
 export const nocheDeRock: EventoResumenVista = {
   id: "evento-noche-de-rock",
@@ -68,6 +84,7 @@ export const festivalCompleto: EventoVista = {
     { id: "tipo-festival-vip", nombre: "VIP", descripcion: "Con barra.", precio: 120000, cupo: 0 },
     { id: "tipo-festival-backstage", nombre: "Backstage", descripcion: "", precio: 0, cupo: 3 },
   ],
+  organizador: luciaOrganizadora,
 };
 
 export const nocheDeRisasCompleta: EventoVista = {
@@ -77,8 +94,107 @@ export const nocheDeRisasCompleta: EventoVista = {
   tiposEntrada: [
     { id: "tipo-risas-general", nombre: "General", descripcion: "Libre.", precio: 12000, cupo: 80 },
   ],
+  organizador: luciaOrganizadora,
 };
 
 export function errorApi(codigo: string, mensaje: string, detalles?: { campo: string; mensaje: string }[]) {
   return { error: detalles ? { codigo, mensaje, detalles } : { codigo, mensaje } };
 }
+
+/** Sofía como organizadora, sin reseñas. */
+export const sofiaOrganizadora: OrganizadorVista = {
+  id: "usuario-sofia",
+  nombre: "Sofía",
+  apellido: "Castro",
+  puntaje: null,
+  cantidadResenias: 0,
+};
+
+/** Tarjetas del catálogo (feature 005), en el orden por fecha del seed. */
+export const rockEnCatalogo: EventoCatalogoVista = {
+  ...nocheDeRock,
+  precioDesde: 15000,
+  agotado: false,
+  organizador: { ...luciaOrganizadora, puntaje: 4.5, cantidadResenias: 12 },
+};
+
+export const clasicoEnCatalogo: EventoCatalogoVista = {
+  id: "evento-clasico-de-basquet",
+  nombre: "Clásico de básquet",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-11-15T22:00:00.000Z",
+  fechaHoraLocal: "2026-11-15T19:00",
+  organizadorId: "usuario-sofia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 8000,
+  agotado: false,
+  organizador: sofiaOrganizadora,
+};
+
+export const hamletEnCatalogo: EventoCatalogoVista = {
+  ...hamletDeMartin,
+  precioDesde: 18000,
+  agotado: true,
+  organizador: {
+    id: "usuario-martin",
+    nombre: "Martín",
+    apellido: "Benítez",
+    puntaje: null,
+    cantidadResenias: 0,
+  },
+};
+
+export const maratonEnCatalogo: EventoCatalogoVista = {
+  id: "evento-maraton-10k",
+  nombre: "Maratón Ciudad 10K",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-12-25T11:00:00.000Z",
+  fechaHoraLocal: "2026-12-25T08:00",
+  organizadorId: "usuario-lucia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 0,
+  agotado: false,
+  organizador: luciaOrganizadora,
+};
+
+export function catalogo(
+  eventos: EventoCatalogoVista[],
+  hayEventosProximos = eventos.length > 0,
+): CatalogoVista {
+  return { eventos, hayEventosProximos };
+}
+
+/** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */
+export const CATALOGO_INICIAL = "/eventos?orden=fecha&sentido=asc";
+
+/** Detalle de la Maratón: dos imágenes y un tipo gratis (feature 005). */
+export const maratonCompleta: EventoVista = {
+  ...maratonEnCatalogo,
+  descripcion: "Carrera de 10 km por las calles de la ciudad.",
+  multimedia: ["https://example.com/maraton.jpg", "https://example.com/llegada.jpg"],
+  tiposEntrada: [
+    {
+      id: "tipo-maraton-inscripcion",
+      nombre: "Inscripción",
+      descripcion: "Kit del corredor incluido.",
+      precio: 30000,
+      cupo: 1000,
+    },
+    { id: "tipo-maraton-kids", nombre: "Carrera kids", descripcion: "", precio: 0, cupo: 200 },
+  ],
+  organizador: luciaOrganizadora,
+};
+
+/** Detalle de Hamlet: agotado, de Martín, con puntaje. */
+export const hamletCompleto: EventoVista = {
+  ...hamletDeMartin,
+  descripcion: "",
+  multimedia: [],
+  tiposEntrada: [
+    { id: "tipo-hamlet-platea", nombre: "Platea", descripcion: "Butacas de platea.", precio: 25000, cupo: 0 },
+    { id: "tipo-hamlet-pullman", nombre: "Pullman", descripcion: "", precio: 18000, cupo: 0 },
+  ],
+  organizador: { ...hamletEnCatalogo.organizador, puntaje: 4.5, cantidadResenias: 12 },
+};

@@ -94,8 +94,9 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       multimedia: [imagen("hamlet"), imagen("hamlet-escenario")],
       organizadorId: martin,
       tiposEntrada: [
-        { nombre: "Platea", descripcion: "Butacas de platea.", precio: 25000, cupo: 120 },
-        { nombre: "Pullman", descripcion: "Butacas del primer piso.", precio: 18000, cupo: 80 },
+        // Agotado (feature 005): muestra la marca "Agotado" en Explorar y en el detalle.
+        { nombre: "Platea", descripcion: "Butacas de platea.", precio: 25000, cupo: 0 },
+        { nombre: "Pullman", descripcion: "Butacas del primer piso.", precio: 18000, cupo: 0 },
       ],
     },
     {
@@ -172,6 +173,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       organizadorId: lucia,
       tiposEntrada: [
         { nombre: "Inscripción", descripcion: "Kit del corredor incluido.", precio: 30000, cupo: 1000 },
+        // Gratis (feature 005): su precio "desde" es "Gratis" y va primero al ordenar por precio.
+        { nombre: "Carrera kids", descripcion: "Circuito de 2 km para menores de 12.", precio: 0, cupo: 200 },
       ],
     },
   ];

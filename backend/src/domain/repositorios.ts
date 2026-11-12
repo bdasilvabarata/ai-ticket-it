@@ -1,6 +1,7 @@
 import type { Categoria } from "./categoria";
 import type { Compra } from "./compra";
 import type { Evento } from "./evento";
+import type { Resenia } from "./resenia";
 import type { Usuario } from "./usuario";
 
 // Interfaces de repositorio (puertos): los services dependen de estas, no de una
@@ -10,6 +11,8 @@ import type { Usuario } from "./usuario";
 export interface RepositorioUsuarios {
   listar(): Promise<Usuario[]>;
   buscarPorId(id: string): Promise<Usuario | null>;
+  /** Los que existen de esos ids (posiblemente ninguno), sin repetir: para `obtenerPorIds`. */
+  listarPorIds(ids: readonly string[]): Promise<Usuario[]>;
 }
 
 export interface RepositorioCategorias {
@@ -39,4 +42,10 @@ export interface RepositorioCompras {
   /** Los ids de tipo son únicos en todo el sistema: no hace falta el evento. */
   existePorTipoEntrada(tipoEntradaId: string): Promise<boolean>;
   guardar(compra: Compra): Promise<void>;
+}
+
+/** Reseñas (mínimo de la 005): lo justo para el puntaje del organizador. La 011 lo amplía. */
+export interface RepositorioResenias {
+  /** Las reseñas de esos eventos (posiblemente ninguna). */
+  listarPorEventos(eventoIds: readonly string[]): Promise<Resenia[]>;
 }

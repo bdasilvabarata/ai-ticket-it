@@ -65,9 +65,29 @@ describe("crearDatosEjemplo", () => {
     expect(tipos.some((tipo) => tipo.cupo <= 3)).toBe(true);
   });
 
-  it("tiene precios muy distintos (máximo ≥ 10 × mínimo)", () => {
+  it("tiene precios muy distintos (máximo ≥ 10 × el menor precio pagado)", () => {
     const precios = tipos.map((tipo) => tipo.precio);
-    expect(Math.max(...precios) / Math.min(...precios)).toBeGreaterThanOrEqual(10);
+    expect(Math.max(...precios) / Math.min(...precios.filter((p) => p > 0))).toBeGreaterThanOrEqual(10);
+  });
+
+  it("tiene al menos un evento próximo con un tipo gratis (feature 005)", () => {
+    const proximos = eventos.filter((evento) => !evento.estaRealizado(ahora));
+    expect(proximos.some((evento) => evento.tiposEntrada.some((tipo) => tipo.precio === 0))).toBe(true);
+    expect(
+      eventos.find((e) => e.id === "evento-maraton-10k")?.buscarTipoEntrada("tipo-maraton-10k-carrera-kids"),
+    ).toMatchObject({ nombre: "Carrera kids", precio: 0, cupo: 200 });
+  });
+
+  it("tiene al menos un evento próximo agotado (feature 005)", () => {
+    const proximos = eventos.filter((evento) => !evento.estaRealizado(ahora));
+    expect(proximos.some((evento) => evento.estaAgotado())).toBe(true);
+    expect(eventos.find((e) => e.id === "evento-hamlet")?.estaAgotado()).toBe(true);
+  });
+
+  it("tiene 6 eventos próximos y 2 realizados", () => {
+    const realizados = eventos.filter((evento) => evento.estaRealizado(ahora));
+    expect(realizados).toHaveLength(2);
+    expect(eventos.length - realizados.length).toBe(6);
   });
 
   it("usa precios y cupos enteros no negativos", () => {

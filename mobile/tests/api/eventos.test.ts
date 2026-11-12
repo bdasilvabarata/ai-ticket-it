@@ -5,6 +5,7 @@ import {
   crearEvento,
   editarTipoEntrada,
   eliminarEvento,
+  listarEventos,
   listarMisEventos,
   obtenerEvento,
   quitarTipoEntrada,
@@ -62,6 +63,62 @@ describe("funciones de eventos: lecturas", () => {
 
     await expect(obtenerEvento(cliente, "evento-festival")).resolves.toEqual(festivalCompleto);
     expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/eventos/evento-festival`, metodo: "GET" });
+  });
+});
+
+describe("listarEventos (catálogo, R13)", () => {
+  const catalogo = { eventos: [], hayEventosProximos: true };
+
+  it("sin parámetros pide GET /eventos?orden=fecha&sentido=asc, sin X-Usuario-Id", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await expect(listarEventos(cliente, {})).resolves.toEqual(catalogo);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/eventos?orden=fecha&sentido=asc`, metodo: "GET" });
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBeUndefined();
+  });
+
+  it("solo agrega los parámetros con valor, en el orden texto, categoriaId, orden, sentido", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { orden: "precio", categoriaId: "categoria-musica", texto: "  rock  " });
+    expect(falso.pedidos[0].url).toBe(
+      `${URL}/eventos?texto=rock&categoriaId=categoria-musica&orden=precio&sentido=asc`,
+    );
+  });
+
+  it("manda el sentido pedido", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { orden: "fecha", sentido: "desc" });
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos?orden=fecha&sentido=desc`);
+  });
+
+  it("un texto vacío o de solo espacios no se manda", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { texto: "   ", orden: "puntaje" });
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos?orden=puntaje&sentido=desc`);
+  });
+
+  it("codifica acentos, espacios, & y + literales", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { texto: "café con leche & rock+pop" });
+    expect(falso.pedidos[0].url).toBe(
+      `${URL}/eventos?texto=caf%C3%A9+con+leche+%26+rock%2Bpop&orden=fecha&sentido=asc`,
+    );
+  });
+
+  it("pasa el signal y usuarioId: null", async () => {
+    const { cliente } = armar({ status: 200, json: catalogo });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+
+    await listarEventos(cliente, {}, { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/eventos?orden=fecha&sentido=asc", {
+      signal: controlador.signal,
+      usuarioId: null,
+    });
   });
 });
 

@@ -168,7 +168,20 @@ export const tema = {
     iconoChico: 14,
     icono: 20,
     iconoGrande: 32,
+    /** Alto de las líneas de relleno del skeleton (texto normal y título de tarjeta). */
+    lineaSkeleton: 14,
+    lineaSkeletonTitulo: 20,
+    /** Cada imagen de la fila del detalle de un evento (proporción 16:9). */
+    imagenDetalle: { ancho: 240, alto: 135 },
   },
+  /** Anchos relativos de las líneas del skeleton: imitan la forma de una tarjeta. */
+  anchoSkeleton: {
+    titulo: "70%",
+    detalle: "55%",
+    corto: "35%",
+  },
+  /** Lo más que ocupa el botón del filtro de categoría junto al buscador: el campo conserva el resto. */
+  anchoMaximoFiltro: "45%",
   sombra,
   /** Lo que se "hunde" un elemento con sombra al presionarlo (lo mismo que mide su sombra). */
   desplazamientoPresionado: 3,

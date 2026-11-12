@@ -26,16 +26,24 @@ export class EntradaInvalidaError extends ErrorAplicacion {
 }
 
 /**
+ * De qué parte de la entrada del caso de uso vino una referencia: los datos que se escriben o la
+ * consulta que se hace. En términos del caso de uso, no de HTTP (research R1 de la 005).
+ */
+export type OrigenDeReferencia = "datos" | "consulta";
+
+/**
  * Un dato de la entrada apunta a algo que no existe (ej.: `categoriaId`). Lleva el nombre del campo
- * tal como lo recibe el service; el error handler lo informa como 400 `ENTRADA_INVALIDA` sobre
- * `body.<campo>`.
+ * tal como lo recibe el service y de dónde vino; el error handler lo informa como 400
+ * `ENTRADA_INVALIDA` sobre `body.<campo>` o `query.<campo>`.
  */
 export class ReferenciaInvalidaError extends ErrorAplicacion {
   readonly campo: string;
+  readonly origen: OrigenDeReferencia;
 
-  constructor(campo: string, mensaje: string) {
+  constructor(campo: string, mensaje: string, origen: OrigenDeReferencia = "datos") {
     super("ENTRADA_INVALIDA", mensaje);
     this.campo = campo;
+    this.origen = origen;
   }
 }
 

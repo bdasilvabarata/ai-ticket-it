@@ -93,3 +93,41 @@ describe("UsuarioService.buscarPorId", () => {
     expect(await service.buscarPorId("u9")).toBeNull();
   });
 });
+
+describe("UsuarioService.obtenerOFallar", () => {
+  it("devuelve la entidad o lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([lucia]);
+    expect(await service.obtenerOFallar("u1")).toBe(lucia);
+    await expect(service.obtenerOFallar("u9")).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+});
+
+describe("UsuarioService.obtenerPorIds", () => {
+  it("devuelve los usuarios por id, en una sola lectura, aunque los ids se repitan", async () => {
+    const repositorio = new UsuarioRepository([lucia, martin, diego]);
+    const lecturas = vi.spyOn(repositorio, "listarPorIds");
+    const service = new UsuarioService({ usuarios: repositorio, eventos: new EventoRepository() });
+    const porId = await service.obtenerPorIds(["u2", "u1", "u2"]);
+    expect([...porId]).toEqual([
+      ["u2", martin],
+      ["u1", lucia],
+    ]);
+    expect(lecturas).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin ids devuelve un Map vacío", async () => {
+    const { service } = crearService([lucia]);
+    expect((await service.obtenerPorIds([])).size).toBe(0);
+  });
+
+  it("si falta alguno lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([lucia]);
+    await expect(service.obtenerPorIds(["u1", "u9"])).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+});

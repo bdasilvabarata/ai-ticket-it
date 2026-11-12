@@ -17,6 +17,7 @@ import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositori
 import { CategoriaService } from "./services/categoria.service";
 import { CerrojoPorClave } from "./services/cerrojo-por-clave";
 import { EventoService } from "./services/evento.service";
+import { ReseniaService } from "./services/resenia.service";
 import { TipoEntradaService } from "./services/tipo-entrada.service";
 import { UsuarioService } from "./services/usuario.service";
 
@@ -36,16 +37,26 @@ export interface OpcionesApp {
  * (y los tests usan supertest).
  */
 export function crearApp({ repositorios = {}, reloj = relojDelSistema }: OpcionesApp = {}): Express {
-  const { usuarios, categorias, eventos, compras } = {
+  const { usuarios, categorias, eventos, compras, resenias } = {
     ...crearRepositoriosDeEjemplo(reloj.ahora()),
     ...repositorios,
   };
 
   const usuarioService = new UsuarioService({ usuarios, eventos });
   const categoriaService = new CategoriaService({ categorias });
+  const reseniaService = new ReseniaService({ resenias });
   // Una sola instancia: los services que modifican eventos comparten el cerrojo (research R2).
   const cerrojo = new CerrojoPorClave();
-  const eventoService = new EventoService({ eventos, compras, categoriaService, cerrojo, reloj });
+  // Eventos se apoya en los dueños de categorías, usuarios y reseñas (constitución 2.2.0, principio III).
+  const eventoService = new EventoService({
+    eventos,
+    compras,
+    categoriaService,
+    usuarioService,
+    reseniaService,
+    cerrojo,
+    reloj,
+  });
   const tipoEntradaService = new TipoEntradaService({ eventos, compras, eventoService, cerrojo, reloj });
 
   const controllers = {

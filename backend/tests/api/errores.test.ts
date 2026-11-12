@@ -14,6 +14,7 @@ function appConUsuariosQueFallan(error: unknown) {
   const usuarios: RepositorioUsuarios = {
     listar: () => Promise.reject(error),
     buscarPorId: () => Promise.reject(error),
+    listarPorIds: () => Promise.reject(error),
   };
   return crearApp({ repositorios: { usuarios } });
 }
@@ -128,5 +129,15 @@ describe("statusDe", () => {
         detalles: [{ campo: "body.categoriaId", mensaje: "No existe la categoría." }],
       },
     });
+  });
+
+  it.each([
+    ["datos", "body.categoriaId"],
+    ["consulta", "query.categoriaId"],
+  ] as const)("una referencia inválida con origen %s sale sobre %s", async (origen, campo) => {
+    const error = new errores.ReferenciaInvalidaError("categoriaId", "No existe la categoría.", origen);
+    const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.error.detalles).toEqual([{ campo, mensaje: "No existe la categoría." }]);
   });
 });

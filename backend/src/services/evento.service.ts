@@ -1,4 +1,12 @@
-import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type {
+  CatalogoVista,
+  EventoCatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  OrdenCatalogo,
+  OrganizadorVista,
+  SentidoCatalogo,
+} from "@ai-ticket-it/shared";
 import {
   Evento,
   ordenDeMisEventos,
@@ -6,20 +14,41 @@ import {
   type DatosDeEvento,
   type DatosDeTipoEntrada,
 } from "../domain/evento";
+import { palabrasDeBusqueda } from "../domain/busqueda";
+import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
 import { NoEncontradoError, SinPermisoError } from "../errors/index";
 import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aEventoResumenVista, aEventoVista } from "./evento.vistas";
+import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
+import type { ReseniaService } from "./resenia.service";
+import type { UsuarioService } from "./usuario.service";
 
 export interface DependenciasEventoService {
   eventos: RepositorioEventos;
   compras: RepositorioCompras;
   categoriaService: CategoriaService;
+  usuarioService: UsuarioService;
+  reseniaService: ReseniaService;
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
+
+/** Consulta ya validada de `GET /eventos` (texto recortado, `""` = sin filtro). */
+export interface ConsultaCatalogoValidada {
+  texto: string;
+  categoriaId?: string;
+  orden: OrdenCatalogo;
+  /** Sin valor: el inicial del criterio. */
+  sentido?: SentidoCatalogo;
+}
+
+/**
+ * Lo que se ordena del catálogo: los datos de la entidad (`fechaHora` como `Date`, el puntaje sin
+ * redondear) y su vista, que sale tal cual. Las vistas no se ordenan: no cumplen `Ordenable`.
+ */
+type ElementoDelCatalogo = Ordenable & { vista: EventoCatalogoVista };
 
 /** Datos ya validados de `POST /eventos`. */
 export type DatosNuevoEventoValidados = DatosDeEvento & { tiposEntrada: DatosDeTipoEntrada[] };
@@ -35,15 +64,76 @@ export class EventoService {
   readonly #eventos: RepositorioEventos;
   readonly #compras: RepositorioCompras;
   readonly #categoriaService: CategoriaService;
+  readonly #usuarioService: UsuarioService;
+  readonly #reseniaService: ReseniaService;
   readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
-  constructor({ eventos, compras, categoriaService, cerrojo, reloj }: DependenciasEventoService) {
+  constructor({
+    eventos,
+    compras,
+    categoriaService,
+    usuarioService,
+    reseniaService,
+    cerrojo,
+    reloj,
+  }: DependenciasEventoService) {
     this.#eventos = eventos;
     this.#compras = compras;
     this.#categoriaService = categoriaService;
+    this.#usuarioService = usuarioService;
+    this.#reseniaService = reseniaService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
+  }
+
+  /**
+   * El catálogo de Explorar (UC-05): los eventos no realizados de todos los organizadores, filtrados
+   * por texto y categoría. Lectura: sin cerrojo y con un único `ahora` por pedido. Hace un número fijo
+   * de lecturas (sin N+1): la categoría pedida, los eventos y un lote por dueño (categorías,
+   * organizadores y sus puntajes).
+   */
+  async listar(consulta: ConsultaCatalogoValidada): Promise<CatalogoVista> {
+    const { texto, categoriaId, orden, sentido } = consulta;
+    // Una referencia de la entrada (principio III): si no existe, 400 sobre query.categoriaId, antes
+    // de leer los eventos. El error lo lanza el dueño de las categorías.
+    if (categoriaId !== undefined) await this.#categoriaService.buscarReferenciada(categoriaId, "consulta");
+    const ahora = this.#reloj.ahora();
+    const todos = await this.#eventos.listar();
+    const proximos = todos.filter((evento) => !evento.estaRealizado(ahora));
+    // Antes de aplicar texto y categoría: decide el vacío de la app (R2).
+    const hayEventosProximos = proximos.length > 0;
+    const palabras = palabrasDeBusqueda(texto);
+    const filtrados = proximos.filter(
+      (evento) =>
+        (categoriaId === undefined || evento.categoriaId === categoriaId) && evento.coincideCon(palabras),
+    );
+    if (filtrados.length === 0) return { eventos: [], hayEventosProximos };
+
+    const organizadorIds = new Set(filtrados.map((e) => e.organizadorId));
+    const [categorias, organizadores, puntajes] = await Promise.all([
+      this.#categoriaService.obtenerPorIds(filtrados.map((e) => e.categoriaId)),
+      this.#usuarioService.obtenerPorIds([...organizadorIds]),
+      // Todos sus eventos, próximos y realizados: solo se reseñan los realizados (R7).
+      this.#reseniaService.puntajesPorOrganizador(todos.filter((e) => organizadorIds.has(e.organizadorId))),
+    ]);
+    // `obtenerPorIds` y `puntajesPorOrganizador` garantizan que están todos (si falta uno, lanzan).
+    const elementos = filtrados.map((evento): ElementoDelCatalogo => {
+      const puntaje = puntajes.get(evento.organizadorId)!;
+      const organizador = aOrganizadorVista(organizadores.get(evento.organizadorId)!, puntaje);
+      return {
+        id: evento.id,
+        nombre: evento.nombre,
+        fechaHora: evento.fechaHora,
+        precioDesde: evento.precioDesde(),
+        puntaje: puntaje.promedio,
+        vista: aEventoCatalogoVista(evento, categorias.get(evento.categoriaId)!, organizador, ahora),
+      };
+    });
+    return {
+      eventos: ordenarCatalogo(elementos, orden, sentido).map((elemento) => elemento.vista),
+      hayEventosProximos,
+    };
   }
 
   /** Los eventos que organiza el usuario actual, en el orden de Mis eventos. */
@@ -76,14 +166,15 @@ export class EventoService {
       ahora,
     );
     await this.#eventos.guardar(evento);
-    return aEventoVista(evento, categoria, ahora);
+    return aEventoVista(evento, categoria, await this.#organizadorVista(usuarioId), ahora);
   }
 
   /** Público: lo usan editar, la vista de solo lectura y, en la 005, el detalle (R8). Sin cerrojo (R2.4). */
   async obtener(id: string): Promise<EventoVista> {
     const evento = await this.obtenerOFallar(id);
     const categoria = await this.#categoriaService.obtenerOFallar(evento.categoriaId);
-    return aEventoVista(evento, categoria, this.#reloj.ahora());
+    const organizador = await this.#organizadorVista(evento.organizadorId);
+    return aEventoVista(evento, categoria, organizador, this.#reloj.ahora());
   }
 
   /**
@@ -97,7 +188,7 @@ export class EventoService {
       const ahora = this.#reloj.ahora();
       const actualizado = evento.actualizar(datos, ahora);
       await this.#eventos.guardar(actualizado);
-      return aEventoVista(actualizado, categoria, ahora);
+      return aEventoVista(actualizado, categoria, await this.#organizadorVista(usuarioId), ahora);
     });
   }
 
@@ -128,5 +219,15 @@ export class EventoService {
       throw new SinPermisoError("Solo el organizador puede modificar este evento.");
     }
     return evento;
+  }
+
+  /**
+   * El organizador con el puntaje de **todos** sus eventos (próximos y realizados; R7). El usuario
+   * se lo pide a su dueño: si no existiera, el 404 es el de `UsuarioService`.
+   */
+  async #organizadorVista(organizadorId: string): Promise<OrganizadorVista> {
+    const usuario = await this.#usuarioService.obtenerOFallar(organizadorId);
+    const susEventos = await this.#eventos.listarPorOrganizador(organizadorId);
+    return aOrganizadorVista(usuario, await this.#reseniaService.puntajeDe(susEventos));
   }
 }

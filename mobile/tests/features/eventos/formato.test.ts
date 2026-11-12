@@ -3,6 +3,9 @@ import {
   textoCupo,
   textoFechaHora,
   textoPrecio,
+  textoPrecioDesde,
+  textoPuntaje,
+  textoSentido,
 } from "../../../src/features/eventos/formato";
 
 describe("formato de eventos (R18, sin Intl)", () => {
@@ -39,5 +42,36 @@ describe("formato de eventos (R18, sin Intl)", () => {
     [30, "30 disponibles"],
   ])("textoCupo(%i) → %s", (cupo, esperado) => {
     expect(textoCupo(cupo)).toBe(esperado);
+  });
+});
+
+describe("textos del catálogo (R18)", () => {
+  it("textoPrecioDesde: 0 es Gratis; si no, desde $ …", () => {
+    expect(textoPrecioDesde(0)).toBe("Gratis");
+    expect(textoPrecioDesde(8000)).toBe("desde $ 8.000");
+  });
+
+  it("textoPuntaje sin reseñas dice Sin reseñas (nunca 0)", () => {
+    expect(textoPuntaje({ puntaje: null, cantidadResenias: 0 })).toBe("Sin reseñas");
+  });
+
+  it("textoPuntaje redondea al décimo con coma y nombra la cantidad", () => {
+    expect(textoPuntaje({ puntaje: 4.5, cantidadResenias: 12 })).toBe("4,5 · 12 reseñas");
+    expect(textoPuntaje({ puntaje: 5, cantidadResenias: 1 })).toBe("5,0 · 1 reseña");
+    expect(textoPuntaje({ puntaje: 4.45, cantidadResenias: 2 })).toBe("4,5 · 2 reseñas");
+    expect(textoPuntaje({ puntaje: 4.04, cantidadResenias: 3 })).toBe("4,0 · 3 reseñas");
+  });
+});
+
+describe("textoSentido", () => {
+  it.each([
+    ["fecha", "asc", "Más próximos primero"],
+    ["fecha", "desc", "Más lejanos primero"],
+    ["precio", "asc", "Más baratos primero"],
+    ["precio", "desc", "Más caros primero"],
+    ["puntaje", "desc", "Mejor puntaje primero"],
+    ["puntaje", "asc", "Menor puntaje primero"],
+  ] as const)("%s %s → %s", (orden, sentido, texto) => {
+    expect(textoSentido(orden, sentido)).toBe(texto);
   });
 });

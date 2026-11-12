@@ -2,11 +2,13 @@ import type {
   RepositorioCategorias,
   RepositorioCompras,
   RepositorioEventos,
+  RepositorioResenias,
   RepositorioUsuarios,
 } from "../domain/repositorios";
 import { CategoriaRepository } from "../repositories/categoria.repository";
 import { CompraRepository } from "../repositories/compra.repository";
 import { EventoRepository } from "../repositories/evento.repository";
+import { ReseniaRepository } from "../repositories/resenia.repository";
 import { UsuarioRepository } from "../repositories/usuario.repository";
 import { crearDatosEjemplo } from "./datos-ejemplo";
 
@@ -15,6 +17,7 @@ export interface Repositorios {
   categorias: RepositorioCategorias;
   eventos: RepositorioEventos;
   compras: RepositorioCompras;
+  resenias: RepositorioResenias;
 }
 
 /**
@@ -28,5 +31,7 @@ export function crearRepositoriosDeEjemplo(ahora: Date = new Date()): Repositori
     categorias: new CategoriaRepository(categorias),
     eventos: new EventoRepository(eventos),
     compras: new CompraRepository(compras),
+    // Sin reseñas: todos los organizadores salen "sin puntaje" hasta la 011 (FR-010).
+    resenias: new ReseniaRepository([]),
   };
 }

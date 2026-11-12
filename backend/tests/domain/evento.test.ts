@@ -114,6 +114,90 @@ describe("Evento", () => {
   });
 });
 
+describe("Evento: consultas del catálogo (feature 005)", () => {
+  it("precioDesde es el menor precio entre todos los tipos, también uno agotado", () => {
+    const e = evento([
+      tipo({ id: "t1", nombre: "General", precio: 15000, cupo: 10 }),
+      tipo({ id: "t2", nombre: "Anticipada", precio: 9000, cupo: 0 }),
+      tipo({ id: "t3", nombre: "VIP", precio: 40000, cupo: 5 }),
+    ]);
+    expect(e.precioDesde()).toBe(9000);
+  });
+
+  it("precioDesde es 0 si algún tipo es gratis", () => {
+    const e = evento([tipo({ id: "t1", precio: 15000 }), tipo({ id: "t2", nombre: "Kids", precio: 0 })]);
+    expect(e.precioDesde()).toBe(0);
+  });
+
+  it("estaAgotado solo si todos los tipos tienen cupo 0", () => {
+    const agotado = evento([tipo({ id: "t1", cupo: 0 }), tipo({ id: "t2", nombre: "VIP", cupo: 0 })]);
+    const parcial = evento([tipo({ id: "t1", cupo: 0 }), tipo({ id: "t2", nombre: "VIP", cupo: 1 })]);
+    expect(agotado.estaAgotado()).toBe(true);
+    expect(parcial.estaAgotado()).toBe(false);
+    expect(evento().estaAgotado()).toBe(false);
+  });
+
+  it("ninguna de las dos modifica el evento", () => {
+    const e = evento([tipo({ id: "t1", precio: 5000, cupo: 0 })]);
+    const antes = structuredClone({ ...e, tiposEntrada: e.tiposEntrada.map((t) => ({ ...t })) });
+    e.precioDesde();
+    e.estaAgotado();
+    expect({ ...e, tiposEntrada: e.tiposEntrada.map((t) => ({ ...t })) }).toEqual(antes);
+  });
+});
+
+describe("Evento.coincideCon (búsqueda, R4)", () => {
+  function conTextos(nombre: string, descripcion: string) {
+    return new Evento({
+      id: "e1",
+      nombre,
+      descripcion,
+      categoriaId: "c1",
+      fechaHora: new Date("2026-12-01T00:00:00Z"),
+      multimedia: [],
+      organizadorId: "u1",
+      tiposEntrada: [tipo()],
+    });
+  }
+  const rock = conTextos("Noche de Rock", "Tres bandas en el club.");
+
+  it("sin palabras coincide siempre", () => {
+    expect(rock.coincideCon([])).toBe(true);
+  });
+
+  it("encuentra parte de una palabra o la palabra completa, sin mayúsculas ni tildes", () => {
+    const basquet = conTextos("Clásico de BÁSQUET", "");
+    expect(basquet.coincideCon(["basq"])).toBe(true);
+    expect(basquet.coincideCon(["basquet"])).toBe(true);
+    expect(rock.coincideCon(["rock"])).toBe(true);
+  });
+
+  it("varias palabras en cualquier orden, también repartidas entre nombre y descripción", () => {
+    expect(rock.coincideCon(["club", "rock"])).toBe(true);
+    const hamlet = conTextos("Hamlet", "Butacas numeradas.");
+    expect(hamlet.coincideCon(["hamlet", "butacas"])).toBe(true);
+  });
+
+  it("todas las palabras tienen que estar: una sola de dos no alcanza", () => {
+    expect(rock.coincideCon(["rock", "jazz"])).toBe(false);
+  });
+
+  it("una palabra no coincide pegando el final del nombre con el principio de la descripción", () => {
+    const pegado = conTextos("Noche de Ro", "ck en vivo");
+    expect(pegado.coincideCon(["rock"])).toBe(false);
+  });
+
+  it("los caracteres especiales son literales", () => {
+    const raro = conTextos("Fiesta (rock) 2.0", "Con * estrellas");
+    expect(raro.coincideCon(["(rock"])).toBe(true);
+    expect(raro.coincideCon(["*"])).toBe(true);
+    expect(raro.coincideCon(["."])).toBe(true);
+    expect(rock.coincideCon(["*"])).toBe(false);
+    expect(rock.coincideCon(["."])).toBe(true);
+    expect(rock.coincideCon(["(rock"])).toBe(false);
+  });
+});
+
 describe("mismoNombreDeTipo", () => {
   it("no distingue mayúsculas, tildes ni espacios de los extremos", () => {
     expect(mismoNombreDeTipo("VIP", " vip ")).toBe(true);

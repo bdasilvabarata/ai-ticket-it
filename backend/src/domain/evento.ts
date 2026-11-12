@@ -1,3 +1,4 @@
+import { normalizarParaBuscar } from "./busqueda";
 import { ReglaDeNegocioError } from "./errores";
 import { esEnteroNoNegativo, esTextoConContenido, Invariantes } from "./invariantes";
 
@@ -134,6 +135,28 @@ export class Evento {
     return ahora.getTime() >= this.fechaHora.getTime();
   }
 
+  /** El menor precio entre **todos** los tipos, con o sin cupo (FR-004). 0 = gratis. */
+  precioDesde(): number {
+    // Siempre hay al menos un tipo (invariante del constructor).
+    return Math.min(...this.tiposEntrada.map((tipo) => tipo.precio));
+  }
+
+  /** Todos los tipos sin cupo (FR-005). Un agotado parcial no cuenta. */
+  estaAgotado(): boolean {
+    return this.tiposEntrada.every((tipo) => tipo.cupo === 0);
+  }
+
+  /**
+   * ¿Cada palabra (ya normalizada con `palabrasDeBusqueda`) está en el nombre **o** en la
+   * descripción? Sin palabras, sí (FR-011, R4). Coincidencia literal (`includes`), sin expresiones
+   * regulares armadas con la entrada; nombre y descripción se comparan por separado.
+   */
+  coincideCon(palabras: readonly string[]): boolean {
+    const nombre = normalizarParaBuscar(this.nombre);
+    const descripcion = normalizarParaBuscar(this.descripcion);
+    return palabras.every((palabra) => nombre.includes(palabra) || descripcion.includes(palabra));
+  }
+
   esOrganizadoPor(usuarioId: string): boolean {
     return this.organizadorId === usuarioId;
   }
@@ -231,7 +254,8 @@ export class Evento {
 
   /**
    * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
-   * consigna; lo usa la búsqueda por precio de la feature 005).
+   * consigna). El filtro por rango de precio quedó fuera de alcance de la 005: todavía no lo usa
+   * ninguna feature.
    */
   tuPrecioEstaEntre(min: number, max: number): boolean {
     return this.tiposEntrada.some((tipo) => tipo.precio >= min && tipo.precio <= max);

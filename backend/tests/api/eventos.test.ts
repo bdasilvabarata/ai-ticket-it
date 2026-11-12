@@ -1,6 +1,7 @@
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
+import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
 import { relojFijo } from "../helpers/eventos";
 
 // Repositorios de ejemplo nuevos por app, armados con el instante del reloj fijo.
@@ -15,6 +16,187 @@ function esperarError(respuesta: request.Response, status: number, codigo: strin
   expect(respuesta.status).toBe(status);
   expect(respuesta.body).toMatchObject({ error: { codigo, mensaje: expect.any(String) } });
 }
+
+/** Los ids del catálogo, en el orden de la respuesta. */
+const idsDelCatalogo = (respuesta: request.Response) =>
+  (respuesta.body.eventos as { id: string }[]).map((e) => e.id);
+
+const PROXIMOS_POR_FECHA = [
+  "evento-noche-de-rock",
+  "evento-clasico-de-basquet",
+  "evento-hamlet",
+  "evento-charla-ia-aplicada",
+  "evento-festival-sonidos-del-sur",
+  "evento-maraton-10k",
+];
+
+describe("GET /api/eventos (catálogo)", () => {
+  it("es público: los 6 próximos del seed por fecha, con hayEventosProximos", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+    expect(respuesta.body.hayEventosProximos).toBe(true);
+  });
+
+  it("un X-Usuario-Id inválido se ignora", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos").set("X-Usuario-Id", "nadie");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("Hamlet sale agotado, la Maratón gratis y todos sin puntaje", async () => {
+    const { body } = await request(nuevaApp()).get("/api/eventos");
+    const porId = new Map((body.eventos as { id: string }[]).map((e) => [e.id, e]));
+    expect(porId.get("evento-hamlet")).toMatchObject({ agotado: true, precioDesde: 18000 });
+    expect(porId.get("evento-maraton-10k")).toMatchObject({ agotado: false, precioDesde: 0 });
+    expect(porId.get("evento-clasico-de-basquet")).toEqual({
+      id: "evento-clasico-de-basquet",
+      nombre: "Clásico de básquet",
+      categoria: { id: "categoria-deportes", nombre: "Deportes" },
+      fechaHora: expect.any(String),
+      fechaHoraLocal: expect.any(String),
+      organizadorId: SOFIA,
+      realizado: false,
+      cantidadTiposEntrada: 2,
+      precioDesde: 8000,
+      agotado: false,
+      organizador: { id: SOFIA, nombre: "Sofía", apellido: "Castro", puntaje: null, cantidadResenias: 0 },
+    });
+    for (const evento of body.eventos) {
+      expect(evento.organizador).toMatchObject({ puntaje: null, cantidadResenias: 0 });
+    }
+  });
+
+  it("con todo el seed realizado responde vacío con hayEventosProximos: false", async () => {
+    const app = crearApp({
+      repositorios: crearRepositoriosDeEjemplo(new Date("2026-11-10T15:00:00.000Z")),
+      reloj: relojFijo(new Date("2027-06-01T00:00:00.000Z")),
+    });
+    const respuesta = await request(app).get("/api/eventos");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: false });
+  });
+});
+
+describe("GET /api/eventos: texto y categoría (US3)", () => {
+  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+
+  it.each(["texto=BASQUET", "texto=b%C3%A1squet", "texto=%20basquet%20"])(
+    "%s → solo el Clásico",
+    async (query) => {
+      const respuesta = await catalogo(query);
+      expect(respuesta.status).toBe(200);
+      expect(idsDelCatalogo(respuesta)).toEqual(["evento-clasico-de-basquet"]);
+    },
+  );
+
+  it.each(["texto=club+rock", "texto=rock%20%20%20club"])("%s → Noche de Rock", async (query) => {
+    expect(idsDelCatalogo(await catalogo(query))).toEqual(["evento-noche-de-rock"]);
+  });
+
+  it("texto=clasico → el Clásico (nombre) y Hamlet (descripción)", async () => {
+    expect(idsDelCatalogo(await catalogo("texto=clasico"))).toEqual([
+      "evento-clasico-de-basquet",
+      "evento-hamlet",
+    ]);
+  });
+
+  it("categoriaId=categoria-musica → solo Noche de Rock (Jazz en el Patio ya se realizó)", async () => {
+    expect(idsDelCatalogo(await catalogo("categoriaId=categoria-musica"))).toEqual(["evento-noche-de-rock"]);
+  });
+
+  it.each(["categoriaId=categoria-stand-up", "texto=rock&categoriaId=categoria-deportes"])(
+    "%s → vacío con hayEventosProximos: true",
+    async (query) => {
+      const respuesta = await catalogo(query);
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+    },
+  );
+
+  it("una categoría que no existe → 400 sobre query.categoriaId (no la lista vacía)", async () => {
+    expect(detalles(await catalogo("categoriaId=categoria-inexistente"))).toEqual({
+      "query.categoriaId": "No existe la categoría.",
+    });
+  });
+
+  it("categoriaId de solo espacios → sin filtro", async () => {
+    const respuesta = await catalogo("categoriaId=%20%20");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("un texto de 101 caracteres → 400; 100 con espacios alrededor → 200", async () => {
+    expect(detalles(await catalogo(`texto=${"a".repeat(101)}`))).toEqual({
+      "query.texto": "Debe tener como máximo 100 caracteres.",
+    });
+    const respuesta = await catalogo(`texto=%20%20${"a".repeat(100)}%20%20`);
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+  });
+
+  it.each([
+    ["texto=a&texto=b", "query.texto"],
+    ["categoriaId=a&categoriaId=b", "query.categoriaId"],
+  ])("%s repetido → 400 Debe ser un texto.", async (query, campo) => {
+    expect(detalles(await catalogo(query))).toEqual({ [campo]: "Debe ser un texto." });
+  });
+});
+
+describe("GET /api/eventos: orden (US4)", () => {
+  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+
+  it("orden=precio → Maratón, Charla, Clásico, Noche de Rock, Hamlet, Festival", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=precio"))).toEqual([
+      "evento-maraton-10k",
+      "evento-charla-ia-aplicada",
+      "evento-clasico-de-basquet",
+      "evento-noche-de-rock",
+      "evento-hamlet",
+      "evento-festival-sonidos-del-sur",
+    ]);
+  });
+
+  it("orden=puntaje sin reseñas y sin orden → igual que por fecha", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=puntaje"))).toEqual(PROXIMOS_POR_FECHA);
+    expect(idsDelCatalogo(await catalogo("orden=fecha"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("sentido=desc invierte el criterio: orden=precio&sentido=desc → el más caro primero", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=precio&sentido=desc"))).toEqual([
+      "evento-festival-sonidos-del-sur",
+      "evento-hamlet",
+      "evento-noche-de-rock",
+      "evento-clasico-de-basquet",
+      "evento-charla-ia-aplicada",
+      "evento-maraton-10k",
+    ]);
+    expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=desc"))).toEqual(
+      PROXIMOS_POR_FECHA.toReversed(),
+    );
+    expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("orden=puntaje&sentido=asc sin reseñas → igual que por fecha (sin puntaje siempre al final)", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=puntaje&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it.each(["sentido=arriba", "sentido=asc&sentido=desc"])("%s → 400 sobre query.sentido", async (query) => {
+    expect(detalles(await catalogo(query))).toEqual({ "query.sentido": "Debe ser asc o desc." });
+  });
+
+  it("orden=nombre → 400 sobre query.orden", async () => {
+    expect(detalles(await catalogo("orden=nombre"))).toEqual({
+      "query.orden": "Debe ser fecha, precio o puntaje.",
+    });
+  });
+
+  it("un orden repetido → 400", async () => {
+    expect(detalles(await catalogo("orden=fecha&orden=precio"))).toEqual({
+      "query.orden": "Debe ser fecha, precio o puntaje.",
+    });
+  });
+});
 
 describe("GET /api/eventos/mios", () => {
   it("responde 401 sin X-Usuario-Id", async () => {
@@ -119,6 +301,7 @@ describe("POST /api/eventos", () => {
           cupo: 30,
         },
       ],
+      organizador: { id: LUCIA, nombre: "Lucía", apellido: "Álvarez", puntaje: null, cantidadResenias: 0 },
     });
   });
 
@@ -276,12 +459,37 @@ describe("GET /api/eventos/:eventoId", () => {
     });
   });
 
+  it("suma el organizador con su puntaje (sin reseñas en el seed), sin X-Usuario-Id", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos/evento-hamlet");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      id: "evento-hamlet",
+      organizadorId: "usuario-martin",
+      cantidadTiposEntrada: 2,
+      organizador: {
+        id: "usuario-martin",
+        nombre: "Martín",
+        apellido: "Benítez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+    });
+  });
+
+  it("sigue sirviendo un evento realizado", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos/evento-noche-de-risas");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({ realizado: true, organizador: { id: SOFIA } });
+  });
+
   it("responde 400 con un id mal formado y 404 si no existe", async () => {
     const app = nuevaApp();
     expect(detalles(await request(app).get("/api/eventos/123"))).toEqual({
       "params.eventoId": "Debe ser un identificador válido.",
     });
-    esperarError(await request(app).get("/api/eventos/evento-inexistente"), 404, "EVENTO_NO_ENCONTRADO");
+    const respuesta = await request(app).get("/api/eventos/evento-inexistente");
+    esperarError(respuesta, 404, "EVENTO_NO_ENCONTRADO");
+    expect(respuesta.body.error.mensaje).toBe("No existe el evento.");
   });
 });
 
@@ -309,6 +517,7 @@ describe("PUT /api/eventos/:eventoId", () => {
       fechaHoraLocal: "2026-12-20T21:30",
       multimedia: [],
       tiposEntrada: [{ id: "tipo-noche-de-rock-general" }],
+      organizador: { id: LUCIA, puntaje: null, cantidadResenias: 0 },
     });
     // En Mis eventos pasa a su nueva posición (después del Festival).
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);

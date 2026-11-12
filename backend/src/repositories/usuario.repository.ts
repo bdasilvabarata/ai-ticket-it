@@ -16,4 +16,8 @@ export class UsuarioRepository implements RepositorioUsuarios {
   async buscarPorId(id: string): Promise<Usuario | null> {
     return this.#usuarios.get(id) ?? null;
   }
+
+  async listarPorIds(ids: readonly string[]): Promise<Usuario[]> {
+    return [...new Set(ids)].flatMap((id) => this.#usuarios.get(id) ?? []);
+  }
 }

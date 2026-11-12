@@ -29,6 +29,8 @@ export interface EventoVista extends EventoResumenVista {
   descripcion: string;
   multimedia: string[];
   tiposEntrada: TipoEntradaVista[];
+  /** Nuevo en la 005: nada se quita (FR-030). */
+  organizador: OrganizadorVista;
 }
 
 /** Cuerpo de alta y edición de un tipo de entrada. */
@@ -59,3 +61,58 @@ export interface DatosNuevoEvento extends DatosEvento {
 export const LIMITES_EVENTO = { nombre: 100, descripcion: 2000, multimedia: 5 } as const;
 
 export const LIMITES_TIPO_ENTRADA = { nombre: 50, descripcion: 300 } as const;
+
+/** Criterios de orden del catálogo (Explorar). Los usan la validación, el dominio y la app. */
+export const ORDENES_CATALOGO = ["fecha", "precio", "puntaje"] as const;
+
+export type OrdenCatalogo = (typeof ORDENES_CATALOGO)[number];
+
+/** Sentido del criterio principal del orden (los desempates no se invierten). */
+export const SENTIDOS_CATALOGO = ["asc", "desc"] as const;
+
+export type SentidoCatalogo = (typeof SENTIDOS_CATALOGO)[number];
+
+/** El sentido de cada criterio si no se pide otro: lo más próximo, lo más barato, lo mejor calificado. */
+export const SENTIDO_INICIAL: Readonly<Record<OrdenCatalogo, SentidoCatalogo>> = {
+  fecha: "asc",
+  precio: "asc",
+  puntaje: "desc",
+};
+
+/** Límites de la búsqueda del catálogo: los valida el servidor y la app los usa en `maxLength`. */
+export const LIMITES_BUSQUEDA = { texto: 100 } as const;
+
+/** Lo que pide la app al catálogo: los vacíos no se mandan. */
+export interface ConsultaCatalogo {
+  texto?: string;
+  categoriaId?: string;
+  orden?: OrdenCatalogo;
+  /** Sin valor: `SENTIDO_INICIAL[orden]`. */
+  sentido?: SentidoCatalogo;
+}
+
+/** Organizador de un evento con su puntaje (las reseñas de todos sus eventos). */
+export interface OrganizadorVista {
+  id: string;
+  nombre: string;
+  apellido: string;
+  /** Promedio sin redondear; `null` = sin reseñas (nunca 0). */
+  puntaje: number | null;
+  cantidadResenias: number;
+}
+
+/** Evento en Explorar. */
+export interface EventoCatalogoVista extends EventoResumenVista {
+  /** Menor precio de todos sus tipos; 0 = gratis. */
+  precioDesde: number;
+  /** Todos sus tipos con cupo 0. */
+  agotado: boolean;
+  organizador: OrganizadorVista;
+}
+
+/** Respuesta de `GET /eventos`. */
+export interface CatalogoVista {
+  eventos: EventoCatalogoVista[];
+  /** Hay eventos no realizados, antes de aplicar texto y categoría (decide el vacío). */
+  hayEventosProximos: boolean;
+}

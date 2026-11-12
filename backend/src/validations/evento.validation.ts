@@ -1,4 +1,10 @@
-import { LIMITES_EVENTO, LIMITES_TIPO_ENTRADA } from "@ai-ticket-it/shared";
+import {
+  LIMITES_BUSQUEDA,
+  LIMITES_EVENTO,
+  LIMITES_TIPO_ENTRADA,
+  ORDENES_CATALOGO,
+  SENTIDOS_CATALOGO,
+} from "@ai-ticket-it/shared";
 import { z } from "zod";
 import {
   enteroDesde,
@@ -75,4 +81,33 @@ export const eventoPorId = crearValidacion({ params: paramsEvento });
 export const eventoEditado = crearValidacion({
   params: paramsEvento,
   body: z.object(camposDelEvento, { error: MENSAJE_CUERPO }),
+});
+
+const MENSAJE_TEXTO = "Debe ser un texto.";
+const MENSAJE_MAXIMO_BUSQUEDA = `Debe tener como máximo ${LIMITES_BUSQUEDA.texto} caracteres.`;
+const MENSAJE_ORDEN = "Debe ser fecha, precio o puntaje.";
+const MENSAJE_SENTIDO = "Debe ser asc o desc.";
+
+/**
+ * `GET /eventos`: la consulta del catálogo (contracts/api.md). Un `z.object`: las claves desconocidas
+ * se descartan. Un parámetro repetido llega como arreglo y no es un texto. El largo se cuenta
+ * después del `trim`. `categoriaId` solo tiene que ser un texto (no `idSchema`): que exista lo
+ * decide el service con `buscarReferenciada`; vacío = sin filtro.
+ */
+export const consultaCatalogo = crearValidacion({
+  query: z.object({
+    texto: z
+      .string({ error: MENSAJE_TEXTO })
+      .trim()
+      .max(LIMITES_BUSQUEDA.texto, MENSAJE_MAXIMO_BUSQUEDA)
+      .default(""),
+    categoriaId: z
+      .string({ error: MENSAJE_TEXTO })
+      .trim()
+      .optional()
+      .transform((valor) => (valor === "" ? undefined : valor)),
+    orden: z.enum(ORDENES_CATALOGO, { error: MENSAJE_ORDEN }).default("fecha"),
+    // Sin valor, el inicial del criterio (lo decide el dominio).
+    sentido: z.enum(SENTIDOS_CATALOGO, { error: MENSAJE_SENTIDO }).optional(),
+  }),
 });

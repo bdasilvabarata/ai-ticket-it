@@ -39,9 +39,18 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
     `eventos/:eventoId/tipos-entrada` (`TipoEntrada` vive dentro del agregado `Evento`: tiene
-    controller y service, pero se guarda con `RepositorioEventos`), y `compras` **mínimo**
+    controller y service, pero se guarda con `RepositorioEventos`), `compras` **mínimo**
     (entidad y `RepositorioCompras` con `existePorEvento` / `existePorTipoEntrada`, sin
-    endpoints; lo amplía la 006).
+    endpoints; lo amplía la 006) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
+    `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
+    `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
+  - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
+    los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden` y `sentido`, más
+    `hayEventosProximos`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae
+    `organizador` (`OrganizadorVista` con `puntaje` sin redondear o `null` y `cantidadResenias`).
+    Módulos puros del dominio: `domain/busqueda.ts` (`normalizarParaBuscar`, `palabrasDeBusqueda`:
+    sin mayúsculas, acentos ni diéresis, ñ ≠ n) y `domain/orden-catalogo.ts` (`ordenarCatalogo`
+    sobre elementos `Ordenable`, desempates fecha → nombre → id).
   - **Reloj**: `domain/reloj.ts` (interfaz `Reloj { ahora() }`) y `config/reloj.ts`
     (`relojDelSistema`). Es la única referencia de "ahora": llega a los services por constructor
     y `crearApp({ reloj })` permite fijarlo en los tests. `domain/` recibe `ahora` como
@@ -59,9 +68,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     tiene **un** service que la busca por id y lanza su 404 (`obtenerOFallar`, público); los demás
     se lo piden a él en vez de repetir la búsqueda. `TipoEntradaService` recibe `EventoService` y
     usa `obtenerDelOrganizador(id, usuarioId)` (404 + 403); `EventoService` recibe
-    `CategoriaService` y valida la categoría elegida con `buscarReferenciada` (si no existe,
-    `ReferenciaInvalidaError` → 400 sobre `body.categoriaId`) y, para varias, le pide el lote con
-    `obtenerPorIds` (Mis eventos: una sola lectura, sin N+1). Los ids nuevos los da el
+    `CategoriaService` y valida la categoría elegida con `buscarReferenciada(id, origen)` (si no
+    existe, `ReferenciaInvalidaError` → 400 sobre `body.categoriaId` con origen `"datos"` o
+    `query.categoriaId` con `"consulta"`) y, para varias, le pide el lote con `obtenerPorIds` (una
+    sola lectura, sin N+1). También recibe `UsuarioService` (`obtenerOFallar` público y
+    `obtenerPorIds`) y `ReseniaService` para el organizador y su puntaje; `ReseniaService` recibe
+    los eventos por parámetro y no depende de `EventoService` (sin ciclos). Los ids nuevos los da el
     repositorio (`siguienteId()`), y los órdenes son comparadores del dominio
     (`ordenDeMisEventos`, `compararPorNombre`).
   - `errors/` no conoce HTTP: cada error lleva código y mensaje, y el status lo asigna
@@ -89,7 +101,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       escrituras **no se reintentan solas** (`mutations.retry: false`; la secuencia solo vuelve a
       pedir queries).
     - `src/consultas/` — `QueryClient` (sin reintentos propios; todo error de query o mutation va a
-      la sesión vía `QueryCache`/`MutationCache`), claves en `claves.ts` y `cliente-api.tsx`
+      la sesión vía `QueryCache`/`MutationCache`), claves en `claves.ts` (`catalogo` es la excepción
+      documentada: **sin usuario**, porque el catálogo es el mismo para todos) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -97,8 +110,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       fuentes, radios, grosores, `tamano`, `sombra` dura con `boxShadow`, opacidad: nada suelto),
       `fuentes` (Archivo y Archivo Black, que `RaizDeLaApp` carga con `useFonts`), `hundido` (lo que
       se desplaza al presionar un elemento con sombra), `Boton` (`primario` · `aviso` = secundaria
-      sobre superficie · `texto`), `Ilustracion`, `SegunConsulta` (los cuatro estados), `Cargando`,
-      `MensajeError`, `ListaVacia`, `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
+      sobre superficie · `texto`), `Ilustracion`, `SegunConsulta` (los cuatro estados; `cargando` y
+      `vacio` opcionales reemplazan a `Cargando` y a `ListaVacia`), `Cargando`, `MensajeError`,
+      `ListaVacia` (con `accion` opcional), `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
       apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
       campo; úsenla en vez de un `ScrollView` suelto), la franja, `Logo` y `CargandoInicio`
       (la ruta `cargando`); todo por `index.ts`. Los textos usan un estilo de `tema.tipografia`
@@ -114,10 +128,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       recordado en AsyncStorage y su validación, la secuencia única de reintentos (1, 2, 4, 8, 16,
       32 s), `useSesion()` y las pantallas `SeleccionarUsuario` y `Perfil`;
     - `categorias/` — `useCategorias`;
-    - `eventos/` — Mis eventos, Crear evento, `EventoDelOrganizador` (edita o muestra en solo
-      lectura según el `realizado` del servidor), los formularios de tipo de entrada,
-      `useMisEventos`/`useEvento`, las mutations de `mutaciones.ts` (en nombre del usuario **del
-      formulario**, invalidan al terminar), `fecha-de-pared.ts` (selector ⇄ `"YYYY-MM-DDTHH:mm"`,
+    - `eventos/` — Explorar (la pestaña de inicio: buscador con `useValorDemorado` de 500 ms,
+      `BotonCategoria` (a la derecha del buscador) que abre `SelectorCategoria` en modo `conTodas` como
+      desplegable, `SelectorOrden` (tocar el elegido invierte el `sentido`), `TarjetaEvento`/`TarjetaSkeleton` y
+      `useCatalogo`), el detalle público `DetalleEvento` (ruta `explorar/[eventoId]`, `FilaImagenes`;
+      ante un 404 llama a `useInvalidarCatalogo`), Mis eventos, Crear evento, `EventoDelOrganizador`
+      (edita o muestra en solo lectura según el `realizado` del servidor), los formularios de tipo
+      de entrada, `useMisEventos`/`useEvento`, las mutations de `mutaciones.ts` (en nombre del
+      usuario **del formulario**, invalidan al terminar, también `["catalogo"]`), `fecha-de-pared.ts` (selector ⇄ `"YYYY-MM-DDTHH:mm"`,
       sin convertir zonas), `errores-de-formulario.ts` (la app no valida: muestra los detalles del
       400 junto a cada campo) y `useConfirmarDescarte` ("¿Descartar los cambios?" al salir de un
       formulario, con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
@@ -140,8 +158,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `tsc`; una ruta mal escrita no compila, también en el CI. `tests/tipos/rutas-tipadas.ts` es la
     guarda (`@ts-expect-error` sobre una ruta inexistente).
   - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
-    `renderConDependencias` (la app real con `fetch` falso) y `crearFetchFalso`/`porRuta` (registra
-    método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
+    `renderConDependencias` (la app real con `fetch` falso; si un test no registra lo que pide
+    Explorar al entrar —el catálogo y las categorías— responde vacío) y `crearFetchFalso`/`porRuta`
+    (registra método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
     `conexion/` y `pantallas/`, y los de cada feature en `features/<dominio>/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.
 
@@ -177,7 +196,7 @@ su re-export, el hook o la función con su firma real).
 | Repository | `listar()` | todas las entidades |
 | Repository | `buscarPorId(id)` · `buscarPor<Criterio>(...)` | la entidad o `null` (nunca lanza 404) |
 | Repository | `listarPor<Criterio>(...)` | las entidades que cumplen el criterio (arreglo, posiblemente vacío) |
-| Repository | `listarPorIds(ids)` | las que existen de esos ids, sin repetir (para las búsquedas en lote) |
+| Repository | `listarPorIds(ids)` | las que existen de esos ids, sin repetir (para las búsquedas en lote; categorías y usuarios) |
 | Repository | `contarPor<Criterio>(...)` · `existe<Algo>(...)` | números / booleanos |
 | Repository | `guardar(entidad)` · `eliminarPorId(id)` | persistencia |
 | Repository | `siguienteId()` | un id nuevo para una entidad (el service no genera ids) |

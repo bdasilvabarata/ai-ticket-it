@@ -61,6 +61,55 @@
       ]
     },
     {
+      "name": "Explorar eventos",
+      "item": [
+        {
+          "name": "Catálogo sin filtros (público)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos" } }
+        },
+        {
+          "name": "Buscar texto=basquet (sin tildes)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?texto=basquet" } }
+        },
+        {
+          "name": "Filtrar categoriaId=categoria-musica",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?categoriaId=categoria-musica" } }
+        },
+        {
+          "name": "Ordenar orden=precio (los gratis primero)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio" } }
+        },
+        {
+          "name": "Ordenar orden=precio&sentido=desc (el más caro primero)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio&sentido=desc" } }
+        },
+        {
+          "name": "Ordenar orden=puntaje (sin puntaje al final)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=puntaje" } }
+        },
+        {
+          "name": "orden=nombre → 400 ENTRADA_INVALIDA (query.orden)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=nombre" } }
+        },
+        {
+          "name": "Categoría inexistente → 400 ENTRADA_INVALIDA (query.categoriaId)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos?categoriaId=categoria-inexistente" }
+          }
+        },
+        {
+          "name": "Texto de 101 caracteres → 400 ENTRADA_INVALIDA (query.texto)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/eventos?texto=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "Eventos",
       "item": [
         {
