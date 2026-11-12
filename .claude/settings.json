@@ -7,7 +7,7 @@
             "type": "command",
             "command": "node \"$CLAUDE_PROJECT_DIR/.claude/hooks/verificar-al-terminar.mjs\"",
             "timeout": 180,
-            "statusMessage": "Verificando typecheck y lint…"
+            "statusMessage": "Verificando typecheck y lint de lo que cambió…"
           }
         ]
       }

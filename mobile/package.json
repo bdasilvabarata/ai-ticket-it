@@ -6,6 +6,7 @@
   "scripts": {
     "start": "expo start",
     "test": "jest",
+    "test:foco": "jest --silent",
     "typecheck": "node scripts/generar-tipos-rutas.js && tsc --noEmit"
   },
   "dependencies": {
