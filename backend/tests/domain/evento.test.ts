@@ -496,3 +496,40 @@ describe("ordenDeMisEventos", () => {
     ]);
   });
 });
+
+describe("Devolver cupo (feature 006: vencimiento de compras)", () => {
+  it("TipoEntrada.devolver suma al cupo en un tipo nuevo; el original no cambia", () => {
+    const original = tipo({ cupo: 3 });
+    const devuelto = original.devolver(2);
+    expect(devuelto).not.toBe(original);
+    expect(devuelto).toMatchObject({ ...datosTipo, cupo: 5 });
+    expect(original.cupo).toBe(3);
+  });
+
+  it("Evento.devolverCupos devuelve un Evento nuevo con cada tipo devuelto e ignora los ids ausentes", () => {
+    const original = evento([tipo({ id: "t1", cupo: 3 }), tipo({ id: "t2", nombre: "VIP", cupo: 0 })]);
+    const devuelto = original.devolverCupos(
+      new Map([
+        ["t1", 1],
+        ["t2", 4],
+        ["otro", 7],
+      ]),
+    );
+    expect(devuelto).not.toBe(original);
+    expect(devuelto.tiposEntrada.map((t) => [t.id, t.cupo])).toEqual([
+      ["t1", 4],
+      ["t2", 4],
+    ]);
+    expect(original.tiposEntrada.map((t) => t.cupo)).toEqual([3, 0]);
+  });
+
+  it("con un Map vacío los cupos quedan iguales", () => {
+    const original = evento([tipo({ cupo: 3 })]);
+    expect(original.devolverCupos(new Map()).tiposEntrada.map((t) => t.cupo)).toEqual([3]);
+  });
+
+  it("no chequea si el evento se realizó: un evento realizado devuelve igual (R9)", () => {
+    const realizado = evento([tipo({ cupo: 0 })], { fechaHora: new Date("2020-01-01T00:00:00Z") });
+    expect(realizado.devolverCupos(new Map([["t1", 2]])).tiposEntrada[0]?.cupo).toBe(2);
+  });
+});

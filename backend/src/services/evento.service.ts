@@ -24,10 +24,12 @@ import type { Cerrojo } from "./cerrojo-por-clave";
 import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
 import type { ReseniaService } from "./resenia.service";
 import type { UsuarioService } from "./usuario.service";
+import type { VencimientoService } from "./vencimiento.service";
 
 export interface DependenciasEventoService {
   eventos: RepositorioEventos;
   compras: RepositorioCompras;
+  vencimientoService: VencimientoService;
   categoriaService: CategoriaService;
   usuarioService: UsuarioService;
   reseniaService: ReseniaService;
@@ -55,14 +57,16 @@ export type DatosNuevoEventoValidados = DatosDeEvento & { tiposEntrada: DatosDeT
 
 /**
  * Casos de uso de eventos (UC-04). Recibe sus dependencias por constructor (principio III): los
- * repositorios de eventos y compras, el service de categorías, el cerrojo compartido y el reloj, la
- * única referencia de "ahora". Toda escritura sobre un evento existente corre bajo
- * `cerrojo.ejecutar(id, …)`: relee el evento y lee el reloj adentro (constitución, "Operaciones
- * atómicas por evento").
+ * repositorios de eventos y compras, `VencimientoService`, los services de categorías, usuarios y
+ * reseñas, el cerrojo compartido y el reloj, la única referencia de "ahora". Toda escritura sobre un
+ * evento existente corre bajo `cerrojo.ejecutar(id, …)`: lee el reloj una vez adentro, relee el
+ * evento y materializa los vencimientos de sus compras antes de verificar (constitución,
+ * "Operaciones atómicas por evento"; 006, R3). Las lecturas muestran el cupo al día sin guardar.
  */
 export class EventoService {
   readonly #eventos: RepositorioEventos;
   readonly #compras: RepositorioCompras;
+  readonly #vencimientoService: VencimientoService;
   readonly #categoriaService: CategoriaService;
   readonly #usuarioService: UsuarioService;
   readonly #reseniaService: ReseniaService;
@@ -72,6 +76,7 @@ export class EventoService {
   constructor({
     eventos,
     compras,
+    vencimientoService,
     categoriaService,
     usuarioService,
     reseniaService,
@@ -80,6 +85,7 @@ export class EventoService {
   }: DependenciasEventoService) {
     this.#eventos = eventos;
     this.#compras = compras;
+    this.#vencimientoService = vencimientoService;
     this.#categoriaService = categoriaService;
     this.#usuarioService = usuarioService;
     this.#reseniaService = reseniaService;
@@ -104,11 +110,13 @@ export class EventoService {
     // Antes de aplicar texto y categoría: decide el vacío de la app (R2).
     const hayEventosProximos = proximos.length > 0;
     const palabras = palabrasDeBusqueda(texto);
-    const filtrados = proximos.filter(
+    const coincidentes = proximos.filter(
       (evento) =>
         (categoriaId === undefined || evento.categoriaId === categoriaId) && evento.coincideCon(palabras),
     );
-    if (filtrados.length === 0) return { eventos: [], hayEventosProximos };
+    if (coincidentes.length === 0) return { eventos: [], hayEventosProximos };
+    // El cupo (y "Agotado") al día: cuenta las entradas de las compras pendientes vencidas (R3).
+    const filtrados = await this.#conCupoAlDia(coincidentes, ahora);
 
     const organizadorIds = new Set(filtrados.map((e) => e.organizadorId));
     const [categorias, organizadores, puntajes] = await Promise.all([
@@ -169,12 +177,17 @@ export class EventoService {
     return aEventoVista(evento, categoria, await this.#organizadorVista(usuarioId), ahora);
   }
 
-  /** Público: lo usan editar, la vista de solo lectura y, en la 005, el detalle (R8). Sin cerrojo (R2.4). */
+  /**
+   * Público: lo usan editar, la vista de solo lectura y, en la 005, el detalle (R8). Sin cerrojo
+   * (R2.4). El cupo se muestra al día (006, R3), sin guardar nada.
+   */
   async obtener(id: string): Promise<EventoVista> {
-    const evento = await this.obtenerOFallar(id);
+    const ahora = this.#reloj.ahora();
+    const guardado = await this.obtenerOFallar(id);
+    const evento = (await this.#conCupoAlDia([guardado], ahora))[0] ?? guardado;
     const categoria = await this.#categoriaService.obtenerOFallar(evento.categoriaId);
     const organizador = await this.#organizadorVista(evento.organizadorId);
-    return aEventoVista(evento, categoria, organizador, this.#reloj.ahora());
+    return aEventoVista(evento, categoria, organizador, ahora);
   }
 
   /**
@@ -183,9 +196,9 @@ export class EventoService {
    */
   async actualizar(id: string, usuarioId: string, datos: DatosDeEvento): Promise<EventoVista> {
     return this.#cerrojo.ejecutar(id, async () => {
-      const evento = await this.obtenerDelOrganizador(id, usuarioId);
-      const categoria = await this.#categoriaService.buscarReferenciada(datos.categoriaId);
       const ahora = this.#reloj.ahora();
+      const evento = await this.obtenerDelOrganizador(id, usuarioId, ahora);
+      const categoria = await this.#categoriaService.buscarReferenciada(datos.categoriaId);
       const actualizado = evento.actualizar(datos, ahora);
       await this.#eventos.guardar(actualizado);
       return aEventoVista(actualizado, categoria, await this.#organizadorVista(usuarioId), ahora);
@@ -195,9 +208,10 @@ export class EventoService {
   /** Elimina un evento propio, no realizado y sin compras (en ningún estado). Bajo el cerrojo del evento. */
   async eliminar(id: string, usuarioId: string): Promise<void> {
     await this.#cerrojo.ejecutar(id, async () => {
-      const evento = await this.obtenerDelOrganizador(id, usuarioId);
+      const ahora = this.#reloj.ahora();
+      const evento = await this.obtenerDelOrganizador(id, usuarioId, ahora);
       const tieneCompras = await this.#compras.existePorEvento(id);
-      evento.verificarQueSePuedeEliminar({ ahora: this.#reloj.ahora(), tieneCompras });
+      evento.verificarQueSePuedeEliminar({ ahora, tieneCompras });
       await this.#eventos.eliminarPorId(id);
     });
   }
@@ -210,15 +224,46 @@ export class EventoService {
   }
 
   /**
-   * El evento que el usuario actual quiere modificar: 404 si no existe y 403 si no lo organiza
-   * (principio VI). Las escrituras lo llaman dentro del cerrojo del evento.
+   * El evento con los vencimientos de sus compras **materializados** (research R3): 404 → guarda las
+   * compras vencidas como CANCELADA → si liberaron cupo, guarda el evento con el cupo devuelto (en
+   * ese orden: una lectura intermedia nunca ve cupo de más, R8). Se llama **dentro** del cerrojo del
+   * evento, con el `ahora` de la operación; no toma el cerrojo.
    */
-  async obtenerDelOrganizador(id: string, usuarioId: string): Promise<Evento> {
+  async obtenerAlDia(id: string, ahora: Date): Promise<Evento> {
+    const evento = await this.obtenerOFallar(id);
+    const liberado = await this.#vencimientoService.vencerPendientes(id, ahora);
+    if (liberado.size === 0) return evento;
+    const alDia = evento.devolverCupos(liberado);
+    await this.#eventos.guardar(alDia);
+    return alDia;
+  }
+
+  /**
+   * El evento que el usuario actual quiere modificar, al día: 404 si no existe y 403 si no lo
+   * organiza (principio VI); recién después materializa los vencimientos (un pedido sin permiso no
+   * cambia nada). Las escrituras lo llaman dentro del cerrojo del evento, con su `ahora`.
+   */
+  async obtenerDelOrganizador(id: string, usuarioId: string, ahora: Date): Promise<Evento> {
     const evento = await this.obtenerOFallar(id);
     if (!evento.esOrganizadoPor(usuarioId)) {
       throw new SinPermisoError("Solo el organizador puede modificar este evento.");
     }
-    return evento;
+    return this.obtenerAlDia(id, ahora);
+  }
+
+  /**
+   * Los eventos como se ven en `ahora`: a cada uno le suma el cupo de sus compras pendientes vencidas,
+   * **sin guardar nada** (lectura, sin cerrojo; R3). Una sola lectura de compras para todos (sin N+1).
+   */
+  async #conCupoAlDia(eventos: readonly Evento[], ahora: Date): Promise<Evento[]> {
+    const liberado = await this.#vencimientoService.cupoLiberadoPorTipo(
+      eventos.map((evento) => evento.id),
+      ahora,
+    );
+    return eventos.map((evento) => {
+      const porTipo = liberado.get(evento.id);
+      return porTipo ? evento.devolverCupos(porTipo) : evento;
+    });
   }
 
   /**

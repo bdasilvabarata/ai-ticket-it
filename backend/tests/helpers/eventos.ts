@@ -1,6 +1,6 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
-import { Compra } from "../../src/domain/compra";
+import { Compra, type CambioEstadoCompra } from "../../src/domain/compra";
 import { Evento, TipoEntrada, type PropiedadesTipoEntrada } from "../../src/domain/evento";
 import type { Reloj } from "../../src/domain/reloj";
 import { Resenia } from "../../src/domain/resenia";
@@ -13,6 +13,17 @@ export const HORA = 60 * 60 * 1000;
 export const DIA = 24 * HORA;
 
 export const relojFijo = (instante: Date = AHORA): Reloj => ({ ahora: () => new Date(instante) });
+
+/** Un reloj que empieza en `instante` y se mueve con `avanzar(ms)` (vencimiento a los 15 minutos). */
+export function relojMovible(instante: Date = AHORA): Reloj & { avanzar(ms: number): void } {
+  let actual = instante.getTime();
+  return {
+    ahora: () => new Date(actual),
+    avanzar: (ms: number) => {
+      actual += ms;
+    },
+  };
+}
 
 export const musica = new Categoria({ id: "categoria-musica", nombre: "Música", descripcion: "Recitales." });
 export const teatro = new Categoria({ id: "categoria-teatro", nombre: "Teatro", descripcion: "Obras." });
@@ -78,19 +89,47 @@ export function evento({
   });
 }
 
+/**
+ * El historial más simple que termina en `estado`: `[PENDIENTE]` o `[PENDIENTE, estado]`, todo por
+ * el comprador y en `creadaEn` (fechas iguales consecutivas son válidas).
+ */
+export function historialHasta(
+  estado: EstadoCompra,
+  compradorId: string,
+  creadaEn: Date = AHORA,
+): CambioEstadoCompra[] {
+  const autor = { tipo: "usuario", usuarioId: compradorId } as const;
+  const alta = { estado: EstadoCompra.PENDIENTE, autor, fechaHora: creadaEn };
+  return estado === EstadoCompra.PENDIENTE ? [alta] : [alta, { estado, autor, fechaHora: creadaEn }];
+}
+
+export interface CambiosCompra {
+  id?: string;
+  compradorId?: string;
+  cantidad?: number;
+  total?: number;
+  /** Fecha del alta (por defecto, AHORA). */
+  creadaEn?: Date;
+  /** Reemplaza el historial que arma el atajo de `estado`. */
+  historial?: CambioEstadoCompra[];
+}
+
+/** Una compra de Martín de 1 entrada por $ 1000 en `estado` (atajo) o con el historial dado. */
 export function compra(
   eventoId: string,
   tipoEntradaId: string,
   estado: EstadoCompra = EstadoCompra.CONFIRMADA,
-) {
+  { compradorId = "usuario-martin", creadaEn = AHORA, historial, ...cambios }: CambiosCompra = {},
+): Compra {
   return new Compra({
     id: `compra-${tipoEntradaId}-${estado.toLowerCase()}`,
-    compradorId: "usuario-martin",
+    compradorId,
     eventoId,
     tipoEntradaId,
     cantidad: 1,
     total: 1000,
-    estado,
+    historial: historial ?? historialHasta(estado, compradorId, creadaEn),
+    ...cambios,
   });
 }
 

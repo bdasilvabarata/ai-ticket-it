@@ -20,6 +20,7 @@ import { EventoService } from "./services/evento.service";
 import { ReseniaService } from "./services/resenia.service";
 import { TipoEntradaService } from "./services/tipo-entrada.service";
 import { UsuarioService } from "./services/usuario.service";
+import { VencimientoService } from "./services/vencimiento.service";
 
 export interface OpcionesApp {
   /**
@@ -47,10 +48,13 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
   const reseniaService = new ReseniaService({ resenias });
   // Una sola instancia: los services que modifican eventos comparten el cerrojo (research R2).
   const cerrojo = new CerrojoPorClave();
+  // Vence las compras pendientes a los 15 minutos; lo necesita el dueño del evento (research R4).
+  const vencimientoService = new VencimientoService({ compras });
   // Eventos se apoya en los dueños de categorías, usuarios y reseñas (constitución 2.2.0, principio III).
   const eventoService = new EventoService({
     eventos,
     compras,
+    vencimientoService,
     categoriaService,
     usuarioService,
     reseniaService,

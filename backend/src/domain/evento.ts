@@ -59,6 +59,16 @@ export class TipoEntrada {
     return Number.isInteger(cantidad) && cantidad > 0 && cantidad <= this.cupo;
   }
 
+  /** Un tipo nuevo con `cantidad` entradas más de cupo (las de una compra vencida); este no cambia. */
+  devolver(cantidad: number): TipoEntrada {
+    return this.con({
+      nombre: this.nombre,
+      descripcion: this.descripcion,
+      precio: this.precio,
+      cupo: this.cupo + cantidad,
+    });
+  }
+
   /** Un tipo nuevo con los datos editados y el mismo `id`; este no cambia. */
   con(datos: DatosDeTipoEntrada): TipoEntrada {
     return new TipoEntrada({ ...datos, id: this.id });
@@ -217,6 +227,20 @@ export class Evento {
     if (tieneCompras) {
       throw new ReglaDeNegocioError("EVENTO_CON_COMPRAS", "El evento tiene compras: no se puede eliminar.");
     }
+  }
+
+  /**
+   * Devuelve el cupo liberado por compras vencidas (`porTipo`: entradas por id de tipo; los ids
+   * ausentes se ignoran). Sin chequeo de "realizado": una compra vence igual con el evento empezado
+   * y su cupo vuelve (research R9).
+   */
+  devolverCupos(porTipo: ReadonlyMap<string, number>): Evento {
+    return this.#con({
+      tiposEntrada: this.tiposEntrada.map((tipo) => {
+        const cantidad = porTipo.get(tipo.id);
+        return cantidad === undefined ? tipo : tipo.devolver(cantidad);
+      }),
+    });
   }
 
   #exigirNoRealizado(ahora: Date): void {

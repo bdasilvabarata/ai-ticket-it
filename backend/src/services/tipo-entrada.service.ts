@@ -19,7 +19,9 @@ export interface DependenciasTipoEntradaService {
  * Casos de uso de los tipos de entrada de un evento. `TipoEntrada` vive dentro del agregado
  * `Evento`: el evento se lo pide a `EventoService` (que responde el 404 y el 403) y se guarda con
  * `RepositorioEventos`. Cada escritura corre bajo el cerrojo del evento (el mismo que usa
- * `EventoService`), relee el evento y verifica en el orden de R5: 404 evento → 403 → 404 tipo → 409.
+ * `EventoService`), lee el reloj una vez adentro, relee el evento al día (con los vencimientos de
+ * sus compras ya materializados; 006, R3) y verifica en el orden de R5: 404 evento → 403 → 404 tipo
+ * → 409.
  */
 export class TipoEntradaService {
   readonly #eventos: RepositorioEventos;
@@ -38,9 +40,10 @@ export class TipoEntradaService {
 
   async crear(eventoId: string, usuarioId: string, datos: DatosDeTipoEntrada): Promise<TipoEntradaVista> {
     return this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId, ahora);
       const tipo = new TipoEntrada({ ...datos, id: this.#eventos.siguienteId() });
-      await this.#eventos.guardar(evento.agregarTipoEntrada(tipo, this.#reloj.ahora()));
+      await this.#eventos.guardar(evento.agregarTipoEntrada(tipo, ahora));
       return aTipoEntradaVista(tipo);
     });
   }
@@ -53,9 +56,10 @@ export class TipoEntradaService {
     datos: DatosDeTipoEntrada,
   ): Promise<TipoEntradaVista> {
     return this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId, ahora);
       this.#obtenerTipoOFallar(evento, tipoId);
-      const actualizado = evento.editarTipoEntrada(tipoId, datos, this.#reloj.ahora());
+      const actualizado = evento.editarTipoEntrada(tipoId, datos, ahora);
       await this.#eventos.guardar(actualizado);
       return aTipoEntradaVista(this.#obtenerTipoOFallar(actualizado, tipoId));
     });
@@ -63,12 +67,11 @@ export class TipoEntradaService {
 
   async eliminar(eventoId: string, tipoId: string, usuarioId: string): Promise<void> {
     await this.#cerrojo.ejecutar(eventoId, async () => {
-      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId);
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId, ahora);
       this.#obtenerTipoOFallar(evento, tipoId);
       const tieneCompras = await this.#compras.existePorTipoEntrada(tipoId);
-      await this.#eventos.guardar(
-        evento.quitarTipoEntrada(tipoId, { ahora: this.#reloj.ahora(), tieneCompras }),
-      );
+      await this.#eventos.guardar(evento.quitarTipoEntrada(tipoId, { ahora, tieneCompras }));
     });
   }
 
