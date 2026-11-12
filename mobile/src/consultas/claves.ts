@@ -18,6 +18,9 @@ export const claves = {
   categorias: () => ["categorias"] as const,
   misEventos: (usuarioId: string) => ["mis-eventos", usuarioId] as const,
   evento: (usuarioId: string, eventoId: string) => ["evento", usuarioId, eventoId] as const,
+  /** Las compras pendientes y el tope restante del usuario en un evento (feature 006). */
+  misComprasDelEvento: (usuarioId: string, eventoId: string) =>
+    ["mis-compras-del-evento", usuarioId, eventoId] as const,
   /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.

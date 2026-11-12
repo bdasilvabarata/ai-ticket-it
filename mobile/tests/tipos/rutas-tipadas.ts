@@ -27,3 +27,22 @@ export const detallePublico: Href = {
 
 // @ts-expect-error el detalle público necesita su parámetro eventoId
 export const detalleSinParametro: Href = { pathname: "/explorar/[eventoId]" };
+
+// Comprar entradas de un tipo (feature 006): necesita el evento y el tipo.
+export const comprar: Href = {
+  pathname: "/explorar/[eventoId]/comprar/[tipoEntradaId]",
+  params: { eventoId: "evento-maraton-10k", tipoEntradaId: "tipo-maraton-inscripcion" },
+};
+
+const soloElEvento = { eventoId: "evento-maraton-10k" };
+export const comprarSinTipo: Href = {
+  pathname: "/explorar/[eventoId]/comprar/[tipoEntradaId]",
+  // @ts-expect-error comprar necesita también el parámetro tipoEntradaId
+  params: soloElEvento,
+};
+
+// Tu compra (feature 006): con su parámetro compila, sin él no.
+export const tuCompra: Href = { pathname: "/compras/[compraId]", params: { compraId: "compra-1" } };
+
+// @ts-expect-error Tu compra necesita su parámetro compraId
+export const tuCompraSinParametro: Href = { pathname: "/compras/[compraId]" };

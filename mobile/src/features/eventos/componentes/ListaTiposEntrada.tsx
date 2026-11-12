@@ -1,4 +1,5 @@
 import type { TipoEntradaVista } from "@ai-ticket-it/shared";
+import type { ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Boton, tema } from "../../../componentes";
@@ -14,10 +15,12 @@ export interface PropsListaTiposEntrada {
     /** Mientras se quita un tipo, las acciones quedan deshabilitadas. */
     ocupada: boolean;
   };
+  /** Lo que va a la derecha de cada tipo (por ejemplo, "Comprar"); sin ella, nada. */
+  accionDeTipo?: (tipo: TipoEntradaVista) => ReactNode;
 }
 
 /** Los tipos de entrada de un evento, con precio y cupo disponible. */
-export function ListaTiposEntrada({ tipos, acciones }: PropsListaTiposEntrada) {
+export function ListaTiposEntrada({ tipos, acciones, accionDeTipo }: PropsListaTiposEntrada) {
   return (
     <View style={estilos.lista}>
       {tipos.map((tipo) => (
@@ -27,6 +30,7 @@ export function ListaTiposEntrada({ tipos, acciones }: PropsListaTiposEntrada) {
             {tipo.descripcion ? <Text style={estilos.detalle}>{tipo.descripcion}</Text> : null}
             <Text style={estilos.detalle}>{`${textoPrecio(tipo.precio)} · ${textoCupo(tipo.cupo)}`}</Text>
           </View>
+          {accionDeTipo ? accionDeTipo(tipo) : null}
           {acciones ? (
             <View style={estilos.botones}>
               <Boton

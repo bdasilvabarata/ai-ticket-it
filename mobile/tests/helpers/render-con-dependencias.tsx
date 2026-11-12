@@ -3,6 +3,7 @@ import { renderRouter } from "expo-router/testing-library";
 
 import { crearDependencias, type Dependencias } from "../../src/composicion";
 import { LayoutRaiz } from "../../src/navegacion/LayoutRaiz";
+import { sinCompras } from "./compras";
 import { crearFetchFalso, type FuncionRespuesta, type RespuestaFalsa, type Respuestas } from "./fetch-falso";
 import { CLAVE_RECORDADO } from "./usuarios";
 
@@ -20,10 +21,14 @@ export interface OpcionesRender {
 
 const creadas: Dependencias[] = [];
 
-/** Lo que pide Explorar y responde vacío si el test no lo registra: el catálogo y las categorías. */
+/**
+ * Lo que pide la app sin que el test lo pida y responde vacío si no lo registra: el catálogo y las
+ * categorías (Explorar) y las compras del usuario en el evento (el detalle, feature 006, R19).
+ */
 function respuestaDeExplorar(url: string): RespuestaFalsa | null {
   if (/\/eventos\?/.test(url)) return { status: 200, json: { eventos: [], hayEventosProximos: false } };
   if (url.endsWith("/categorias")) return { status: 200, json: [] };
+  if (/\/eventos\/[^/]+\/mis-compras$/.test(url)) return { status: 200, json: sinCompras };
   return null;
 }
 
