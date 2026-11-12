@@ -47,8 +47,9 @@ compra; notificaciones; pulido estético (013).
   antes del inicio vence 14 minutos después de empezado). La regla "Cancelación" de la
   constitución se mantiene tal cual para las compras confirmadas: se pueden cancelar y reembolsar
   hasta que el evento empiece o la entrada figure como utilizada (feature 009). Para una compra
-  `PENDIENTE` prevalece la regla de los 15 minutos: es un refinamiento de la constitución, no
-  una contradicción. Reemplaza el supuesto "no se paga una compra de un evento realizado"
+  `PENDIENTE` prevalece la regla de los 15 minutos, según la constitución 2.4.0 (regla
+  "Cancelación": una `PENDIENTE` puede pasar a `CANCELADA` con el evento empezado; una
+  `CONFIRMADA`, no). Reemplaza el supuesto "no se paga una compra de un evento realizado"
   (FR-012, edge case "Evento que empieza con una compra pendiente").
 
 ## User Scenarios & Testing *(mandatory)*
@@ -315,8 +316,8 @@ perdió, reintentar y ver la compra confirmada.
 - **Servidor caído durante el pago**: la compra sigue pendiente en la app; el reintento manual
   consulta el estado real y, si ya estaba confirmada, la muestra confirmada (US4).
 - **Usuario actual cambiado en medio del pago**: la compra pertenece a quien la hizo; si se
-  cambia de usuario desde Perfil, la pantalla de pago deja de mostrarse para el nuevo usuario y
-  él no puede pagarla (sin permiso).
+  cambia de usuario desde Perfil, la pantalla de pago muestra que el nuevo usuario no tiene
+  permiso para ver esa compra (sin acciones) y no puede pagarla.
 
 ## Requirements *(mandatory)*
 
@@ -487,9 +488,10 @@ perdió, reintentar y ver la compra confirmada.
   "Confirmar").
 - **El inicio del evento corta el alta, no el pago** (Clarifications, 2026-11-12): con el evento
   empezado no nace ninguna compra nueva, pero una pendiente se puede pagar hasta que venza (y, si
-  no, vence igual, también con el evento empezado). Para las compras pendientes, la regla de los
-  15 minutos prevalece sobre la de "Cancelación" de la constitución, que sigue valiendo para las
-  confirmadas (se reembolsan hasta que el evento empieza o la entrada se usa; feature 009).
+  no, vence igual, también con el evento empezado), según la constitución 2.4.0 (regla
+  "Cancelación"): una pendiente puede pasar a `CANCELADA` con el evento empezado, y una
+  confirmada se cancela y reembolsa solo hasta que el evento empieza o la entrada se usa
+  (feature 009).
 - **"Realizado"** es el mismo criterio de la 004 y la 005: desde la fecha y hora de inicio
   (inclusive) según el reloj del servidor.
 - **Visibilidad de la compra**: en esta feature solo la ve su comprador, para pagarla y ver la

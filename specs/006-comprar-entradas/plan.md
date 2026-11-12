@@ -78,11 +78,12 @@ repositorios nuevos)
 - 360 px sin desplazamiento horizontal.
 
 **Scale/Scope**:
-- 4 endpoints nuevos; 2 que cambian de valor (cupo al día).
+- 4 endpoints nuevos; 2 que cambian de valor (`GET /eventos` y `GET /eventos/:eventoId`, cupo
+  al día).
 - 1 entidad ampliada (`Compra` + `CambioEstadoCompra`), 1 módulo puro nuevo (tope), 3
   operaciones nuevas de `Evento` y 2 de `TipoEntrada`.
 - 2 services nuevos (`CompraService`, `VencimientoService`), 2 ampliados.
-- 3 rutas (una se mueve), 3 pantallas, 1 componente base y 3 de feature nuevos, 2 ampliados.
+- 3 rutas (una se mueve), 3 pantallas, 1 componente base y 5 de feature nuevos, 2 ampliados.
 - Unos 16 archivos de test nuevos o ampliados.
 
 ## Constitution Check
@@ -95,7 +96,7 @@ repositorios nuevos)
 | Dominio · Operaciones atómicas | Alta, pago y vencimiento corren bajo `cerrojo.ejecutar(eventoId, …)`, releen evento, compras y reloj adentro, sin cerrojos anidados (los métodos de los dueños que se llaman adentro no lo toman); las lecturas no lo usan y el orden de guardado nunca muestra cupo de más (R3, R4, R8) | ✅ |
 | Dominio · Total | `Compra.registrar` calcula `precio × cantidad` con el precio vigente; el cuerpo no lleva precio ni total (las claves desconocidas se descartan) | ✅ |
 | Dominio · Estados | Solo `PENDIENTE → CONFIRMADA` (pago) y `PENDIENTE → CANCELADA` (vencimiento), con `TRANSICION_INVALIDA` para el resto; cada cambio registra estado, autor (usuario o sistema) y fecha del servidor (R5) | ✅ |
-| Dominio · Cancelación | La regla se mantiene para las compras confirmadas (009). Para una `PENDIENTE` prevalece el vencimiento a los 15 minutos, también con el evento empezado: refinamiento confirmado en la revisión del plan (R9, Clarifications de la spec). El inicio del evento corta el alta, no el pago | ✅ refinamiento |
+| Dominio · Cancelación | La regla se mantiene para las compras confirmadas (009). Para una `PENDIENTE` prevalece el vencimiento a los 15 minutos, también con el evento empezado, según la constitución 2.4.0 (R9, Clarifications de la spec). El inicio del evento corta el alta, no el pago | ✅ |
 | Dominio · zona horaria | `fechaHoraLocal` y `venceEnLocal` con `horaDeBuenosAires`; la app no usa la zona del teléfono | ✅ |
 | I. Spec-Driven | Spec con 5 clarificaciones. Plan → tasks → implement. Backlog: 006 → `plan` | ✅ |
 | II. Test-First | Cada regla (cupo justo, cupo nunca negativo, total del servidor, realizado, propio evento, tope acumulado y gratis, vencimiento a los 15 min exactos, cupo devuelto una vez, transiciones, solo el comprador paga, historial) con su test y caso borde (SC-005); cada test con su stub de firma real | ✅ |
@@ -108,8 +109,8 @@ repositorios nuevos)
 | IX. Calidad | `strict`, las cuatro verificaciones y el CI. Las piezas nuevas se justifican en R4 (`VencimientoService`) y R12 (`complementos`) | ✅ |
 
 **Gate**: pasa sin violaciones. El vencimiento de una compra pendiente después de empezado el
-evento es un refinamiento de la regla "Cancelación" confirmado en la revisión del plan (R9): la
-constitución no se enmienda.
+evento lo permite la regla "Cancelación" de la constitución 2.4.0, enmendada a partir del
+`/speckit-analyze` de esta feature (R9).
 
 **Post-design re-check (Phase 1)**: el diseño no agrega violaciones. Puntos que se registran en
 AGENTS.md al terminar la implementación (como hicieron la 004 y la 005):

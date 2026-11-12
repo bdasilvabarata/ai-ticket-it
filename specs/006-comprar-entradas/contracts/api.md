@@ -142,7 +142,7 @@ La forma de las vistas no cambia.
 | 409 | `EVENTO_REALIZADO` | "El evento ya se realizó: no se pueden comprar entradas." | alta con el evento empezado, según el reloj del servidor (el pago no lo usa) |
 | 409 | `COMPRA_PROPIO_EVENTO` | "No podés comprar entradas de un evento que organizás." | el organizador compra en su evento |
 | 409 | `TOPE_POR_PERSONA` | ver [data-model.md](../data-model.md) (dice cuántas puede comprar todavía) | supera 4 pagas por evento o 1 por tipo gratis |
-| 409 | `CUPO_INSUFICIENTE` | "Quedan N entrada(s) de «Tipo»." · "No quedan entradas de «Tipo»." | `cantidad` > cupo disponible |
+| 409 | `CUPO_INSUFICIENTE` | "Quedan N entradas de «Tipo»." · "Queda 1 entrada de «Tipo»." · "No quedan entradas de «Tipo»." | `cantidad` > cupo disponible |
 | 409 | `COMPRA_VENCIDA` | "La compra venció: pasaron 15 minutos sin pagarla." | pagar una compra vencida |
 | 409 | `TRANSICION_INVALIDA` | "La compra no está pendiente de pago." | pagar una compra que no está `PENDIENTE` |
 

@@ -149,8 +149,8 @@ la compra usa su propio mensaje con el mismo código `EVENTO_REALIZADO`. El pago
 |---|---|
 | `EVENTO_REALIZADO` (alta) | "El evento ya se realizó: no se pueden comprar entradas." |
 | `COMPRA_PROPIO_EVENTO` | "No podés comprar entradas de un evento que organizás." |
-| `TOPE_POR_PERSONA` | pago, quedan N > 0: "Podés comprar N entrada(s) más de tipos pagos de este evento." · pago, 0: "Ya tenés el máximo de 4 entradas de tipos pagos de este evento." · gratis: "Ya tenés tu entrada gratis de «Carrera kids»." / pidió más de 1: "Podés tener 1 sola entrada de «Carrera kids»." |
-| `CUPO_INSUFICIENTE` | N > 0: "Quedan N entrada(s) de «VIP»." · 0: "No quedan entradas de «VIP»." |
+| `TOPE_POR_PERSONA` | pago, quedan N > 1: "Podés comprar N entradas más de tipos pagos de este evento." · pago, 1: "Podés comprar 1 entrada más de tipos pagos de este evento." · pago, 0: "Ya tenés el máximo de 4 entradas de tipos pagos de este evento." · gratis: "Ya tenés tu entrada gratis de «Carrera kids»." / pidió más de 1: "Podés tener 1 sola entrada de «Carrera kids»." |
+| `CUPO_INSUFICIENTE` | N > 1: "Quedan N entradas de «VIP»." · 1: "Queda 1 entrada de «VIP»." · 0: "No quedan entradas de «VIP»." |
 | `COMPRA_VENCIDA` | "La compra venció: pasaron 15 minutos sin pagarla." |
 | `TRANSICION_INVALIDA` | "La compra no está pendiente de pago." (otras transiciones, en la 008 y la 009, con su propio mensaje) |
 

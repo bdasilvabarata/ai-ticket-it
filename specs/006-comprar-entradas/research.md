@@ -234,12 +234,9 @@ y **Alternatives considered**. Primero las de backend (R1–R11) y después las 
     cupo vuelve.
 - **Rationale**: la persona reservó cuando el evento todavía no había empezado; la ventana de
   15 minutos es la misma para todos (una compra hecha 1 minuto antes del inicio vence 14 minutos
-  después de empezado). La regla "Cancelación" de la constitución ("una compra NO PUEDE
-  cancelarse si está `UTILIZADA` o si el evento ya se realizó") **se mantiene** y rige las
-  compras confirmadas: se cancelan con reembolso hasta que el evento empieza o la entrada se usa
-  (009). Para una compra `PENDIENTE` prevalece la regla de los 15 minutos: un refinamiento que
-  confirmó la revisión humana del plan, sin enmendar la constitución ("Una spec PUEDE refinar
-  estas reglas").
+  después de empezado). La regla "Cancelación" de la constitución 2.4.0 (enmendada a partir del
+  `/speckit-analyze` de esta feature) lo permite: una `CONFIRMADA` no se cancela una vez empezado
+  el evento (009), y una `PENDIENTE` sí puede pasar a `CANCELADA` con el evento empezado.
 - **Alternatives considered**: rechazar el pago con el evento empezado (la versión anterior del
   plan; obligaba a interpretar la regla de cancelación y dejaba sin entrada a quien reservó a
   tiempo); no vencer las compras de eventos empezados (quedarían pendientes para siempre,
