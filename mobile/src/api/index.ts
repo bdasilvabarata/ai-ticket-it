@@ -8,7 +8,7 @@ export {
 export { resolverUrlBase } from "./direccion";
 export { ErrorDeApi, ServidorNoDisponibleError } from "./errores";
 export { listarCategorias } from "./categorias";
-export { comprarEntradas, obtenerMisComprasDelEvento } from "./compras";
+export { comprarEntradas, obtenerCompra, obtenerMisComprasDelEvento, pagarCompra } from "./compras";
 export {
   actualizarEvento,
   agregarTipoEntrada,

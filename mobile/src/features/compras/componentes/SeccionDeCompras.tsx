@@ -2,6 +2,7 @@ import type { EventoVista } from "@ai-ticket-it/shared";
 import { StyleSheet, Text, View } from "react-native";
 
 import { tema } from "../../../componentes";
+import { ComprasPendientes } from "./ComprasPendientes";
 
 export interface PropsSeccionDeCompras {
   usuarioId: string;
@@ -10,7 +11,7 @@ export interface PropsSeccionDeCompras {
 
 /**
  * Lo que el detalle muestra del usuario antes de "Tipos de entrada" (contracts/app.md, "Sección
- * propia"): si organiza el evento, que no compra en él.
+ * propia"): si organiza el evento, que no compra en él; si no, sus compras pendientes de pago.
  */
 export function SeccionDeCompras({ usuarioId, evento }: PropsSeccionDeCompras) {
   if (evento.organizador.id === usuarioId) {
@@ -20,7 +21,7 @@ export function SeccionDeCompras({ usuarioId, evento }: PropsSeccionDeCompras) {
       </View>
     );
   }
-  return null;
+  return <ComprasPendientes usuarioId={usuarioId} eventoId={evento.id} />;
 }
 
 const estilos = StyleSheet.create({

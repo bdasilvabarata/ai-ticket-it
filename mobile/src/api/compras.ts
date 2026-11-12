@@ -3,6 +3,7 @@ import type { CompraVista, DatosCompra, MisComprasDelEventoVista } from "@ai-tic
 import type { ClienteApi } from "./cliente";
 
 const rutaDelEvento = (eventoId: string) => `/eventos/${encodeURIComponent(eventoId)}`;
+const rutaDeLaCompra = (compraId: string) => `/compras/${encodeURIComponent(compraId)}`;
 
 /**
  * `POST /eventos/:eventoId/compras`: solo el tipo y la cantidad (el total lo calcula el servidor). Va
@@ -27,4 +28,22 @@ export function obtenerMisComprasDelEvento(
   return cliente.get<MisComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/mis-compras`, {
     signal: opciones.signal,
   });
+}
+
+/** `GET /compras/:compraId`: la compra al día (solo la ve su comprador). */
+export function obtenerCompra(
+  cliente: ClienteApi,
+  compraId: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<CompraVista> {
+  return cliente.get<CompraVista>(rutaDeLaCompra(compraId), { signal: opciones.signal });
+}
+
+/** `POST /compras/:compraId/pago`, sin cuerpo: pago simulado. No se reintenta solo. */
+export function pagarCompra(
+  cliente: ClienteApi,
+  compraId: string,
+  { usuarioId }: { usuarioId: string },
+): Promise<CompraVista> {
+  return cliente.post<CompraVista>(`${rutaDeLaCompra(compraId)}/pago`, undefined, { usuarioId });
 }

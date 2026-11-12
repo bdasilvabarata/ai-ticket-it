@@ -11,3 +11,8 @@ export function textoTotal(total: number): string {
 export function textoCantidad(cantidad: number): string {
   return cantidad === 1 ? "1 entrada" : `${cantidad} entradas`;
 }
+
+/** "2026-11-12T15:35" (hora de pared de Buenos Aires) → "Podés pagar hasta las 15:35". */
+export function textoVencimiento(venceEnLocal: string): string {
+  return `Podés pagar hasta las ${venceEnLocal.slice(11, 16)}`;
+}

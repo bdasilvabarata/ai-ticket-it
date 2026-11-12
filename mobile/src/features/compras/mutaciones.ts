@@ -1,7 +1,7 @@
 import type { DatosCompra } from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query } from "@tanstack/react-query";
 
-import { comprarEntradas, ErrorDeApi } from "../../api";
+import { comprarEntradas, ErrorDeApi, pagarCompra } from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
@@ -35,5 +35,29 @@ export function useComprarEntradas(usuarioId: string, eventoId: string) {
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
       ]);
     },
+  });
+}
+
+/**
+ * Paga (simulado) una compra. Con éxito escribe la respuesta en la consulta de la compra; al
+ * terminar, con éxito o error, invalida la compra (el estado real lo dice el servidor: vencida, ya
+ * confirmada o con la respuesta perdida), las compras del usuario en el evento, el evento (todos los
+ * usuarios: el cupo pudo volver) y el catálogo.
+ */
+export function usePagarCompra(usuarioId: string, compraId: string, eventoId: string) {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => pagarCompra(cliente, compraId, { usuarioId }),
+    onSuccess: (compra) => {
+      queryClient.setQueryData(claves.compra(usuarioId, compraId), compra);
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: claves.compra(usuarioId, compraId) }),
+        queryClient.invalidateQueries({ queryKey: claves.misComprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
+        queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+      ]),
   });
 }

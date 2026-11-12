@@ -1,4 +1,10 @@
-import { comprarEntradas, crearClienteApi, obtenerMisComprasDelEvento } from "../../src/api";
+import {
+  comprarEntradas,
+  crearClienteApi,
+  obtenerCompra,
+  obtenerMisComprasDelEvento,
+  pagarCompra,
+} from "../../src/api";
 import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
 
 const URL = "http://servidor:3000/api";
@@ -71,5 +77,34 @@ describe("obtenerMisComprasDelEvento", () => {
     const controlador = new AbortController();
     await obtenerMisComprasDelEvento(cliente, "evento-festival", { signal: controlador.signal });
     expect(get).toHaveBeenCalledWith("/eventos/evento-festival/mis-compras", { signal: controlador.signal });
+  });
+});
+
+describe("obtenerCompra", () => {
+  it("pide GET /compras/:id con el usuario actual y codifica el id", async () => {
+    const { cliente, falso } = armar({ status: 200, json: { id: "compra a/b" } });
+    await expect(obtenerCompra(cliente, "compra a/b")).resolves.toEqual({ id: "compra a/b" });
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras/compra%20a%2Fb`, metodo: "GET" });
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: {} });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerCompra(cliente, "compra-1", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/compras/compra-1", { signal: controlador.signal });
+  });
+});
+
+describe("pagarCompra", () => {
+  it("envía POST /compras/:id/pago sin cuerpo, en nombre del usuario dado", async () => {
+    const { cliente, falso } = armar({ status: 200, json: { id: "compra-1" } });
+    await expect(pagarCompra(cliente, "compra a/b", { usuarioId: "usuario-sofia" })).resolves.toEqual({
+      id: "compra-1",
+    });
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras/compra%20a%2Fb/pago`, metodo: "POST" });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-sofia");
   });
 });

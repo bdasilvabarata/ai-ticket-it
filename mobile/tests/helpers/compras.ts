@@ -45,3 +45,45 @@ export const compraPendiente: CompraVista = {
     },
   ],
 };
+
+/** La misma compra, pagada por Martín. */
+export const compraConfirmada: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CONFIRMADA,
+  venceEn: null,
+  venceEnLocal: null,
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CONFIRMADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-12T18:25:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:25",
+    },
+  ],
+};
+
+/** La misma compra, vencida: CANCELADA por el sistema a los 15 minutos. */
+export const compraCancelada: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CANCELADA,
+  venceEn: null,
+  venceEnLocal: null,
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "sistema" },
+      fechaHora: "2026-11-12T18:35:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:35",
+    },
+  ],
+};
+
+/** Una compra PENDIENTE de 1 entrada gratis ("Carrera kids" de la Maratón). */
+export const compraGratis: CompraVista = {
+  ...compraPendiente,
+  tipoEntrada: { id: "tipo-maraton-kids", nombre: "Carrera kids" },
+  cantidad: 1,
+  total: 0,
+};
