@@ -114,6 +114,14 @@
             "description": "Una categoría del catálogo (igualdad exacta). Vacío = sin filtro; si no existe, 400 sobre `query.categoriaId`.",
             "schema": { "type": "string" },
             "example": "categoria-musica"
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "description": "`fecha` ascendente · `precio` (\"desde\") ascendente · `puntaje` del organizador descendente, sin puntaje al final. Desempates: fecha → nombre (sin mayúsculas ni tildes) → id. Se aplica sobre lo filtrado.",
+            "schema": { "type": "string", "enum": ["fecha", "precio", "puntaje"], "default": "fecha" },
+            "example": "precio"
           }
         ],
         "responses": {
@@ -122,7 +130,7 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
           },
           "400": {
-            "description": "Texto de más de 100 caracteres, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "description": "Texto de más de 100 caracteres, orden desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },

@@ -143,6 +143,38 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
   });
 });
 
+describe("GET /api/eventos: orden (US4)", () => {
+  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+
+  it("orden=precio → Maratón, Charla, Clásico, Noche de Rock, Hamlet, Festival", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=precio"))).toEqual([
+      "evento-maraton-10k",
+      "evento-charla-ia-aplicada",
+      "evento-clasico-de-basquet",
+      "evento-noche-de-rock",
+      "evento-hamlet",
+      "evento-festival-sonidos-del-sur",
+    ]);
+  });
+
+  it("orden=puntaje sin reseñas y sin orden → igual que por fecha", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=puntaje"))).toEqual(PROXIMOS_POR_FECHA);
+    expect(idsDelCatalogo(await catalogo("orden=fecha"))).toEqual(PROXIMOS_POR_FECHA);
+  });
+
+  it("orden=nombre → 400 sobre query.orden", async () => {
+    expect(detalles(await catalogo("orden=nombre"))).toEqual({
+      "query.orden": "Debe ser fecha, precio o puntaje.",
+    });
+  });
+
+  it("un orden repetido → 400", async () => {
+    expect(detalles(await catalogo("orden=fecha&orden=precio"))).toEqual({
+      "query.orden": "Debe ser fecha, precio o puntaje.",
+    });
+  });
+});
+
 describe("GET /api/eventos/mios", () => {
   it("responde 401 sin X-Usuario-Id", async () => {
     esperarError(await request(nuevaApp()).get("/api/eventos/mios"), 401, "USUARIO_NO_IDENTIFICADO");

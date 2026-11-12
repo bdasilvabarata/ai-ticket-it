@@ -23,16 +23,21 @@ const comparadorDeNombres = new Intl.Collator("es", { sensitivity: "base" });
 const porFecha: Comparador = (a, b) => a.fechaHora.getTime() - b.fechaHora.getTime();
 const porNombre: Comparador = (a, b) => comparadorDeNombres.compare(a.nombre, b.nombre);
 const porId: Comparador = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+const porPrecio: Comparador = (a, b) => a.precioDesde - b.precioDesde;
+
+/** De mayor a menor, sin redondear; sin puntaje (`null`) siempre al final, nunca como 0. */
+const porPuntaje: Comparador = (a, b) => {
+  if (a.puntaje === null || b.puntaje === null) {
+    return (a.puntaje === null ? 1 : 0) - (b.puntaje === null ? 1 : 0);
+  }
+  return b.puntaje - a.puntaje;
+};
 
 /** El criterio principal de cada orden (FR-018–FR-020). */
 const CRITERIO_PRINCIPAL: Record<OrdenCatalogo, Comparador> = {
   fecha: porFecha,
-  precio: () => {
-    throw new Error("no implementado");
-  },
-  puntaje: () => {
-    throw new Error("no implementado");
-  },
+  precio: porPrecio,
+  puntaje: porPuntaje,
 };
 
 function encadenar(...comparadores: Comparador[]): Comparador {

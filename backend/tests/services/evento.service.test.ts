@@ -473,3 +473,48 @@ describe("EventoService.listar: texto y categoría (US3)", () => {
     });
   });
 });
+
+describe("EventoService.listar: orden (US4)", () => {
+  const ids = (vista: { eventos: { id: string }[] }) => vista.eventos.map((e) => e.id);
+  const conPrecio = (
+    id: string,
+    precio: number,
+    cambios: { organizadorId?: string; en?: number; nombre?: string } = {},
+  ) => evento({ id, ...cambios, tiposEntrada: [tipo({ id: `tipo-${id}`, precio })] });
+
+  it("por precio, sobre lo filtrado por texto", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [
+        conPrecio("evento-caro", 9000, { nombre: "Rock caro", en: DIA }),
+        conPrecio("evento-gratis", 0, { nombre: "Rock gratis", en: 2 * DIA }),
+        conPrecio("evento-medio", 3000, { nombre: "Jazz", en: 3 * DIA }),
+      ],
+    });
+    expect(ids(await service.listar({ texto: "", orden: "precio" }))).toEqual([
+      "evento-gratis",
+      "evento-medio",
+      "evento-caro",
+    ]);
+    expect(ids(await service.listar({ texto: "rock", orden: "precio" }))).toEqual([
+      "evento-gratis",
+      "evento-caro",
+    ]);
+  });
+
+  it("por puntaje del organizador, contando las reseñas de un evento realizado; sin reseñas al final", async () => {
+    const { eventoService: service } = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-sin", organizadorId: "usuario-diego", en: DIA }),
+        evento({ id: "evento-lucia", organizadorId: "usuario-lucia", en: 2 * DIA }),
+        evento({ id: "evento-martin", organizadorId: "usuario-martin", en: 3 * DIA }),
+        evento({ id: "evento-martin-pasado", organizadorId: "usuario-martin", en: -DIA }),
+      ],
+      resenias: [resenia("evento-lucia", 3), resenia("evento-martin-pasado", 5)],
+    });
+    expect(ids(await service.listar({ texto: "", orden: "puntaje" }))).toEqual([
+      "evento-martin",
+      "evento-lucia",
+      "evento-sin",
+    ]);
+  });
+});

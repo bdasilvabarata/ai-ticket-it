@@ -57,3 +57,57 @@ describe("ordenarCatalogo: fecha", () => {
     expect(ordenado[0]?.vista).toEqual({ nombre: "B" });
   });
 });
+
+describe("ordenarCatalogo: precio", () => {
+  it("ascendente, con los gratis primero", () => {
+    const lista = [
+      elemento("a", { precio: 8000 }),
+      elemento("b", { precio: 0 }),
+      elemento("c", { precio: 2000 }),
+    ];
+    expect(ids(ordenarCatalogo(lista, "precio"))).toEqual(["b", "c", "a"]);
+  });
+
+  it("empate de precio → fecha → nombre → id", () => {
+    const lista = [
+      elemento("d", { precio: 1000, dia: 2, nombre: "Zeta" }),
+      elemento("c", { precio: 1000, dia: 1, nombre: "Zeta" }),
+      elemento("b", { precio: 1000, dia: 2, nombre: "Alfa" }),
+      elemento("a", { precio: 1000, dia: 2, nombre: "zeta" }),
+    ];
+    expect(ids(ordenarCatalogo(lista, "precio"))).toEqual(["c", "b", "a", "d"]);
+  });
+});
+
+describe("ordenarCatalogo: puntaje", () => {
+  it("descendente con el valor sin redondear (4,36 antes que 4,34)", () => {
+    const lista = [
+      elemento("a", { puntaje: 4.34 }),
+      elemento("b", { puntaje: 4.36 }),
+      elemento("c", { puntaje: 5 }),
+    ];
+    expect(ids(ordenarCatalogo(lista, "puntaje"))).toEqual(["c", "b", "a"]);
+  });
+
+  it("sin puntaje siempre al final, nunca como 0 (un 1,0 va antes)", () => {
+    const lista = [elemento("a", { puntaje: null, dia: 0 }), elemento("b", { puntaje: 1, dia: 5 })];
+    expect(ids(ordenarCatalogo(lista, "puntaje"))).toEqual(["b", "a"]);
+  });
+
+  it("todos sin puntaje → queda en orden de fecha", () => {
+    const lista = [elemento("a", { dia: 3 }), elemento("b", { dia: 1 }), elemento("c", { dia: 2 })];
+    expect(ids(ordenarCatalogo(lista, "puntaje"))).toEqual(["b", "c", "a"]);
+  });
+
+  it("empate de puntaje → fecha → nombre → id, sin cambiar el arreglo original", () => {
+    const lista = [
+      elemento("c", { puntaje: 4, dia: 2, nombre: "Beta" }),
+      elemento("b", { puntaje: 4, dia: 2, nombre: "Alfa" }),
+      elemento("a", { puntaje: 4, dia: 1, nombre: "Zeta" }),
+      elemento("d", { puntaje: 4, dia: 2, nombre: "alfa" }),
+    ];
+    const copia = [...lista];
+    expect(ids(ordenarCatalogo(lista, "puntaje"))).toEqual(["a", "b", "d", "c"]);
+    expect(lista).toEqual(copia);
+  });
+});
