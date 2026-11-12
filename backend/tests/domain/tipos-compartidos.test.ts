@@ -1,11 +1,15 @@
 import {
   EstadoCompra,
   LIMITES_BUSQUEDA,
+  LIMITES_COMPRA,
   LIMITES_EVENTO,
   LIMITES_TIPO_ENTRADA,
   ORDENES_CATALOGO,
   type OrdenCatalogo,
   type CategoriaVista,
+  type CompraVista,
+  type DatosCompra,
+  type MisComprasDelEventoVista,
   type DatosEvento,
   type DatosNuevoEvento,
   type DatosTipoEntrada,
@@ -67,5 +71,20 @@ describe("tipos compartidos", () => {
     expectTypeOf<DatosNuevoEvento["tiposEntrada"]>().toEqualTypeOf<DatosTipoEntrada[]>();
     expectTypeOf<DatosNuevoEvento>().toExtend<DatosEvento>();
     expectTypeOf<CategoriaVista>().toEqualTypeOf<{ id: string; nombre: string; descripcion: string }>();
+  });
+
+  it("los límites de una compra son los de la constitución", () => {
+    expect(LIMITES_COMPRA).toEqual({
+      entradasPorEvento: 4,
+      entradasPorTipoGratis: 1,
+      minutosParaPagar: 15,
+    });
+  });
+
+  it("DatosCompra no lleva precio ni total, y CompraVista trae el estado y el historial", () => {
+    expectTypeOf<DatosCompra>().toEqualTypeOf<{ tipoEntradaId: string; cantidad: number }>();
+    expectTypeOf<CompraVista["estado"]>().toEqualTypeOf<EstadoCompra>();
+    expectTypeOf<CompraVista["venceEn"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<MisComprasDelEventoVista["pendientes"]>().toEqualTypeOf<CompraVista[]>();
   });
 });

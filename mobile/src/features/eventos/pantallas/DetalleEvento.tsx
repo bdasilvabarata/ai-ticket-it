@@ -1,6 +1,6 @@
-import type { EventoVista } from "@ai-ticket-it/shared";
+import type { EventoVista, TipoEntradaVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, type ComponentType } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Boton, Ilustracion, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
@@ -16,16 +16,34 @@ import { useEvento } from "../useEvento";
 
 /**
  * El detalle público de un evento (contracts/app.md, "Detalle del evento"), el mismo para un evento
- * propio. Sin botón de compra: lo agrega la 006.
+ * propio. Sin `complementos`, de solo lectura; la compra la suma la feature `compras` con ellos.
  */
-export function DetalleEvento() {
+/** Lo que otra feature (compras) suma al detalle sin que `eventos` la conozca (research R12). */
+export interface ComplementosDelDetalle {
+  /** A la derecha de cada tipo de entrada. */
+  AccionDeTipo?: ComponentType<{ evento: EventoVista; tipo: TipoEntradaVista }>;
+  /** Antes de "Tipos de entrada". */
+  SeccionPropia?: ComponentType<{ evento: EventoVista }>;
+}
+
+export function DetalleEvento({ complementos = {} }: { complementos?: ComplementosDelDetalle }) {
   const { eventoId } = useLocalSearchParams<{ eventoId: string }>();
   const { estado } = useSesion();
   if (estado.fase !== "con-usuario") return null; // el guard ya no muestra esta ruta
-  return <DetalleSegunConsulta usuarioId={estado.usuarioId} eventoId={eventoId} />;
+  return (
+    <DetalleSegunConsulta usuarioId={estado.usuarioId} eventoId={eventoId} complementos={complementos} />
+  );
 }
 
-function DetalleSegunConsulta({ usuarioId, eventoId }: { usuarioId: string; eventoId: string }) {
+function DetalleSegunConsulta({
+  usuarioId,
+  eventoId,
+  complementos,
+}: {
+  usuarioId: string;
+  eventoId: string;
+  complementos: ComplementosDelDetalle;
+}) {
   const consulta = useEvento(usuarioId, eventoId);
   const invalidarCatalogo = useInvalidarCatalogo();
   const noEncontrado = esNoEncontrado(consulta.error);
@@ -48,12 +66,18 @@ function DetalleSegunConsulta({ usuarioId, eventoId }: { usuarioId: string; even
   }
   return (
     <SegunConsulta consulta={consulta} mensajeVacio="No encontramos este evento.">
-      {(evento) => <ContenidoDelDetalle evento={evento} />}
+      {(evento) => <ContenidoDelDetalle evento={evento} complementos={complementos} />}
     </SegunConsulta>
   );
 }
 
-function ContenidoDelDetalle({ evento }: { evento: EventoVista }) {
+function ContenidoDelDetalle({
+  evento,
+  complementos: { AccionDeTipo, SeccionPropia },
+}: {
+  evento: EventoVista;
+  complementos: ComplementosDelDetalle;
+}) {
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
       {evento.realizado ? (
@@ -79,11 +103,15 @@ function ContenidoDelDetalle({ evento }: { evento: EventoVista }) {
           {`${nombreCompleto(evento.organizador)} · ${textoPuntaje(evento.organizador)}`}
         </Text>
       </View>
+      {SeccionPropia ? <SeccionPropia evento={evento} /> : null}
       <View style={estilos.datos}>
         <Text style={estilos.titulo} accessibilityRole="header">
           Tipos de entrada
         </Text>
-        <ListaTiposEntrada tipos={evento.tiposEntrada} />
+        <ListaTiposEntrada
+          tipos={evento.tiposEntrada}
+          accionDeTipo={AccionDeTipo ? (tipo) => <AccionDeTipo evento={evento} tipo={tipo} /> : undefined}
+        />
       </View>
     </PantallaDesplazable>
   );

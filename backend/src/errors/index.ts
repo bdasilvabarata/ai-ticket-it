@@ -68,6 +68,13 @@ export class NoEncontradoError extends ErrorAplicacion {
   }
 }
 
+/** La compra no existe (feature 006). HTTP: 404. */
+export class CompraNoEncontradaError extends ErrorAplicacion {
+  constructor() {
+    super("COMPRA_NO_ENCONTRADA", "No existe la compra.");
+  }
+}
+
 /** Conflicto de estado o de cupo (ej.: una regla del dominio). HTTP: 409. */
 export class ConflictoError extends ErrorAplicacion {
   constructor(codigo: string, mensaje: string) {

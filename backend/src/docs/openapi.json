@@ -11,7 +11,8 @@
     { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" },
     { "name": "Categorías", "description": "Catálogo de categorías de eventos" },
     { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
-    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" }
+    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
+    { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" }
   ],
   "paths": {
     "/salud": {
@@ -396,6 +397,555 @@
         }
       }
     },
+    "/eventos/{eventoId}/compras": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Comprar entradas de un tipo",
+        "description": "Registra una compra PENDIENTE (vence a los 15 minutos) con total `precio × cantidad` calculado por el servidor y descuenta el cupo, bajo el cerrojo del evento. Orden: 401 → 400 de forma → 404 evento → 400 `body.tipoEntradaId` → 409 `EVENTO_REALIZADO` → 409 `COMPRA_PROPIO_EVENTO` → 409 `TOPE_POR_PERSONA` → 409 `CUPO_INSUFICIENTE`. Tope: 4 entradas de tipos pagos por evento y 1 por tipo gratis, contando sus compras vigentes.",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosCompra" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "La compra registrada (PENDIENTE)",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "cantidadInvalida": {
+                    "summary": "cantidad 0, negativa, decimal, texto o mayor que 4",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.cantidad", "mensaje": "Debe ser un entero entre 1 y 4." }
+                        ]
+                      }
+                    }
+                  },
+                  "cantidadFaltante": {
+                    "summary": "Sin cantidad",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.cantidad", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "tipoFaltante": {
+                    "summary": "Sin tipoEntradaId",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.tipoEntradaId", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "tipoMalFormado": {
+                    "summary": "tipoEntradaId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.tipoEntradaId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  },
+                  "tipoDeOtroEvento": {
+                    "summary": "Tipo inexistente o de otro evento (tipo-hamlet-platea sobre el Festival)",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.tipoEntradaId",
+                            "mensaje": "No existe el tipo de entrada en este evento."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No se puede comprar (`EVENTO_REALIZADO`, `COMPRA_PROPIO_EVENTO`, `TOPE_POR_PERSONA`, `CUPO_INSUFICIENTE`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "summary": "El evento ya empezó (Noche de risas)",
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se pueden comprar entradas."
+                      }
+                    }
+                  },
+                  "COMPRA_PROPIO_EVENTO": {
+                    "summary": "La organizadora compra en su evento",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_PROPIO_EVENTO",
+                        "mensaje": "No podés comprar entradas de un evento que organizás."
+                      }
+                    }
+                  },
+                  "TOPE_POR_PERSONA": {
+                    "summary": "Martín (2 VIP confirmadas) pide 3 General",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Podés comprar 2 entradas más de tipos pagos de este evento."
+                      }
+                    }
+                  },
+                  "TOPE_PAGAS_COMPLETO": {
+                    "summary": "Ya tiene 4 entradas de tipos pagos",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Ya tenés el máximo de 4 entradas de tipos pagos de este evento."
+                      }
+                    }
+                  },
+                  "TOPE_GRATIS": {
+                    "summary": "Segunda entrada de un tipo gratis",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Ya tenés tu entrada gratis de «Carrera kids»."
+                      }
+                    }
+                  },
+                  "CUPO_INSUFICIENTE": {
+                    "summary": "Pide más de las que quedan",
+                    "value": {
+                      "error": { "codigo": "CUPO_INSUFICIENTE", "mensaje": "Quedan 3 entradas de «VIP»." }
+                    }
+                  },
+                  "CUPO_UNA": {
+                    "summary": "Queda una sola",
+                    "value": {
+                      "error": { "codigo": "CUPO_INSUFICIENTE", "mensaje": "Queda 1 entrada de «VIP»." }
+                    }
+                  },
+                  "AGOTADO": {
+                    "summary": "Tipo agotado",
+                    "value": {
+                      "error": {
+                        "codigo": "CUPO_INSUFICIENTE",
+                        "mensaje": "No quedan entradas de «Backstage»."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/mis-compras": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Mis compras del evento",
+        "description": "Del usuario actual: sus compras pendientes no vencidas de ese evento y cuántas entradas más puede comprar de cada tipo según su tope (el cupo está en el evento). Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Sus pendientes y restantes por tipo",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MisComprasDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Ver una compra",
+        "description": "La compra con su estado al día: una PENDIENTE vencida se ve CANCELADA, con un último cambio del sistema fechado en el vencimiento, aunque todavía no se haya guardado así. Solo la ve su comprador. Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra, al día",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/pago": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Pagar una compra (pago simulado)",
+        "description": "Sin cuerpo (si viene uno, se ignora). Bajo el cerrojo del evento de la compra: vence las pendientes vencidas del evento, verifica que el usuario sea el comprador y pasa la compra de PENDIENTE a CONFIRMADA. A los 15 minutos exactos del alta ya venció. Que el evento haya empezado no impide pagar. No es idempotente: pagar dos veces da 409 TRANSICION_INVALIDA.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra CONFIRMADA, con `venceEn: null` y el historial [PENDIENTE, CONFIRMADA]",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "yaPagada": {
+                    "summary": "Ya está CONFIRMADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra no está pendiente de pago."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/cancelacion": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Cancelar una compra pendiente",
+        "description": "Sin cuerpo (si viene uno, se ignora). El comprador cancela su compra PENDIENTE sin esperar a que venza: bajo el cerrojo del evento de la compra vence las pendientes vencidas del evento, verifica que el usuario sea el comprador, pasa la compra a CANCELADA (con un cambio de estado del comprador) y devuelve sus entradas al cupo. También con el evento empezado. Una compra CONFIRMADA no se cancela acá (eso es de la feature 009, con reembolso): 409 TRANSICION_INVALIDA.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra CANCELADA, con `venceEn: null` y el historial [PENDIENTE, CANCELADA del comprador]",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla (ya se canceló sola)",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "yaPagada": {
+                    "summary": "Ya está CONFIRMADA o ya se canceló",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra no está pendiente de pago."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/eventos/{eventoId}/tipos-entrada": {
       "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
       "post": {
@@ -627,6 +1177,13 @@
         "description": "UUID (lo que crean los usuarios) o id legible `evento-<slug>` (datos de ejemplo)",
         "schema": { "type": "string", "example": "evento-festival-sonidos-del-sur" }
       },
+      "CompraId": {
+        "name": "compraId",
+        "in": "path",
+        "required": true,
+        "description": "UUID (las compras nuevas) o id legible `compra-<slug>` (datos de ejemplo)",
+        "schema": { "type": "string", "example": "compra-martin-festival-vip" }
+      },
       "TipoEntradaId": {
         "name": "tipoEntradaId",
         "in": "path",
@@ -639,9 +1196,7 @@
       "SaludVista": {
         "type": "object",
         "required": ["estado"],
-        "properties": {
-          "estado": { "type": "string", "enum": ["ok"] }
-        }
+        "properties": { "estado": { "type": "string", "enum": ["ok"] } }
       },
       "UsuarioVista": {
         "type": "object",
@@ -827,6 +1382,146 @@
             }
           }
         ]
+      },
+      "DatosCompra": {
+        "type": "object",
+        "required": ["tipoEntradaId", "cantidad"],
+        "description": "Nunca lleva precio ni total: el total lo calcula el servidor. Las claves desconocidas se ignoran.",
+        "properties": {
+          "tipoEntradaId": { "type": "string", "example": "tipo-festival-sonidos-del-sur-vip" },
+          "cantidad": { "type": "integer", "minimum": 1, "maximum": 4, "example": 2 }
+        }
+      },
+      "CambioEstadoCompraVista": {
+        "type": "object",
+        "required": ["estado", "autor", "fechaHora", "fechaHoraLocal"],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "autor": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["tipo", "usuarioId"],
+                "properties": {
+                  "tipo": { "type": "string", "enum": ["usuario"] },
+                  "usuarioId": { "type": "string" }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["tipo"],
+                "properties": { "tipo": { "type": "string", "enum": ["sistema"] } }
+              }
+            ]
+          },
+          "fechaHora": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+          "fechaHoraLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          }
+        }
+      },
+      "CompraVista": {
+        "type": "object",
+        "required": [
+          "id",
+          "compradorId",
+          "evento",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "venceEn",
+          "venceEnLocal",
+          "historial"
+        ],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "compradorId": { "type": "string", "example": "usuario-sofia" },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHora", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-festival-sonidos-del-sur" },
+              "nombre": { "type": "string", "example": "Festival Sonidos del Sur" },
+              "fechaHora": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-12T15:20",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": { "type": "boolean" }
+            }
+          },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "VIP" } }
+          },
+          "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "historial": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CambioEstadoCompraVista" },
+            "description": "Cronológico; el primero es PENDIENTE"
+          }
+        }
+      },
+      "MisComprasDelEventoVista": {
+        "type": "object",
+        "required": ["pendientes", "confirmadas", "restantesPorTipo"],
+        "properties": {
+          "pendientes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CompraVista" },
+            "description": "Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva"
+          },
+          "confirmadas": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CompraVista" },
+            "description": "Sus compras CONFIRMADA de ese evento (sus entradas), de la más nueva a la más vieja"
+          },
+          "restantesPorTipo": {
+            "type": "array",
+            "description": "Cuántas entradas más puede comprar de cada tipo según su tope (0 en todos si es el organizador)",
+            "items": {
+              "type": "object",
+              "required": ["tipoEntradaId", "restantes"],
+              "properties": {
+                "tipoEntradaId": { "type": "string" },
+                "restantes": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
       },
       "DatosTipoEntrada": {
         "type": "object",

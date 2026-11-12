@@ -4,7 +4,18 @@ import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
-import { AHORA, DIA, compra, evento, musica, relojFijo, resenia, teatro, tipo } from "../helpers/eventos";
+import {
+  AHORA,
+  DIA,
+  compra,
+  evento,
+  musica,
+  relojFijo,
+  relojMovible,
+  resenia,
+  teatro,
+  tipo,
+} from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // Sin servidor: el service recibe los repositorios en memoria de producción, construidos con los
@@ -516,5 +527,153 @@ describe("EventoService.listar: orden (US4)", () => {
       "evento-lucia",
       "evento-sin",
     ]);
+  });
+});
+
+describe("EventoService: cupo al día con compras vencidas (feature 006, R3)", () => {
+  const MINUTO = 60 * 1000;
+  const sinFiltros = { texto: "", orden: "fecha" } as const;
+  const vip = (cupo: number) => tipo({ id: "tipo-a-vip", nombre: "VIP", cupo });
+  const festival = (cupo = 48) => evento({ id: "evento-a", tiposEntrada: [vip(cupo)] });
+  /** 2 VIP de Martín, PENDIENTE desde AHORA: vence a los 15 minutos. */
+  const pendienteDe2 = () =>
+    compra("evento-a", "tipo-a-vip", EstadoCompra.PENDIENTE, { id: "compra-pendiente", cantidad: 2 });
+
+  function armar(eventos: Evento[] = [festival()], compras: Compra[] = [pendienteDe2()]) {
+    const reloj = relojMovible();
+    return { reloj, ...crearServicesDeEventos({ eventos, compras, reloj }) };
+  }
+
+  const cupoVip = (vista: { tiposEntrada: { id: string; cupo: number }[] }) =>
+    vista.tiposEntrada.find((t) => t.id === "tipo-a-vip")?.cupo;
+
+  describe("lecturas (obtener y listar): muestran el cupo al día sin guardar nada", () => {
+    it("a los 15 minutos, obtener muestra el cupo devuelto (48 + 2) sin guardar el evento ni la compra", async () => {
+      const { reloj, eventoService, repositorioEventos, repositorioCompras } = armar();
+      const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+      const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+      reloj.avanzar(15 * MINUTO);
+      expect(cupoVip(await eventoService.obtener("evento-a"))).toBe(50);
+      expect(guardarEvento).not.toHaveBeenCalled();
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.estado).toBe(EstadoCompra.PENDIENTE);
+      expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
+        48,
+      );
+    });
+
+    it("a los 14 minutos, todavía 48", async () => {
+      const { reloj, eventoService } = armar();
+      reloj.avanzar(14 * MINUTO);
+      expect(cupoVip(await eventoService.obtener("evento-a"))).toBe(48);
+    });
+
+    it("listar recalcula agotado: un evento con todo en 0 más una vencida deja de estar agotado", async () => {
+      const { reloj, eventoService, repositorioEventos, repositorioCompras } = armar([festival(0)]);
+      const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+      const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+      expect((await eventoService.listar(sinFiltros)).eventos[0]?.agotado).toBe(true);
+      reloj.avanzar(15 * MINUTO);
+      expect((await eventoService.listar(sinFiltros)).eventos[0]?.agotado).toBe(false);
+      expect(guardarEvento).not.toHaveBeenCalled();
+      expect(guardarCompra).not.toHaveBeenCalled();
+    });
+
+    it("listar con varios eventos hace una sola listarPendientesPorEventos (sin N+1)", async () => {
+      const { eventoService, repositorioCompras } = armar([
+        festival(),
+        evento({ id: "evento-b" }),
+        evento({ id: "evento-c", organizadorId: "usuario-martin" }),
+      ]);
+      const listarPendientes = vi.spyOn(repositorioCompras, "listarPendientesPorEventos");
+      await eventoService.listar(sinFiltros);
+      expect(listarPendientes).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("obtenerAlDia (dentro del cerrojo del que llama)", () => {
+    it("404 si el evento no existe", async () => {
+      const { eventoService } = armar();
+      await expect(eventoService.obtenerAlDia("evento-x", AHORA)).rejects.toMatchObject({
+        constructor: NoEncontradoError,
+        codigo: "EVENTO_NO_ENCONTRADO",
+      });
+    });
+
+    it("con vencidas, guarda las compras CANCELADA y después el evento con el cupo devuelto", async () => {
+      const { eventoService, repositorioEventos, repositorioCompras } = armar();
+      const orden: string[] = [];
+      const guardarCompra = repositorioCompras.guardar.bind(repositorioCompras);
+      const guardarEvento = repositorioEventos.guardar.bind(repositorioEventos);
+      vi.spyOn(repositorioCompras, "guardar").mockImplementation(async (c) => {
+        orden.push(`compra ${c.estado}`);
+        await guardarCompra(c);
+      });
+      vi.spyOn(repositorioEventos, "guardar").mockImplementation(async (e) => {
+        orden.push(`evento ${e.buscarTipoEntrada("tipo-a-vip")?.cupo}`);
+        await guardarEvento(e);
+      });
+
+      const alDia = await eventoService.obtenerAlDia("evento-a", new Date(AHORA.getTime() + 15 * MINUTO));
+
+      expect(orden).toEqual(["compra CANCELADA", "evento 50"]);
+      expect(alDia.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(50);
+      expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.fueVencida()).toBe(true);
+      expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
+        50,
+      );
+    });
+
+    it("sin vencidas no guarda el evento y lo devuelve tal cual", async () => {
+      const { eventoService, repositorioEventos } = armar();
+      const guardado = await repositorioEventos.buscarPorId("evento-a");
+      const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+      expect(await eventoService.obtenerAlDia("evento-a", new Date(AHORA.getTime() + 14 * MINUTO))).toBe(
+        guardado,
+      );
+      expect(guardarEvento).not.toHaveBeenCalled();
+    });
+  });
+
+  it("obtenerDelOrganizador de otro usuario → 403 sin materializar nada", async () => {
+    const { eventoService, repositorioCompras } = armar();
+    await expect(
+      eventoService.obtenerDelOrganizador("evento-a", "usuario-martin", new Date(AHORA.getTime() + DIA)),
+    ).rejects.toMatchObject({ constructor: SinPermisoError });
+    expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.estado).toBe(EstadoCompra.PENDIENTE);
+  });
+
+  describe("las escrituras de la 004 materializan antes de verificar y guardar (con un solo ahora)", () => {
+    it("actualizar: el cupo guardado queda igual al mostrado y la próxima lectura no vuelve a sumar", async () => {
+      const { reloj, eventoService, repositorioCompras } = armar();
+      reloj.avanzar(15 * MINUTO);
+      const ahora = vi.spyOn(reloj, "ahora");
+      expect(cupoVip(await eventoService.obtener("evento-a"))).toBe(50);
+      ahora.mockClear();
+
+      const vista = await eventoService.actualizar("evento-a", "usuario-lucia", datosEditados());
+
+      expect(ahora).toHaveBeenCalledTimes(1);
+      expect(cupoVip(vista)).toBe(50);
+      expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.fueVencida()).toBe(true);
+      reloj.avanzar(DIA);
+      expect(cupoVip(await eventoService.obtener("evento-a"))).toBe(50);
+    });
+
+    it("eliminar materializa antes de verificar: la vencida queda CANCELADA y sigue impidiendo eliminar", async () => {
+      const { reloj, eventoService, repositorioEventos, repositorioCompras } = armar();
+      reloj.avanzar(15 * MINUTO);
+      const ahora = vi.spyOn(reloj, "ahora");
+
+      await expect(eventoService.eliminar("evento-a", "usuario-lucia")).rejects.toMatchObject({
+        codigo: "EVENTO_CON_COMPRAS",
+      });
+
+      expect(ahora).toHaveBeenCalledTimes(1);
+      expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.fueVencida()).toBe(true);
+      expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
+        50,
+      );
+    });
   });
 });

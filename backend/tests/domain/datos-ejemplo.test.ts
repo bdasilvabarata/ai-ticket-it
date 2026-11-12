@@ -176,6 +176,40 @@ describe("crearDatosEjemplo", () => {
     }
   });
 
+  it("las compras tienen historial coherente (R10): una pagada y una vencida por el sistema", () => {
+    const porId = new Map(compras.map((c) => [c.id, c]));
+    const martin = { tipo: "usuario", usuarioId: "usuario-martin" };
+    expect(porId.get("compra-martin-festival-vip")?.historial).toEqual([
+      { estado: EstadoCompra.PENDIENTE, autor: martin, fechaHora: new Date(ahora.getTime() - 2 * DIA) },
+      {
+        estado: EstadoCompra.CONFIRMADA,
+        autor: martin,
+        fechaHora: new Date(ahora.getTime() - 2 * DIA + 5 * 60 * 1000),
+      },
+    ]);
+    const vencida = porId.get("compra-diego-festival-general");
+    expect(vencida?.historial).toEqual([
+      {
+        estado: EstadoCompra.PENDIENTE,
+        autor: { tipo: "usuario", usuarioId: "usuario-diego" },
+        fechaHora: new Date(ahora.getTime() - DIA),
+      },
+      {
+        estado: EstadoCompra.CANCELADA,
+        autor: { tipo: "sistema" },
+        fechaHora: new Date(ahora.getTime() - DIA + 15 * 60 * 1000),
+      },
+    ]);
+    expect(vencida?.fueVencida()).toBe(true);
+  });
+
+  it("ninguna compra queda PENDIENTE y los cupos del Festival siguen VIP 50 y Backstage 3", () => {
+    expect(compras.filter((c) => c.estado === EstadoCompra.PENDIENTE)).toEqual([]);
+    const festival = eventos.find((e) => e.id === "evento-festival-sonidos-del-sur");
+    expect(festival?.buscarTipoEntrada("tipo-festival-sonidos-del-sur-vip")?.cupo).toBe(50);
+    expect(festival?.buscarTipoEntrada("tipo-festival-sonidos-del-sur-backstage")?.cupo).toBe(3);
+  });
+
   it("deja los favoritos vacíos", () => {
     for (const usuario of usuarios) expect(usuario.favoritos).toEqual([]);
   });

@@ -1,8 +1,9 @@
+import { EstadoCompra } from "@ai-ticket-it/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
 import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
-import { relojFijo } from "../helpers/eventos";
+import { compra, relojFijo } from "../helpers/eventos";
 
 // Repositorios de ejemplo nuevos por app, armados con el instante del reloj fijo.
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
@@ -607,5 +608,49 @@ describe("DELETE /api/eventos/:eventoId", () => {
     );
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
     expect(mios.body).toHaveLength(3);
+  });
+});
+
+describe("GET /api/eventos y /api/eventos/:eventoId: cupo al día (feature 006, R3)", () => {
+  const INSTANTE = new Date("2026-11-10T15:00:00.000Z");
+  const MINUTO = 60 * 1000;
+
+  /** El seed más una compra PENDIENTE de 1 Platea de Hamlet (agotado) hecha `minutos` antes. */
+  async function appConPendienteDeHamlet(minutos: number) {
+    const repositorios = crearRepositoriosDeEjemplo(INSTANTE);
+    await repositorios.compras.guardar(
+      compra("evento-hamlet", "tipo-hamlet-platea", EstadoCompra.PENDIENTE, {
+        id: "compra-pendiente-hamlet",
+        compradorId: DIEGO,
+        creadaEn: new Date(INSTANTE.getTime() - minutos * MINUTO),
+      }),
+    );
+    return crearApp({ repositorios, reloj: relojFijo(INSTANTE) });
+  }
+
+  it("una compra pendiente vencida devuelve su cupo: el detalle lo muestra y Hamlet deja de estar agotado", async () => {
+    const app = await appConPendienteDeHamlet(15);
+    const detalle = await request(app).get("/api/eventos/evento-hamlet");
+    expect(detalle.status).toBe(200);
+    expect(detalle.body.tiposEntrada).toMatchObject([
+      { id: "tipo-hamlet-platea", cupo: 1 },
+      { id: "tipo-hamlet-pullman", cupo: 0 },
+    ]);
+    const catalogo = await request(app).get("/api/eventos");
+    const hamlet = (catalogo.body.eventos as { id: string; agotado: boolean }[]).find(
+      (e) => e.id === "evento-hamlet",
+    );
+    expect(hamlet?.agotado).toBe(false);
+  });
+
+  it("si todavía no venció, el cupo sigue tomado", async () => {
+    const app = await appConPendienteDeHamlet(14);
+    const detalle = await request(app).get("/api/eventos/evento-hamlet");
+    expect(detalle.body.tiposEntrada[0]).toMatchObject({ id: "tipo-hamlet-platea", cupo: 0 });
+    const catalogo = await request(app).get("/api/eventos");
+    const hamlet = (catalogo.body.eventos as { id: string; agotado: boolean }[]).find(
+      (e) => e.id === "evento-hamlet",
+    );
+    expect(hamlet?.agotado).toBe(true);
   });
 });

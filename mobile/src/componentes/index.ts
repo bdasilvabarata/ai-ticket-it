@@ -2,6 +2,11 @@ export { Boton, type PropsBoton } from "./Boton";
 export { Cargando } from "./Cargando";
 export { CargandoInicio } from "./CargandoInicio";
 export {
+  EtiquetaEstadoCompra,
+  textoEtiquetaEstado,
+  type PropsEtiquetaEstadoCompra,
+} from "./EtiquetaEstadoCompra";
+export {
   FranjaServidorNoDisponible,
   type PropsFranjaServidorNoDisponible,
 } from "./FranjaServidorNoDisponible";

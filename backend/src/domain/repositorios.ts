@@ -36,8 +36,16 @@ export interface RepositorioEventos {
   eliminarPorId(id: string): Promise<void>;
 }
 
-/** Compras (mínimo de la feature 004): alcanza para saber si algo tiene compras, en cualquier estado. */
+/** Compras (feature 006): alta, búsquedas para el tope y el vencimiento, y si algo tiene compras. */
 export interface RepositorioCompras {
+  /** Un id nuevo para una compra (UUID v4). */
+  siguienteId(): string;
+  buscarPorId(id: string): Promise<Compra | null>;
+  /** Las compras de esa persona en ese evento, en cualquier estado (posiblemente ninguna). */
+  listarPorEventoYComprador(eventoId: string, compradorId: string): Promise<Compra[]>;
+  /** Las compras guardadas como PENDIENTE (vencidas o no) de esos eventos, en una sola lectura. */
+  listarPendientesPorEventos(eventoIds: readonly string[]): Promise<Compra[]>;
+  /** Cualquier compra, en cualquier estado (también una vencida), cuenta. */
   existePorEvento(eventoId: string): Promise<boolean>;
   /** Los ids de tipo son únicos en todo el sistema: no hace falta el evento. */
   existePorTipoEntrada(tipoEntradaId: string): Promise<boolean>;

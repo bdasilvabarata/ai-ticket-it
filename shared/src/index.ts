@@ -1,4 +1,12 @@
 export type { CategoriaVista } from "./categoria";
+export { LIMITES_COMPRA } from "./compra";
+export type {
+  AutorCambioEstadoVista,
+  CambioEstadoCompraVista,
+  CompraVista,
+  DatosCompra,
+  MisComprasDelEventoVista,
+} from "./compra";
 export { EstadoCompra } from "./estado-compra";
 export type { DetalleError, ErrorApi } from "./errores";
 export {

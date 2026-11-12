@@ -24,7 +24,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 
 ## Mapa
 
-- `shared/` — tipos de contratos y enums compartidos (ej.: `EstadoCompra`).
+- `shared/` — tipos de contratos y enums compartidos (ej.: `EstadoCompra`, `CompraVista`) y los
+  límites de compra `LIMITES_COMPRA` (4 entradas pagas por evento, 1 por tipo gratis, 15 minutos
+  para pagar), que usan el backend y la app.
 - `backend/src/` — Express en capas:
   `routes/ → controllers/ → services/ → repositories/ → domain/`, más `middlewares/`
   (usuario actual, logging, 404, registro y respuesta de errores), `validations/` (zod),
@@ -39,9 +41,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
     `eventos/:eventoId/tipos-entrada` (`TipoEntrada` vive dentro del agregado `Evento`: tiene
-    controller y service, pero se guarda con `RepositorioEventos`), `compras` **mínimo**
-    (entidad y `RepositorioCompras` con `existePorEvento` / `existePorTipoEntrada`, sin
-    endpoints; lo amplía la 006) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
+    controller y service, pero se guarda con `RepositorioEventos`), `compras` (feature 006:
+    `POST /eventos/:eventoId/compras` y `GET /eventos/:eventoId/mis-compras` (pendientes,
+    confirmadas y restantes por tipo) en el router de eventos, `GET /compras/:compraId`,
+    `POST /compras/:compraId/pago` y `POST /compras/:compraId/cancelacion` en `compras.routes.ts`;
+    todos con usuario, y una compra solo la ve, la paga y la cancela su comprador) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
     `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
@@ -51,6 +55,24 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     Módulos puros del dominio: `domain/busqueda.ts` (`normalizarParaBuscar`, `palabrasDeBusqueda`:
     sin mayúsculas, acentos ni diéresis, ñ ≠ n) y `domain/orden-catalogo.ts` (`ordenarCatalogo`
     sobre elementos `Ordenable`, desempates fecha → nombre → id).
+  - **Compras** (feature 006): `domain/compra.ts` es una `Compra` con **historial** de cambios de
+    estado (`{ estado, autor: usuario | sistema, fechaHora }`; el estado es el del último, el primero
+    siempre `PENDIENTE`) y transiciones que devuelven una `Compra` nueva (`registrar`, `pagar`,
+    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
+    aplica `LIMITES_COMPRA` sobre las compras **vigentes**. `RepositorioCompras` suma `siguienteId`,
+    `buscarPorId`, `listarPorEventoYComprador` y `listarPendientesPorEventos` (las guardadas
+    `PENDIENTE`, vencidas o no); `existePorEvento` / `existePorTipoEntrada` cuentan toda compra,
+    también una cancelada.
+  - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
+    nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
+    (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
+    materializa (`vencerPendientes`: guarda las `CANCELADA` del sistema fechadas en `venceEn`). Las
+    **lecturas** (`EventoService.obtener`/`listar`, `GET /compras/:id`, `mis-compras`) muestran todo
+    al día sin guardar nada; **toda escritura** de un evento (alta y pago de compras, ediciones de
+    la 004) materializa antes con `EventoService.obtenerAlDia(id, ahora)`, y por eso
+    `obtenerDelOrganizador(id, usuarioId, ahora)` recibe el `ahora` leído dentro del cerrojo. Orden
+    de guardado: en el alta, primero el evento con el cupo descontado y después la compra; al vencer,
+    primero las compras y después el evento con el cupo devuelto (nunca se ve cupo de más).
   - **Reloj**: `domain/reloj.ts` (interfaz `Reloj { ahora() }`) y `config/reloj.ts`
     (`relojDelSistema`). Es la única referencia de "ahora": llega a los services por constructor
     y `crearApp({ reloj })` permite fijarlo en los tests. `domain/` recibe `ahora` como
@@ -60,7 +82,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     que modifican eventos. Reglas: (1) adentro de `cerrojo.ejecutar(eventoId, …)` se **vuelve a
     leer** el evento y el reloj, se verifica y recién después se guarda; (2) se libera siempre
     (`finally`) y el error llega al que llamó; (3) sin cerrojos anidados; (4) las lecturas no lo
-    usan. Crear un evento no lo usa (su id es nuevo).
+    usan. Crear un evento no lo usa (su id es nuevo). El alta y el pago de una compra lo toman con
+    el `eventoId` del evento (el pago, el de la compra, y relee la compra adentro).
+    `EventoService.obtenerAlDia`, `TipoEntradaService.buscarReferenciada` y
+    `TipoEntradaService.descontarCupo` / `devolverCupo` se usan **dentro** del cerrojo del que
+    llama y no lo toman. La cancelación de una pendiente sigue el orden de guardado del vencimiento
+    (primero la compra, después el evento con el cupo devuelto).
   - Orden de los chequeos de una escritura: 401 → 400 de forma → 404 evento → 403 → 404 tipo →
     400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Los 404/403 los lanza el service con
     `errors/`; los 409, `domain/`.
@@ -73,7 +100,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `query.categoriaId` con `"consulta"`) y, para varias, le pide el lote con `obtenerPorIds` (una
     sola lectura, sin N+1). También recibe `UsuarioService` (`obtenerOFallar` público y
     `obtenerPorIds`) y `ReseniaService` para el organizador y su puntaje; `ReseniaService` recibe
-    los eventos por parámetro y no depende de `EventoService` (sin ciclos). Los ids nuevos los da el
+    los eventos por parámetro y no depende de `EventoService` (sin ciclos). `EventoService` recibe
+    también `VencimientoService`, y `CompraService` (dueño de `Compra`, con `obtenerOFallar`) recibe
+    `EventoService` y `TipoEntradaService`; cada uno escribe solo su agregado. `app.ts` los arma en
+    el orden `VencimientoService → EventoService → TipoEntradaService → CompraService`. Orden de
+    chequeos del alta: 401 → 400 forma → 404 evento → 400 `body.tipoEntradaId` → 409
+    `EVENTO_REALIZADO` → `COMPRA_PROPIO_EVENTO` → `TOPE_POR_PERSONA` → `CUPO_INSUFICIENTE`; del
+    pago: 401 → 400 → 404 `COMPRA_NO_ENCONTRADA` → 403 → 409 `COMPRA_VENCIDA` →
+    `TRANSICION_INVALIDA`. Los ids nuevos los da el
     repositorio (`siguienteId()`), y los órdenes son comparadores del dominio
     (`ordenDeMisEventos`, `compararPorNombre`).
   - `errors/` no conoce HTTP: cada error lleva código y mensaje, y el status lo asigna
@@ -89,7 +123,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     (`export { Perfil as default } from "../../src/features/sesion";`); las secciones pendientes
     renderizan `<SeccionPendiente nombre="…" />`. `(tabs)/` tiene las pestañas Explorar · Mis
     compras · Mis eventos · Perfil; `seleccionar-usuario` es el selector (pantalla completa sin
-    usuario, modal desde Perfil) y `cargando`, la espera inicial. El lint prohíbe importar
+    usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
+    son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
+    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y `compras/[compraId]`
+    ("Tu compra"). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
   - **Base** (no importa features):
     - `src/api/` — el cliente HTTP y un archivo por recurso con sus funciones de endpoint,
@@ -102,7 +139,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       pedir queries).
     - `src/consultas/` — `QueryClient` (sin reintentos propios; todo error de query o mutation va a
       la sesión vía `QueryCache`/`MutationCache`), claves en `claves.ts` (`catalogo` es la excepción
-      documentada: **sin usuario**, porque el catálogo es el mismo para todos) y `cliente-api.tsx`
+      documentada: **sin usuario**, porque el catálogo es el mismo para todos; la 006 suma
+      `misComprasDelEvento(usuarioId, eventoId)` y `compra(usuarioId, compraId)`) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -114,7 +152,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `vacio` opcionales reemplazan a `Cargando` y a `ListaVacia`), `Cargando`, `MensajeError`,
       `ListaVacia` (con `accion` opcional), `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
       apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
-      campo; úsenla en vez de un `ScrollView` suelto), la franja, `Logo` y `CargandoInicio`
+      campo; úsenla en vez de un `ScrollView` suelto), `EtiquetaEstadoCompra` (el **único**
+      componente que muestra el estado de una compra, con su etiqueta y color), la franja, `Logo` y `CargandoInicio`
       (la ruta `cargando`); todo por `index.ts`. Los textos usan un estilo de `tema.tipografia`
       (`...tema.tipografia.cuerpo, color: …`): con fuentes propias el peso es la familia, nunca
       `fontWeight`. El primario es azul (`marca`, el verde exacto del logo, solo para acentos sin
@@ -131,7 +170,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     - `eventos/` — Explorar (la pestaña de inicio: buscador con `useValorDemorado` de 500 ms,
       `BotonCategoria` (a la derecha del buscador) que abre `SelectorCategoria` en modo `conTodas` como
       desplegable, `SelectorOrden` (tocar el elegido invierte el `sentido`), `TarjetaEvento`/`TarjetaSkeleton` y
-      `useCatalogo`), el detalle público `DetalleEvento` (ruta `explorar/[eventoId]`, `FilaImagenes`;
+      `useCatalogo`), el detalle público `DetalleEvento` (lo monta `DetalleEventoConCompras` de `compras` en
+      `explorar/[eventoId]/index`, `FilaImagenes`;
       ante un 404 llama a `useInvalidarCatalogo`), Mis eventos, Crear evento, `EventoDelOrganizador`
       (edita o muestra en solo lectura según el `realizado` del servidor), los formularios de tipo
       de entrada, `useMisEventos`/`useEvento`, las mutations de `mutaciones.ts` (en nombre del
@@ -139,6 +179,18 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       sin convertir zonas), `errores-de-formulario.ts` (la app no valida: muestra los detalles del
       400 junto a cada campo) y `useConfirmarDescarte` ("¿Descartar los cambios?" al salir de un
       formulario, con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
+      `DetalleEvento` acepta `complementos` opcionales (`ComplementosDelDetalle`: `AccionDeTipo` al
+      lado de cada tipo, vía la prop `accionDeTipo` de `ListaTiposEntrada`, y `SeccionPropia` antes
+      de "Tipos de entrada"): así otra feature le suma cosas **sin que `eventos` la importe**;
+    - `compras/` (feature 006; **depende de `eventos`** por su `index.ts`, nunca al revés: el lint
+      lo rechaza como ciclo) — `DetalleEventoConCompras` (el detalle con "Comprar" por tipo, "Sos el
+      organizador de este evento", "Ver mis entradas" y "Tus compras pendientes" con "Pagar" y
+      "Cancelar"), `MisEntradasDelEvento`, `ComprarEntradas` (`SelectorCantidad`
+      y total estimado; el tope lo informa el servidor en `restantesPorTipo`), `Compra` ("Tu compra":
+      `ResumenCompra` y "Pagar"/"Confirmar", dibujada siempre desde `useCompra`, así un pago con la
+      respuesta perdida muestra el estado real), `useMisComprasDelEvento`/`useCompra`, las mutations
+      `useComprarEntradas`/`usePagarCompra`/`useCancelarCompra` (sin reintentos; al terminar invalidan el evento para
+      todos los usuarios, `misComprasDelEvento`, la compra y `["catalogo"]`) y `formato.ts`.
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la
@@ -159,7 +211,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     guarda (`@ts-expect-error` sobre una ruta inexistente).
   - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
     `renderConDependencias` (la app real con `fetch` falso; si un test no registra lo que pide
-    Explorar al entrar —el catálogo y las categorías— responde vacío) y `crearFetchFalso`/`porRuta`
+    Explorar al entrar —el catálogo y las categorías— o el detalle —`mis-compras`— responde vacío) y `crearFetchFalso`/`porRuta`
     (registra método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
     `conexion/` y `pantallas/`, y los de cada feature en `features/<dominio>/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.

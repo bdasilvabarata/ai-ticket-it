@@ -1,4 +1,4 @@
-import { EstadoCompra } from "@ai-ticket-it/shared";
+import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { Categoria, type DatosCategoria } from "../domain/categoria";
 import { Compra } from "../domain/compra";
 import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
@@ -192,7 +192,15 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
 
   // Compras sobre el Festival (de Lucía y próximo) para mostrar las reglas de la 004 (R17): el
   // evento no se elimina y VIP y General no se quitan (la cancelada también cuenta); Backstage, sí.
+  // Con historial coherente (006, R10): una pagada por Martín (le quedan 2 entradas pagas) y una que
+  // venció sin pagarse (CANCELADA por el sistema; no devuelve cupo de nuevo). Ninguna PENDIENTE: la
+  // demo no depende de la hora de arranque.
   const festival = "festival-sonidos-del-sur";
+  const diego = "usuario-diego";
+  const porMartin = { tipo: "usuario", usuarioId: martin } as const;
+  const masMinutos = (fecha: Date, minutos: number) => new Date(fecha.getTime() + minutos * 60 * 1000);
+  const haceMartin = new Date(ahora.getTime() - 2 * 24 * HORA_MS);
+  const haceDiego = new Date(ahora.getTime() - 24 * HORA_MS);
   const compras = [
     new Compra({
       id: "compra-martin-festival-vip",
@@ -201,16 +209,30 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       tipoEntradaId: `tipo-${festival}-vip`,
       cantidad: 2,
       total: 240000,
-      estado: EstadoCompra.CONFIRMADA,
+      historial: [
+        { estado: EstadoCompra.PENDIENTE, autor: porMartin, fechaHora: haceMartin },
+        { estado: EstadoCompra.CONFIRMADA, autor: porMartin, fechaHora: masMinutos(haceMartin, 5) },
+      ],
     }),
     new Compra({
       id: "compra-diego-festival-general",
-      compradorId: "usuario-diego",
+      compradorId: diego,
       eventoId: `evento-${festival}`,
       tipoEntradaId: `tipo-${festival}-general`,
       cantidad: 1,
       total: 45000,
-      estado: EstadoCompra.CANCELADA,
+      historial: [
+        {
+          estado: EstadoCompra.PENDIENTE,
+          autor: { tipo: "usuario", usuarioId: diego },
+          fechaHora: haceDiego,
+        },
+        {
+          estado: EstadoCompra.CANCELADA,
+          autor: { tipo: "sistema" },
+          fechaHora: masMinutos(haceDiego, LIMITES_COMPRA.minutosParaPagar),
+        },
+      ],
     }),
   ];
 

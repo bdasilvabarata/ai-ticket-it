@@ -54,8 +54,11 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   - `CONFIRMADA → UTILIZADA` (el organizador registra el ingreso)
   - `CONFIRMADA → CANCELADA → REEMBOLSADA`
   Todo cambio de estado DEBE registrar un `CambioEstadoCompra` con quién y cuándo.
-- **Cancelación**: una compra NO PUEDE cancelarse si está `UTILIZADA` o si el evento ya se
-  realizó. Las entradas de una compra cancelada vuelven al cupo disponible.
+- **Cancelación**: una compra `CONFIRMADA` NO PUEDE cancelarse una vez que el evento empezó
+  (desde su fecha y hora de inicio, inclusive, según el reloj del servidor), y una `UTILIZADA`
+  no se cancela nunca. Una compra `PENDIENTE` SÍ PUEDE pasar a `CANCELADA` con el evento ya
+  empezado (por ejemplo, al vencer sin pagarse). Las entradas de una compra cancelada vuelven
+  al cupo disponible.
 - **Reseñas**: solo puede reseñar un evento quien tenga una compra `UTILIZADA` de ese evento,
   una única vez por evento. La puntuación es un entero de 1 a 5.
 - **Puntaje del organizador**: promedio de las puntuaciones de las reseñas de sus eventos.
@@ -343,4 +346,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.3.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-12
+**Version**: 2.4.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-12

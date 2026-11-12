@@ -1,5 +1,6 @@
 import { DatosInvalidosError, ReglaDeNegocioError } from "../domain/errores";
 import {
+  CompraNoEncontradaError,
   ConflictoError,
   CuerpoDemasiadoGrandeError,
   EntradaInvalidaError,
@@ -58,6 +59,7 @@ const STATUS: ReadonlyArray<readonly [ClaseDeError, number]> = [
   [UsuarioNoIdentificadoError, 401],
   [SinPermisoError, 403],
   [NoEncontradoError, 404],
+  [CompraNoEncontradaError, 404],
   [ConflictoError, 409],
   [CuerpoDemasiadoGrandeError, 413],
 ];

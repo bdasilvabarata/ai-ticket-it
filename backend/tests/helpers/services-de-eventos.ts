@@ -11,10 +11,12 @@ import { ReseniaRepository } from "../../src/repositories/resenia.repository";
 import { UsuarioRepository } from "../../src/repositories/usuario.repository";
 import { CategoriaService } from "../../src/services/categoria.service";
 import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
+import { CompraService } from "../../src/services/compra.service";
 import { EventoService } from "../../src/services/evento.service";
 import { ReseniaService } from "../../src/services/resenia.service";
 import { TipoEntradaService } from "../../src/services/tipo-entrada.service";
 import { UsuarioService } from "../../src/services/usuario.service";
+import { VencimientoService } from "../../src/services/vencimiento.service";
 import { diego, lucia, martin, musica, relojFijo, sofia, teatro } from "./eventos";
 
 export interface DatosDeServicesDeEventos {
@@ -27,9 +29,10 @@ export interface DatosDeServicesDeEventos {
 }
 
 /**
- * Los services de eventos conectados como en `app.ts` (un cerrojo compartido, `TipoEntradaService`
- * sobre `EventoService`, que se apoya en los de categorías, usuarios y reseñas), con repositorios
- * en memoria armados con los datos de cada caso.
+ * Los services de eventos y compras conectados como en `app.ts` (un cerrojo compartido,
+ * `CompraService` sobre `EventoService` y `TipoEntradaService`, `TipoEntradaService` sobre
+ * `EventoService`, que se apoya en `VencimientoService` y en los de categorías, usuarios y reseñas),
+ * con repositorios en memoria armados con los datos de cada caso.
  */
 export function crearServicesDeEventos({
   eventos = [],
@@ -48,9 +51,11 @@ export function crearServicesDeEventos({
   const categoriaService = new CategoriaService({ categorias: repositorioCategorias });
   const usuarioService = new UsuarioService({ usuarios: repositorioUsuarios, eventos: repositorioEventos });
   const reseniaService = new ReseniaService({ resenias: repositorioResenias });
+  const vencimientoService = new VencimientoService({ compras: repositorioCompras });
   const eventoService = new EventoService({
     eventos: repositorioEventos,
     compras: repositorioCompras,
+    vencimientoService,
     categoriaService,
     usuarioService,
     reseniaService,
@@ -64,9 +69,18 @@ export function crearServicesDeEventos({
     cerrojo,
     reloj,
   });
-  return {
+  const compraService = new CompraService({
+    compras: repositorioCompras,
     eventoService,
     tipoEntradaService,
+    cerrojo,
+    reloj,
+  });
+  return {
+    vencimientoService,
+    eventoService,
+    tipoEntradaService,
+    compraService,
     cerrojo,
     repositorioEventos,
     repositorioCompras,
