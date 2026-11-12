@@ -16,7 +16,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 003 | **Refactor mobile**: organización por feature, piezas base de pantalla (tema, botón, cuatro estados) y cliente HTTP con todos los métodos | — | P0 | 002 | integrada |
 | 004 | **Crear evento** con tipos de entrada (precio y cupo) y catálogo de categorías | UC-04 | P1 | 001, 003 | integrada |
 | 005 | **Explorar eventos**: búsqueda textual, filtro por categoría, detalle del evento y ordenamiento por precio, fecha y puntaje del organizador | UC-03, UC-11 | P1 | 001, 003, 004 (categorías, detalle del evento y cupo) | integrada |
-| 006 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (cerrojo por evento y compra mínima), 005 (detalle del evento) | pendiente |
+| 006 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (cerrojo por evento y compra mínima), 005 (detalle del evento) | plan |
 | 007 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 006 | pendiente |
 | 008 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 004, 006 | pendiente |
 | 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | pendiente |
@@ -82,11 +82,13 @@ graph LR
   ¿Versión de Expo SDK alineada con la de Expo Go del celular?
   `shared` exporta TypeScript sin compilar (decisión R2 de 001): Metro lo resuelve, pero
   jest-expo necesita configurar `transformIgnorePatterns` para transformar `@ai-ticket-it/shared`.
-- 006: ¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?
+- 006: ~~¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?~~ Resuelta en su
+  clarify: vence a los 15 minutos y libera el cupo; se puede pagar aunque el evento haya empezado.
 - 008: ¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
   evento)? ¿con qué dato la identifica?
 - 009: ¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
-  organizador? ¿hay plazo mínimo antes del evento?
+  organizador? Plazo **decidido** (revisión del plan de la 006): el de la constitución, hasta que el
+  evento empieza o la entrada se usa, sin plazo extra. Una `PENDIENTE` vence a los 15 minutos (006).
 - 011: ¿se puede editar o borrar una reseña?
 
 ## Deuda técnica

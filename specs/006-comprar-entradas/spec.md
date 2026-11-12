@@ -40,6 +40,16 @@ compra; notificaciones; pulido estético (013).
 - Q: Si el comprador sale de la pantalla de pago sin pagar, ¿dónde retoma el pago de esa compra pendiente, ya que "Mis compras" llega recién en la 007? → A: En el detalle del evento: el comprador ve sus compras pendientes (no vencidas) de ese evento, con tipo, cantidad, total, hasta qué hora puede pagar y "Pagar". También recupera una compra registrada cuya respuesta se perdió con el servidor caído (FR-023, US2 escenario 10, US4 escenario 5).
 - Q: ¿Hay un máximo de entradas por compra, además del cupo disponible? → A: Sí, un tope **por persona y por evento, acumulado**: un comprador no puede tener más de 4 entradas de tipos pagos de un mismo evento sumando sus compras vigentes (pendientes no vencidas y confirmadas; las canceladas, incluidas las vencidas, no cuentan). En un tipo gratis el tope es 1 entrada por persona para ese tipo, aparte de las 4 (en la Maratón: hasta 4 "Inscripción" y 1 "Carrera kids"). Reemplaza el supuesto "sin tope de cantidad" (FR-002, FR-002a, US1 escenario 3, US3 escenarios 11 y 12).
 - Q: Al "comprar" un tipo gratis, ¿la compra pasa por el paso de pago o queda CONFIRMADA directamente? → A: Mismo recorrido que una paga: nace `PENDIENTE` y el comprador toca "Confirmar" (pago simulado de $ 0) para pasarla a `CONFIRMADA`; si no confirma, vence a los 15 minutos como cualquier otra (FR-009, US2 escenario 4).
+- Q: ¿Qué pasa con las compras cuando el evento empieza? → A: Una compra no puede **empezar**
+  (nacer `PENDIENTE`) con el evento empezado. Una compra pendiente creada antes **se puede pagar**
+  con el evento empezado mientras no venza, y si no se paga, vence a los 15 minutos como
+  cualquier otra, **aunque el evento ya haya empezado** (por ejemplo, una compra hecha 1 minuto
+  antes del inicio vence 14 minutos después de empezado). La regla "Cancelación" de la
+  constitución se mantiene tal cual para las compras confirmadas: se pueden cancelar y reembolsar
+  hasta que el evento empiece o la entrada figure como utilizada (feature 009). Para una compra
+  `PENDIENTE` prevalece la regla de los 15 minutos: es un refinamiento de la constitución, no
+  una contradicción. Reemplaza el supuesto "no se paga una compra de un evento realizado"
+  (FR-012, edge case "Evento que empieza con una compra pendiente").
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -270,9 +280,10 @@ perdió, reintentar y ver la compra confirmada.
 - **Evento que se realiza mientras se compra**: lo decide el servidor al registrar la compra, con
   su reloj, dentro de la misma operación atómica que verifica el cupo; si la hora del evento
   llegó, se rechaza aunque el detalle de la app todavía ofrezca comprar.
-- **Evento que se realiza con una compra pendiente**: el pago se rechaza indicando que el evento
-  ya se realizó (una compra no se confirma para un evento pasado); la compra sigue pendiente
-  hasta vencer a los 15 minutos de su alta, como cualquier otra (FR-014).
+- **Evento que empieza con una compra pendiente**: la compra se puede pagar igual mientras no
+  venza (la persona reservó antes de que empezara); si no se paga, vence a los 15 minutos de su
+  alta como cualquier otra (FR-014). Lo que no se puede, con el evento empezado, es registrar una
+  compra nueva (FR-007).
 - **Pago en el límite del vencimiento**: si el pago y el vencimiento coinciden, gana lo que el
   servidor procese primero bajo la operación atómica del evento: o queda `CONFIRMADA` (y ya no
   vence) o queda `CANCELADA` (y el pago se rechaza por vencida). A los 15 minutos exactos ya está
@@ -364,7 +375,8 @@ perdió, reintentar y ver la compra confirmada.
   pago; el pago simulado siempre se acepta y pasa la compra a `CONFIRMADA`.
 - **FR-012**: El sistema DEBE rechazar el pago si quien paga no es el comprador de la compra (sin
   permiso), si la compra no existe (no encontrada), si la compra no está `PENDIENTE` (transición
-  inválida: solo `PENDIENTE → CONFIRMADA`), si venció (FR-014b) o si el evento ya se realizó.
+  inválida: solo `PENDIENTE → CONFIRMADA`) o si venció (FR-014b). Que el evento ya haya
+  empezado **no** impide pagar una compra pendiente no vencida (Clarifications, 2026-11-12).
 - **FR-013**: Verificar y cambiar el estado de la compra DEBE ocurrir bajo la operación atómica
   del evento de la compra (constitución), de modo que dos pagos simultáneos de la misma compra
   produzcan un único cambio a `CONFIRMADA`.
@@ -473,8 +485,11 @@ perdió, reintentar y ver la compra confirmada.
 - **Un tipo gratis sigue el mismo recorrido** `PENDIENTE → CONFIRMADA` (Clarifications,
   2026-11-12), para respetar una única máquina de estados; solo cambia el texto ("Gratis",
   "Confirmar").
-- **No se paga una compra de un evento realizado**: confirmar entradas de un evento pasado no
-  tiene sentido de negocio; es coherente con que tampoco se puede comprar.
+- **El inicio del evento corta el alta, no el pago** (Clarifications, 2026-11-12): con el evento
+  empezado no nace ninguna compra nueva, pero una pendiente se puede pagar hasta que venza (y, si
+  no, vence igual, también con el evento empezado). Para las compras pendientes, la regla de los
+  15 minutos prevalece sobre la de "Cancelación" de la constitución, que sigue valiendo para las
+  confirmadas (se reembolsan hasta que el evento empieza o la entrada se usa; feature 009).
 - **"Realizado"** es el mismo criterio de la 004 y la 005: desde la fecha y hora de inicio
   (inclusive) según el reloj del servidor.
 - **Visibilidad de la compra**: en esta feature solo la ve su comprador, para pagarla y ver la
