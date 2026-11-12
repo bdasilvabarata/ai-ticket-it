@@ -257,8 +257,9 @@ y desalineaciones.
 
 - TypeScript en modo `strict` en todos los paquetes.
 - `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` (Prettier) DEBEN
-  pasar antes de cerrar una tarea y antes de abrir un PR. El CI de GitHub Actions los corre en
-  cada PR a `development` y `main`.
+  pasar antes de cerrar una fase de `tasks.md` y antes de abrir un PR. El CI de GitHub Actions
+  los corre completos, sin caché, en cada PR y cada push a `development` y `main`. Durante una
+  fase, la verificación sigue "Verificación durante el desarrollo" (Flujo de Trabajo).
 - Prohibido `any` explícito, `@ts-ignore` o `eslint-disable` sin un comentario que lo
   justifique.
 - Simplicidad primero: no se agrega una abstracción, dependencia o capa que la spec no
@@ -300,6 +301,31 @@ Si una feature queda bloqueada por otra que no está integrada:
 2. se crea la rama desde la feature de la que depende y se rebasa sobre `development` cuando
    esa dependencia se integre.
 
+### Verificación durante el desarrollo
+
+- **Ciclo de TDD**: en cada rojo y cada verde se corre **solo el test de la tarea**, por archivo
+  (`npm run test:foco -w backend|mobile -- <archivos>`, o `npm run test:afectados -w backend`),
+  con salida resumida (Vitest `--reporter=dot`, Jest `--silent`). La suite completa no se corre
+  en cada ciclo.
+- **Cierre de fase y PR**: al cerrar cada fase de `tasks.md` y antes de abrir el PR se corren
+  completos `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check`, y DEBEN
+  quedar en verde. Una fase no se da por cerrada con solo los tests focalizados.
+- **Hook `Stop`** (`.claude/hooks/verificar-al-terminar.mjs`): al terminar cada turno verifica
+  typecheck y lint de los paquetes con archivos cambiados desde la última verificación exitosa
+  (`shared/` → los tres paquetes; configuración de la raíz → todo el repo; solo Markdown → nada),
+  con `tsc --incremental` y `eslint --cache`. Si falla, DEBE bloquear el cierre del turno. No corre
+  tests.
+- **CI**: no cambia con esta sección. Corre formato, lint, tipos y tests completos y sin caché en
+  cada PR y cada push a `development` y `main`, y es la verificación que decide la integración.
+- **Implement por fases**: `/speckit-implement` se corre de a una fase de `tasks.md`, con contexto
+  limpio entre fases. `/speckit-tasks` agrupa las tareas triviales (stubs con firma real,
+  re-exports de `app/`) con la tarea que las necesita, en vez de listarlas una por una.
+
+**Rationale**: la suite de mobile tarda alrededor de un minuto; correrla en cada ciclo de TDD
+multiplicaba el tiempo de implementación sin aportar más información que el test de la tarea. La
+suite completa al cierre de cada fase y el CI sin caché conservan la garantía de calidad del
+principio IX.
+
 ### Commits
 
 Conventional Commits en español, con el scope de la feature:
@@ -317,4 +343,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.2.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-11
+**Version**: 2.3.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-12
