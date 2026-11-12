@@ -1,10 +1,17 @@
+import { LIMITES_BUSQUEDA } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
-import { FlatList, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { FlatList, StyleSheet, TextInput, View } from "react-native";
 
 import { ListaVacia, SegunConsulta, tema } from "../../../componentes";
+import { SelectorCategoria } from "../componentes/SelectorCategoria";
 import { TarjetaEvento } from "../componentes/TarjetaEvento";
 import { TarjetaSkeleton } from "../componentes/TarjetaSkeleton";
 import { useCatalogo } from "../useCatalogo";
+import { useValorDemorado } from "../useValorDemorado";
+
+/** La lista se actualiza este tiempo después de la última tecla (FR-014). */
+const DEMORA_DEL_BUSCADOR_MS = 500;
 
 /** El mismo detalle público para cualquier evento, también uno propio. */
 const abrirDetalle = (eventoId: string) =>
@@ -26,24 +33,64 @@ function CargandoEventos() {
   );
 }
 
-/** Explorar: el catálogo de eventos próximos (contracts/app.md, "Explorar"). */
+/**
+ * Explorar: el catálogo de eventos próximos (contracts/app.md, "Explorar"). La consulta (texto,
+ * categoría) vive acá: la pestaña no se desmonta al apilar el detalle, así que se conserva (FR-024).
+ */
 export function Explorar() {
-  const consulta = useCatalogo({ texto: "", categoriaId: null, orden: "fecha" });
+  const [texto, setTexto] = useState("");
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
+  const textoDemorado = useValorDemorado(texto.trim(), DEMORA_DEL_BUSCADOR_MS);
+  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden: "fecha" });
+  // Desde la primera tecla hasta que llega la respuesta del texto nuevo, el skeleton: nunca quedan a
+  // la vista los resultados del texto anterior (FR-007).
+  const escribiendo = texto.trim() !== textoDemorado;
+
+  const limpiarBusqueda = () => {
+    setTexto("");
+    setCategoriaId(null);
+  };
+
   return (
     <View style={estilos.pantalla}>
-      {/* Los controles de búsqueda, fuera de los estados: no se desmontan (US3 y US4). */}
-      <View />
+      {/* Los controles, fuera de los estados: no se desmontan ni pierden lo escrito. */}
+      <View style={estilos.controles}>
+        <TextInput
+          value={texto}
+          onChangeText={setTexto}
+          placeholder="Buscar por nombre o descripción"
+          placeholderTextColor={tema.colores.textoSecundario}
+          accessibilityLabel="Buscar eventos"
+          maxLength={LIMITES_BUSQUEDA.texto}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          autoCorrect={false}
+          style={estilos.buscador}
+        />
+        <SelectorCategoria conTodas valor={categoriaId} alCambiar={setCategoriaId} />
+      </View>
       <SegunConsulta
-        consulta={consulta}
+        consulta={{ ...consulta, isPending: consulta.isPending || escribiendo }}
         cargando={<CargandoEventos />}
         esVacio={(catalogo) => catalogo === undefined || catalogo.eventos.length === 0}
-        vacio={<ListaVacia mensaje="Todavía no hay eventos próximos." icono="calendar-outline" />}
+        vacio={
+          consulta.data?.hayEventosProximos ? (
+            <ListaVacia
+              mensaje="Ningún evento coincide con tu búsqueda."
+              icono="search-outline"
+              accion={{ texto: "Limpiar búsqueda", alPresionar: limpiarBusqueda }}
+            />
+          ) : (
+            <ListaVacia mensaje="Todavía no hay eventos próximos." icono="calendar-outline" />
+          )
+        }
       >
         {(catalogo) => (
           <FlatList
             data={catalogo.eventos}
             keyExtractor={(evento) => evento.id}
             contentContainerStyle={estilos.lista}
+            keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
               <TarjetaEvento evento={item} alPresionar={() => abrirDetalle(item.id)} />
             )}
@@ -56,5 +103,21 @@ export function Explorar() {
 
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
+  controles: {
+    gap: tema.espacio.medio,
+    paddingHorizontal: tema.espacio.normal,
+    paddingTop: tema.espacio.normal,
+  },
+  buscador: {
+    ...tema.tipografia.cuerpo,
+    minHeight: tema.tamano.campo,
+    borderWidth: tema.grosor.normal,
+    borderColor: tema.colores.borde,
+    borderRadius: tema.radio.normal,
+    paddingVertical: tema.espacio.chico,
+    paddingHorizontal: tema.espacio.medio,
+    color: tema.colores.texto,
+    backgroundColor: tema.colores.superficie,
+  },
   lista: { padding: tema.espacio.normal, paddingBottom: tema.espacio.amplio, gap: tema.espacio.medio },
 });

@@ -20,32 +20,35 @@ export interface OpcionesRender {
 
 const creadas: Dependencias[] = [];
 
-/** Las consultas del catálogo de Explorar (`GET /eventos?…`). */
-const ES_CATALOGO = /\/eventos\?/;
-
-/** Lo que responde el catálogo si el test no lo registra: vacío, sin eventos próximos. */
-const CATALOGO_VACIO: RespuestaFalsa = { status: 200, json: { eventos: [], hayEventosProximos: false } };
+/** Lo que pide Explorar y responde vacío si el test no lo registra: el catálogo y las categorías. */
+function respuestaDeExplorar(url: string): RespuestaFalsa | null {
+  if (/\/eventos\?/.test(url)) return { status: 200, json: { eventos: [], hayEventosProximos: false } };
+  if (url.endsWith("/categorias")) return { status: 200, json: [] };
+  return null;
+}
 
 /**
- * Explorar es la pestaña de inicio y pide el catálogo apenas se confirma al usuario (feature 005).
- * En los tests que no registran ese pedido (los de antes de la 005, cuando Explorar era una sección
- * pendiente) el catálogo responde vacío ("Todavía no hay eventos próximos."): una lista de
- * respuestas en orden no gasta una entrada en él y un `porRuta` sin la ruta del catálogo no falla.
+ * Explorar es la pestaña de inicio y pide el catálogo y las categorías apenas se confirma al
+ * usuario (feature 005). En los tests que no registran esos pedidos (los de antes de la 005, cuando
+ * Explorar era una sección pendiente) responden vacíos ("Todavía no hay eventos próximos."): una
+ * lista de respuestas en orden no gasta una entrada en ellos y un `porRuta` sin sus rutas no falla.
  */
-function conCatalogoVacioSiFalta(respuestas: Respuestas): FuncionRespuesta {
+function conExplorarVacioSiFalta(respuestas: Respuestas): FuncionRespuesta {
   if (typeof respuestas === "function") {
     return (url, init) => {
       try {
         return respuestas(url, init);
       } catch (error) {
-        if (ES_CATALOGO.test(url)) return CATALOGO_VACIO;
+        const deExplorar = respuestaDeExplorar(url);
+        if (deExplorar) return deExplorar;
         throw error;
       }
     };
   }
   let indice = 0;
   return (url, init) => {
-    if (ES_CATALOGO.test(url)) return CATALOGO_VACIO;
+    const deExplorar = respuestaDeExplorar(url);
+    if (deExplorar) return deExplorar;
     if (respuestas.length === 0) throw new Error("crearFetchFalso: no hay respuestas configuradas");
     const elegida = respuestas[Math.min(indice, respuestas.length - 1)];
     indice += 1;
@@ -74,7 +77,7 @@ export async function renderConDependencias({
   if (usuarioRecordado !== undefined) {
     await AsyncStorage.setItem(CLAVE_RECORDADO, JSON.stringify({ version: 1, usuarioId: usuarioRecordado }));
   }
-  const falso = crearFetchFalso(conCatalogoVacioSiFalta(respuestas));
+  const falso = crearFetchFalso(conExplorarVacioSiFalta(respuestas));
   const deps = crearDependencias({
     fetch: falso.fetch,
     almacenamiento: AsyncStorage,

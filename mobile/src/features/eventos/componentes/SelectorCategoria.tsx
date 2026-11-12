@@ -6,15 +6,27 @@ import { useCategorias } from "../../categorias";
 import { estilosDeCampo } from "./CampoDeTexto";
 import { MensajeDeCampo } from "./MensajeDeCampo";
 
-export interface PropsSelectorCategoria {
-  valor: string | null;
-  alCambiar: (categoriaId: string) => void;
-  error?: string;
-}
+/**
+ * Dos modos: el de los formularios (una categoría obligatoria) y el de Explorar (`conTodas`), con
+ * "Todas" primero (`null`).
+ */
+export type PropsSelectorCategoria =
+  | { conTodas?: false; valor: string | null; alCambiar: (categoriaId: string) => void; error?: string }
+  | { conTodas: true; valor: string | null; alCambiar: (categoriaId: string | null) => void; error?: string };
 
 /** Categoría como grupo de opciones (sin biblioteca de picker; R16), con sus propios estados. */
-export function SelectorCategoria({ valor, alCambiar, error }: PropsSelectorCategoria) {
+export function SelectorCategoria(props: PropsSelectorCategoria) {
+  const { valor, error } = props;
   const consulta = useCategorias();
+  // "Todas" (null) solo en el modo de Explorar; en los formularios siempre se elige una categoría.
+  const opciones: { id: string | null; nombre: string }[] = [
+    ...(props.conTodas ? [{ id: null, nombre: "Todas" }] : []),
+    ...(consulta.data ?? []),
+  ];
+  const elegir = (id: string | null) => {
+    if (props.conTodas) props.alCambiar(id);
+    else if (id !== null) props.alCambiar(id);
+  };
   return (
     <View style={estilos.contenedor}>
       <Text style={estilosDeCampo.etiqueta}>Categoría</Text>
@@ -37,15 +49,15 @@ export function SelectorCategoria({ valor, alCambiar, error }: PropsSelectorCate
         </View>
       ) : (
         <View accessibilityRole="radiogroup" accessibilityLabel="Categoría" style={estilos.opciones}>
-          {consulta.data.map((categoria) => {
+          {opciones.map((categoria) => {
             const elegida = categoria.id === valor;
             return (
               <Pressable
-                key={categoria.id}
+                key={categoria.id ?? "todas"}
                 accessibilityRole="radio"
                 accessibilityLabel={categoria.nombre}
                 accessibilityState={{ checked: elegida }}
-                onPress={() => alCambiar(categoria.id)}
+                onPress={() => elegir(categoria.id)}
                 style={({ pressed }) => [
                   estilos.opcion,
                   pressed && estilos.presionada,

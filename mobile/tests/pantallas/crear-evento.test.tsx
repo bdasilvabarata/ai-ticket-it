@@ -162,12 +162,10 @@ describe("Crear evento (US1): formulario y envío", () => {
   });
 
   it("las categorías muestran Cargando categorías… y, ante un error, Reintentar", async () => {
-    await abrirCrearEvento({
-      categoriasRespuestas: [
-        { status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") },
-        { status: 200, json: categorias },
-      ],
-    });
+    // Explorar (la pestaña de inicio, feature 005) pide las categorías primero: el primer 500 es el
+    // suyo, y el formulario las vuelve a pedir al abrirse.
+    const fallo = { status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") } as const;
+    await abrirCrearEvento({ categoriasRespuestas: [fallo, fallo, { status: 200, json: categorias }] });
     expect(await screen.findByText("Falló el servidor.")).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
