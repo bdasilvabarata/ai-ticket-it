@@ -174,20 +174,71 @@ Desde la raíz del repo:
 | `npm start` | arranca el servidor con los datos de ejemplo en memoria |
 | `npm run dev` | igual, recargando ante cambios (cada recarga vuelve a los datos de ejemplo) |
 | `npm run mobile` | arranca Metro (`expo start`) para abrir la app con Expo Go (ver README) |
-| `npm test` · `npm run lint` · `npm run typecheck` | calidad, en todos los paquetes |
+| `npm test` · `npm run lint` · `npm run typecheck` | calidad, en todos los paquetes (sin caché, como el CI) |
 | `npm run format` · `npm run format:check` | Prettier (escribe / verifica); no toca los `.md` |
+| `npm run test:foco -w backend -- <archivos>` | Vitest solo sobre esos tests, salida `dot` |
+| `npm run test:afectados -w backend` | Vitest sobre los tests que dependen de lo que cambió sin commitear (`--changed`) |
+| `npm run test:foco -w mobile -- <archivos>` | Jest solo sobre esos tests, `--silent` |
 
-Antes de dar una tarea por terminada: `npm test`, `npm run lint`, `npm run typecheck` y
-`npm run format:check` en verde. El CI (`.github/workflows/ci.yml`) los corre en cada PR.
-Además, un hook `Stop` de Claude Code (`.claude/settings.json` →
-`.claude/hooks/verificar-al-terminar.mjs`) corre `typecheck` y `lint` al terminar cada turno en
-que cambió algo que no sea Markdown, y si fallan no deja cerrar el turno hasta corregirlos.
-Por eso, en TDD, el test y un **stub con la firma real** del módulo que importa (que lanza
-`new Error("no implementado")`) se escriben en el mismo turno: el typecheck queda en verde y el
-test falla por comportamiento, no por un import inexistente.
+### Cuándo se corre cada cosa (constitución, "Verificación durante el desarrollo")
+
+| Momento | Qué se corre |
+|---|---|
+| Cada ciclo rojo/verde de TDD | **solo** el test de la tarea: `test:foco` con su archivo (o `test:afectados` en el backend) |
+| Fin de cada turno | el hook `Stop` (automático, ver abajo) |
+| Al cerrar una fase de `tasks.md` y antes del PR | la suite completa: `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` en verde |
+| Cada PR y cada push a `development`/`main` | el CI (`.github/workflows/ci.yml`): todo, sin caché |
+
+- Se corre el test por archivo y no la suite: la suite de mobile tarda entre 1 y 1,5 minutos;
+  un test de mobile de lógica pura, ~4 s, y uno de `tests/pantallas/` (renderiza la app), entre 10
+  y 20 s; un test del backend, ~4 s.
+- En `mobile/`, `jest --findRelatedTests` / `-o` **no sirven para las pantallas**: los tests de
+  `tests/pantallas/` llegan a ellas a través de las rutas de `app/` (que Expo Router carga con
+  `require.context`), así que Jest no las relaciona. Se nombra el archivo del test.
+- Un cambio en `shared/` lo consumen los dos paquetes: los tests de mobile no lo detectan con
+  `-o`; se corren los tests que lo usan o la suite completa.
+- Los tests focalizados no reemplazan a la suite: un cambio puede romper un test de otra
+  pantalla. Por eso la suite completa al cerrar cada fase.
+
+### Hook `Stop`
+
+Un hook `Stop` de Claude Code (`.claude/settings.json` → `.claude/hooks/verificar-al-terminar.mjs`)
+verifica tipos y lint al terminar cada turno y, si fallan, **no deja cerrar el turno** hasta
+corregirlos. Compara cada archivo con la última verificación exitosa y verifica solo lo afectado:
+
+| Cambió | Typecheck | Lint |
+|---|---|---|
+| solo `.md` | nada | nada |
+| `backend/` | backend | `backend/` |
+| `mobile/` | mobile (regenera las rutas tipadas solo si cambió `mobile/app/`) | `mobile/` |
+| `shared/` | shared, backend y mobile | los tres |
+| `eslint.config.js`, `tsconfig.base.json`, `package.json`, `package-lock.json` | los tres | todo el repo |
+| otro `.js`/`.mjs`/`.ts` de la raíz (por ejemplo, el hook) | — | ese archivo |
+
+Usa `tsc --incremental` y `eslint --cache --cache-strategy content`, con las cachés en
+`node_modules/.cache/` (fuera de git), y corre typecheck y lint en paralelo. **No corre tests**:
+esos van según la tabla de arriba. Si sospechás de la caché, borrá `node_modules/.cache/` o corré
+`npm run typecheck` / `npm run lint`, que no la usan.
+
+### TDD con stub
+
+Como el hook bloquea el turno con el typecheck en rojo, en TDD el test y un **stub con la firma
+real** del módulo que importa (que lanza `new Error("no implementado")`) se escriben en el mismo
+turno: el typecheck queda en verde y el test falla por comportamiento, no por un import
+inexistente. El rojo se comprueba con `test:foco` sobre ese test, y el verde, con el mismo comando.
 Vale igual en `mobile/`: el test de una pantalla, hook o función de `src/api/` va en el mismo
 turno que el stub de lo que importa (la pantalla con su export con nombre y la ruta de `app/` con
 su re-export, el hook o la función con su firma real).
+
+### Implement por fases
+
+- `/speckit-tasks` **agrupa las tareas triviales** en una sola: los stubs con firma real y los
+  re-exports de `app/` van junto con el test que los necesita (o en una tarea "stubs y rutas de la
+  fase"), no una tarea por archivo.
+- `/speckit-implement` se corre **de a una fase de `tasks.md`** (por ejemplo,
+  `/speckit-implement fase 3`), con **contexto limpio entre fases** (`/clear`): lo que la fase
+  siguiente necesita está en `tasks.md`, el plan y el código, no en la conversación. Cada fase
+  cierra con la suite completa en verde, las tareas marcadas en `tasks.md` y su commit.
 
 ## Convención de nombres (repositories y services)
 
