@@ -258,16 +258,18 @@ confirmaciones ni en un error falso.
 
 **Purpose**: documentación, accesibilidad, validación de punta a punta y cierre.
 
-- [ ] T050 [P] Actualizar `AGENTS.md` (plan, "Post-design re-check"):
+- [X] T050 [P] Actualizar `AGENTS.md` (plan, "Post-design re-check"):
   - recurso `compras` (ya no "mínimo"): sus cuatro endpoints, `Compra` con historial, `CompraService` dueño (`obtenerOFallar`) y `VencimientoService`; `RepositorioCompras` con `siguienteId`, `buscarPorId`, `listarPorEventoYComprador`, `listarPendientesPorEventos`;
   - el vencimiento perezoso: lecturas al día sin guardar; toda escritura de un evento materializa antes con `EventoService.obtenerAlDia`, y `obtenerDelOrganizador` recibe `ahora`;
   - los métodos para usar dentro del cerrojo del que llama (`obtenerAlDia`, `TipoEntradaService.buscarReferenciada` y `descontarCupo`) y el orden de guardado;
   - `domain/tope-por-persona.ts` y `LIMITES_COMPRA` en `shared/`;
   - mobile: la feature `compras` (depende de `eventos`, no al revés), `DetalleEvento` con `complementos` y `ListaTiposEntrada` con `accionDeTipo`, las rutas `explorar/[eventoId]/index`, `explorar/[eventoId]/comprar/[tipoEntradaId]` y `compras/[compraId]`, `EtiquetaEstadoCompra` en la base, las claves `misComprasDelEvento` y `compra`, y el `mis-compras` vacío por defecto de `renderConDependencias`.
-- [ ] T051 [P] Sumar a `mobile/tests/arquitectura/reglas-de-dependencia.test.ts` el caso de un import de `features/eventos` hacia `features/compras` (hoy no hay ninguno) y comprobar que el lint lo rechaza (`import-x/no-cycle` o la regla de features) (R19).
+- [X] T051 [P] Sumar a `mobile/tests/arquitectura/reglas-de-dependencia.test.ts` el caso de un import de `features/eventos` hacia `features/compras` (hoy no hay ninguno) y comprobar que el lint lo rechaza (`import-x/no-cycle` o la regla de features) (R19).
 - [ ] T052 Revisar en 360 px y con TalkBack: sin desplazamiento horizontal; "Comprar" al lado de cada tipo sin cortar textos; selector, "−"/"+", estado, "Pagar…" y los avisos anunciados; sin valores sueltos fuera del `tema`. Ajustar lo que haga falta en `mobile/src/features/compras/`.
-- [ ] T053 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz y dejar las cuatro en verde (incluidos todos los tests de la 004 y la 005).
+  - *Revisión de código (2026-11-12)*: sin valores fuera del `tema` ni `fontWeight`; las filas de tipo hacen `flexWrap` con los textos en `flex: 1` (el "Comprar" baja de renglón antes de cortar texto); selector, estado y avisos con `accessibilityLabel` / `accessibilityLiveRegion`. **Falta** la pasada en un dispositivo a 360 px con TalkBack.
+- [X] T053 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz y dejar las cuatro en verde (incluidos todos los tests de la 004 y la 005).
 - [ ] T054 Validar a mano las secciones "Pedidos directos" y "Recorrido en la app" de `specs/006-comprar-entradas/quickstart.md` y anotar cualquier desvío; en el paso 2–3, cronometrar comprar y pagar (< 1 min, ≤ 5 toques: SC-001).
+  - *Pedidos directos (2026-11-12)*: sin desvíos. Sofía 2 VIP → `201 PENDIENTE` total 240000, `venceEn` = alta + 15 min, VIP 48; `mis-compras` → 1 pendiente y restantes 2/2/2; pago de Diego → `403 SIN_PERMISO`; pago → `200 CONFIRMADA`; repetido → `409`; cantidad 0, -1, 1.5 y 5 → `400 ENTRADA_INVALIDA` en `body.cantidad`; tipo de otro evento → `400`; Noche de risas → `409 EVENTO_REALIZADO`; Lucía → `409 COMPRA_PROPIO_EVENTO`; Martín 3 General → `409 TOPE_POR_PERSONA` "Podés comprar 2 entradas más…"; las 3 Backstage → `201` y una más → `409 CUPO_INSUFICIENTE` "No quedan entradas de «Backstage»."; la vencida del seed → `409 COMPRA_VENCIDA`; sin usuario → `401`. **Falta** el recorrido en la app con Expo Go (pasos 1–9, cronometrar SC-001).
 - [ ] T055 En `docs/backlog.md`, pasar la 006 a `en PR`, y abrir el PR de `feature/006-comprar-entradas` a `development` con las cuatro verificaciones del CI en verde.
 
 ---
