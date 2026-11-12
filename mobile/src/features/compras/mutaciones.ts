@@ -1,7 +1,7 @@
 import type { DatosCompra } from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query } from "@tanstack/react-query";
 
-import { comprarEntradas, ErrorDeApi, pagarCompra } from "../../api";
+import { cancelarCompra, comprarEntradas, ErrorDeApi, pagarCompra } from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
@@ -49,6 +49,29 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: () => pagarCompra(cliente, compraId, { usuarioId }),
+    onSuccess: (compra) => {
+      queryClient.setQueryData(claves.compra(usuarioId, compraId), compra);
+    },
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: claves.compra(usuarioId, compraId) }),
+        queryClient.invalidateQueries({ queryKey: claves.misComprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
+        queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+      ]),
+  });
+}
+
+/**
+ * Cancela una compra pendiente (sin esperar a que venza). Al terminar, con éxito o error, invalida lo
+ * mismo que el pago: la compra, las compras del usuario en el evento, el evento (todos los usuarios:
+ * su cupo volvió) y el catálogo.
+ */
+export function useCancelarCompra(usuarioId: string, compraId: string, eventoId: string) {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => cancelarCompra(cliente, compraId, { usuarioId }),
     onSuccess: (compra) => {
       queryClient.setQueryData(claves.compra(usuarioId, compraId), compra);
     },

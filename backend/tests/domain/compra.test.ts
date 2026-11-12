@@ -353,3 +353,45 @@ describe("Compra.pagar (feature 006)", () => {
     );
   });
 });
+
+describe("Compra.cancelar (corrección de la 006)", () => {
+  const porMartinAhora = (ms: number) => ({
+    estado: EstadoCompra.CANCELADA,
+    autor: porMartin,
+    fechaHora: despues(ms),
+  });
+
+  it("PENDIENTE → CANCELADA por su comprador en `ahora`; la original no cambia", () => {
+    const original = compraPendiente();
+    const cancelada = original.cancelar("usuario-martin", despues(PLAZO - 1));
+    expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(cancelada.historial).toEqual([pendiente, porMartinAhora(PLAZO - 1)]);
+    expect(cancelada.fueVencida()).toBe(false);
+    expect(cancelada.esVigente(despues(PLAZO - 1))).toBe(false);
+    expect(original.estado).toBe(EstadoCompra.PENDIENTE);
+  });
+
+  it("una cancelada por el comprador no libera cupo como vencida ni se puede pagar", () => {
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO));
+    expect(cupoLiberadoPorTipo([cancelada], despues(PLAZO * 2)).size).toBe(0);
+    expect(() => cancelada.pagar("usuario-martin", despues(2 * MINUTO))).toThrow(
+      expect.objectContaining({ codigo: "TRANSICION_INVALIDA" }),
+    );
+  });
+
+  it("vencida (a los 15 minutos o ya CANCELADA por el sistema) → COMPRA_VENCIDA", () => {
+    const vencida = expect.objectContaining({ codigo: "COMPRA_VENCIDA" });
+    expect(() => compraPendiente().cancelar("usuario-martin", despues(PLAZO))).toThrow(vencida);
+    expect(() => compraPendiente().vencer().cancelar("usuario-martin", despues(MINUTO))).toThrow(vencida);
+  });
+
+  it("CONFIRMADA o ya cancelada por el comprador → TRANSICION_INVALIDA", () => {
+    const invalida = expect.objectContaining({
+      codigo: "TRANSICION_INVALIDA",
+      message: "La compra no está pendiente de pago.",
+    });
+    expect(() => compraConfirmada().cancelar("usuario-martin", despues(10 * MINUTO))).toThrow(invalida);
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO));
+    expect(() => cancelada.cancelar("usuario-martin", despues(2 * MINUTO))).toThrow(invalida);
+  });
+});

@@ -86,6 +86,7 @@ Del usuario actual, con un `ahora` por pedido y sin cerrojo:
 ```json
 {
   "pendientes": [],
+  "confirmadas": [{ "id": "compra-martin-festival-vip", "estado": "CONFIRMADA", "...": "CompraVista" }],
   "restantesPorTipo": [
     { "tipoEntradaId": "tipo-festival-sonidos-del-sur-general", "restantes": 2 },
     { "tipoEntradaId": "tipo-festival-sonidos-del-sur-vip", "restantes": 2 },
@@ -96,6 +97,8 @@ Del usuario actual, con un `ahora` por pedido y sin cerrojo:
 
 - `pendientes`: no incluye las vencidas, las confirmadas, las canceladas ni las de otros
   usuarios.
+- `confirmadas` (revisión, FR-023b): sus compras `CONFIRMADA` de ese evento, de la más nueva a la
+  más vieja.
 - `restantesPorTipo`: un elemento por cada tipo del evento, en su orden. Es solo el tope (el cupo
   está en la `EventoVista`): la app usa `min(cupo, restantes)`. Para el organizador del evento,
   `0` en todos. Con el evento realizado se calcula igual (la app no ofrece comprar).
@@ -124,6 +127,21 @@ Respuesta `200`: la `CompraVista` `CONFIRMADA`, con `venceEn: null`, `venceEnLoc
 historial `[PENDIENTE, CONFIRMADA]`. Pagar dos veces la misma compra da `409
 TRANSICION_INVALIDA` la segunda vez (no es idempotente: la app consulta el estado real).
 
+### `POST /api/compras/:compraId/cancelacion` (revisión, FR-023a)
+
+Sin cuerpo (si viene uno, se ignora). El comprador cancela su compra `PENDIENTE` sin esperar a
+que venza. Bajo el cerrojo del evento de la compra, en el mismo orden que el pago:
+
+1. vence las compras pendientes vencidas del evento (también esta, si venció);
+2. `403` si el usuario no es el comprador;
+3. `409 COMPRA_VENCIDA` si venció;
+4. `409 TRANSICION_INVALIDA` si no está `PENDIENTE` (ya `CONFIRMADA` o ya cancelada);
+5. `PENDIENTE → CANCELADA`, con un cambio **por el comprador** en `ahora`; se guarda primero la
+   compra y después el evento con sus entradas devueltas al cupo.
+
+Respuesta `200`: la `CompraVista` `CANCELADA`, con `venceEn: null` y el historial
+`[PENDIENTE, CANCELADA (usuario)]`. También con el evento empezado.
+
 ### Lecturas de eventos al día
 
 `GET /api/eventos` y `GET /api/eventos/:eventoId` muestran el `cupo` de cada tipo (y `agotado`)
@@ -136,15 +154,15 @@ La forma de las vistas no cambia.
 |---|---|---|---|
 | 400 | `ENTRADA_INVALIDA` | "Los datos enviados no son válidos." | `cantidad` o `tipoEntradaId` inválidos o tipo que no es del evento (`detalles` en `body.*`); ids de la ruta mal formados (`params.*`) |
 | 401 | `USUARIO_NO_IDENTIFICADO` | "Tenés que indicar un usuario válido." | sin `X-Usuario-Id` válido |
-| 403 | `SIN_PERMISO` | "Solo quien hizo la compra puede verla o pagarla." | ver o pagar una compra ajena |
+| 403 | `SIN_PERMISO` | "Solo quien hizo la compra puede verla o pagarla." | ver, pagar o cancelar una compra ajena |
 | 404 | `EVENTO_NO_ENCONTRADO` | "No existe el evento." | alta o mis-compras de un evento inexistente |
-| 404 | `COMPRA_NO_ENCONTRADA` | "No existe la compra." | ver o pagar una compra inexistente |
+| 404 | `COMPRA_NO_ENCONTRADA` | "No existe la compra." | ver, pagar o cancelar una compra inexistente |
 | 409 | `EVENTO_REALIZADO` | "El evento ya se realizó: no se pueden comprar entradas." | alta con el evento empezado, según el reloj del servidor (el pago no lo usa) |
 | 409 | `COMPRA_PROPIO_EVENTO` | "No podés comprar entradas de un evento que organizás." | el organizador compra en su evento |
 | 409 | `TOPE_POR_PERSONA` | ver [data-model.md](../data-model.md) (dice cuántas puede comprar todavía) | supera 4 pagas por evento o 1 por tipo gratis |
 | 409 | `CUPO_INSUFICIENTE` | "Quedan N entradas de «Tipo»." · "Queda 1 entrada de «Tipo»." · "No quedan entradas de «Tipo»." | `cantidad` > cupo disponible |
-| 409 | `COMPRA_VENCIDA` | "La compra venció: pasaron 15 minutos sin pagarla." | pagar una compra vencida |
-| 409 | `TRANSICION_INVALIDA` | "La compra no está pendiente de pago." | pagar una compra que no está `PENDIENTE` |
+| 409 | `COMPRA_VENCIDA` | "La compra venció: pasaron 15 minutos sin pagarla." | pagar o cancelar una compra vencida |
+| 409 | `TRANSICION_INVALIDA` | "La compra no está pendiente de pago." | pagar o cancelar una compra que no está `PENDIENTE` |
 
 Todo rechazo deja el cupo y las compras sin cambios (salvo la materialización de los
 vencimientos, que refleja lo que ya había pasado).

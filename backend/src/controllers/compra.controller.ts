@@ -29,4 +29,9 @@ export class CompraController {
     const { compraId } = compraPorId.leer(req, "params");
     res.json(await this.compraService.pagar(compraId, usuarioActual(req).id));
   };
+
+  cancelar = async (req: Request, res: Response<CompraVista>): Promise<void> => {
+    const { compraId } = compraPorId.leer(req, "params");
+    res.json(await this.compraService.cancelar(compraId, usuarioActual(req).id));
+  };
 }

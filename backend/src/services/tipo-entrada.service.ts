@@ -97,6 +97,17 @@ export class TipoEntradaService {
     return descontado;
   }
 
+  /**
+   * Devuelve al cupo las entradas de una compra que su comprador canceló y guarda el evento. Como
+   * `descontarCupo`, corre **dentro** del cerrojo de quien llama; sin chequeo de "realizado" (una
+   * pendiente se cancela también con el evento empezado).
+   */
+  async devolverCupo(evento: Evento, tipoId: string, cantidad: number): Promise<Evento> {
+    const devuelto = evento.devolverCupos(new Map([[tipoId, cantidad]]));
+    await this.#eventos.guardar(devuelto);
+    return devuelto;
+  }
+
   /** 404 si el tipo no es de **este** evento (FR-023), aunque exista en otro. */
   #obtenerTipoOFallar(evento: Evento, tipoId: string): TipoEntrada {
     const tipo = evento.buscarTipoEntrada(tipoId);

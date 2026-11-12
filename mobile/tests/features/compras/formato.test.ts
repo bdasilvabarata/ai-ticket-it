@@ -1,4 +1,11 @@
-import { textoCantidad, textoTotal, textoVencimiento } from "../../../src/features/compras/formato";
+import {
+  textoCancelada,
+  textoCantidad,
+  textoEntradasConfirmadas,
+  textoTotal,
+  textoVencimiento,
+} from "../../../src/features/compras/formato";
+import { compraCancelada, compraCanceladaPorElComprador } from "../../helpers/compras";
 
 describe("textoTotal", () => {
   it("0 → Gratis", () => {
@@ -20,5 +27,23 @@ describe("textoCantidad", () => {
 describe("textoVencimiento", () => {
   it('"2026-11-12T15:35" → Podés pagar hasta las 15:35 (sin convertir zonas)', () => {
     expect(textoVencimiento("2026-11-12T15:35")).toBe("Podés pagar hasta las 15:35");
+  });
+});
+
+describe("textoCancelada", () => {
+  it("vencida (el sistema) o cancelada por su comprador", () => {
+    expect(textoCancelada(compraCancelada)).toBe(
+      "Esta compra venció: sus entradas volvieron a estar disponibles.",
+    );
+    expect(textoCancelada(compraCanceladaPorElComprador)).toBe(
+      "Cancelaste esta compra: sus entradas volvieron a estar disponibles.",
+    );
+  });
+});
+
+describe("textoEntradasConfirmadas", () => {
+  it("1 → singular; 3 → plural", () => {
+    expect(textoEntradasConfirmadas(1)).toBe("Tenés 1 entrada confirmada para este evento");
+    expect(textoEntradasConfirmadas(3)).toBe("Tenés 3 entradas confirmadas para este evento");
   });
 });

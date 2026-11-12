@@ -47,3 +47,15 @@ export function pagarCompra(
 ): Promise<CompraVista> {
   return cliente.post<CompraVista>(`${rutaDeLaCompra(compraId)}/pago`, undefined, { usuarioId });
 }
+
+/**
+ * `POST /compras/:compraId/cancelacion`, sin cuerpo: el comprador cancela su compra pendiente y sus
+ * entradas vuelven al cupo. No se reintenta solo.
+ */
+export function cancelarCompra(
+  cliente: ClienteApi,
+  compraId: string,
+  { usuarioId }: { usuarioId: string },
+): Promise<CompraVista> {
+  return cliente.post<CompraVista>(`${rutaDeLaCompra(compraId)}/cancelacion`, undefined, { usuarioId });
+}

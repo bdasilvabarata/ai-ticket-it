@@ -842,6 +842,110 @@
         }
       }
     },
+    "/compras/{compraId}/cancelacion": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Cancelar una compra pendiente",
+        "description": "Sin cuerpo (si viene uno, se ignora). El comprador cancela su compra PENDIENTE sin esperar a que venza: bajo el cerrojo del evento de la compra vence las pendientes vencidas del evento, verifica que el usuario sea el comprador, pasa la compra a CANCELADA (con un cambio de estado del comprador) y devuelve sus entradas al cupo. También con el evento empezado. Una compra CONFIRMADA no se cancela acá (eso es de la feature 009, con reembolso): 409 TRANSICION_INVALIDA.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra CANCELADA, con `venceEn: null` y el historial [PENDIENTE, CANCELADA del comprador]",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla (ya se canceló sola)",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "yaPagada": {
+                    "summary": "Ya está CONFIRMADA o ya se canceló",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra no está pendiente de pago."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/eventos/{eventoId}/tipos-entrada": {
       "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
       "post": {
@@ -1393,12 +1497,17 @@
       },
       "MisComprasDelEventoVista": {
         "type": "object",
-        "required": ["pendientes", "restantesPorTipo"],
+        "required": ["pendientes", "confirmadas", "restantesPorTipo"],
         "properties": {
           "pendientes": {
             "type": "array",
             "items": { "$ref": "#/components/schemas/CompraVista" },
             "description": "Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva"
+          },
+          "confirmadas": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CompraVista" },
+            "description": "Sus compras CONFIRMADA de ese evento (sus entradas), de la más nueva a la más vieja"
           },
           "restantesPorTipo": {
             "type": "array",

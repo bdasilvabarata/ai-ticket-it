@@ -42,9 +42,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
     `eventos/:eventoId/tipos-entrada` (`TipoEntrada` vive dentro del agregado `Evento`: tiene
     controller y service, pero se guarda con `RepositorioEventos`), `compras` (feature 006:
-    `POST /eventos/:eventoId/compras` y `GET /eventos/:eventoId/mis-compras` en el router de
-    eventos, `GET /compras/:compraId` y `POST /compras/:compraId/pago` en `compras.routes.ts`; todos
-    con usuario, y una compra solo la ve y la paga su comprador) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
+    `POST /eventos/:eventoId/compras` y `GET /eventos/:eventoId/mis-compras` (pendientes,
+    confirmadas y restantes por tipo) en el router de eventos, `GET /compras/:compraId`,
+    `POST /compras/:compraId/pago` y `POST /compras/:compraId/cancelacion` en `compras.routes.ts`;
+    todos con usuario, y una compra solo la ve, la paga y la cancela su comprador) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
     `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
@@ -57,7 +58,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - **Compras** (feature 006): `domain/compra.ts` es una `Compra` con **historial** de cambios de
     estado (`{ estado, autor: usuario | sistema, fechaHora }`; el estado es el del último, el primero
     siempre `PENDIENTE`) y transiciones que devuelven una `Compra` nueva (`registrar`, `pagar`,
-    `vencer`, `alDia`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
+    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
     aplica `LIMITES_COMPRA` sobre las compras **vigentes**. `RepositorioCompras` suma `siguienteId`,
     `buscarPorId`, `listarPorEventoYComprador` y `listarPendientesPorEventos` (las guardadas
     `PENDIENTE`, vencidas o no); `existePorEvento` / `existePorTipoEntrada` cuentan toda compra,
@@ -84,7 +85,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     usan. Crear un evento no lo usa (su id es nuevo). El alta y el pago de una compra lo toman con
     el `eventoId` del evento (el pago, el de la compra, y relee la compra adentro).
     `EventoService.obtenerAlDia`, `TipoEntradaService.buscarReferenciada` y
-    `TipoEntradaService.descontarCupo` se usan **dentro** del cerrojo del que llama y no lo toman.
+    `TipoEntradaService.descontarCupo` / `devolverCupo` se usan **dentro** del cerrojo del que
+    llama y no lo toman. La cancelación de una pendiente sigue el orden de guardado del vencimiento
+    (primero la compra, después el evento con el cupo devuelto).
   - Orden de los chequeos de una escritura: 401 → 400 de forma → 404 evento → 403 → 404 tipo →
     400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Los 404/403 los lanza el service con
     `errors/`; los 409, `domain/`.
@@ -121,8 +124,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     renderizan `<SeccionPendiente nombre="…" />`. `(tabs)/` tiene las pestañas Explorar · Mis
     compras · Mis eventos · Perfil; `seleccionar-usuario` es el selector (pantalla completa sin
     usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
-    son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`
-    y `compras/[compraId]` ("Tu compra"). El lint prohíbe importar
+    son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
+    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y `compras/[compraId]`
+    ("Tu compra"). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
   - **Base** (no importa features):
     - `src/api/` — el cliente HTTP y un archivo por recurso con sus funciones de endpoint,
@@ -180,11 +184,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       de "Tipos de entrada"): así otra feature le suma cosas **sin que `eventos` la importe**;
     - `compras/` (feature 006; **depende de `eventos`** por su `index.ts`, nunca al revés: el lint
       lo rechaza como ciclo) — `DetalleEventoConCompras` (el detalle con "Comprar" por tipo, "Sos el
-      organizador de este evento" y "Tus compras pendientes"), `ComprarEntradas` (`SelectorCantidad`
+      organizador de este evento", "Ver mis entradas" y "Tus compras pendientes" con "Pagar" y
+      "Cancelar"), `MisEntradasDelEvento`, `ComprarEntradas` (`SelectorCantidad`
       y total estimado; el tope lo informa el servidor en `restantesPorTipo`), `Compra` ("Tu compra":
       `ResumenCompra` y "Pagar"/"Confirmar", dibujada siempre desde `useCompra`, así un pago con la
       respuesta perdida muestra el estado real), `useMisComprasDelEvento`/`useCompra`, las mutations
-      `useComprarEntradas`/`usePagarCompra` (sin reintentos; al terminar invalidan el evento para
+      `useComprarEntradas`/`usePagarCompra`/`useCancelarCompra` (sin reintentos; al terminar invalidan el evento para
       todos los usuarios, `misComprasDelEvento`, la compra y `["catalogo"]`) y `formato.ts`.
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({

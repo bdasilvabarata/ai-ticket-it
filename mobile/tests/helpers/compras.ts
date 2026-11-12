@@ -5,12 +5,13 @@ import { maratonCompleta } from "./eventos";
 // Datos de compras para los tests de la feature 006.
 
 /** Lo que responde `renderConDependencias` si un test no registra `mis-compras` (R19). */
-export const sinCompras: MisComprasDelEventoVista = { pendientes: [], restantesPorTipo: [] };
+export const sinCompras: MisComprasDelEventoVista = { pendientes: [], confirmadas: [], restantesPorTipo: [] };
 
 /** `mis-compras` con esos restantes por tipo y sin pendientes. */
 export function conRestantes(restantes: Record<string, number>): MisComprasDelEventoVista {
   return {
     pendientes: [],
+    confirmadas: [],
     restantesPorTipo: Object.entries(restantes).map(([tipoEntradaId, cantidad]) => ({
       tipoEntradaId,
       restantes: cantidad,
@@ -76,6 +77,23 @@ export const compraCancelada: CompraVista = {
       autor: { tipo: "sistema" },
       fechaHora: "2026-11-12T18:35:00.000Z",
       fechaHoraLocal: "2026-11-12T15:35",
+    },
+  ],
+};
+
+/** La misma compra, cancelada por Martín antes de pagarla. */
+export const compraCanceladaPorElComprador: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CANCELADA,
+  venceEn: null,
+  venceEnLocal: null,
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-12T18:25:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:25",
     },
   ],
 };

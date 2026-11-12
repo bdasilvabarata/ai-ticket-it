@@ -274,6 +274,17 @@ confirmaciones ni en un error falso.
 
 ---
 
+## Phase 8: Correcciones de la revisión (2026-11-12)
+
+**Purpose**: tres correcciones pedidas al revisar la app (FR-023a, FR-023b y FR-023c).
+
+- [X] T056 Cancelar una compra pendiente (FR-023a). Backend: `Compra.cancelar(usuarioId, ahora)` (vencida → `COMPRA_VENCIDA`; no `PENDIENTE` → `TRANSICION_INVALIDA`), `TipoEntradaService.devolverCupo` (dentro del cerrojo de quien llama), `CompraService.cancelar` (bajo el cerrojo del evento; guarda la compra y después el evento) y `POST /compras/:compraId/cancelacion`, con OpenAPI y Postman; tests en `tests/domain/compra.test.ts`, `tests/services/compra.service.test.ts`, `tests/services/tipo-entrada.service.test.ts` y `tests/api/compras.test.ts`. Mobile: `cancelarCompra`, `useCancelarCompra`, "Cancelar" con confirmación en `FilaCompraPendiente` y el aviso de "Tu compra" según quién canceló (`textoCancelada`); tests en `tests/api/compras.test.ts`, `tests/features/compras/formato.test.ts`, `tests/pantallas/detalle-evento.test.tsx` y `tests/pantallas/compra.test.tsx`.
+- [X] T057 Ver mis entradas (FR-023b). `MisComprasDelEventoVista.confirmadas` en `shared/` y en `CompraService.misComprasDelEvento` (de la más nueva a la más vieja); `AccesoMisEntradas` en la sección propia del detalle y la ruta `explorar/[eventoId]/mis-entradas` (`MisEntradasDelEvento` con `FilaCompraConfirmada`); tests en los mismos archivos.
+- [X] T058 El aviso del máximo en una columna angosta a la derecha de la fila del tipo (FR-023c), en `AccionComprar`.
+- [X] T059 `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` en verde.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

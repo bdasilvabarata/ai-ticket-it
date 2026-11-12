@@ -57,8 +57,9 @@ function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
  * Una compra de entradas de un tipo, con su historial de estados (feature 006). El estado, el alta
  * y el vencimiento se derivan del historial. Es inmutable: las operaciones devuelven una `Compra`
  * nueva. El alta es `Compra.registrar` (PENDIENTE). Transiciones de esta feature:
- * `PENDIENTE → CONFIRMADA` (el pago del comprador) y `PENDIENTE → CANCELADA` (vencimiento del
- * sistema a los 15 minutos); las de la 008 y la 009 se suman después.
+ * `PENDIENTE → CONFIRMADA` (el pago del comprador), `PENDIENTE → CANCELADA` por el sistema
+ * (vencimiento a los 15 minutos) y `PENDIENTE → CANCELADA` por el comprador (la cancela antes de
+ * pagarla); las de la 008 y la 009 se suman después.
  */
 export class Compra {
   readonly id: string;
@@ -183,6 +184,25 @@ export class Compra {
     }
     return this.#conCambio({
       estado: EstadoCompra.CONFIRMADA,
+      autor: { tipo: "usuario", usuarioId },
+      fechaHora: ahora,
+    });
+  }
+
+  /**
+   * PENDIENTE → CANCELADA por su comprador en `ahora`, antes de pagarla (sus entradas vuelven al
+   * cupo). Mismo orden que `pagar`: vencida → `COMPRA_VENCIDA`; no PENDIENTE → `TRANSICION_INVALIDA`
+   * (cancelar una confirmada, con reembolso, es de la 009). También con el evento empezado.
+   */
+  cancelar(usuarioId: string, ahora: Date): Compra {
+    if (this.estaVencida(ahora) || this.fueVencida()) {
+      throw new ReglaDeNegocioError("COMPRA_VENCIDA", "La compra venció: pasaron 15 minutos sin pagarla.");
+    }
+    if (this.estado !== EstadoCompra.PENDIENTE) {
+      throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "La compra no está pendiente de pago.");
+    }
+    return this.#conCambio({
+      estado: EstadoCompra.CANCELADA,
       autor: { tipo: "usuario", usuarioId },
       fechaHora: ahora,
     });

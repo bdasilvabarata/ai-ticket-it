@@ -16,7 +16,7 @@ import {
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { ResumenCompra } from "../componentes/ResumenCompra";
-import { textoVencimiento } from "../formato";
+import { textoCancelada, textoVencimiento } from "../formato";
 import { usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
 
@@ -85,7 +85,7 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
       ) : null}
       {compra.estado === EstadoCompra.CANCELADA ? (
         <Text style={estilos.mensaje} accessibilityLiveRegion="polite">
-          Esta compra venció: sus entradas volvieron a estar disponibles.
+          {textoCancelada(compra)}
         </Text>
       ) : null}
       <ResumenCompra compra={compra} />

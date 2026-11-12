@@ -3,6 +3,7 @@ import { router } from "expo-router";
 
 import {
   compraCancelada,
+  compraCanceladaPorElComprador,
   compraConfirmada,
   compraGratis,
   compraPendiente,
@@ -122,6 +123,17 @@ describe("Tu compra (US2)", () => {
     expect(await screen.findByLabelText("Estado: Cancelada")).toBeOnTheScreen();
     expect(
       screen.getByText("Esta compra venció: sus entradas volvieron a estar disponibles."),
+    ).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();
+  });
+
+  it("CANCELADA por el comprador: Cancelaste esta compra y Volver al evento, sin Pagar", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraCanceladaPorElComprador }] });
+
+    expect(await screen.findByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(
+      screen.getByText("Cancelaste esta compra: sus entradas volvieron a estar disponibles."),
     ).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();

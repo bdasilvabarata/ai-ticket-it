@@ -14,7 +14,7 @@ import { aCompraVista } from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import type { TipoEntradaService } from "./tipo-entrada.service";
 
-/** Solo quien hizo la compra puede verla o pagarla (403). */
+/** Solo quien hizo la compra puede verla, pagarla o cancelarla (403; el mensaje es el de la 006). */
 function exigirQueEsSuya(compra: Compra, usuarioId: string): void {
   if (compra.compradorId !== usuarioId) {
     throw new SinPermisoError("Solo quien hizo la compra puede verla o pagarla.");
@@ -121,8 +121,33 @@ export class CompraService {
   }
 
   /**
+   * El comprador cancela una compra PENDIENTE sin esperar a que venza. Como `pagar`: bajo el
+   * cerrojo de su evento, con un único `ahora`, materializa los vencimientos del evento, relee la
+   * compra, 403 si no es suya y `compra.cancelar` decide entre 409 vencida, 409 transición inválida
+   * o CANCELADA por el comprador. Guarda primero la compra y después el evento con su cupo devuelto
+   * (como al vencer: nunca se ve cupo de más).
+   */
+  async cancelar(compraId: string, usuarioId: string): Promise<CompraVista> {
+    const { eventoId } = await this.obtenerOFallar(compraId);
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerAlDia(eventoId, ahora);
+      const compra = await this.obtenerOFallar(compraId);
+      exigirQueEsSuya(compra, usuarioId);
+      const cancelada = compra.cancelar(usuarioId, ahora);
+      await this.#compras.guardar(cancelada);
+      const devuelto = await this.#tipoEntradaService.devolverCupo(
+        evento,
+        cancelada.tipoEntradaId,
+        cancelada.cantidad,
+      );
+      return aCompraVista(cancelada, devuelto, ahora);
+    });
+  }
+
+  /**
    * Lo que el detalle del evento necesita saber del usuario actual: sus compras pendientes no
-   * vencidas (de la más vieja a la más nueva) y cuántas entradas más puede comprar de cada tipo
+   * vencidas (de la más vieja a la más nueva), sus confirmadas (de la más nueva a la más vieja) y cuántas entradas más puede comprar de cada tipo
    * (0 en todos si organiza el evento). Lectura: sin cerrojo, con un `ahora` y sin guardar.
    */
   async misComprasDelEvento(eventoId: string, usuarioId: string): Promise<MisComprasDelEventoVista> {
@@ -137,6 +162,10 @@ export class CompraService {
       pendientes: suyas
         .filter((compra) => compra.estado === EstadoCompra.PENDIENTE)
         .toSorted((a, b) => a.creadaEn.getTime() - b.creadaEn.getTime())
+        .map((compra) => aCompraVista(compra, evento, ahora)),
+      confirmadas: suyas
+        .filter((compra) => compra.estado === EstadoCompra.CONFIRMADA)
+        .toSorted((a, b) => b.creadaEn.getTime() - a.creadaEn.getTime())
         .map((compra) => aCompraVista(compra, evento, ahora)),
       restantesPorTipo: evento.tiposEntrada.map((tipo) => ({
         tipoEntradaId: tipo.id,

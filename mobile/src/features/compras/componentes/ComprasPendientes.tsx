@@ -22,7 +22,7 @@ export function ComprasPendientes({ usuarioId, eventoId }: PropsComprasPendiente
         Tus compras pendientes
       </Text>
       {data.pendientes.map((compra) => (
-        <FilaCompraPendiente key={compra.id} compra={compra} />
+        <FilaCompraPendiente key={compra.id} usuarioId={usuarioId} compra={compra} />
       ))}
     </View>
   );

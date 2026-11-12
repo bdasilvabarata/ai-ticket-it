@@ -115,11 +115,14 @@ describe("POST /api/eventos/:eventoId/compras", () => {
 });
 
 describe("GET /api/eventos/:eventoId/mis-compras", () => {
-  it("Martín en el Festival: sin pendientes y 2 restantes en cada tipo", async () => {
+  it("Martín en el Festival: sin pendientes, su compra confirmada y 2 restantes en cada tipo", async () => {
     const respuesta = await misCompras(nuevaApp(), "usuario-martin");
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toEqual({
       pendientes: [],
+      confirmadas: [
+        expect.objectContaining({ id: "compra-martin-festival-vip", estado: EstadoCompra.CONFIRMADA }),
+      ],
       restantesPorTipo: [
         { tipoEntradaId: GENERAL, restantes: 2 },
         { tipoEntradaId: VIP, restantes: 2 },
@@ -435,5 +438,56 @@ describe("rechazos del alta: status, código y mensaje, sin tocar el cupo", () =
         { campo: "params.compraId", mensaje: "Debe ser un identificador válido." },
       ]);
     }
+  });
+});
+
+describe("POST /api/compras/:compraId/cancelacion (corrección de la 006)", () => {
+  const cancelar = (app: App, compraId: string, usuarioId = "usuario-sofia") =>
+    request(app).post(`/api/compras/${compraId}/cancelacion`).set("X-Usuario-Id", usuarioId);
+
+  it("Sofía cancela su pendiente → 200 CANCELADA por ella, el cupo vuelve y ya no está en mis-compras", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
+    expect(await cupoDe(app, VIP)).toBe(48);
+
+    const respuesta = await cancelar(app, compra.id);
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({ estado: EstadoCompra.CANCELADA, venceEn: null });
+    expect(respuesta.body.historial.at(-1)).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+    });
+    expect(await cupoDe(app, VIP)).toBe(50);
+    expect((await misCompras(app, "usuario-sofia")).body.pendientes).toEqual([]);
+  });
+
+  it("Diego → 403; inexistente → 404; sin usuario → 401; ya pagada → 409 TRANSICION_INVALIDA", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
+    expect((await cancelar(app, compra.id, "usuario-diego")).status).toBe(403);
+    expect((await cancelar(app, "compra-inexistente")).body.error.codigo).toBe("COMPRA_NO_ENCONTRADA");
+    expect((await request(app).post(`/api/compras/${compra.id}/cancelacion`)).status).toBe(401);
+    await pagar(app, compra.id);
+    const otra = await cancelar(app, compra.id);
+    expect(otra.status).toBe(409);
+    expect(otra.body.error.codigo).toBe("TRANSICION_INVALIDA");
+  });
+
+  it("la compra vencida del seed → 409 COMPRA_VENCIDA", async () => {
+    const respuesta = await cancelar(nuevaApp(), "compra-diego-festival-general", "usuario-diego");
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error.codigo).toBe("COMPRA_VENCIDA");
+  });
+});
+
+describe("GET /api/eventos/:eventoId/mis-compras: confirmadas (corrección de la 006)", () => {
+  it("después de pagar, la compra pasa de pendientes a confirmadas", async () => {
+    const app = nuevaApp();
+    const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 }, "usuario-diego");
+    await pagar(app, compra.id, "usuario-diego");
+    const { body } = await misCompras(app, "usuario-diego");
+    expect(body.pendientes).toEqual([]);
+    expect(body.confirmadas.map((c: { id: string }) => c.id)).toContain(compra.id);
   });
 });

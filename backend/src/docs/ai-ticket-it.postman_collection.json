@@ -420,6 +420,14 @@
           }
         },
         {
+          "name": "Cancelar la compra ya pagada → 409 TRANSICION_INVALIDA (una PENDIENTE pasaría a CANCELADA)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
           "name": "Cantidad 0 → 400 ENTRADA_INVALIDA (body.cantidad)",
           "request": {
             "method": "POST",

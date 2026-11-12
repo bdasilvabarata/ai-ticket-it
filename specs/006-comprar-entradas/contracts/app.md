@@ -11,6 +11,7 @@ buscan los tests.
 | `explorar/[eventoId]/index.tsx` **(se mueve** desde `explorar/[eventoId].tsx`) | `DetalleEventoConCompras` (feature `compras`) | "Evento" |
 | `explorar/[eventoId]/comprar/[tipoEntradaId].tsx` **(nueva)** | `ComprarEntradas` (feature `compras`) | "Comprar entradas" |
 | `compras/[compraId].tsx` **(nueva)** | `Compra` (feature `compras`) | "Tu compra" |
+| `explorar/[eventoId]/mis-entradas.tsx` **(nueva, revisión FR-023b)** | `MisEntradasDelEvento` (feature `compras`) | "Mis entradas" |
 
 - Los tres archivos son un re-export de una línea.
 - `LayoutRaiz` los declara en el `Stack.Protected` de `con-usuario`
@@ -20,6 +21,8 @@ buscan los tests.
   - "Comprar" de un tipo → `router.push({ pathname: "/explorar/[eventoId]/comprar/[tipoEntradaId]", params })`;
   - compra registrada → `router.replace({ pathname: "/compras/[compraId]", params })`;
   - "Pagar" de una compra pendiente del detalle → `router.push` a `/compras/[compraId]`;
+  - "Ver mis entradas" del detalle → `router.push` a `/explorar/[eventoId]/mis-entradas`, y "Ver"
+    de cada entrada → `router.push` a `/compras/[compraId]`;
   - "Volver al evento" → `router.back()`; "Ir a Explorar" y "Volver a Explorar" → `router.dismissTo("/")`.
 - `tests/tipos/rutas-tipadas.ts` suma `/explorar/[eventoId]/comprar/[tipoEntradaId]` y
   `/compras/[compraId]`.
@@ -32,6 +35,7 @@ buscan los tests.
 | `obtenerMisComprasDelEvento(cliente, eventoId, { signal })` | `GET /eventos/:eventoId/mis-compras` |
 | `obtenerCompra(cliente, compraId, { signal })` | `GET /compras/:compraId` |
 | `pagarCompra(cliente, compraId, { usuarioId })` | `POST /compras/:compraId/pago` sin cuerpo |
+| `cancelarCompra(cliente, compraId, { usuarioId })` | `POST /compras/:compraId/cancelacion` sin cuerpo (revisión) |
 
 Los ids van con `encodeURIComponent`, como en `eventos.ts`.
 
@@ -43,6 +47,7 @@ Los ids van con `encodeURIComponent`, como en `eventos.ts`.
 | `useCompra(usuarioId, compraId)` | `claves.compra(usuarioId, compraId)` = `["compra", usuarioId, compraId]` |
 | `useComprarEntradas(usuarioId, eventoId)` | al terminar (éxito o error) invalida `["evento", *, eventoId]` (todos los usuarios), `misComprasDelEvento` y `["catalogo"]`; ante un 404, el evento se invalida sin volver a pedirlo |
 | `usePagarCompra(usuarioId, compraId, eventoId)` | con éxito, escribe la respuesta en `claves.compra`; al terminar invalida la compra, `misComprasDelEvento`, `["evento", *, eventoId]` y `["catalogo"]` |
+| `useCancelarCompra(usuarioId, compraId, eventoId)` (revisión) | lo mismo que `usePagarCompra` |
 
 Las mutations van en nombre del usuario de la pantalla y no se reintentan solas.
 
@@ -56,8 +61,19 @@ igual (incluido "Este evento ya se realizó" y "No encontramos este evento.").
 | Condición | Se ve |
 |---|---|
 | el usuario es el organizador | "Sos el organizador de este evento" |
-| tiene compras pendientes no vencidas | título "Tus compras pendientes" y, por compra: "VIP · 2 entradas · $ 240.000" (o "Gratis"), "Podés pagar hasta las 15:35", `EtiquetaEstadoCompra` "Pendiente" y el botón "Pagar" (`accessibilityLabel` "Pagar la compra de 2 entradas VIP") |
+| tiene compras confirmadas (revisión, FR-023b) | "Tenés 3 entradas confirmadas para este evento" (la suma de sus cantidades) y "Ver mis entradas" |
+| tiene compras pendientes no vencidas | título "Tus compras pendientes" y, por compra: "VIP · 2 entradas · $ 240.000" (o "Gratis"), "Podés pagar hasta las 15:35", `EtiquetaEstadoCompra` "Pendiente", el botón "Pagar" (`accessibilityLabel` "Pagar la compra de 2 entradas VIP") y "Cancelar" (`accessibilityLabel` "Cancelar la compra de 2 entradas VIP"; revisión, FR-023a) |
 | sin pendientes, o la consulta falló o carga | nada |
+
+"Cancelar" pide confirmación (`Alert` "¿Cancelar la compra de 2 entradas VIP?", con "Volver" y
+"Cancelar compra"); en curso dice "Cancelando…". Sin servidor: "No se pudo cancelar. Probá de
+nuevo." en la fila, que sigue pendiente; un `409` no avisa (se vuelve a pedir `mis-compras`).
+
+**Mis entradas** (`MisEntradasDelEvento`, revisión FR-023b): con `SegunConsulta` sobre
+`useMisComprasDelEvento`; el nombre del evento como título y, por compra confirmada, "VIP · 2
+entradas · $ 240.000", `EtiquetaEstadoCompra` "Confirmada" y "Ver" (`accessibilityLabel` "Ver la
+compra de 2 entradas VIP"). Sin confirmadas: "Todavía no tenés entradas confirmadas para este
+evento.".
 
 Las compras pendientes se muestran con "Pagar" también si el evento ya empezó: se pueden pagar
 hasta que vencen (research R9). Lo que desaparece con el evento empezado es "Comprar".
@@ -67,7 +83,7 @@ hasta que vencen (research R9). Lo que desaparece con el evento empezado es "Com
 | Condición (en este orden) | Se ve |
 |---|---|
 | evento realizado · usuario organizador · tipo con cupo 0 | nada (el cupo ya dice "Agotado") |
-| `restantes` del tipo = 0 | "Ya tenés el máximo de entradas para este evento" |
+| `restantes` del tipo = 0 | "Ya tenés el máximo de entradas para este evento", en una columna angosta a la derecha (≈ 38 % de la fila, alineado a la derecha), sin quitarle ancho al nombre y la descripción (revisión, FR-023c) |
 | si no (también mientras carga `mis-compras`) | botón "Comprar" (`accessibilityLabel` "Comprar VIP") |
 
 ## Comprar entradas (`ComprarEntradas`)
@@ -107,6 +123,7 @@ Se dibuja siempre desde `useCompra` (el estado del servidor; research R17), con 
 | `PENDIENTE` | `EtiquetaEstadoCompra` "Pendiente"; resumen: nombre del evento, fecha y hora, tipo, "2 entradas", "Total: $ 240.000" / "Total: Gratis"; "Podés pagar hasta las 15:35"; botón "Pagar" (total > 0) o "Confirmar" (total 0); en curso: "Pagando…" / "Confirmando…" y deshabilitado |
 | `CONFIRMADA` | `EtiquetaEstadoCompra` "Confirmada"; "¡Listo! Tu compra está confirmada."; el mismo resumen; botones "Volver al evento" e "Ir a Explorar" |
 | `CANCELADA` (vencida) | `EtiquetaEstadoCompra` "Cancelada"; "Esta compra venció: sus entradas volvieron a estar disponibles."; "Volver al evento" |
+| `CANCELADA` (por el comprador; revisión) | igual, con "Cancelaste esta compra: sus entradas volvieron a estar disponibles." |
 
 Errores del pago:
 

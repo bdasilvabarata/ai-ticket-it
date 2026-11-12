@@ -59,6 +59,8 @@ export interface CompraVista {
 export interface MisComprasDelEventoVista {
   /** Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva. */
   pendientes: CompraVista[];
+  /** Sus compras CONFIRMADA de ese evento (sus entradas), de la más nueva a la más vieja. */
+  confirmadas: CompraVista[];
   /** Cuántas entradas más puede comprar de cada tipo según su tope (todos los tipos; 0 si es el organizador). */
   restantesPorTipo: { tipoEntradaId: string; restantes: number }[];
 }

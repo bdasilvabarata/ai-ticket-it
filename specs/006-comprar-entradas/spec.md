@@ -21,13 +21,15 @@ total calculado por el servidor y el cupo disponible descontado de forma atómic
 simulado** que pasa la compra a `CONFIRMADA`; el **historial de cambios de estado** de la compra
 (quién y cuándo); el **vencimiento** de una compra pendiente sin pagar a los 15 minutos; ver
 una compra propia el tiempo necesario para pagarla y ver su confirmación; las **compras
-pendientes propias** en el detalle del evento, para retomar el pago;
+pendientes propias** en el detalle del evento, para retomar el pago **o cancelarlas** sin
+esperar a que venzan; el acceso desde el detalle a las **entradas confirmadas** propias de ese
+evento ("Ver mis entradas");
 los rechazos con mensaje claro (evento realizado, tipo agotado, cupo insuficiente, cantidad
 inválida, evento o tipo inexistente).
 
 **No incluye**: el listado "Mis compras" y los días restantes (007, UC-01); las compras de un
-evento vistas por el organizador y registrar el uso (008, UC-02); cancelar y reembolsar (009,
-UC-07 y UC-08); el chat de la compra (010); pasarela de pago real, datos de tarjeta, medios de
+evento vistas por el organizador y registrar el uso (008, UC-02); cancelar y reembolsar una compra
+**confirmada** (009, UC-07 y UC-08); el chat de la compra (010); pasarela de pago real, datos de tarjeta, medios de
 pago, facturas o comprobantes; elegir asientos; comprar varios tipos de entrada en una misma
 compra; notificaciones; pulido estético (013).
 
@@ -423,7 +425,22 @@ perdió, reintentar y ver la compra confirmada.
   vencidas de ese evento (tipo, cantidad, total, hasta qué hora puede pagar y estado), cada una
   con "Pagar", que lleva al resumen de pago. Solo ve las propias; las vencidas y las
   confirmadas no aparecen ahí (el listado completo es de la 007). Se actualiza después de
-  comprar, pagar o al vencer una compra la próxima vez que se muestra el detalle.
+  comprar, pagar, cancelar o al vencer una compra la próxima vez que se muestra el detalle.
+- **FR-023a** (revisión, 2026-11-12): Cada compra pendiente del detalle DEBE tener también
+  "Cancelar", que, tras confirmarlo, la pasa a `CANCELADA` con un cambio de estado **del
+  comprador** (no del sistema) y devuelve sus entradas al cupo disponible, sin esperar los 15
+  minutos. Solo su comprador puede cancelarla; una vencida da `COMPRA_VENCIDA` y una que no está
+  `PENDIENTE` (por ejemplo, ya confirmada) da `TRANSICION_INVALIDA`: cancelar una confirmada, con
+  reembolso, sigue siendo de la 009. Se puede cancelar también con el evento empezado (como al
+  vencer). "Tu compra" de una cancelada por el comprador dice "Cancelaste esta compra: sus
+  entradas volvieron a estar disponibles.".
+- **FR-023b** (revisión, 2026-11-12): Si el usuario tiene compras `CONFIRMADA` de ese evento, el
+  detalle DEBE mostrar cuántas entradas confirmadas tiene y "Ver mis entradas", que abre "Mis
+  entradas": sus compras confirmadas del evento (tipo, cantidad, total y estado), cada una con
+  "Ver", que abre "Tu compra". El listado de todas sus compras sigue siendo de la 007.
+- **FR-023c** (revisión, 2026-11-12): El aviso "Ya tenés el máximo de entradas para este evento"
+  de un tipo DEBE ocupar una columna angosta a la derecha, como "Comprar", sin quitarles ancho al
+  nombre y la descripción del tipo (se parte en varias líneas).
 
 **Datos de ejemplo**
 
@@ -475,8 +492,8 @@ perdió, reintentar y ver la compra confirmada.
 
 - **El cupo se descuenta al registrar la compra (`PENDIENTE`)**, no al pagar: la constitución
   dice que el cupo "disminuye en la cantidad de cada compra que se registra". Una compra
-  pendiente reserva entradas hasta pagarse o vencer a los 15 minutos (FR-014); cancelarla a
-  mano es de la 009.
+  pendiente reserva entradas hasta pagarse, cancelarse (FR-023a) o vencer a los 15 minutos
+  (FR-014).
 - **Una compra = un tipo de entrada**, como en el modelo de la consigna (Compra tiene un
   `tipoEntrada` y una `cantidad`). Comprar dos tipos son dos compras.
 - **Tope por persona** (Clarifications, 2026-11-12): 4 entradas pagas por evento y 1 por tipo

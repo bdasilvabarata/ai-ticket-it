@@ -1,6 +1,6 @@
 import type { EventoVista, TipoEntradaVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
-import { StyleSheet, Text } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
 
 import { Boton, tema } from "../../../componentes";
 import { useMisComprasDelEvento } from "../useMisComprasDelEvento";
@@ -21,7 +21,11 @@ export function AccionComprar({ usuarioId, evento, tipo }: PropsAccionComprar) {
   if (evento.realizado || evento.organizador.id === usuarioId || tipo.cupo === 0) return null;
   const restantes = misCompras?.restantesPorTipo.find((r) => r.tipoEntradaId === tipo.id)?.restantes;
   if (restantes === 0) {
-    return <Text style={estilos.maximo}>Ya tenés el máximo de entradas para este evento</Text>;
+    return (
+      <View style={estilos.maximo}>
+        <Text style={estilos.textoMaximo}>Ya tenés el máximo de entradas para este evento</Text>
+      </View>
+    );
   }
   return (
     <Boton
@@ -38,5 +42,8 @@ export function AccionComprar({ usuarioId, evento, tipo }: PropsAccionComprar) {
 }
 
 const estilos = StyleSheet.create({
-  maximo: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario, flexShrink: 1 },
+  // Ocupa a lo sumo una columna angosta a la derecha (como "Comprar"), así el nombre y la
+  // descripción del tipo conservan su ancho: el aviso se parte en varias líneas, no los empuja.
+  maximo: { flexBasis: "38%", flexGrow: 0, flexShrink: 1 },
+  textoMaximo: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario, textAlign: "right" },
 });

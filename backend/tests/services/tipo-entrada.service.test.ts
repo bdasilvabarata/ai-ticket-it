@@ -274,6 +274,14 @@ describe("TipoEntradaService: lo que usa la compra (feature 006)", () => {
     expect(guardar).not.toHaveBeenCalled();
   });
 
+  it("devolverCupo guarda el evento con el tipo devuelto y lo devuelve", async () => {
+    const { tipoEntradaService, repositorioEventos } = armarCompra();
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    const devuelto = await tipoEntradaService.devolverCupo(eventoA, "tipo-a-vip", 2);
+    expect(devuelto.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(4);
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(4);
+  });
+
   it("ninguno de los dos toma el cerrojo (corren dentro del de quien llama)", async () => {
     const { tipoEntradaService, repositorioEventos, cerrojo } = armarCompra();
     const ejecutar = vi.spyOn(cerrojo, "ejecutar");

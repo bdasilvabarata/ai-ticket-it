@@ -3,6 +3,7 @@ import {
   crearClienteApi,
   obtenerCompra,
   obtenerMisComprasDelEvento,
+  cancelarCompra,
   pagarCompra,
 } from "../../src/api";
 import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
@@ -104,6 +105,21 @@ describe("pagarCompra", () => {
       id: "compra-1",
     });
     expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras/compra%20a%2Fb/pago`, metodo: "POST" });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-sofia");
+  });
+});
+
+describe("cancelarCompra", () => {
+  it("envía POST /compras/:id/cancelacion sin cuerpo, en nombre del usuario dado", async () => {
+    const { cliente, falso } = armar({ status: 200, json: { id: "compra-1" } });
+    await expect(cancelarCompra(cliente, "compra a/b", { usuarioId: "usuario-sofia" })).resolves.toEqual({
+      id: "compra-1",
+    });
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/compras/compra%20a%2Fb/cancelacion`,
+      metodo: "POST",
+    });
     expect(falso.pedidos[0].cuerpo).toBeUndefined();
     expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-sofia");
   });
