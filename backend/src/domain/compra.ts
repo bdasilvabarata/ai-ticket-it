@@ -1,5 +1,6 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { ReglaDeNegocioError } from "./errores";
+import type { TipoEntrada } from "./evento";
 import { esEnteroNoNegativo, Invariantes } from "./invariantes";
 
 /** Quién hizo un cambio de estado: un usuario o el sistema (el vencimiento). */
@@ -24,6 +25,16 @@ export interface PropiedadesCompra {
   historial: CambioEstadoCompra[];
 }
 
+/** Lo que necesita `Compra.registrar`: el tipo comprado (con su precio vigente) y el instante del alta. */
+export interface DatosDeAlta {
+  id: string;
+  compradorId: string;
+  eventoId: string;
+  tipo: TipoEntrada;
+  cantidad: number;
+  ahora: Date;
+}
+
 const ESTADOS = new Set<string>(Object.values(EstadoCompra));
 const PLAZO_PARA_PAGAR_MS = LIMITES_COMPRA.minutosParaPagar * 60 * 1000;
 
@@ -45,7 +56,7 @@ function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
 /**
  * Una compra de entradas de un tipo, con su historial de estados (feature 006). El estado, el alta
  * y el vencimiento se derivan del historial. Es inmutable: las operaciones devuelven una `Compra`
- * nueva. Transiciones de esta feature: `PENDIENTE → CANCELADA` (vencimiento del sistema a los 15
+ * nueva. El alta es `Compra.registrar` (PENDIENTE). Transiciones de esta feature: `PENDIENTE → CANCELADA` (vencimiento del sistema a los 15
  * minutos); el pago y las de la 008 y la 009 se suman después.
  */
 export class Compra {
@@ -78,6 +89,29 @@ export class Compra {
     this.cantidad = propiedades.cantidad;
     this.total = propiedades.total;
     this.historial = Object.freeze(propiedades.historial.map((cambio) => Object.freeze({ ...cambio })));
+  }
+
+  /**
+   * Fábrica de alta: el total lo calcula el servidor (`precio × cantidad`, fijo desde ahora) y el
+   * historial arranca en PENDIENTE por el comprador en `ahora`. Las reglas de la compra (realizado,
+   * propio evento, tope y cupo) ya las verificaron el evento y el service.
+   */
+  static registrar({ id, compradorId, eventoId, tipo, cantidad, ahora }: DatosDeAlta): Compra {
+    return new Compra({
+      id,
+      compradorId,
+      eventoId,
+      tipoEntradaId: tipo.id,
+      cantidad,
+      total: tipo.precio * cantidad,
+      historial: [
+        {
+          estado: EstadoCompra.PENDIENTE,
+          autor: { tipo: "usuario", usuarioId: compradorId },
+          fechaHora: ahora,
+        },
+      ],
+    });
   }
 
   /** El estado del último cambio. */

@@ -2,10 +2,10 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import type { Evento } from "../../src/domain/evento";
-import { NoEncontradoError, SinPermisoError } from "../../src/errors/index";
+import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
 import type { EventoService } from "../../src/services/evento.service";
 import type { TipoEntradaService } from "../../src/services/tipo-entrada.service";
-import { compra, DIA, evento, relojMovible, tipo } from "../helpers/eventos";
+import { AHORA, compra, DIA, evento, relojMovible, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
@@ -211,5 +211,75 @@ describe("TipoEntradaService: materializa los vencimientos antes de escribir (fe
     expect(ahora).toHaveBeenCalledTimes(1);
     expect((await repositorioCompras.buscarPorId("compra-vencida"))?.fueVencida()).toBe(true);
     expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(4);
+  });
+});
+
+describe("TipoEntradaService: lo que usa la compra (feature 006)", () => {
+  const ANTES_DEL_INICIO = new Date(AHORA.getTime() + DIA);
+
+  function armarCompra() {
+    const servicios = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", tiposEntrada: [general, vip] }),
+        evento({ id: "evento-b", organizadorId: "usuario-martin", tiposEntrada: [deOtroEvento] }),
+      ],
+    });
+    return servicios;
+  }
+
+  it("buscarReferenciada devuelve el tipo del evento", async () => {
+    const { tipoEntradaService, repositorioEventos } = armarCompra();
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    expect(tipoEntradaService.buscarReferenciada(eventoA, "tipo-a-vip")).toBe(
+      eventoA.buscarTipoEntrada("tipo-a-vip"),
+    );
+  });
+
+  it("buscarReferenciada con un tipo de otro evento o inexistente → ReferenciaInvalidaError sobre tipoEntradaId", async () => {
+    const { tipoEntradaService, repositorioEventos } = armarCompra();
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    for (const tipoId of ["tipo-b-platea", "tipo-inexistente"]) {
+      const error = (() => {
+        try {
+          tipoEntradaService.buscarReferenciada(eventoA, tipoId);
+        } catch (lanzado) {
+          return lanzado;
+        }
+        return null;
+      })();
+      expect(error).toBeInstanceOf(ReferenciaInvalidaError);
+      expect(error).toMatchObject({
+        campo: "tipoEntradaId",
+        origen: "datos",
+        mensaje: "No existe el tipo de entrada en este evento.",
+      });
+    }
+  });
+
+  it("descontarCupo guarda el evento con el tipo descontado y lo devuelve", async () => {
+    const { tipoEntradaService, repositorioEventos } = armarCompra();
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    const descontado = await tipoEntradaService.descontarCupo(eventoA, "tipo-a-vip", 2, ANTES_DEL_INICIO);
+    expect(descontado.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(0);
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(0);
+  });
+
+  it("descontarCupo con cupo insuficiente no guarda nada", async () => {
+    const { tipoEntradaService, repositorioEventos } = armarCompra();
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    const guardar = vi.spyOn(repositorioEventos, "guardar");
+    await expect(
+      tipoEntradaService.descontarCupo(eventoA, "tipo-a-vip", 3, ANTES_DEL_INICIO),
+    ).rejects.toMatchObject({ codigo: "CUPO_INSUFICIENTE" });
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it("ninguno de los dos toma el cerrojo (corren dentro del de quien llama)", async () => {
+    const { tipoEntradaService, repositorioEventos, cerrojo } = armarCompra();
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    const eventoA = (await repositorioEventos.buscarPorId("evento-a"))!;
+    tipoEntradaService.buscarReferenciada(eventoA, "tipo-a-vip");
+    await tipoEntradaService.descontarCupo(eventoA, "tipo-a-vip", 1, ANTES_DEL_INICIO);
+    expect(ejecutar).not.toHaveBeenCalled();
   });
 });

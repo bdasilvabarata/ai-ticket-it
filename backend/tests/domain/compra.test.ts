@@ -7,6 +7,7 @@ import {
   type PropiedadesCompra,
 } from "../../src/domain/compra";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
+import { TipoEntrada } from "../../src/domain/evento";
 
 const CREADA = new Date("2026-11-10T15:00:00.000Z");
 const MINUTO = 60 * 1000;
@@ -244,5 +245,63 @@ describe("cupoLiberadoPorTipo", () => {
 
   it("sin compras, un Map vacío", () => {
     expect(cupoLiberadoPorTipo([], ahora)).toEqual(new Map());
+  });
+});
+
+describe("Compra.registrar (alta, feature 006)", () => {
+  const vip = new TipoEntrada({
+    id: "tipo-festival-vip",
+    nombre: "VIP",
+    descripcion: "",
+    precio: 120000,
+    cupo: 50,
+  });
+  const gratis = new TipoEntrada({
+    id: "tipo-kids",
+    nombre: "Carrera kids",
+    descripcion: "",
+    precio: 0,
+    cupo: 10,
+  });
+  const alta = (tipo: TipoEntrada, cantidad: number) =>
+    Compra.registrar({
+      id: "compra-nueva",
+      compradorId: "usuario-sofia",
+      eventoId: "evento-festival",
+      tipo,
+      cantidad,
+      ahora: CREADA,
+    });
+
+  it("total = precio × cantidad, con el tipo y el comprador dados", () => {
+    const compra = alta(vip, 2);
+    expect(compra).toMatchObject({
+      id: "compra-nueva",
+      compradorId: "usuario-sofia",
+      eventoId: "evento-festival",
+      tipoEntradaId: "tipo-festival-vip",
+      cantidad: 2,
+      total: 240000,
+    });
+  });
+
+  it("un tipo gratis da total 0", () => {
+    expect(alta(gratis, 1).total).toBe(0);
+  });
+
+  it("el historial es un único PENDIENTE por el comprador en `ahora`", () => {
+    const compra = alta(vip, 1);
+    expect(compra.estado).toBe(EstadoCompra.PENDIENTE);
+    expect(compra.historial).toEqual([
+      {
+        estado: EstadoCompra.PENDIENTE,
+        autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+        fechaHora: CREADA,
+      },
+    ]);
+  });
+
+  it("cantidad 0 lanza DatosInvalidosError", () => {
+    expect(() => alta(vip, 0)).toThrow(DatosInvalidosError);
   });
 });

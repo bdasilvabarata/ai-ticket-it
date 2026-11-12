@@ -356,6 +356,49 @@
           }
         }
       ]
+    },
+    {
+      "name": "Comprar entradas",
+      "item": [
+        {
+          "name": "Sofía compra 2 VIP del Festival",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 2\n}"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Mis compras de Sofía en el Festival",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/mis-compras"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

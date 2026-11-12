@@ -1,6 +1,8 @@
 import { Router, type RequestHandler } from "express";
+import type { CompraController } from "../controllers/compra.controller";
 import type { EventoController } from "../controllers/evento.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
+import { compraNueva, comprasDelEvento } from "../validations/compra.validation";
 import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 import {
   tipoEntradaEditado,
@@ -18,7 +20,7 @@ function crearTiposEntradaRouter(controller: TipoEntradaController, requerirUsua
 }
 
 export function crearEventosRouter(
-  controllers: { eventos: EventoController; tiposEntrada: TipoEntradaController },
+  controllers: { eventos: EventoController; tiposEntrada: TipoEntradaController; compras: CompraController },
   requerirUsuario: RequestHandler,
 ): Router {
   const { eventos: controller } = controllers;
@@ -32,6 +34,14 @@ export function crearEventosRouter(
   router.get("/:eventoId", eventoPorId.middleware, controller.obtener);
   router.put("/:eventoId", requerirUsuario, eventoEditado.middleware, controller.actualizar);
   router.delete("/:eventoId", requerirUsuario, eventoPorId.middleware, controller.eliminar);
+  // Compras (feature 006): en nombre del usuario actual.
+  router.post("/:eventoId/compras", requerirUsuario, compraNueva.middleware, controllers.compras.crear);
+  router.get(
+    "/:eventoId/mis-compras",
+    requerirUsuario,
+    comprasDelEvento.middleware,
+    controllers.compras.misComprasDelEvento,
+  );
   router.use("/:eventoId/tipos-entrada", crearTiposEntradaRouter(controllers.tiposEntrada, requerirUsuario));
   return router;
 }

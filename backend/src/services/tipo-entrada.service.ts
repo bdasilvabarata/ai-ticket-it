@@ -2,7 +2,7 @@ import type { TipoEntradaVista } from "@ai-ticket-it/shared";
 import { TipoEntrada, type DatosDeTipoEntrada, type Evento } from "../domain/evento";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
-import { NoEncontradoError } from "../errors/index";
+import { NoEncontradoError, ReferenciaInvalidaError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import type { EventoService } from "./evento.service";
 import { aTipoEntradaVista } from "./evento.vistas";
@@ -73,6 +73,28 @@ export class TipoEntradaService {
       const tieneCompras = await this.#compras.existePorTipoEntrada(tipoId);
       await this.#eventos.guardar(evento.quitarTipoEntrada(tipoId, { ahora, tieneCompras }));
     });
+  }
+
+  /**
+   * El tipo al que apunta `tipoEntradaId` del cuerpo de una compra: si no es de **este** evento,
+   * `ReferenciaInvalidaError` (400 sobre `body.tipoEntradaId`), no 404: la ruta sí existe. Se usa
+   * dentro del cerrojo de quien llama, sobre el evento que ya releyó.
+   */
+  buscarReferenciada(evento: Evento, tipoId: string): TipoEntrada {
+    const tipo = evento.buscarTipoEntrada(tipoId);
+    if (!tipo)
+      throw new ReferenciaInvalidaError("tipoEntradaId", "No existe el tipo de entrada en este evento.");
+    return tipo;
+  }
+
+  /**
+   * Descuenta el cupo de una compra y guarda el evento (el dueño del agregado escribe; R4). Corre
+   * **dentro** del cerrojo de quien llama, sin tomarlo; si el dominio rechaza, no guarda nada.
+   */
+  async descontarCupo(evento: Evento, tipoId: string, cantidad: number, ahora: Date): Promise<Evento> {
+    const descontado = evento.descontarCupo(tipoId, cantidad, ahora);
+    await this.#eventos.guardar(descontado);
+    return descontado;
   }
 
   /** 404 si el tipo no es de **este** evento (FR-023), aunque exista en otro. */

@@ -11,7 +11,8 @@
     { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" },
     { "name": "Categorías", "description": "Catálogo de categorías de eventos" },
     { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
-    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" }
+    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
+    { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" }
   ],
   "paths": {
     "/salud": {
@@ -388,6 +389,162 @@
                         "mensaje": "El evento tiene compras: no se puede eliminar."
                       }
                     }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/compras": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        }
+      ],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Comprar entradas de un tipo",
+        "description": "Registra una compra PENDIENTE (vence a los 15 minutos) con total `precio × cantidad` calculado por el servidor y descuenta el cupo, bajo el cerrojo del evento. Orden: 401 → 400 de forma → 404 evento → 400 `body.tipoEntradaId` → 409 `EVENTO_REALIZADO` → 409 `COMPRA_PROPIO_EVENTO` → 409 `TOPE_POR_PERSONA` → 409 `CUPO_INSUFICIENTE`. Tope: 4 entradas de tipos pagos por evento y 1 por tipo gratis, contando sus compras vigentes.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosCompra"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "La compra registrada (PENDIENTE)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompraVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/UsuarioNoIdentificado"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No se puede comprar",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se pueden comprar entradas."
+                      }
+                    }
+                  },
+                  "COMPRA_PROPIO_EVENTO": {
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_PROPIO_EVENTO",
+                        "mensaje": "No podés comprar entradas de un evento que organizás."
+                      }
+                    }
+                  },
+                  "TOPE_POR_PERSONA": {
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Podés comprar 2 entradas más de tipos pagos de este evento."
+                      }
+                    }
+                  },
+                  "CUPO_INSUFICIENTE": {
+                    "value": {
+                      "error": {
+                        "codigo": "CUPO_INSUFICIENTE",
+                        "mensaje": "Quedan 3 entradas de «Backstage»."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/mis-compras": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        }
+      ],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Mis compras del evento",
+        "description": "Del usuario actual: sus compras pendientes no vencidas de ese evento y cuántas entradas más puede comprar de cada tipo según su tope (el cupo está en el evento). Lectura: no guarda nada.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sus pendientes y restantes por tipo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MisComprasDelEventoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "401": {
+            "$ref": "#/components/responses/UsuarioNoIdentificado"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
                   }
                 }
               }
@@ -827,6 +984,206 @@
             }
           }
         ]
+      },
+      "DatosCompra": {
+        "type": "object",
+        "required": ["tipoEntradaId", "cantidad"],
+        "description": "Nunca lleva precio ni total: el total lo calcula el servidor. Las claves desconocidas se ignoran.",
+        "properties": {
+          "tipoEntradaId": {
+            "type": "string",
+            "example": "tipo-festival-sonidos-del-sur-vip"
+          },
+          "cantidad": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4,
+            "example": 2
+          }
+        }
+      },
+      "CambioEstadoCompraVista": {
+        "type": "object",
+        "required": ["estado", "autor", "fechaHora", "fechaHoraLocal"],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "autor": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["tipo", "usuarioId"],
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": ["usuario"]
+                  },
+                  "usuarioId": {
+                    "type": "string"
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["tipo"],
+                "properties": {
+                  "tipo": {
+                    "type": "string",
+                    "enum": ["sistema"]
+                  }
+                }
+              }
+            ]
+          },
+          "fechaHora": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z"
+          },
+          "fechaHoraLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          }
+        }
+      },
+      "CompraVista": {
+        "type": "object",
+        "required": [
+          "id",
+          "compradorId",
+          "evento",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "venceEn",
+          "venceEnLocal",
+          "historial"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "compradorId": {
+            "type": "string",
+            "example": "usuario-sofia"
+          },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHora", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "evento-festival-sonidos-del-sur"
+              },
+              "nombre": {
+                "type": "string",
+                "example": "Festival Sonidos del Sur"
+              },
+              "fechaHora": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-12T18:20:00.000Z"
+              },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-12T15:20",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": {
+                "type": "boolean"
+              }
+            }
+          },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "nombre": {
+                "type": "string",
+                "example": "VIP"
+              }
+            }
+          },
+          "cantidad": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 2
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z"
+          },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "historial": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CambioEstadoCompraVista"
+            },
+            "description": "Cronológico; el primero es PENDIENTE"
+          }
+        }
+      },
+      "MisComprasDelEventoVista": {
+        "type": "object",
+        "required": ["pendientes", "restantesPorTipo"],
+        "properties": {
+          "pendientes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompraVista"
+            },
+            "description": "Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva"
+          },
+          "restantesPorTipo": {
+            "type": "array",
+            "description": "Cuántas entradas más puede comprar de cada tipo según su tope (0 en todos si es el organizador)",
+            "items": {
+              "type": "object",
+              "required": ["tipoEntradaId", "restantes"],
+              "properties": {
+                "tipoEntradaId": {
+                  "type": "string"
+                },
+                "restantes": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
       },
       "DatosTipoEntrada": {
         "type": "object",

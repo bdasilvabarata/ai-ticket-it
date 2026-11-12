@@ -17,6 +17,13 @@ function exigirFechaFutura(fechaHora: Date, ahora: Date): void {
   }
 }
 
+/** "Quedan 3 entradas de «VIP»." · "Queda 1 entrada de «VIP»." · "No quedan entradas de «VIP»." */
+function mensajeDeCupo(tipo: TipoEntrada): string {
+  if (tipo.cupo === 0) return `No quedan entradas de «${tipo.nombre}».`;
+  if (tipo.cupo === 1) return `Queda 1 entrada de «${tipo.nombre}».`;
+  return `Quedan ${tipo.cupo} entradas de «${tipo.nombre}».`;
+}
+
 function hayNombresRepetidos(tipos: readonly TipoEntrada[]): boolean {
   return tipos.some((tipo, i) =>
     tipos.slice(i + 1).some((otro) => mismoNombreDeTipo(tipo.nombre, otro.nombre)),
@@ -57,6 +64,21 @@ export class TipoEntrada {
   /** ¿Se pueden comprar `cantidad` entradas sin dejar el cupo por debajo de 0? (diagrama de la consigna) */
   hayCupoPara(cantidad: number): boolean {
     return Number.isInteger(cantidad) && cantidad > 0 && cantidad <= this.cupo;
+  }
+
+  /** Precio 0: tiene su propio tope por persona (1 por tipo, aparte de las 4 pagas). */
+  esGratis(): boolean {
+    return this.precio === 0;
+  }
+
+  /** Un tipo nuevo con `cantidad` entradas menos de cupo (una compra); el constructor exige cupo ≥ 0. */
+  descontar(cantidad: number): TipoEntrada {
+    return this.con({
+      nombre: this.nombre,
+      descripcion: this.descripcion,
+      precio: this.precio,
+      cupo: this.cupo - cantidad,
+    });
   }
 
   /** Un tipo nuevo con `cantidad` entradas más de cupo (las de una compra vencida); este no cambia. */
@@ -229,6 +251,33 @@ export class Evento {
     }
   }
 
+  /** Las reglas de una compra que dependen solo del evento, en el orden de R2: realizado → propio evento. */
+  exigirQueSePuedeComprar(compradorId: string, ahora: Date): void {
+    this.#exigirNoRealizadoParaComprar(ahora);
+    if (this.esOrganizadoPor(compradorId)) {
+      throw new ReglaDeNegocioError(
+        "COMPRA_PROPIO_EVENTO",
+        "No podés comprar entradas de un evento que organizás.",
+      );
+    }
+  }
+
+  /**
+   * Descuenta `cantidad` entradas del tipo (una compra): no realizado → tipo (red de seguridad) →
+   * cupo suficiente (`CUPO_INSUFICIENTE` dice cuántas quedan). Devuelve un Evento nuevo.
+   */
+  descontarCupo(tipoId: string, cantidad: number, ahora: Date): Evento {
+    this.#exigirNoRealizadoParaComprar(ahora);
+    const tipo = this.#tipoOFallar(tipoId);
+    if (!tipo.hayCupoPara(cantidad)) {
+      throw new ReglaDeNegocioError("CUPO_INSUFICIENTE", mensajeDeCupo(tipo));
+    }
+    const descontado = tipo.descontar(cantidad);
+    return this.#con({
+      tiposEntrada: this.tiposEntrada.map((otro) => (otro.id === tipoId ? descontado : otro)),
+    });
+  }
+
   /**
    * Devuelve el cupo liberado por compras vencidas (`porTipo`: entradas por id de tipo; los ids
    * ausentes se ignoran). Sin chequeo de "realizado": una compra vence igual con el evento empezado
@@ -241,6 +290,16 @@ export class Evento {
         return cantidad === undefined ? tipo : tipo.devolver(cantidad);
       }),
     });
+  }
+
+  /** Mismo código que el de las ediciones, con el mensaje de la compra. */
+  #exigirNoRealizadoParaComprar(ahora: Date): void {
+    if (this.estaRealizado(ahora)) {
+      throw new ReglaDeNegocioError(
+        "EVENTO_REALIZADO",
+        "El evento ya se realizó: no se pueden comprar entradas.",
+      );
+    }
   }
 
   #exigirNoRealizado(ahora: Date): void {

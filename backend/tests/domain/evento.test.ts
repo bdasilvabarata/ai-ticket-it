@@ -533,3 +533,96 @@ describe("Devolver cupo (feature 006: vencimiento de compras)", () => {
     expect(realizado.devolverCupos(new Map([["t1", 2]])).tiposEntrada[0]?.cupo).toBe(2);
   });
 });
+
+describe("Comprar (feature 006)", () => {
+  const INICIO = new Date("2026-12-01T00:00:00Z");
+  const antes = new Date(INICIO.getTime() - 1);
+  const vip = (cupo: number) => tipo({ id: "vip", nombre: "VIP", precio: 120000, cupo });
+
+  /** El mensaje del ReglaDeNegocioError que lanza `operacion`. */
+  function mensajeDeRegla(operacion: () => unknown): string {
+    try {
+      operacion();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ReglaDeNegocioError);
+      return (error as ReglaDeNegocioError).message;
+    }
+    throw new Error("Debía lanzar ReglaDeNegocioError.");
+  }
+
+  describe("TipoEntrada", () => {
+    it("esGratis ⇔ precio 0", () => {
+      expect(tipo({ precio: 0 }).esGratis()).toBe(true);
+      expect(tipo({ precio: 1 }).esGratis()).toBe(false);
+    });
+
+    it("descontar(3) sobre 3 deja cupo 0 en un tipo nuevo; el original no cambia", () => {
+      const original = tipo({ cupo: 3 });
+      const descontado = original.descontar(3);
+      expect(descontado.cupo).toBe(0);
+      expect(original.cupo).toBe(3);
+    });
+
+    it("descontar más que el cupo lanza DatosInvalidosError (el cupo nunca es negativo)", () => {
+      expect(camposInvalidos(() => tipo({ cupo: 2 }).descontar(3))).toEqual(["cupo"]);
+    });
+  });
+
+  describe("exigirQueSePuedeComprar", () => {
+    it("1 ms antes del inicio, alguien que no organiza el evento puede comprar", () => {
+      expect(() => evento().exigirQueSePuedeComprar("u2", antes)).not.toThrow();
+    });
+
+    it("en el instante exacto del inicio → EVENTO_REALIZADO con el mensaje de la compra", () => {
+      expect(codigoDeRegla(() => evento().exigirQueSePuedeComprar("u2", INICIO))).toBe("EVENTO_REALIZADO");
+      expect(mensajeDeRegla(() => evento().exigirQueSePuedeComprar("u2", INICIO))).toBe(
+        "El evento ya se realizó: no se pueden comprar entradas.",
+      );
+    });
+
+    it("el organizador → COMPRA_PROPIO_EVENTO", () => {
+      expect(codigoDeRegla(() => evento().exigirQueSePuedeComprar("u1", antes))).toBe("COMPRA_PROPIO_EVENTO");
+      expect(mensajeDeRegla(() => evento().exigirQueSePuedeComprar("u1", antes))).toBe(
+        "No podés comprar entradas de un evento que organizás.",
+      );
+    });
+
+    it("realizado y organizador → EVENTO_REALIZADO (va primero)", () => {
+      expect(codigoDeRegla(() => evento().exigirQueSePuedeComprar("u1", INICIO))).toBe("EVENTO_REALIZADO");
+    });
+  });
+
+  describe("descontarCupo", () => {
+    it("realizado → EVENTO_REALIZADO", () => {
+      expect(codigoDeRegla(() => evento([vip(3)]).descontarCupo("vip", 1, INICIO))).toBe("EVENTO_REALIZADO");
+    });
+
+    it("cupo 3 y pide 3 → un Evento nuevo con 0; el original no cambia", () => {
+      const original = evento([vip(3)]);
+      const descontado = original.descontarCupo("vip", 3, antes);
+      expect(descontado).not.toBe(original);
+      expect(descontado.buscarTipoEntrada("vip")?.cupo).toBe(0);
+      expect(original.buscarTipoEntrada("vip")?.cupo).toBe(3);
+    });
+
+    it("pide más que el cupo → CUPO_INSUFICIENTE con las que quedan", () => {
+      expect(codigoDeRegla(() => evento([vip(3)]).descontarCupo("vip", 4, antes))).toBe("CUPO_INSUFICIENTE");
+      expect(mensajeDeRegla(() => evento([vip(3)]).descontarCupo("vip", 4, antes))).toBe(
+        "Quedan 3 entradas de «VIP».",
+      );
+      expect(mensajeDeRegla(() => evento([vip(1)]).descontarCupo("vip", 2, antes))).toBe(
+        "Queda 1 entrada de «VIP».",
+      );
+      expect(mensajeDeRegla(() => evento([vip(0)]).descontarCupo("vip", 1, antes))).toBe(
+        "No quedan entradas de «VIP».",
+      );
+    });
+
+    it("el mensaje de las ediciones (004) no cambia", () => {
+      const datos = { nombre: "X", descripcion: "", categoriaId: "c1", fechaHora: INICIO, multimedia: [] };
+      expect(mensajeDeRegla(() => evento().actualizar(datos, INICIO))).toBe(
+        "El evento ya se realizó: no se puede modificar.",
+      );
+    });
+  });
+});

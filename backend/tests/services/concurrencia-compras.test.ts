@@ -1,5 +1,5 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { AHORA, DIA, compra, evento, relojMovible, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
@@ -71,5 +71,114 @@ describe("Concurrencia: vencimiento y escrituras del mismo evento (feature 006)"
       30,
     );
     expect((await eventoService.obtener("evento-a")).tiposEntrada[0]?.cupo).toBe(30);
+  });
+});
+
+describe("Concurrencia: compras simultáneas (feature 006, SC-002)", () => {
+  /** Un evento de Lucía con un único tipo VIP pago con ese cupo (y precio). */
+  function armarCompras({ cupo = 10, precio = 1000 } = {}) {
+    return crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", tiposEntrada: [tipo({ id: "tipo-a-vip", nombre: "VIP", precio, cupo })] }),
+        evento({ id: "evento-b", tiposEntrada: [tipo({ id: "tipo-b-general" })] }),
+      ],
+    });
+  }
+
+  const codigos = (resultados: PromiseSettledResult<unknown>[]) =>
+    resultados.map((r) => (r.status === "fulfilled" ? "ok" : (r.reason as { codigo: string }).codigo));
+
+  it("50 compras de 1 entrada de 50 personas sobre cupo 10 → 10 cumplidas, 40 CUPO_INSUFICIENTE y cupo 0", async () => {
+    const { compraService, repositorioEventos, repositorioCompras } = armarCompras({ cupo: 10 });
+    const guardar = repositorioEventos.guardar.bind(repositorioEventos);
+    const cupos: number[] = [];
+    vi.spyOn(repositorioEventos, "guardar").mockImplementation(async (guardado) => {
+      cupos.push(guardado.buscarTipoEntrada("tipo-a-vip")?.cupo ?? 0);
+      await guardar(guardado);
+    });
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: 50 }, (_, i) =>
+        compraService.crear("evento-a", `usuario-comprador-${i}`, {
+          tipoEntradaId: "tipo-a-vip",
+          cantidad: 1,
+        }),
+      ),
+    );
+
+    const resumen = codigos(resultados);
+    expect(resumen.filter((c) => c === "ok")).toHaveLength(10);
+    expect(resumen.filter((c) => c === "CUPO_INSUFICIENTE")).toHaveLength(40);
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(0);
+    expect(cupos.every((cupo) => cupo >= 0)).toBe(true);
+    expect(await repositorioCompras.listarPendientesPorEventos(["evento-a"])).toHaveLength(10);
+  });
+
+  it("dos compras simultáneas de la misma persona que juntas superan su tope (3 + 2) → una cumplida y otra TOPE_POR_PERSONA", async () => {
+    const { compraService } = armarCompras();
+    const resultados = await Promise.allSettled([
+      compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-vip", cantidad: 3 }),
+      compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-vip", cantidad: 2 }),
+    ]);
+    expect(codigos(resultados).toSorted()).toEqual(["TOPE_POR_PERSONA", "ok"]);
+  });
+
+  it("una compra sobre el evento A bloqueado no frena una sobre el evento B", async () => {
+    const { compraService, cerrojo } = armarCompras();
+    let liberar = () => {};
+    const bloqueoDeA = cerrojo.ejecutar(
+      "evento-a",
+      () => new Promise<void>((resolver) => (liberar = resolver)),
+    );
+    const sobreA = compraService.crear("evento-a", "usuario-sofia", {
+      tipoEntradaId: "tipo-a-vip",
+      cantidad: 1,
+    });
+    let terminoA = false;
+    void sobreA.then(() => (terminoA = true));
+
+    await compraService.crear("evento-b", "usuario-sofia", { tipoEntradaId: "tipo-b-general", cantidad: 1 });
+    expect(terminoA).toBe(false);
+
+    liberar();
+    await Promise.all([bloqueoDeA, sobreA]);
+    expect(terminoA).toBe(true);
+  });
+
+  it("una compra y una edición que baja el cupo: una se evalúa sobre el resultado de la otra y el cupo nunca es negativo", async () => {
+    const { compraService, tipoEntradaService, repositorioEventos } = armarCompras({ cupo: 5 });
+    const resultados = await Promise.allSettled([
+      compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-vip", cantidad: 4 }),
+      tipoEntradaService.actualizar("evento-a", "tipo-a-vip", "usuario-lucia", {
+        nombre: "VIP",
+        descripcion: "",
+        precio: 1000,
+        cupo: 2,
+      }),
+    ]);
+    const [compraHecha, edicion] = codigos(resultados);
+    const cupoFinal = (await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada(
+      "tipo-a-vip",
+    )?.cupo;
+    expect(edicion).toBe("ok");
+    // Compra primero (5 → 1) y la edición deja 2; o edición primero (2) y la compra de 4 se rechaza.
+    expect([
+      ["ok", 2],
+      ["CUPO_INSUFICIENTE", 2],
+    ]).toContainEqual([compraHecha, cupoFinal]);
+  });
+
+  it("una compra y un cambio de precio simultáneos: el total es precio × cantidad con uno de los dos precios, nunca una mezcla", async () => {
+    const { compraService, tipoEntradaService } = armarCompras({ precio: 1000 });
+    const [compraHecha] = await Promise.all([
+      compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-vip", cantidad: 2 }),
+      tipoEntradaService.actualizar("evento-a", "tipo-a-vip", "usuario-lucia", {
+        nombre: "VIP",
+        descripcion: "",
+        precio: 3000,
+        cupo: 10,
+      }),
+    ]);
+    expect([2000, 6000]).toContain(compraHecha.total);
   });
 });

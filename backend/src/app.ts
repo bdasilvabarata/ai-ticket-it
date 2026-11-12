@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import { relojDelSistema } from "./config/reloj";
 import { CategoriaController } from "./controllers/categoria.controller";
+import { CompraController } from "./controllers/compra.controller";
 import { EventoController } from "./controllers/evento.controller";
 import { SaludController } from "./controllers/salud.controller";
 import { TipoEntradaController } from "./controllers/tipo-entrada.controller";
@@ -16,6 +17,7 @@ import { crearRouterApi } from "./routes/index";
 import { crearRepositoriosDeEjemplo, type Repositorios } from "./seed/repositorios-de-ejemplo";
 import { CategoriaService } from "./services/categoria.service";
 import { CerrojoPorClave } from "./services/cerrojo-por-clave";
+import { CompraService } from "./services/compra.service";
 import { EventoService } from "./services/evento.service";
 import { ReseniaService } from "./services/resenia.service";
 import { TipoEntradaService } from "./services/tipo-entrada.service";
@@ -62,6 +64,8 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
     reloj,
   });
   const tipoEntradaService = new TipoEntradaService({ eventos, compras, eventoService, cerrojo, reloj });
+  // Las compras le piden el evento y su cupo a sus dueños, bajo el mismo cerrojo (research R4).
+  const compraService = new CompraService({ compras, eventoService, tipoEntradaService, cerrojo, reloj });
 
   const controllers = {
     salud: new SaludController(),
@@ -69,6 +73,7 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
     categorias: new CategoriaController(categoriaService),
     eventos: new EventoController(eventoService),
     tiposEntrada: new TipoEntradaController(tipoEntradaService),
+    compras: new CompraController(compraService),
   };
   const requerirUsuario = crearRequerirUsuario(usuarioService);
 
