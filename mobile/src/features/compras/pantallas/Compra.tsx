@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useRef, type ReactNode } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
-import { ErrorDeApi } from "../../../api";
+import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
 import {
   Boton,
   EtiquetaEstadoCompra,
@@ -13,6 +13,7 @@ import {
   tema,
   type PropsIlustracion,
 } from "../../../componentes";
+import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { ResumenCompra } from "../componentes/ResumenCompra";
 import { textoVencimiento } from "../formato";
@@ -102,12 +103,27 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
   );
 }
 
-/** Hasta cuándo se puede pagar y "Pagar" ("Confirmar" si es gratis). */
+/**
+ * El aviso de un pago fallido (contracts/app.md, "Errores del pago"). Los 409 no avisan: la compra
+ * se vuelve a pedir y su estado real (vencida o ya confirmada) reemplaza a esta parte de la pantalla.
+ */
+function mensajeDelError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof ServidorNoDisponibleError) return "No se pudo pagar. Probá de nuevo.";
+  if (error instanceof ErrorDeApi) return error.status === 409 ? null : error.mensaje;
+  return "Ocurrió un error inesperado.";
+}
+
+/**
+ * Hasta cuándo se puede pagar y "Pagar" ("Confirmar" si es gratis). Solo se muestra con la compra
+ * `PENDIENTE`, así que el aviso de un pago fallido desaparece apenas la relectura trae otro estado.
+ */
 function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista }) {
   const pagar = usePagarCompra(usuarioId, compra.id, compra.evento.id);
   // Marca sincrónica: un segundo toque antes de que se vuelva a dibujar no manda otro pedido.
   const enviando = useRef(false);
   const gratis = compra.total === 0;
+  const error = mensajeDelError(pagar.error);
 
   const alPagar = () => {
     if (enviando.current) return;
@@ -122,6 +138,7 @@ function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista })
   return (
     <>
       {compra.venceEnLocal ? <Text style={estilos.dato}>{textoVencimiento(compra.venceEnLocal)}</Text> : null}
+      <AvisoDeFormulario mensaje={error} />
       <View style={estilos.acciones}>
         <Boton
           texto={gratis ? "Confirmar" : "Pagar"}

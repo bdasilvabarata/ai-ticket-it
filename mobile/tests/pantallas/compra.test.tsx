@@ -13,7 +13,7 @@ import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "
 import { tituloDelHeader } from "../helpers/formulario";
 import { esperarPestanas } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { martin, todos } from "../helpers/usuarios";
+import { diego, martin, todos } from "../helpers/usuarios";
 
 type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 
@@ -213,5 +213,94 @@ describe("Tu compra (US2)", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Volver al evento" }));
 
     await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+  });
+});
+
+const SIN_SERVIDOR = "No se pudo pagar. Probá de nuevo.";
+
+/**
+ * Un servidor cuya compra está pendiente hasta que la confirma el pago número `pagoQueConfirma`, y
+ * confirmada desde entonces; cada pago responde lo que diga `pagos` (en orden).
+ */
+function confirmadaConElPago(pagoQueConfirma: number, pagos: RespuestaFalsa[]): Opciones {
+  let recibidos = 0;
+  return {
+    compra: [
+      () => ({ status: 200, json: recibidos >= pagoQueConfirma ? compraConfirmada : compraPendiente }),
+    ],
+    pago: [
+      () => {
+        recibidos += 1;
+        return pagos[Math.min(recibidos, pagos.length) - 1] ?? "rechazar";
+      },
+    ],
+  };
+}
+
+describe("Tu compra con conexión inestable (US4)", () => {
+  it("sin servidor al pagar: el aviso arriba de Pagar, que sigue disponible, Pendiente y un solo POST", async () => {
+    const resultado = await abrirCompra({ pago: ["rechazar"] });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+
+    expect(await screen.findByText(SIN_SERVIDOR)).toBeOnTheScreen();
+    await act(() => jest.advanceTimersByTimeAsync(70_000));
+    expect(resultado.falso.pedidosA(PAGO)).toHaveLength(1);
+    expect(screen.getByText(SIN_SERVIDOR)).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Pagar" })).toBeEnabled();
+  });
+
+  it("pago aceptado con la respuesta perdida: la compra se vuelve a pedir y se ve la confirmación sin error", async () => {
+    await abrirCompra(confirmadaConElPago(1, ["rechazar"]));
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+
+    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(screen.getByText("¡Listo! Tu compra está confirmada.")).toBeOnTheScreen();
+    expect(screen.queryByText(SIN_SERVIDOR)).toBeNull();
+  });
+
+  it("reintento que recibe 409 TRANSICION_INVALIDA con la compra ya confirmada: la confirmación sin error (FR-021)", async () => {
+    // El primer pago se cae; cuando llega el reintento a mano la compra ya está confirmada (el
+    // primero terminó llegando) y el servidor responde 409.
+    const resultado = await abrirCompra(
+      confirmadaConElPago(2, [
+        "rechazar",
+        { status: 409, json: errorApi("TRANSICION_INVALIDA", "La compra no está pendiente de pago.") },
+      ]),
+    );
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+    expect(await screen.findByText(SIN_SERVIDOR)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Pagar" }));
+
+    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(screen.getByText("¡Listo! Tu compra está confirmada.")).toBeOnTheScreen();
+    expect(screen.queryByText(SIN_SERVIDOR)).toBeNull();
+    expect(screen.queryByText("La compra no está pendiente de pago.")).toBeNull();
+    expect(resultado.falso.pedidosA(PAGO)).toHaveLength(2);
+  });
+
+  it("cambiar de usuario desde Perfil con la pantalla abierta: No tenés permiso para ver esta compra.", async () => {
+    const resultado = await abrirCompra({
+      compra: [
+        (_url, init) =>
+          (init?.headers as Record<string, string> | undefined)?.["X-Usuario-Id"] === diego.id
+            ? {
+                status: 403,
+                json: errorApi("SIN_PERMISO", "Solo quien hizo la compra puede verla o pagarla."),
+              }
+            : { status: 200, json: compraPendiente },
+      ],
+    });
+    expect(await screen.findByRole("button", { name: "Pagar" })).toBeOnTheScreen();
+
+    await act(() => router.push("/seleccionar-usuario"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Diego Fernández" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
+    expect(await screen.findByText("No tenés permiso para ver esta compra.")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();
   });
 });

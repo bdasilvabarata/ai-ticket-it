@@ -379,3 +379,57 @@ describe("Comprar entradas: errores del alta (US3)", () => {
     expect(await screen.findByText("$ 30.000 · 3 disponibles")).toBeOnTheScreen();
   });
 });
+
+const SIN_SERVIDOR = "No se pudo registrar la compra. Probá de nuevo.";
+
+describe("Comprar entradas con conexión inestable (US4)", () => {
+  it("sin servidor: el aviso, un solo POST (también tras la secuencia), tipo y cantidad conservados; reintentar a mano registra", async () => {
+    const resultado = await abrirComprar(INSCRIPCION, {
+      compras: ["rechazar", { status: 201, json: compraPendiente }],
+    });
+    await elegirYConfirmar(2);
+
+    expect(await screen.findByText(SIN_SERVIDOR)).toBeOnTheScreen();
+    // La secuencia de reintentos vuelve a pedir las queries, nunca la escritura.
+    await act(() => jest.advanceTimersByTimeAsync(70_000));
+    expect(resultado.falso.pedidosA(COMPRAS)).toHaveLength(1);
+    expect(screen.getByText("Inscripción")).toBeOnTheScreen();
+    expect(screen.getByText("2 entradas")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Confirmar compra" })).toBeEnabled();
+
+    await fireEvent.press(screen.getByRole("button", { name: "Confirmar compra" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
+    const pedidos = resultado.falso.pedidosA(COMPRAS);
+    expect(pedidos).toHaveLength(2);
+    expect(JSON.parse(pedidos[1]?.cuerpo ?? "null")).toEqual({ tipoEntradaId: INSCRIPCION, cantidad: 2 });
+  });
+
+  it("compra registrada con la respuesta perdida: al volver al detalle figura en Tus compras pendientes con Pagar", async () => {
+    let enviada = false;
+    const resultado = await comprarDesdeElDetalle("Inscripción", {
+      compras: [
+        () => {
+          enviada = true;
+          return "rechazar";
+        },
+      ],
+      misCompras: [
+        () => ({
+          status: 200,
+          json: enviada ? { ...ambos, pendientes: [compraPendiente] } : ambos,
+        }),
+      ],
+    });
+    await elegirYConfirmar(2);
+    expect(await screen.findByText(SIN_SERVIDOR)).toBeOnTheScreen();
+
+    await act(() => router.back());
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+    expect(await screen.findByText("Tus compras pendientes")).toBeOnTheScreen();
+    expect(
+      screen.getByRole("button", { name: "Pagar la compra de 2 entradas Inscripción" }),
+    ).toBeOnTheScreen();
+  });
+});
