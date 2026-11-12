@@ -31,7 +31,7 @@ Cambios del flujo de trabajo que no son features de producto (no siguen Spec Kit
 
 | Cambio | Rama / PR | Estado |
 |---|---|---|
-| **Flujo SDD más rápido**: tests focalizados en cada ciclo de TDD (`test:foco`, `test:afectados`) y suite completa al cerrar cada fase; hook `Stop` incremental por paquete (`tsc --incremental`, `eslint --cache`); `/speckit-implement` de a una fase. Constitución v2.3.0 ("Verificación durante el desarrollo") y AGENTS.md. El CI no cambia | `chore/flujo-sdd-rapido` · #9 | en PR |
+| **Flujo SDD más rápido**: tests focalizados en cada ciclo de TDD (`test:foco`, `test:afectados`) y suite completa al cerrar cada fase; hook `Stop` incremental por paquete (`tsc --incremental`, `eslint --cache`); `/speckit-implement` de a una fase. Constitución v2.3.0 ("Verificación durante el desarrollo") y AGENTS.md. El CI no cambia | `chore/flujo-sdd-rapido` · #9 | integrada |
 
 ## Grafo de dependencias
 
