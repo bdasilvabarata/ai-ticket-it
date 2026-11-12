@@ -248,8 +248,8 @@ Noche de Rock (15000), Hamlet (18000), Festival (45000); `?orden=puntaje` → ig
 
 **Purpose**: comentarios, documentación, accesibilidad, validación de punta a punta y cierre.
 
-- [ ] T051 [P] Corregir el comentario de `tuPrecioEstaEntre` en `backend/src/domain/evento.ts`: el filtro por rango de precio quedó fuera de alcance de la 005 (lo pide el diagrama de la consigna, sin feature que lo use todavía).
-- [ ] T052 [P] Actualizar `AGENTS.md` (plan, "Post-design re-check"):
+- [X] T051 [P] Corregir el comentario de `tuPrecioEstaEntre` en `backend/src/domain/evento.ts`: el filtro por rango de precio quedó fuera de alcance de la 005 (lo pide el diagrama de la consigna, sin feature que lo use todavía).
+- [X] T052 [P] Actualizar `AGENTS.md` (plan, "Post-design re-check"):
   - `GET /eventos` público y `EventoVista` con `organizador`;
   - `Resenia` mínima, `RepositorioResenias.listarPorEventos` y `ReseniaService` (lo amplía la 011), en "Recursos";
   - `UsuarioService.obtenerOFallar` público y `obtenerPorIds`, y `RepositorioUsuarios.listarPorIds` en la convención de nombres;
@@ -257,7 +257,7 @@ Noche de Rock (15000), Hamlet (18000), Festival (45000); `?orden=puntaje` → ig
   - Explorar y el detalle público en la feature `eventos`, la ruta `explorar/[eventoId]`, `useCatalogo`/`useInvalidarCatalogo`/`useValorDemorado` y la clave `catalogo` **sin usuario** (la excepción documentada en `claves.ts`);
   - las props nuevas de `SegunConsulta` (`cargando`, `vacio`) y `ListaVacia` (`accion`), y el modo `conTodas` de `SelectorCategoria`.
 - [ ] T053 Revisar en 360 px y con TalkBack: sin desplazamiento horizontal de la página (solo la fila de imágenes se desliza; los chips se acomodan en renglones), tarjetas, selectores, buscador e imágenes anunciados, "Agotado" como texto y sin valores sueltos fuera del `tema` (SC-007). Ajustar lo que haga falta en `mobile/src/features/eventos/`.
-- [ ] T054 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz, y dejar las cuatro en verde (incluidos todos los tests de la 004: SC-008).
+- [X] T054 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz, y dejar las cuatro en verde (incluidos todos los tests de la 004: SC-008).
 - [ ] T055 Validar a mano las secciones 2 (pedidos directos) y 3 (recorrido de la demo en el celular) de `specs/005-explorar-eventos/quickstart.md` y anotar cualquier desvío. En el paso 2 de la app, cronometrar buscar un evento sin tildes y abrir su detalle: menos de 30 s (SC-001); al dejar de escribir, la lista cambia en menos de 1 s (SC-004).
 - [ ] T056 En `docs/backlog.md`, pasar la 005 a `en PR`, y abrir el PR de `feature/005-explorar-eventos` a `development` con las cuatro verificaciones del CI en verde.
 

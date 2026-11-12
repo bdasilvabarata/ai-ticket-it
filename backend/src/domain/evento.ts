@@ -254,7 +254,8 @@ export class Evento {
 
   /**
    * ¿Algún tipo de entrada tiene un precio entre `min` y `max` (inclusive)? (diagrama de la
-   * consigna; lo usa la búsqueda por precio de la feature 005).
+   * consigna). El filtro por rango de precio quedó fuera de alcance de la 005: todavía no lo usa
+   * ninguna feature.
    */
   tuPrecioEstaEntre(min: number, max: number): boolean {
     return this.tiposEntrada.some((tipo) => tipo.precio >= min && tipo.precio <= max);
