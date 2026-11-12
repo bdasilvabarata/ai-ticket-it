@@ -269,3 +269,171 @@ describe("GET /api/compras/:compraId y POST /api/compras/:compraId/pago", () => 
     expect(await cupoDe(app, VIP)).toBe(50);
   });
 });
+
+// US3 (T045): la tabla de rechazos de contracts/api.md ("Ejemplos" y "Errores de esta feature").
+// Cada rechazo deja el cupo igual (SC-003): se compara el detalle del evento antes y después.
+describe("rechazos del alta: status, código y mensaje, sin tocar el cupo", () => {
+  const MARATON = "/api/eventos/evento-maraton-10k";
+  const RISAS = "/api/eventos/evento-noche-de-risas";
+  const ENTRADA_INVALIDA = { codigo: "ENTRADA_INVALIDA", mensaje: "Los datos enviados no son válidos." };
+
+  async function cuposDe(app: App, evento: string): Promise<number[]> {
+    const { body } = await request(app).get(evento);
+    return (body.tiposEntrada as { cupo: number }[]).map((t) => t.cupo);
+  }
+
+  /** Hace el pedido y verifica que el cupo del `evento` no cambió. */
+  async function rechazo(app: App, pedido: () => request.Test, evento = FESTIVAL) {
+    const antes = await cuposDe(app, evento);
+    const respuesta = await pedido();
+    expect(await cuposDe(app, evento)).toEqual(antes);
+    return respuesta;
+  }
+
+  it('cantidad 0, -1, 1.5, "2", 5 o faltante → 400 ENTRADA_INVALIDA en body.cantidad', async () => {
+    const app = nuevaApp();
+    const casos: [object, string][] = [
+      ...[0, -1, 1.5, "2", 5].map((cantidad): [object, string] => [
+        { tipoEntradaId: VIP, cantidad },
+        "Debe ser un entero entre 1 y 4.",
+      ]),
+      [{ tipoEntradaId: VIP }, "Es obligatorio."],
+    ];
+    for (const [cuerpo, mensaje] of casos) {
+      const respuesta = await rechazo(app, () => comprar(app, cuerpo));
+      expect(respuesta.status, JSON.stringify(cuerpo)).toBe(400);
+      expect(respuesta.body.error).toMatchObject(ENTRADA_INVALIDA);
+      expect(respuesta.body.error.detalles).toEqual([{ campo: "body.cantidad", mensaje }]);
+    }
+  });
+
+  it("tipoEntradaId faltante, mal formado o de otro evento → 400 en body.tipoEntradaId", async () => {
+    const app = nuevaApp();
+    const casos: [object, string][] = [
+      [{ cantidad: 1 }, "Es obligatorio."],
+      [{ tipoEntradaId: "Tipo 1", cantidad: 1 }, "Debe ser un identificador válido."],
+      [{ tipoEntradaId: 7, cantidad: 1 }, "Debe ser un identificador válido."],
+      [{ tipoEntradaId: "tipo-hamlet-platea", cantidad: 1 }, "No existe el tipo de entrada en este evento."],
+    ];
+    for (const [cuerpo, mensaje] of casos) {
+      const respuesta = await rechazo(app, () => comprar(app, cuerpo));
+      expect(respuesta.status, JSON.stringify(cuerpo)).toBe(400);
+      expect(respuesta.body.error).toMatchObject(ENTRADA_INVALIDA);
+      expect(respuesta.body.error.detalles).toEqual([{ campo: "body.tipoEntradaId", mensaje }]);
+    }
+  });
+
+  it("evento inexistente → 404 EVENTO_NO_ENCONTRADO; eventoId mal formado → 400 en params.eventoId", async () => {
+    const app = nuevaApp();
+    const cuerpo = { tipoEntradaId: VIP, cantidad: 1 };
+    const inexistente = await rechazo(app, () =>
+      comprar(app, cuerpo, "usuario-sofia", "/api/eventos/evento-inexistente"),
+    );
+    expect(inexistente.status).toBe(404);
+    expect(inexistente.body.error).toMatchObject({
+      codigo: "EVENTO_NO_ENCONTRADO",
+      mensaje: "No existe el evento.",
+    });
+
+    const malFormado = await rechazo(app, () =>
+      comprar(app, cuerpo, "usuario-sofia", "/api/eventos/Evento%201"),
+    );
+    expect(malFormado.status).toBe(400);
+    expect(malFormado.body.error.detalles).toEqual([
+      { campo: "params.eventoId", mensaje: "Debe ser un identificador válido." },
+    ]);
+  });
+
+  it("Noche de risas (ya realizada) → 409 EVENTO_REALIZADO", async () => {
+    const app = nuevaApp();
+    const cuerpo = { tipoEntradaId: "tipo-noche-de-risas-general", cantidad: 1 };
+    const respuesta = await rechazo(app, () => comprar(app, cuerpo, "usuario-martin", RISAS), RISAS);
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "EVENTO_REALIZADO",
+      mensaje: "El evento ya se realizó: no se pueden comprar entradas.",
+    });
+  });
+
+  it("Lucía en su Festival → 409 COMPRA_PROPIO_EVENTO", async () => {
+    const app = nuevaApp();
+    const respuesta = await rechazo(app, () =>
+      comprar(app, { tipoEntradaId: VIP, cantidad: 1 }, "usuario-lucia"),
+    );
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "COMPRA_PROPIO_EVENTO",
+      mensaje: "No podés comprar entradas de un evento que organizás.",
+    });
+  });
+
+  it("Martín con 3 General → 409 TOPE_POR_PERSONA con las que le quedan", async () => {
+    const app = nuevaApp();
+    const respuesta = await rechazo(app, () =>
+      comprar(app, { tipoEntradaId: GENERAL, cantidad: 3 }, "usuario-martin"),
+    );
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "TOPE_POR_PERSONA",
+      mensaje: "Podés comprar 2 entradas más de tipos pagos de este evento.",
+    });
+  });
+
+  it("dos Carrera kids seguidas de Sofía → 201 y 409 TOPE_POR_PERSONA", async () => {
+    const app = nuevaApp();
+    const kids = { tipoEntradaId: "tipo-maraton-10k-carrera-kids", cantidad: 1 };
+    const primera = await comprar(app, kids, "usuario-sofia", MARATON);
+    expect(primera.status).toBe(201);
+    expect(primera.body.total).toBe(0);
+    const segunda = await rechazo(app, () => comprar(app, kids, "usuario-sofia", MARATON), MARATON);
+    expect(segunda.status).toBe(409);
+    expect(segunda.body.error.codigo).toBe("TOPE_POR_PERSONA");
+  });
+
+  it('las 3 Backstage y después 1 más → 409 CUPO_INSUFICIENTE "No quedan entradas de «Backstage»."', async () => {
+    const app = nuevaApp();
+    expect((await comprar(app, { tipoEntradaId: BACKSTAGE, cantidad: 3 }, "usuario-diego")).status).toBe(201);
+    const respuesta = await rechazo(app, () =>
+      comprar(app, { tipoEntradaId: BACKSTAGE, cantidad: 1 }, "usuario-valentina"),
+    );
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "CUPO_INSUFICIENTE",
+      mensaje: "No quedan entradas de «Backstage».",
+    });
+  });
+
+  it('4 VIP con cupo 3 → 409 CUPO_INSUFICIENTE "Quedan 3 entradas de «VIP»."', async () => {
+    const app = nuevaApp();
+    const { body: evento } = await request(app).get(FESTIVAL);
+    type Tipo = { id: string; nombre: string; descripcion: string; precio: number };
+    const vip = (evento.tiposEntrada as Tipo[]).find((t) => t.id === VIP)!;
+    const edicion = await request(app)
+      .put(`${FESTIVAL}/tipos-entrada/${VIP}`)
+      .set("X-Usuario-Id", "usuario-lucia")
+      .send({ nombre: vip.nombre, descripcion: vip.descripcion, precio: vip.precio, cupo: 3 });
+    expect(edicion.status).toBe(200);
+
+    const respuesta = await rechazo(app, () => comprar(app, { tipoEntradaId: VIP, cantidad: 4 }));
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "CUPO_INSUFICIENTE",
+      mensaje: "Quedan 3 entradas de «VIP».",
+    });
+  });
+
+  it("mis-compras y las rutas de /compras/:id con ids mal formados → 400 en params.*", async () => {
+    const app = nuevaApp();
+    const misComprasMal = await misCompras(app, "usuario-sofia", "/api/eventos/Evento%201");
+    expect(misComprasMal.status).toBe(400);
+    expect(misComprasMal.body.error.detalles).toEqual([
+      { campo: "params.eventoId", mensaje: "Debe ser un identificador válido." },
+    ]);
+    for (const respuesta of [await verCompra(app, "Compra%201"), await pagar(app, "Compra%201")]) {
+      expect(respuesta.status).toBe(400);
+      expect(respuesta.body.error.detalles).toEqual([
+        { campo: "params.compraId", mensaje: "Debe ser un identificador válido." },
+      ]);
+    }
+  });
+});

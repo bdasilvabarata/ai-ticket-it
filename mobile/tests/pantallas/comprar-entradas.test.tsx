@@ -225,3 +225,157 @@ describe("Comprar entradas (US1)", () => {
     expect(await screen.findByRole("button", { name: "Confirmar compra" })).toBeOnTheScreen();
   });
 });
+
+/**
+ * Respuestas que cambian después del alta rechazada: `antes` hasta que llega el `POST` y `despues`
+ * desde entonces (el servidor ya sabe lo que la app todavía no).
+ */
+function trasElRechazo(
+  rechazo: RespuestaFalsa,
+  cambios: { evento?: [EventoVista, EventoVista]; restantes?: [number, number] },
+) {
+  let rechazado = false;
+  const elegir = <T,>([antes, despues]: [T, T]) => (rechazado ? despues : antes);
+  const opciones: Opciones = {
+    compras: [
+      () => {
+        rechazado = true;
+        return rechazo;
+      },
+    ],
+  };
+  if (cambios.evento) {
+    const evento = cambios.evento;
+    opciones.evento = [() => ({ status: 200, json: elegir(evento) })];
+  }
+  if (cambios.restantes) {
+    const restantes = cambios.restantes;
+    opciones.misCompras = [
+      () => ({ status: 200, json: conRestantes({ [INSCRIPCION]: elegir(restantes), [KIDS]: 1 }) }),
+    ];
+  }
+  return opciones;
+}
+
+async function elegirYConfirmar(cantidad: number) {
+  for (let i = 1; i < cantidad; i++) {
+    await fireEvent.press(await screen.findByRole("button", { name: "Una entrada más" }));
+  }
+  expect(await screen.findByText(cantidad === 1 ? "1 entrada" : `${cantidad} entradas`)).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole("button", { name: "Confirmar compra" }));
+}
+
+describe("Comprar entradas: errores del alta (US3)", () => {
+  it("409 CUPO_INSUFICIENTE: el mensaje del servidor, el evento se vuelve a pedir y la cantidad se recorta", async () => {
+    const mensaje = "Queda 1 entrada de «Inscripción».";
+    const resultado = await abrirComprar(
+      INSCRIPCION,
+      trasElRechazo(
+        { status: 409, json: errorApi("CUPO_INSUFICIENTE", mensaje) },
+        { evento: [conTipo({ cupo: 10 }), conTipo({ cupo: 1 })] },
+      ),
+    );
+    const eventoAntes = resultado.falso.pedidosA(EVENTO).length;
+    const misComprasAntes = resultado.falso.pedidosA(MIS_COMPRAS).length;
+    await elegirYConfirmar(3);
+
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+    await waitFor(() => expect(screen.getByText("1 entrada")).toBeOnTheScreen());
+    expect(resultado.falso.pedidosA(EVENTO).length).toBeGreaterThan(eventoAntes);
+    expect(resultado.falso.pedidosA(MIS_COMPRAS).length).toBeGreaterThan(misComprasAntes);
+    expect(screen.getByText("Inscripción")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Confirmar compra" })).toBeEnabled();
+  });
+
+  it("409 TOPE_POR_PERSONA: el mensaje, mis-compras se vuelve a pedir y la cantidad se recorta", async () => {
+    const mensaje = "Podés comprar 1 entrada más de tipos pagos de este evento.";
+    await abrirComprar(
+      INSCRIPCION,
+      trasElRechazo({ status: 409, json: errorApi("TOPE_POR_PERSONA", mensaje) }, { restantes: [4, 1] }),
+    );
+    await elegirYConfirmar(3);
+
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+    await waitFor(() => expect(screen.getByText("1 entrada")).toBeOnTheScreen());
+    expect(screen.getByRole("button", { name: "Una entrada más" })).toBeDisabled();
+  });
+
+  it("409 EVENTO_REALIZADO: el mensaje y, con el evento vuelto a pedir, Este evento ya se realizó", async () => {
+    const mensaje = "El evento ya se realizó: no se pueden comprar entradas.";
+    await abrirComprar(
+      INSCRIPCION,
+      trasElRechazo(
+        { status: 409, json: errorApi("EVENTO_REALIZADO", mensaje) },
+        { evento: [maratonCompleta, { ...maratonCompleta, realizado: true }] },
+      ),
+    );
+    await elegirYConfirmar(1);
+
+    expect(await screen.findByText("Este evento ya se realizó")).toBeOnTheScreen();
+    expect(screen.getByText(mensaje)).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Confirmar compra" })).toBeNull();
+  });
+
+  it("409 COMPRA_PROPIO_EVENTO: el mensaje del servidor", async () => {
+    const mensaje = "No podés comprar entradas de un evento que organizás.";
+    await abrirComprar(INSCRIPCION, {
+      compras: [{ status: 409, json: errorApi("COMPRA_PROPIO_EVENTO", mensaje) }],
+    });
+    await elegirYConfirmar(1);
+
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+  });
+
+  it("400 en body.tipoEntradaId: Este tipo de entrada ya no está disponible. y Volver al evento", async () => {
+    const resultado = await comprarDesdeElDetalle("Inscripción", {
+      compras: [
+        {
+          status: 400,
+          json: errorApi("ENTRADA_INVALIDA", "Los datos enviados no son válidos.", [
+            { campo: "body.tipoEntradaId", mensaje: "No existe el tipo de entrada en este evento." },
+          ]),
+        },
+      ],
+    });
+    await elegirYConfirmar(1);
+
+    expect(await screen.findByText("Este tipo de entrada ya no está disponible.")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Confirmar compra" })).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Volver al evento" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+  });
+
+  it("404 EVENTO_NO_ENCONTRADO: No encontramos este evento., Volver a Explorar y el catálogo se vuelve a pedir", async () => {
+    const resultado = await abrirComprar(INSCRIPCION, {
+      compras: [{ status: 404, json: errorApi("EVENTO_NO_ENCONTRADO", "No existe el evento.") }],
+    });
+    const catalogoAntes = resultado.falso.pedidosA(CATALOGO_INICIAL).length;
+    await elegirYConfirmar(1);
+
+    expect(await screen.findByText("No encontramos este evento.")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Confirmar compra" })).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Volver a Explorar" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/"));
+    await waitFor(() =>
+      expect(resultado.falso.pedidosA(CATALOGO_INICIAL).length).toBeGreaterThan(catalogoAntes),
+    );
+  });
+
+  it("al volver al detalle tras un CUPO_INSUFICIENTE se ve el cupo real", async () => {
+    const resultado = await comprarDesdeElDetalle(
+      "Inscripción",
+      trasElRechazo(
+        { status: 409, json: errorApi("CUPO_INSUFICIENTE", "Quedan 3 entradas de «Inscripción».") },
+        { evento: [maratonCompleta, conTipo({ cupo: 3 })] },
+      ),
+    );
+    await elegirYConfirmar(4);
+    expect(await screen.findByText("Quedan 3 entradas de «Inscripción».")).toBeOnTheScreen();
+
+    await act(() => router.back());
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+    expect(await screen.findByText("$ 30.000 · 3 disponibles")).toBeOnTheScreen();
+  });
+});

@@ -376,22 +376,14 @@
           ],
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras"
-            },
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
             "body": {
               "mode": "raw",
               "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 2\n}"
             },
             "header": [
-              {
-                "key": "X-Usuario-Id",
-                "value": "usuario-sofia"
-              },
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
             ]
           }
         },
@@ -399,59 +391,137 @@
           "name": "Mis compras de Sofía en el Festival",
           "request": {
             "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/mis-compras"
-            },
-            "header": [
-              {
-                "key": "X-Usuario-Id",
-                "value": "usuario-sofia"
-              }
-            ]
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/mis-compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
           }
         },
         {
           "name": "Ver compra de Sofía (la última que compró)",
           "request": {
             "method": "GET",
-            "url": {
-              "raw": "{{baseUrl}}/compras/{{compraId}}"
-            },
-            "header": [
-              {
-                "key": "X-Usuario-Id",
-                "value": "usuario-sofia"
-              }
-            ]
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
           }
         },
         {
           "name": "Pagar la compra de Sofía",
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/compras/{{compraId}}/pago"
-            },
-            "header": [
-              {
-                "key": "X-Usuario-Id",
-                "value": "usuario-sofia"
-              }
-            ]
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/pago" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
           }
         },
         {
           "name": "Pagar de nuevo → 409 TRANSICION_INVALIDA",
           "request": {
             "method": "POST",
-            "url": {
-              "raw": "{{baseUrl}}/compras/{{compraId}}/pago"
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/pago" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Cantidad 0 → 400 ENTRADA_INVALIDA (body.cantidad)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 0\n}"
             },
             "header": [
-              {
-                "key": "X-Usuario-Id",
-                "value": "usuario-sofia"
-              }
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Tipo de otro evento → 400 ENTRADA_INVALIDA (body.tipoEntradaId)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-hamlet-platea\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Evento realizado (Noche de risas) → 409 EVENTO_REALIZADO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-risas/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-noche-de-risas-general\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "La organizadora compra en su evento → 409 COMPRA_PROPIO_EVENTO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-lucia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Martín supera su tope con 3 General → 409 TOPE_POR_PERSONA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-general\",\n  \"cantidad\": 3\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Diego compra las 3 Backstage",
+          "request": {
+            "method": "POST",
+            "description": "Agota Backstage para el pedido siguiente. Si se corrió antes 'Quitar Backstage del Festival', reiniciar el servidor (vuelve a los datos de ejemplo).",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-backstage\",\n  \"cantidad\": 3\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-diego" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Una Backstage más (agotado) → 409 CUPO_INSUFICIENTE",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-backstage\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-valentina" },
+              { "key": "Content-Type", "value": "application/json" }
             ]
           }
         }

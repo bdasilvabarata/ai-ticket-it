@@ -1,3 +1,5 @@
+export { AvisoDeFormulario } from "./componentes/AvisoDeFormulario";
+export { esNoEncontrado } from "./errores-de-formulario";
 export { textoCantidadTipos, textoCupo, textoFechaHora, textoPrecio } from "./formato";
 export { AgregarTipoEntrada } from "./pantallas/AgregarTipoEntrada";
 export { CrearEvento } from "./pantallas/CrearEvento";

@@ -11,7 +11,7 @@ import {
   tema,
   type ConsultaMostrable,
 } from "../../../componentes";
-import { textoFechaHora, textoPrecio, useEvento } from "../../eventos";
+import { AvisoDeFormulario, esNoEncontrado, textoFechaHora, textoPrecio, useEvento } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { SelectorCantidad } from "../componentes/SelectorCantidad";
 import { textoTotal } from "../formato";
@@ -74,16 +74,34 @@ function SegunLasConsultas({
   );
 }
 
-/** Cuando no hay nada para comprar: el motivo y "Volver al evento". */
-function SinCompra({ mensaje, encabezado }: { mensaje: string; encabezado?: ReactNode }) {
+/**
+ * Cuando no hay nada para comprar: el motivo, el mensaje del servidor si un alta lo rechazó, y
+ * "Volver al evento" (o "Volver a Explorar" si el evento ya no existe).
+ */
+function SinCompra({
+  mensaje,
+  encabezado,
+  aviso,
+  volverAExplorar = false,
+}: {
+  mensaje: string;
+  encabezado?: ReactNode;
+  aviso?: string | null;
+  volverAExplorar?: boolean;
+}) {
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
       {encabezado}
       <Text style={estilos.aviso} accessibilityLiveRegion="polite">
         {mensaje}
       </Text>
+      <AvisoDeFormulario mensaje={aviso} />
       <View style={estilos.acciones}>
-        <Boton variante="aviso" texto="Volver al evento" alPresionar={() => router.back()} />
+        {volverAExplorar ? (
+          <Boton variante="aviso" texto="Volver a Explorar" alPresionar={() => router.dismissTo("/")} />
+        ) : (
+          <Boton variante="aviso" texto="Volver al evento" alPresionar={() => router.back()} />
+        )}
       </View>
     </PantallaDesplazable>
   );
@@ -104,6 +122,16 @@ function Encabezado({ evento, tipo }: { evento: EventoVista; tipo: TipoEntradaVi
   );
 }
 
+/** 400 sobre `body.tipoEntradaId`: el tipo ya no es del evento (lo quitaron mientras se compraba). */
+function esTipoNoDisponible(error: unknown): boolean {
+  return (
+    error instanceof ErrorDeApi &&
+    error.status === 400 &&
+    error.detalles.some(({ campo }) => campo === "body.tipoEntradaId")
+  );
+}
+
+/** El mensaje de un alta rechazada (contracts/app.md, "Errores del alta"): el del servidor. */
 function mensajeDelError(error: unknown): string | null {
   if (!error) return null;
   if (error instanceof ServidorNoDisponibleError) return "No se pudo registrar la compra. Probá de nuevo.";
@@ -131,8 +159,16 @@ function Formulario({
   // Si el máximo baja (otra compra, el tope), la cantidad se recorta sin dejar de ser ≥ 1.
   const cantidad = Math.max(1, Math.min(elegida, maximo));
   const encabezado = <Encabezado evento={evento} tipo={tipo} />;
+  // Tras un rechazo, el evento y mis-compras ya se volvieron a pedir (la mutation los invalida): lo
+  // que sigue se dibuja con los datos reales, conservando el tipo y la cantidad elegidos.
+  const error = mensajeDelError(comprar.error);
 
-  if (evento.realizado) return <SinCompra encabezado={encabezado} mensaje="Este evento ya se realizó" />;
+  if (esNoEncontrado(comprar.error))
+    return <SinCompra mensaje="No encontramos este evento." volverAExplorar />;
+  if (esTipoNoDisponible(comprar.error))
+    return <SinCompra encabezado={encabezado} mensaje="Este tipo de entrada ya no está disponible." />;
+  if (evento.realizado)
+    return <SinCompra encabezado={encabezado} mensaje="Este evento ya se realizó" aviso={error} />;
   if (tipo.cupo === 0)
     return <SinCompra encabezado={encabezado} mensaje="No quedan entradas de este tipo." />;
   if (maximo === 0) {
@@ -153,8 +189,6 @@ function Formulario({
       },
     );
   };
-  const error = mensajeDelError(comprar.error);
-
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
       {encabezado}
@@ -163,11 +197,7 @@ function Formulario({
         <Text style={estilos.dato}>{`Podés comprar hasta ${maximo} entradas de este evento`}</Text>
       ) : null}
       <Text style={estilos.total}>{`Total: ${textoTotal(tipo.precio * cantidad)}`}</Text>
-      {error ? (
-        <Text style={estilos.error} accessibilityLiveRegion="polite">
-          {error}
-        </Text>
-      ) : null}
+      <AvisoDeFormulario mensaje={error} />
       <View style={estilos.acciones}>
         <Boton
           texto="Confirmar compra"
@@ -188,6 +218,5 @@ const estilos = StyleSheet.create({
   nombreTipo: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
   total: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
   aviso: { ...tema.tipografia.mensaje, color: tema.colores.texto },
-  error: { ...tema.tipografia.cuerpo, color: tema.colores.error },
   acciones: { alignItems: "flex-start" },
 });
