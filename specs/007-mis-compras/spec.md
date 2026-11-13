@@ -361,7 +361,8 @@ simular el servidor caído y ver el error con reintento.
   dice "Todavía no compraste entradas" y tiene una acción que lleva a Explorar.
 - **FR-017**: La lista DEBE volver a pedirse al volver a la pestaña y quedar desactualizada (y
   pedirse de nuevo al mostrarse) después de comprar, pagar o cancelar una compra, sea desde el
-  detalle del evento, "Mis entradas" o "Tu compra".
+  detalle del evento o "Tu compra" ("Mis entradas" no tiene acciones que cambien una compra:
+  cancelar una confirmada llega con la 009).
 - **FR-018**: Mientras la lista está abierta, la app DEBE volver a pedirla cuando llega la hora
   límite más próxima de las pendientes que muestra, para que el servidor (lectura al día) la
   devuelva `CANCELADA`. La app NO DEBE decidir por su cuenta que una compra venció: el estado
@@ -385,8 +386,9 @@ simular el servidor caído y ver el error con reintento.
 - **Fila de "Mis compras"** (vista, no se guarda): una compra con los datos actuales de su evento
   (nombre, fecha y hora) y de su tipo (nombre), su hora límite de pago si está pendiente y sus
   días restantes si está confirmada.
-- **Días restantes** (calculado, no se guarda): los días entre "ahora" según el reloj del
-  servidor y la fecha y hora del evento, en la zona horaria de Buenos Aires (FR-009 a FR-011).
+- **Días restantes** (calculado, no se guarda): los días de calendario de Buenos Aires entre la
+  fecha de hoy (según el reloj del servidor) y la fecha del evento, no bloques de 24 horas
+  (FR-009 a FR-011).
 - **Evento** y **TipoEntrada** (de la 004): aportan nombre y fecha a la fila; un evento
   realizado deja de estar en el catálogo pero no en "Mis compras".
 
