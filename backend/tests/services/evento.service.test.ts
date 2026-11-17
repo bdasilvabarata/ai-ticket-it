@@ -84,6 +84,44 @@ describe("EventoService.obtener", () => {
   });
 });
 
+describe("EventoService.obtenerPorIds (feature 007)", () => {
+  const eventos = () => [evento({ id: "evento-a" }), evento({ id: "evento-b" }), evento({ id: "evento-c" })];
+
+  it("devuelve un Map por id con todos los pedidos, en una sola lectura", async () => {
+    const servicios = crearServicesDeEventos({ eventos: eventos() });
+    const listarPorIds = vi.spyOn(servicios.repositorioEventos, "listarPorIds");
+    const buscarPorId = vi.spyOn(servicios.repositorioEventos, "buscarPorId");
+
+    const porId = await servicios.eventoService.obtenerPorIds(["evento-a", "evento-c"]);
+
+    expect([...porId.keys()].toSorted()).toEqual(["evento-a", "evento-c"]);
+    expect(porId.get("evento-a")?.id).toBe("evento-a");
+    expect(porId.get("evento-c")?.id).toBe("evento-c");
+    expect(listarPorIds).toHaveBeenCalledTimes(1);
+    expect(buscarPorId).not.toHaveBeenCalled();
+  });
+
+  it("si falta alguno → 404 EVENTO_NO_ENCONTRADO", async () => {
+    const { service } = crearService(eventos());
+    const pedido = service.obtenerPorIds(["evento-a", "evento-x"]);
+    await expect(pedido).rejects.toBeInstanceOf(NoEncontradoError);
+    await expect(pedido).rejects.toMatchObject({ codigo: "EVENTO_NO_ENCONTRADO" });
+  });
+
+  it("no toma el cerrojo ni guarda nada", async () => {
+    const servicios = crearServicesDeEventos({ eventos: eventos() });
+    const cerrojo = vi.spyOn(servicios.cerrojo, "ejecutar");
+    const guardarEvento = vi.spyOn(servicios.repositorioEventos, "guardar");
+    const guardarCompra = vi.spyOn(servicios.repositorioCompras, "guardar");
+
+    await servicios.eventoService.obtenerPorIds(["evento-a", "evento-b"]);
+
+    expect(cerrojo).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(guardarCompra).not.toHaveBeenCalled();
+  });
+});
+
 describe("EventoService.actualizar", () => {
   it("reemplaza los datos, no toca los tipos y devuelve la vista", async () => {
     const { service, repositorioEventos } = crearService([evento({ id: "evento-a" })]);

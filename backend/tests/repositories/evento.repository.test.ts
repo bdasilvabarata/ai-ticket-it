@@ -61,6 +61,31 @@ describe("EventoRepository: escrituras y listarPorOrganizador", () => {
   });
 });
 
+describe("EventoRepository.listarPorIds", () => {
+  const a = evento("evento-a", "usuario-lucia");
+  const b = evento("evento-b", "usuario-martin");
+  const c = evento("evento-c", "usuario-lucia");
+
+  it("devuelve los que existen de esos ids", async () => {
+    const repositorio = new EventoRepository([a, b, c]);
+    expect(await repositorio.listarPorIds(["evento-a", "evento-c"])).toEqual([a, c]);
+  });
+
+  it("un id repetido no repite el evento", async () => {
+    const repositorio = new EventoRepository([a, b, c]);
+    expect(await repositorio.listarPorIds(["evento-b", "evento-b", "evento-a"])).toEqual([b, a]);
+  });
+
+  it("un id inexistente se ignora", async () => {
+    const repositorio = new EventoRepository([a, b]);
+    expect(await repositorio.listarPorIds(["evento-a", "evento-inexistente"])).toEqual([a]);
+  });
+
+  it("[] → []", async () => {
+    expect(await new EventoRepository([a, b]).listarPorIds([])).toEqual([]);
+  });
+});
+
 describe("EventoRepository.siguienteId", () => {
   it("devuelve un UUID distinto en cada llamada", () => {
     const repositorio = new EventoRepository();
