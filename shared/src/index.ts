@@ -5,6 +5,7 @@ export type {
   CambioEstadoCompraVista,
   CompraVista,
   DatosCompra,
+  MiCompraVista,
   MisComprasDelEventoVista,
 } from "./compra";
 export { EstadoCompra } from "./estado-compra";

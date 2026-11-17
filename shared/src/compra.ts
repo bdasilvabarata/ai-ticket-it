@@ -55,6 +55,14 @@ export interface CompraVista {
   historial: CambioEstadoCompraVista[];
 }
 
+/** Una fila de "Mis compras" (feature 007): la compra al día con su evento y su tipo actuales, sin historial. */
+export type MiCompraVista = Omit<CompraVista, "compradorId" | "historial"> & {
+  /** Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null. */
+  diasRestantes: number | null;
+  /** Solo en CANCELADA: "sistema" si venció sin pagarse, "usuario" si la canceló su comprador; si no, null. */
+  canceladaPor: "sistema" | "usuario" | null;
+};
+
 /** Respuesta de `GET /eventos/:eventoId/mis-compras` (del usuario actual). */
 export interface MisComprasDelEventoVista {
   /** Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva. */

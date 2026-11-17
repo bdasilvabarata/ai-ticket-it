@@ -76,8 +76,8 @@ llega en la US2 (hasta entonces vale `null` en todas las compras).
 
 **Purpose**: el tipo compartido nuevo (aditivo, no rompe nada) y el estado del backlog.
 
-- [ ] T001 [P] En `docs/backlog.md`, pasar la 007 de `plan` a `tasks`.
-- [ ] T002 En `shared/src/compra.ts`, sumar `MiCompraVista` con el JSDoc de data-model ("Tipos compartidos"): `type MiCompraVista = Omit<CompraVista, "compradorId" | "historial"> & { diasRestantes: number | null /* "Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null." */; canceladaPor: "sistema" | "usuario" | null /* "Solo en CANCELADA: \"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador; si no, null." */ }`. Exportarlo (como tipo) en `shared/src/index.ts`. `npm run typecheck` en verde en los tres paquetes.
+- [X] T001 [P] En `docs/backlog.md`, pasar la 007 de `plan` a `tasks`.
+- [X] T002 En `shared/src/compra.ts`, sumar `MiCompraVista` con el JSDoc de data-model ("Tipos compartidos"): `type MiCompraVista = Omit<CompraVista, "compradorId" | "historial"> & { diasRestantes: number | null /* "Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null." */; canceladaPor: "sistema" | "usuario" | null /* "Solo en CANCELADA: \"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador; si no, null." */ }`. Exportarlo (como tipo) en `shared/src/index.ts`. `npm run typecheck` en verde en los tres paquetes.
 
 ---
 
