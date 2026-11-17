@@ -1,12 +1,27 @@
 import { EstadoCompra, type MiCompraVista } from "@ai-ticket-it/shared";
-import { act, fireEvent, screen, within } from "expo-router/testing-library";
+import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
+import { router } from "expo-router";
 
-import { compraConfirmada, compraGratis, compraPendiente, miCompra } from "../helpers/compras";
-import { errorApi, festival } from "../helpers/eventos";
-import { porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
+import { compraConfirmada, compraGratis, compraPendiente, conRestantes, miCompra } from "../helpers/compras";
+import {
+  CATALOGO_INICIAL,
+  catalogo,
+  errorApi,
+  festival,
+  maratonCompleta,
+  maratonEnCatalogo,
+} from "../helpers/eventos";
+import {
+  porMetodo,
+  porRuta,
+  type FetchFalso,
+  type FuncionRespuesta,
+  type RespuestaFalsa,
+} from "../helpers/fetch-falso";
+import { espiarAlertas, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { martin, todos } from "../helpers/usuarios";
+import { diego, martin, todos } from "../helpers/usuarios";
 
 type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 
@@ -40,11 +55,13 @@ const maratonGratis = miCompra(compraGratis, {
 async function abrirMisCompras(misCompras: Lista, extra: Record<string, Lista> = {}) {
   const resultado = await renderConDependencias({
     usuarioRecordado: martin.id,
+    // `porRuta` elige la primera ruta en que termina la URL: las de `extra` (como
+    // `/eventos/:id/compras`) van antes que `/compras`.
     respuestas: porRuta({
       "/usuarios/actual": [{ status: 200, json: martin }],
       "/usuarios": [{ status: 200, json: todos }],
-      [MIS_COMPRAS]: misCompras,
       ...extra,
+      [MIS_COMPRAS]: misCompras,
     }),
   });
   await esperarPestanas();
@@ -304,5 +321,194 @@ describe("Mis compras: retomar el pago de una pendiente (US3)", () => {
       ),
     ).toBeNull();
     expect(screen.queryByRole("button", { name: /^Pagar la compra de / })).toBeNull();
+  });
+});
+
+describe("Mis compras: la lista al día (US4)", () => {
+  const MINUTO = 60_000;
+  const EVENTO = "/eventos/evento-maraton-10k";
+  const COMPRA = "/compras/compra-nueva";
+  const FILA_MARATON = "Ver la compra de 2 Inscripción para Maratón Ciudad 10K";
+
+  /** Los `GET /compras` de la lista (no los de una compra ni el alta en un evento). */
+  const pedidosDeLaLista = (falso: FetchFalso) =>
+    falso.pedidos.filter((pedido) => pedido.metodo === "GET" && pedido.url.endsWith("/api/compras"));
+  const avanzar = (ms: number) => act(() => jest.advanceTimersByTimeAsync(ms));
+  const cancelada = (canceladaPor: "sistema" | "usuario") =>
+    miCompra(compraPendiente, {
+      estado: EstadoCompra.CANCELADA,
+      venceEn: null,
+      venceEnLocal: null,
+      canceladaPor,
+    });
+
+  /** Lo que pide el detalle de la Maratón desde Explorar (rutas que van antes de `/compras`). */
+  const detalleDeLaMaraton = (misComprasDelEvento: Lista, otras: Record<string, Lista> = {}) => ({
+    "/categorias": [{ status: 200, json: [] }] as Lista,
+    [CATALOGO_INICIAL]: [{ status: 200, json: catalogo([maratonEnCatalogo]) }] as Lista,
+    [`${EVENTO}/mis-compras`]: misComprasDelEvento,
+    [EVENTO]: [{ status: 200, json: maratonCompleta }] as Lista,
+    ...otras,
+  });
+
+  it("volver a la pestaña vuelve a pedir la lista; el primer foco no duplica el pedido del montaje (R8)", async () => {
+    const { falso } = await abrirMisCompras([{ status: 200, json: [festivalVip] }]);
+    await filas();
+    expect(pedidosDeLaLista(falso)).toHaveLength(1);
+
+    await irAPestana("Explorar");
+    await irAPestana("Mis compras");
+
+    await waitFor(() => expect(pedidosDeLaLista(falso)).toHaveLength(2));
+  });
+
+  it("con la lista abierta, al llegar la hora límite de una pendiente la vuelve a pedir y la muestra como dice el servidor (R9)", async () => {
+    // La pendiente vence 2 minutos después del primer pedido; después el servidor la da por vencida.
+    const { falso } = await abrirMisCompras([
+      () => ({
+        status: 200,
+        json: [miCompra(compraPendiente, { venceEn: new Date(Date.now() + 2 * MINUTO).toISOString() })],
+      }),
+      { status: 200, json: [cancelada("sistema")] },
+    ]);
+    const fila = await screen.findByRole("button", { name: FILA_MARATON });
+    expect(within(fila).getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+
+    await avanzar(2 * MINUTO - 5000);
+    expect(pedidosDeLaLista(falso)).toHaveLength(1);
+    expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen(); // la app no decide que venció
+
+    await avanzar(10_000);
+
+    expect(await screen.findByText("Venció sin pagarse")).toBeOnTheScreen();
+    expect(pedidosDeLaLista(falso)).toHaveLength(2);
+    expect(screen.getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Pagar la compra de / })).toBeNull();
+
+    await avanzar(30 * MINUTO); // ya sin pendientes: nada más programado
+    expect(pedidosDeLaLista(falso)).toHaveLength(2);
+  });
+
+  it("sin pendientes no programa ningún pedido", async () => {
+    const { falso } = await abrirMisCompras([{ status: 200, json: [festivalVip] }]);
+    await filas();
+
+    await avanzar(30 * MINUTO);
+
+    expect(pedidosDeLaLista(falso)).toHaveLength(1);
+  });
+
+  it("tras pagar desde Tu compra la lista se invalida y al volver refleja CONFIRMADA (FR-017)", async () => {
+    const { falso } = await abrirMisCompras(
+      [
+        { status: 200, json: [miCompra(compraPendiente)] },
+        { status: 200, json: [miCompra(compraConfirmada, { diasRestantes: 10 })] },
+      ],
+      {
+        [`${COMPRA}/pago`]: [porMetodo({ POST: [{ status: 200, json: compraConfirmada }] })],
+        [COMPRA]: [
+          { status: 200, json: compraPendiente },
+          { status: 200, json: compraConfirmada },
+        ],
+      },
+    );
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar la compra de 2 Inscripción" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+    expect(await screen.findByText("¡Listo! Tu compra está confirmada.")).toBeOnTheScreen();
+
+    await waitFor(() => expect(pedidosDeLaLista(falso)).toHaveLength(2)); // la invalidación, sin volver
+
+    await act(() => router.back());
+    const fila = await screen.findByRole("button", { name: FILA_MARATON });
+    expect(within(fila).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(within(fila).getByText("Faltan 10 días")).toBeOnTheScreen();
+  });
+
+  it("tras comprar desde el detalle la lista se invalida y al volver a la pestaña aparece la compra (SC-005)", async () => {
+    const { falso } = await abrirMisCompras(
+      [
+        { status: 200, json: [] },
+        { status: 200, json: [miCompra(compraPendiente)] },
+      ],
+      detalleDeLaMaraton([{ status: 200, json: conRestantes({ "tipo-maraton-inscripcion": 4 }) }], {
+        [`${EVENTO}/compras`]: [porMetodo({ POST: [{ status: 201, json: compraPendiente }] })],
+        [COMPRA]: [{ status: 200, json: compraPendiente }],
+      }),
+    );
+    expect(await screen.findByText("Todavía no compraste entradas")).toBeOnTheScreen();
+
+    await irAPestana("Explorar");
+    await fireEvent.press(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Comprar Inscripción" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Una entrada más" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Confirmar compra" }));
+    expect(await screen.findByRole("button", { name: "Pagar" })).toBeOnTheScreen();
+
+    await waitFor(() => expect(pedidosDeLaLista(falso)).toHaveLength(2)); // la invalidación
+
+    await act(() => router.navigate("/mis-compras"));
+    const fila = await screen.findByRole("button", { name: FILA_MARATON });
+    expect(within(fila).getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+  });
+
+  it("tras cancelar una pendiente desde el detalle la lista se invalida y al volver dice La cancelaste", async () => {
+    const alertas = espiarAlertas();
+    const { falso } = await abrirMisCompras(
+      [
+        { status: 200, json: [miCompra(compraPendiente)] },
+        { status: 200, json: [cancelada("usuario")] },
+      ],
+      detalleDeLaMaraton(
+        [
+          { status: 200, json: { pendientes: [compraPendiente], confirmadas: [], restantesPorTipo: [] } },
+          { status: 200, json: { pendientes: [], confirmadas: [], restantesPorTipo: [] } },
+        ],
+        {
+          [`${COMPRA}/cancelacion`]: [
+            porMetodo({
+              POST: [{ status: 200, json: { ...compraPendiente, estado: EstadoCompra.CANCELADA } }],
+            }),
+          ],
+        },
+      ),
+    );
+    await filas();
+
+    await irAPestana("Explorar");
+    await fireEvent.press(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Cancelar la compra de 2 entradas Inscripción" }),
+    );
+    await tocarEnAlerta(alertas, "¿Cancelar la compra de 2 entradas Inscripción?", "Cancelar compra");
+
+    await waitFor(() => expect(pedidosDeLaLista(falso)).toHaveLength(2)); // la invalidación
+
+    await act(() => router.navigate("/mis-compras"));
+    expect(await screen.findByText("La cancelaste")).toBeOnTheScreen();
+  });
+
+  it("al cambiar de usuario no se ve, ni mientras carga, ninguna compra del anterior (FR-019, SC-006)", async () => {
+    const delUsuario = (init: RequestInit | undefined) =>
+      (init?.headers as Record<string, string> | undefined)?.["X-Usuario-Id"];
+    const { falso } = await abrirMisCompras(
+      [(_url, init) => (delUsuario(init) === diego.id ? "colgar" : { status: 200, json: [festivalVip] })],
+      {
+        "/usuarios/actual": [
+          (_url, init) => ({ status: 200, json: delUsuario(init) === diego.id ? diego : martin }),
+        ],
+      },
+    );
+    await filas();
+
+    await irAPestana("Perfil");
+    await fireEvent.press(await screen.findByRole("button", { name: "Cambiar usuario" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Diego Fernández" }));
+    expect(await screen.findByText("Diego Fernández")).toBeOnTheScreen();
+    await irAPestana("Mis compras");
+
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Ver la compra de / })).toBeNull();
+    expect(screen.queryByText("Festival Sonidos del Sur")).toBeNull();
+    expect(pedidosDeLaLista(falso).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
   });
 });
