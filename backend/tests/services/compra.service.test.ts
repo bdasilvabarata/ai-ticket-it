@@ -695,7 +695,7 @@ describe("CompraService.misCompras (feature 007)", () => {
       creadaEn: "2026-11-10T15:00:00.000Z",
       venceEn: null,
       venceEnLocal: null,
-      diasRestantes: null,
+      diasRestantes: 5,
       canceladaPor: null,
     });
     expect(vista).not.toHaveProperty("historial");
@@ -856,6 +856,90 @@ describe("CompraService.misCompras (feature 007)", () => {
     expect(await compraService.misCompras("usuario-sofia")).toEqual([]);
     expect(listarPorIds).not.toHaveBeenCalled();
     expect(buscarEvento).not.toHaveBeenCalled();
+  });
+
+  describe("diasRestantes (US2)", () => {
+    const aDiez = () =>
+      evento({ id: "evento-diez", en: 10 * DIA, tiposEntrada: [tipo({ id: "tipo-diez" })] });
+
+    it("una CONFIRMADA de un evento a 10 días → 10; con el reloj un día después → 9, sin guardarlo", async () => {
+      const reloj = relojMovible();
+      const { compraService, repositorioCompras } = armar({
+        reloj,
+        eventos: [aDiez()],
+        compras: [deSofia("confirmada", "evento-diez", "tipo-diez", EstadoCompra.CONFIRMADA)],
+      });
+      const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+
+      expect((await compraService.misCompras("usuario-sofia"))[0]?.diasRestantes).toBe(10);
+      reloj.avanzar(DIA);
+      expect((await compraService.misCompras("usuario-sofia"))[0]?.diasRestantes).toBe(9);
+      expect(guardarCompra).not.toHaveBeenCalled();
+    });
+
+    it("una CONFIRMADA de un evento ya empezado → null, con el evento realizado", async () => {
+      const { compraService } = armar({
+        compras: [deSofia("pasada", "evento-pasado", "tipo-pasado-general", EstadoCompra.CONFIRMADA)],
+      });
+      expect((await compraService.misCompras("usuario-sofia"))[0]).toMatchObject({
+        diasRestantes: null,
+        evento: { realizado: true },
+      });
+    });
+
+    it("PENDIENTE, CANCELADA, UTILIZADA y REEMBOLSADA de eventos futuros → null", async () => {
+      const { compraService } = armar({
+        eventos: [aDiez()],
+        compras: [
+          deSofia("pendiente", "evento-diez", "tipo-diez", EstadoCompra.PENDIENTE),
+          deSofia("cancelada", "evento-diez", "tipo-diez", EstadoCompra.CANCELADA),
+          deSofia("utilizada", "evento-diez", "tipo-diez", EstadoCompra.UTILIZADA),
+          deSofia("reembolsada", "evento-diez", "tipo-diez", EstadoCompra.REEMBOLSADA),
+        ],
+      });
+      const vistas = await compraService.misCompras("usuario-sofia");
+      expect(vistas).toHaveLength(4);
+      for (const vista of vistas) expect(vista.diasRestantes).toBeNull();
+    });
+
+    it("si el organizador cambia la fecha del evento, se recalculan con la nueva", async () => {
+      const { compraService, repositorioEventos } = armar({
+        eventos: [aDiez()],
+        compras: [deSofia("confirmada", "evento-diez", "tipo-diez", EstadoCompra.CONFIRMADA)],
+      });
+      expect((await compraService.misCompras("usuario-sofia"))[0]?.diasRestantes).toBe(10);
+
+      await repositorioEventos.guardar(
+        evento({ id: "evento-diez", en: 3 * DIA, tiposEntrada: [tipo({ id: "tipo-diez" })] }),
+      );
+      expect((await compraService.misCompras("usuario-sofia"))[0]?.diasRestantes).toBe(3);
+    });
+
+    it("invariante: diasRestantes !== null ⇒ CONFIRMADA, evento no realizado y ≥ 0", async () => {
+      const { compraService } = armar({
+        eventos: [aDiez()],
+        compras: [
+          deSofia("confirmada-diez", "evento-diez", "tipo-diez", EstadoCompra.CONFIRMADA),
+          deSofia("confirmada-a", "evento-a", "tipo-a-vip", EstadoCompra.CONFIRMADA),
+          deSofia("confirmada-pasada", "evento-pasado", "tipo-pasado-general", EstadoCompra.CONFIRMADA),
+          deSofia("pendiente", "evento-a", "tipo-a-vip", EstadoCompra.PENDIENTE),
+          vencidaMaterializada("vencida"),
+        ],
+      });
+      const vistas = await compraService.misCompras("usuario-sofia");
+      expect(
+        vistas
+          .filter((v) => v.diasRestantes !== null)
+          .map((v) => v.id)
+          .toSorted(),
+      ).toEqual(["confirmada-a", "confirmada-diez"].toSorted());
+      for (const vista of vistas) {
+        if (vista.diasRestantes === null) continue;
+        expect(vista.estado).toBe(EstadoCompra.CONFIRMADA);
+        expect(vista.evento.realizado).toBe(false);
+        expect(vista.diasRestantes).toBeGreaterThanOrEqual(0);
+      }
+    });
   });
 
   it("no toma el cerrojo, no guarda nada y lee el reloj una vez", async () => {

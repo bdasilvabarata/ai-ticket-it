@@ -2,7 +2,10 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
-import { relojFijo, relojMovible } from "../helpers/eventos";
+import { diasRestantes } from "../../src/domain/dias-restantes";
+import { CompraRepository } from "../../src/repositories/compra.repository";
+import { EventoRepository } from "../../src/repositories/evento.repository";
+import { DIA, compra, evento, relojFijo, relojMovible, tipo } from "../helpers/eventos";
 
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
 const nuevaApp = () => crearApp({ reloj });
@@ -525,6 +528,35 @@ describe("GET /api/compras (feature 007)", () => {
     });
     expect(vista).not.toHaveProperty("historial");
     expect(vista).not.toHaveProperty("compradorId");
+  });
+
+  it("Martín: diasRestantes de su CONFIRMADA es el calculado para el reloj de la app (US2)", async () => {
+    const [vista] = (await listar(nuevaApp(), "usuario-martin")).body;
+    const esperado = diasRestantes(new Date(vista.evento.fechaHora), reloj.ahora());
+    expect(esperado).toBeGreaterThan(0);
+    expect(vista.diasRestantes).toBe(esperado);
+  });
+
+  it("con el reloj fijado, una compra confirmada de un evento de mañana → diasRestantes 1", async () => {
+    const app = crearApp({
+      reloj,
+      repositorios: {
+        eventos: new EventoRepository([
+          evento({ id: "evento-manana", en: DIA, tiposEntrada: [tipo({ id: "tipo-manana" })] }),
+        ]),
+        compras: new CompraRepository([
+          compra("evento-manana", "tipo-manana", EstadoCompra.CONFIRMADA, {
+            id: "compra-manana",
+            compradorId: "usuario-sofia",
+          }),
+        ]),
+      },
+    });
+    const respuesta = await listar(app, "usuario-sofia");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual([
+      expect.objectContaining({ id: "compra-manana", estado: EstadoCompra.CONFIRMADA, diasRestantes: 1 }),
+    ]);
   });
 
   it("Diego → 200 con su compra CANCELADA por el sistema", async () => {

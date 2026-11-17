@@ -131,6 +131,59 @@ describe("Mis compras (US1)", () => {
   });
 });
 
+describe("Mis compras: días restantes (US2)", () => {
+  /** Una confirmada del Festival con esos días restantes y, si se da, otra hora o `realizado`. */
+  const confirmada = (
+    id: string,
+    diasRestantes: number | null,
+    evento: Partial<MiCompraVista["evento"]> = {},
+  ): MiCompraVista => ({ ...festivalVip, id, diasRestantes, evento: { ...festivalVip.evento, ...evento } });
+  const filaDe = async (id: string, compras: MiCompraVista[]) => {
+    await abrirMisCompras([{ status: 200, json: compras }]);
+    const todas = await filas();
+    return todas[compras.findIndex((c) => c.id === id)]!;
+  };
+
+  it("una CONFIRMADA dice Confirmada y cuánto falta: Faltan 10 días, Mañana, Hoy · 21:00", async () => {
+    const compras = [
+      confirmada("en-diez", 10),
+      confirmada("manana", 1),
+      confirmada("hoy", 0, { fechaHoraLocal: "2026-12-01T21:00" }),
+    ];
+    await abrirMisCompras([{ status: 200, json: compras }]);
+    const [enDiez, manana, hoy] = await filas();
+
+    expect(within(enDiez!).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(within(enDiez!).getByText("Faltan 10 días")).toBeOnTheScreen();
+    expect(within(manana!).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(within(manana!).getByText("Mañana")).toBeOnTheScreen();
+    expect(within(hoy!).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(within(hoy!).getByText("Hoy · 21:00")).toBeOnTheScreen();
+  });
+
+  it("una CONFIRMADA de un evento realizado dice Confirmada y Evento realizado", async () => {
+    const fila = await filaDe("realizada", [confirmada("realizada", null, { realizado: true })]);
+    expect(within(fila).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(within(fila).getByText("Evento realizado")).toBeOnTheScreen();
+  });
+
+  it("una PENDIENTE o una CANCELADA no muestra días (FR-012)", async () => {
+    const compras = [
+      miCompra(compraPendiente, { id: "pendiente" }),
+      miCompra(compraPendiente, {
+        id: "cancelada",
+        estado: EstadoCompra.CANCELADA,
+        venceEn: null,
+        venceEnLocal: null,
+        canceladaPor: "sistema",
+      }),
+    ];
+    await abrirMisCompras([{ status: 200, json: compras }]);
+    await filas();
+    expect(screen.queryByText(/^Faltan \d+ días$|^Mañana$|^Hoy · |^Evento realizado$/)).toBeNull();
+  });
+});
+
 describe("Mis compras: los cuatro estados (FR-016)", () => {
   it("muestra cargando mientras espera al servidor", async () => {
     await abrirMisCompras(["colgar"]);

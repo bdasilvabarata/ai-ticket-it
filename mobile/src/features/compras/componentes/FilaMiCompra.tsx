@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { EtiquetaEstadoCompra, hundido, tema } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
-import { textoCantidad, textoTotal } from "../formato";
+import { textoAvisoDeMiCompra, textoCantidad, textoTotal } from "../formato";
 
 export interface PropsFilaMiCompra {
   compra: MiCompraVista;
@@ -17,6 +17,7 @@ export interface PropsFilaMiCompra {
  */
 export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
   const tipo = compra.tipoEntrada.nombre;
+  const aviso = textoAvisoDeMiCompra(compra);
   return (
     <View style={estilos.contenedor}>
       <Pressable
@@ -32,6 +33,7 @@ export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
         </Text>
         <View style={estilos.estado}>
           <EtiquetaEstadoCompra estado={compra.estado} />
+          {aviso !== null && <Text style={estilos.aviso}>{aviso}</Text>}
         </View>
       </Pressable>
     </View>
@@ -57,6 +59,7 @@ const estilos = StyleSheet.create({
   evento: { ...tema.tipografia.subtitulo, color: tema.colores.texto, flexShrink: 1 },
   detalle: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario, flexShrink: 1 },
   resumen: { ...tema.tipografia.cuerpoFuerte, color: tema.colores.texto, flexShrink: 1 },
-  // El aviso de la US2/US3 va al lado de la etiqueta y baja de renglón si no entra.
+  // El aviso va al lado de la etiqueta (nunca la reemplaza, FR-012) y baja de renglón si no entra.
   estado: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: tema.espacio.chico },
+  aviso: { ...tema.tipografia.secundario, color: tema.colores.texto, flexShrink: 1 },
 });
