@@ -1,5 +1,1 @@
-import { SeccionPendiente } from "../../src/componentes";
-
-export default function MisCompras() {
-  return <SeccionPendiente nombre="Mis compras" />;
-}
+export { MisCompras as default } from "../../src/features/compras";

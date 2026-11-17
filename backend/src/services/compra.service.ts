@@ -2,15 +2,17 @@ import {
   EstadoCompra,
   type CompraVista,
   type DatosCompra,
+  type MiCompraVista,
   type MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
 import { Compra } from "../domain/compra";
+import { compararMisCompras } from "../domain/orden-mis-compras";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
 import { entradasRestantes, exigirTopePorPersona } from "../domain/tope-por-persona";
 import { CompraNoEncontradaError, SinPermisoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aCompraVista } from "./compra.vistas";
+import { aCompraVista, aMiCompraVista } from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import type { TipoEntradaService } from "./tipo-entrada.service";
 
@@ -172,6 +174,33 @@ export class CompraService {
         restantes: organiza ? 0 : entradasRestantes(tipo, vigentes),
       })),
     };
+  }
+
+  /**
+   * "Mis compras" (feature 007): las del usuario como comprador, de todos los eventos y en todos
+   * los estados, **al día** y en el orden de `compararMisCompras`. Lectura: un `ahora`, sin cerrojo
+   * y sin guardar nada (no materializa vencimientos). Dos lecturas por pedido, cualquiera sea la
+   * cantidad de compras: las compras y sus eventos en lote (sin compras, ninguna de eventos).
+   */
+  async misCompras(usuarioId: string): Promise<MiCompraVista[]> {
+    const ahora = this.#reloj.ahora();
+    const compras = (await this.#compras.listarPorComprador(usuarioId)).map((compra) => compra.alDia(ahora));
+    if (compras.length === 0) return [];
+    const eventos = await this.#eventoService.obtenerPorIds([...new Set(compras.map((c) => c.eventoId))]);
+    return compras
+      .map((compra) => {
+        // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
+        const evento = eventos.get(compra.eventoId)!;
+        return {
+          id: compra.id,
+          creadaEn: compra.creadaEn,
+          fechaHoraEvento: evento.fechaHora,
+          eventoRealizado: evento.estaRealizado(ahora),
+          vista: aMiCompraVista(compra, evento, ahora),
+        };
+      })
+      .toSorted(compararMisCompras)
+      .map(({ vista }) => vista);
   }
 
   /** Sus compras de ese evento que cuentan para el tope en `ahora` (PENDIENTE no vencidas y CONFIRMADA). */

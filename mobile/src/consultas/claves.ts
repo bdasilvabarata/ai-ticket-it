@@ -21,6 +21,11 @@ export const claves = {
   /** Las compras pendientes y el tope restante del usuario en un evento (feature 006). */
   misComprasDelEvento: (usuarioId: string, eventoId: string) =>
     ["mis-compras-del-evento", usuarioId, eventoId] as const,
+  /**
+   * Todas las compras del usuario como comprador (feature 007). No comparte prefijo con
+   * `mis-compras-del-evento`: invalidar una no toca la otra.
+   */
+  misCompras: (usuarioId: string) => ["mis-compras", usuarioId] as const,
   /** Una compra, leída por su comprador (feature 006). */
   compra: (usuarioId: string, compraId: string) => ["compra", usuarioId, compraId] as const,
   /**

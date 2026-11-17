@@ -491,3 +491,74 @@ describe("GET /api/eventos/:eventoId/mis-compras: confirmadas (corrección de la
     expect(body.confirmadas.map((c: { id: string }) => c.id)).toContain(compra.id);
   });
 });
+
+describe("GET /api/compras (feature 007)", () => {
+  const listar = (app: App, usuarioId?: string, ruta = "/api/compras") => {
+    const pedido = request(app).get(ruta);
+    return usuarioId === undefined ? pedido : pedido.set("X-Usuario-Id", usuarioId);
+  };
+
+  it("sin X-Usuario-Id o con un usuario inexistente → 401 USUARIO_NO_IDENTIFICADO", async () => {
+    const app = nuevaApp();
+    for (const usuarioId of [undefined, "usuario-inexistente"]) {
+      const respuesta = await listar(app, usuarioId);
+      expect(respuesta.status, String(usuarioId)).toBe(401);
+      expect(respuesta.body.error.codigo).toBe("USUARIO_NO_IDENTIFICADO");
+    }
+  });
+
+  it("Martín → 200 con su compra CONFIRMADA del Festival, VIP, 2 entradas, sin historial ni compradorId", async () => {
+    const respuesta = await listar(nuevaApp(), "usuario-martin");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toHaveLength(1);
+    const [vista] = respuesta.body;
+    expect(vista).toMatchObject({
+      id: "compra-martin-festival-vip",
+      evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur", realizado: false },
+      tipoEntrada: { id: VIP, nombre: "VIP" },
+      cantidad: 2,
+      total: 240000,
+      estado: EstadoCompra.CONFIRMADA,
+      venceEn: null,
+      venceEnLocal: null,
+      canceladaPor: null,
+    });
+    expect(vista).not.toHaveProperty("historial");
+    expect(vista).not.toHaveProperty("compradorId");
+  });
+
+  it("Diego → 200 con su compra CANCELADA por el sistema", async () => {
+    const respuesta = await listar(nuevaApp(), "usuario-diego");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual([
+      expect.objectContaining({
+        id: "compra-diego-festival-general",
+        estado: EstadoCompra.CANCELADA,
+        canceladaPor: "sistema",
+        venceEn: null,
+      }),
+    ]);
+  });
+
+  it("Lucía (organiza el Festival) → 200 []", async () => {
+    const respuesta = await listar(nuevaApp(), "usuario-lucia");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual([]);
+  });
+
+  it("una query se ignora", async () => {
+    const app = nuevaApp();
+    const conQuery = await listar(app, "usuario-martin", "/api/compras?estado=PENDIENTE");
+    expect(conQuery.status).toBe(200);
+    expect(conQuery.body).toEqual((await listar(app, "usuario-martin")).body);
+  });
+
+  it("GET /api/compras/:compraId sigue funcionando", async () => {
+    const respuesta = await request(nuevaApp())
+      .get("/api/compras/compra-martin-festival-vip")
+      .set("X-Usuario-Id", "usuario-martin");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({ id: "compra-martin-festival-vip", compradorId: "usuario-martin" });
+    expect(respuesta.body.historial).toBeInstanceOf(Array);
+  });
+});

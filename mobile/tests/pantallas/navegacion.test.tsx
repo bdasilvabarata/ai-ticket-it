@@ -5,8 +5,6 @@ import { botonesDePestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { lucia, todos } from "../helpers/usuarios";
 
-const PENDIENTE = "Esta sección todavía no está disponible.";
-
 function entrarConfirmado() {
   return renderConDependencias({
     usuarioRecordado: lucia.id,
@@ -37,19 +35,15 @@ describe("navegación principal (US3)", () => {
     expect(resultado.getPathname()).toBe("/");
   });
 
-  // Mis eventos (feature 004) y Explorar (feature 005) ya no son secciones pendientes: las prueban
-  // tests/pantallas/mis-eventos y tests/pantallas/explorar.
-  it.each([["Mis compras", "/mis-compras"]])(
-    "la pestaña %s muestra su nombre y que todavía no está disponible (US3-2)",
-    async (nombre, ruta) => {
-      const resultado = await entrarConfirmado();
-      await screen.findByText("Todavía no hay eventos próximos.");
+  // Ninguna pestaña es ya una sección pendiente: Mis eventos (004), Explorar (005) y Mis compras
+  // (007) las prueban tests/pantallas/mis-eventos, explorar y mis-compras.
+  it("la pestaña Mis compras abre la lista de compras del usuario", async () => {
+    const resultado = await entrarConfirmado();
+    await screen.findByText("Todavía no hay eventos próximos.");
 
-      await irAPestana(nombre);
+    await irAPestana("Mis compras");
 
-      expect(resultado.getPathname()).toBe(ruta);
-      expect(screen.getByRole("header", { name: nombre })).toBeOnTheScreen();
-      expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
-    },
-  );
+    expect(resultado.getPathname()).toBe("/mis-compras");
+    expect(await screen.findByText("Todavía no compraste entradas")).toBeOnTheScreen();
+  });
 });

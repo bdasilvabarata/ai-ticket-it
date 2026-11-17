@@ -2,6 +2,7 @@ import {
   comprarEntradas,
   crearClienteApi,
   obtenerCompra,
+  obtenerMisCompras,
   obtenerMisComprasDelEvento,
   cancelarCompra,
   pagarCompra,
@@ -95,6 +96,24 @@ describe("obtenerCompra", () => {
     const controlador = new AbortController();
     await obtenerCompra(cliente, "compra-1", { signal: controlador.signal });
     expect(get).toHaveBeenCalledWith("/compras/compra-1", { signal: controlador.signal });
+  });
+});
+
+describe("obtenerMisCompras", () => {
+  it("pide GET /compras con el usuario actual y devuelve el arreglo tal cual", async () => {
+    const lista = [{ id: "compra-1" }, { id: "compra-2" }];
+    const { cliente, falso } = armar({ status: 200, json: lista });
+    await expect(obtenerMisCompras(cliente)).resolves.toEqual(lista);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras`, metodo: "GET" });
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: [] });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerMisCompras(cliente, { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/compras", { signal: controlador.signal });
   });
 });
 

@@ -12,6 +12,7 @@ export {
   cancelarCompra,
   comprarEntradas,
   obtenerCompra,
+  obtenerMisCompras,
   obtenerMisComprasDelEvento,
   pagarCompra,
 } from "./compras";

@@ -412,6 +412,14 @@
           }
         },
         {
+          "name": "Mis compras de Sofía (todas, al día y ordenadas)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
           "name": "Pagar de nuevo → 409 TRANSICION_INVALIDA",
           "request": {
             "method": "POST",
