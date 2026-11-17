@@ -1,6 +1,7 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 
 import {
+  textoAccionDePago,
   textoAvisoDeMiCompra,
   textoCancelada,
   textoCantidad,
@@ -13,6 +14,7 @@ import {
   compraCancelada,
   compraCanceladaPorElComprador,
   compraConfirmada,
+  compraPendiente,
   miCompra,
 } from "../../helpers/compras";
 
@@ -89,5 +91,34 @@ describe("textoAvisoDeMiCompra", () => {
   it("UTILIZADA y REEMBOLSADA → sin aviso", () => {
     expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.UTILIZADA }))).toBeNull();
     expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.REEMBOLSADA }))).toBeNull();
+  });
+});
+
+describe("textoAccionDePago", () => {
+  it("gratis → Confirmar; con precio → Pagar", () => {
+    expect(textoAccionDePago(0)).toBe("Confirmar");
+    expect(textoAccionDePago(120000)).toBe("Pagar");
+  });
+});
+
+describe("textoAvisoDeMiCompra: pendientes y canceladas (US3)", () => {
+  it("PENDIENTE → hasta qué hora se puede pagar", () => {
+    expect(
+      textoAvisoDeMiCompra(
+        miCompra(compraPendiente, { estado: EstadoCompra.PENDIENTE, venceEnLocal: "2026-12-01T15:35" }),
+      ),
+    ).toBe("Podés pagar hasta las 15:35");
+  });
+
+  it("CANCELADA por el sistema → Venció sin pagarse; por su comprador → La cancelaste", () => {
+    const cancelada = (canceladaPor: "sistema" | "usuario") =>
+      miCompra(compraPendiente, {
+        estado: EstadoCompra.CANCELADA,
+        venceEn: null,
+        venceEnLocal: null,
+        canceladaPor,
+      });
+    expect(textoAvisoDeMiCompra(cancelada("sistema"))).toBe("Venció sin pagarse");
+    expect(textoAvisoDeMiCompra(cancelada("usuario"))).toBe("La cancelaste");
   });
 });

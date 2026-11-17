@@ -1,10 +1,10 @@
-import type { MiCompraVista } from "@ai-ticket-it/shared";
+import { EstadoCompra, type MiCompraVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { EtiquetaEstadoCompra, hundido, tema } from "../../../componentes";
+import { Boton, EtiquetaEstadoCompra, hundido, tema } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
-import { textoAvisoDeMiCompra, textoCantidad, textoTotal } from "../formato";
+import { textoAccionDePago, textoAvisoDeMiCompra, textoCantidad, textoTotal } from "../formato";
 
 export interface PropsFilaMiCompra {
   compra: MiCompraVista;
@@ -12,8 +12,9 @@ export interface PropsFilaMiCompra {
 
 /**
  * Una compra de "Mis compras" (contracts/app.md, "`FilaMiCompra`"): un contenedor sin rol con los
- * datos tocables, que abren "Tu compra". La acción de pago (US3) va como **hermana** de los datos,
- * nunca adentro: un botón anidado en un `Pressable` accesible no se puede enfocar en Android (R10).
+ * datos tocables, que abren "Tu compra". En una `PENDIENTE`, "Pagar" ("Confirmar" si es gratis) va
+ * como **hermana** de los datos, nunca adentro: un botón anidado en un `Pressable` accesible no se
+ * puede enfocar en Android (R10). También abre "Tu compra", donde se paga.
  */
 export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
   const tipo = compra.tipoEntrada.nombre;
@@ -36,6 +37,15 @@ export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
           {aviso !== null && <Text style={estilos.aviso}>{aviso}</Text>}
         </View>
       </Pressable>
+      {compra.estado === EstadoCompra.PENDIENTE && (
+        <View style={estilos.acciones}>
+          <Boton
+            texto={textoAccionDePago(compra.total)}
+            accessibilityLabel={`Pagar la compra de ${compra.cantidad} ${tipo}`}
+            alPresionar={() => abrirCompra(compra.id)}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -62,4 +72,5 @@ const estilos = StyleSheet.create({
   // El aviso va al lado de la etiqueta (nunca la reemplaza, FR-012) y baja de renglón si no entra.
   estado: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: tema.espacio.chico },
   aviso: { ...tema.tipografia.secundario, color: tema.colores.texto, flexShrink: 1 },
+  acciones: { alignItems: "flex-start" },
 });

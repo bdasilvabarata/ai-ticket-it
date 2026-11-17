@@ -222,3 +222,87 @@ describe("Mis compras: los cuatro estados (FR-016)", () => {
     expect(await screen.findByText("Todavía no hay eventos próximos.")).toBeOnTheScreen();
   });
 });
+
+describe("Mis compras: retomar el pago de una pendiente (US3)", () => {
+  /** Una pendiente de Martín en el Festival: 1 VIP por $ 120.000, pagable hasta las 15:35. */
+  const pendienteVip = miCompra(compraPendiente, {
+    id: "compra-pendiente-vip",
+    evento: festivalVip.evento,
+    tipoEntrada: festivalVip.tipoEntrada,
+    cantidad: 1,
+    total: 120000,
+  });
+  const cancelada = (id: string, canceladaPor: "sistema" | "usuario"): MiCompraVista => ({
+    ...pendienteVip,
+    id,
+    estado: EstadoCompra.CANCELADA,
+    venceEn: null,
+    venceEnLocal: null,
+    canceladaPor,
+  });
+  const FILA_PENDIENTE = "Ver la compra de 1 VIP para Festival Sonidos del Sur";
+
+  it("una PENDIENTE dice Pendiente, hasta qué hora se puede pagar y tiene Pagar, que abre Tu compra", async () => {
+    const { falso } = await abrirMisCompras([{ status: 200, json: [pendienteVip] }], {
+      "/compras/compra-pendiente-vip": ["colgar"],
+    });
+    const fila = await screen.findByRole("button", { name: FILA_PENDIENTE });
+    expect(within(fila).getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+    expect(within(fila).getByText("Podés pagar hasta las 15:35")).toBeOnTheScreen();
+
+    const pagar = screen.getByRole("button", { name: "Pagar la compra de 1 VIP" });
+    expect(within(pagar).getByText("Pagar")).toBeOnTheScreen();
+    await fireEvent.press(pagar);
+
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(falso.pedidosA("/compras/compra-pendiente-vip")).toHaveLength(1);
+  });
+
+  it("el botón de pago es hermano de la fila, no está adentro (enfocables por separado, R10)", async () => {
+    await abrirMisCompras([{ status: 200, json: [pendienteVip] }]);
+    const fila = await screen.findByRole("button", { name: FILA_PENDIENTE });
+    expect(screen.getByLabelText("Pagar la compra de 1 VIP")).toBeOnTheScreen();
+    expect(within(fila).queryByLabelText("Pagar la compra de 1 VIP")).toBeNull();
+  });
+
+  it("una pendiente gratis tiene Confirmar", async () => {
+    await abrirMisCompras([{ status: 200, json: [miCompra(compraGratis, { id: "compra-gratis" })] }]);
+    const confirmar = await screen.findByRole("button", { name: "Pagar la compra de 1 Carrera kids" });
+    expect(within(confirmar).getByText("Confirmar")).toBeOnTheScreen();
+  });
+
+  it("una CANCELADA dice Venció sin pagarse o La cancelaste, sin Pagar, y la fila igual abre Tu compra", async () => {
+    const { falso } = await abrirMisCompras(
+      [{ status: 200, json: [cancelada("vencida", "sistema"), cancelada("por-mi", "usuario")] }],
+      { "/compras/vencida": ["colgar"] },
+    );
+    const [vencida, porMi] = await filas();
+    expect(within(vencida!).getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(within(vencida!).getByText("Venció sin pagarse")).toBeOnTheScreen();
+    expect(within(porMi!).getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(within(porMi!).getByText("La cancelaste")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Pagar la compra de / })).toBeNull();
+
+    await fireEvent.press(vencida!);
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(falso.pedidosA("/compras/vencida")).toHaveLength(1);
+  });
+
+  it("UTILIZADA y REEMBOLSADA: sin aviso, sin días y sin acciones (FR-015)", async () => {
+    const compras = [EstadoCompra.UTILIZADA, EstadoCompra.REEMBOLSADA].map((estado) => ({
+      ...pendienteVip,
+      id: `compra-${estado}`,
+      estado,
+      venceEn: null,
+      venceEnLocal: null,
+    }));
+    await abrirMisCompras([{ status: 200, json: compras }]);
+    await filas();
+    expect(
+      screen.queryByText(
+        /^Faltan \d+ días$|^Mañana$|^Hoy · |^Evento realizado$|^Podés pagar|^Venció sin pagarse$|^La cancelaste$/,
+      ),
+    ).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Pagar la compra de / })).toBeNull();
+  });
+});

@@ -16,7 +16,7 @@ import {
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { ResumenCompra } from "../componentes/ResumenCompra";
-import { textoCancelada, textoVencimiento } from "../formato";
+import { textoAccionDePago, textoCancelada, textoVencimiento } from "../formato";
 import { usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
 
@@ -141,7 +141,7 @@ function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista })
       <AvisoDeFormulario mensaje={error} />
       <View style={estilos.acciones}>
         <Boton
-          texto={gratis ? "Confirmar" : "Pagar"}
+          texto={textoAccionDePago(compra.total)}
           textoEnCurso={gratis ? "Confirmando…" : "Pagando…"}
           enCurso={pagar.isPending}
           alPresionar={alPagar}

@@ -44,6 +44,11 @@ export function textoDiasRestantes(dias: number, fechaHoraLocal: string): string
   return `Faltan ${dias} días`;
 }
 
+/** La acción de pago de una pendiente: 0 → "Confirmar" (gratis); con precio → "Pagar". */
+export function textoAccionDePago(total: number): string {
+  return total === 0 ? "Confirmar" : "Pagar";
+}
+
 /** El aviso que va junto al estado de una fila de "Mis compras", o `null` si no lleva (contracts/app.md). */
 export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
   switch (compra.estado) {
@@ -52,6 +57,11 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
       return compra.diasRestantes === null
         ? null
         : textoDiasRestantes(compra.diasRestantes, compra.evento.fechaHoraLocal);
+    case EstadoCompra.PENDIENTE:
+      return compra.venceEnLocal === null ? null : textoVencimiento(compra.venceEnLocal);
+    case EstadoCompra.CANCELADA:
+      if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
+      return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
     default:
       return null;
   }
