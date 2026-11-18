@@ -65,7 +65,27 @@ export class Entrada {
     if (compra.estado !== EstadoCompra.CONFIRMADA && compra.estado !== EstadoCompra.UTILIZADA) {
       return compra.estado;
     }
-    return this.cambios[this.cambios.length - 1]?.estado ?? EstadoCompra.CONFIRMADA;
+    return this.ultimoEstadoPropio ?? EstadoCompra.CONFIRMADA;
+  }
+
+  /** Esta entrada con su uso registrado por `organizadorId` en `ahora` (la compra decide si se puede). */
+  usar(organizadorId: string, ahora: Date): Entrada {
+    return new Entrada({
+      codigo: this.codigo,
+      cambios: [
+        ...this.cambios,
+        {
+          estado: EstadoCompra.UTILIZADA,
+          autor: { tipo: "usuario", usuarioId: organizadorId },
+          fechaHora: ahora,
+        },
+      ],
+    });
+  }
+
+  /** El estado de su último cambio propio, sin mirar la compra (para las invariantes). */
+  get ultimoEstadoPropio(): EstadoCompra | null {
+    return this.cambios[this.cambios.length - 1]?.estado ?? null;
   }
 
   /** Cuándo se registró su uso, o `null`. */
@@ -76,7 +96,8 @@ export class Entrada {
 
 /**
  * Tantas entradas como la cantidad (si la cantidad es válida; si no, ya lo informa ese campo),
- * códigos con formato y distintos, y cambios propios solo si la compra llegó a CONFIRMADA.
+ * códigos con formato y distintos, cambios propios solo si la compra llegó a CONFIRMADA y, con la
+ * compra CONFIRMADA o UTILIZADA, la compra está UTILIZADA si y solo si alguna entrada lo está.
  */
 function sonEntradasValidas(propiedades: PropiedadesCompra): boolean {
   const { entradas, cantidad, historial } = propiedades;
@@ -87,8 +108,17 @@ function sonEntradasValidas(propiedades: PropiedadesCompra): boolean {
     (!cantidadValida || entradas.length === cantidad) &&
     codigos.every(esCodigoValido) &&
     new Set(codigos).size === codigos.length &&
-    (llegoAConfirmada || entradas.every((entrada) => entrada.cambios.length === 0))
+    (llegoAConfirmada || entradas.every((entrada) => entrada.cambios.length === 0)) &&
+    usoCoherente(historial, entradas)
   );
+}
+
+/** Con la compra CONFIRMADA o UTILIZADA: UTILIZADA ⇔ alguna entrada usada (en otro estado, la entrada lo hereda). */
+function usoCoherente(historial: readonly CambioEstadoCompra[], entradas: readonly Entrada[]): boolean {
+  const estado = historial[historial.length - 1]?.estado;
+  if (estado !== EstadoCompra.CONFIRMADA && estado !== EstadoCompra.UTILIZADA) return true;
+  const algunaUsada = entradas.some((entrada) => entrada.ultimoEstadoPropio === EstadoCompra.UTILIZADA);
+  return (estado === EstadoCompra.UTILIZADA) === algunaUsada;
 }
 
 const ESTADOS = new Set<string>(Object.values(EstadoCompra));
@@ -115,7 +145,7 @@ function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
  * nueva. El alta es `Compra.registrar` (PENDIENTE). Transiciones de esta feature:
  * `PENDIENTE → CONFIRMADA` (el pago del comprador), `PENDIENTE → CANCELADA` por el sistema
  * (vencimiento a los 15 minutos) y `PENDIENTE → CANCELADA` por el comprador (la cancela antes de
- * pagarla); las de la 008 y la 009 se suman después. Desde la 008 lleva sus `entradas`, una por unidad
+ * pagarla); la 008 suma `CONFIRMADA → UTILIZADA` (la primera entrada usada) y la 009, las suyas. Desde la 008 lleva sus `entradas`, una por unidad
  * con su código; sus transiciones las conservan.
  */
 export class Compra {
@@ -186,6 +216,40 @@ export class Compra {
     return this.entradas.find((entrada) => entrada.codigo === codigo)?.estadoEn(this) ?? null;
   }
 
+  /** Cuántas de sus entradas están UTILIZADA. */
+  get entradasUsadas(): number {
+    return this.entradas.filter((entrada) => entrada.estadoEn(this) === EstadoCompra.UTILIZADA).length;
+  }
+
+  /**
+   * La entrada con ese código pasa a UTILIZADA por el organizador en `ahora` (feature 008, R9). Si es
+   * la primera de la compra, la compra pasa a UTILIZADA con el mismo cambio; si ya lo estaba, su
+   * historial no cambia. Una entrada que no está CONFIRMADA (o un código ajeno, que el service ya
+   * descartó) → `TRANSICION_INVALIDA`. La ventana de uso y el permiso los verifica el service antes.
+   * Se llama sobre la compra al día (una pendiente vencida falla como CANCELADA).
+   */
+  registrarUso(codigo: string, organizadorId: string, ahora: Date): Compra {
+    const estado = this.estadoDeEntrada(codigo);
+    if (estado !== EstadoCompra.CONFIRMADA) {
+      throw new ReglaDeNegocioError("TRANSICION_INVALIDA", motivoNoUsable(estado));
+    }
+    const entradas = this.entradas.map((entrada) =>
+      entrada.codigo === codigo ? entrada.usar(organizadorId, ahora) : entrada,
+    );
+    const historial =
+      this.estado === EstadoCompra.CONFIRMADA
+        ? [
+            ...this.historial,
+            {
+              estado: EstadoCompra.UTILIZADA,
+              autor: { tipo: "usuario", usuarioId: organizadorId },
+              fechaHora: ahora,
+            } as const,
+          ]
+        : [...this.historial];
+    return new Compra({ ...this.#propiedades(), historial, entradas });
+  }
+
   /** El estado del último cambio. */
   get estado(): EstadoCompra {
     return this.#ultimoCambio().estado;
@@ -212,10 +276,11 @@ export class Compra {
     return ultimo.estado === EstadoCompra.CANCELADA && ultimo.autor.tipo === "sistema";
   }
 
-  /** Cuenta para el tope por persona: PENDIENTE no vencida, o CONFIRMADA. */
+  /** Cuenta para el tope por persona: PENDIENTE no vencida, CONFIRMADA o UTILIZADA. */
   esVigente(ahora: Date): boolean {
     return (
       this.estado === EstadoCompra.CONFIRMADA ||
+      this.estado === EstadoCompra.UTILIZADA ||
       (this.estado === EstadoCompra.PENDIENTE && !this.estaVencida(ahora))
     );
   }
@@ -289,16 +354,36 @@ export class Compra {
   }
 
   #conCambio(cambio: CambioEstadoCompra): Compra {
-    return new Compra({
+    return new Compra({ ...this.#propiedades(), historial: [...this.historial, cambio] });
+  }
+
+  #propiedades(): PropiedadesCompra {
+    return {
       id: this.id,
       compradorId: this.compradorId,
       eventoId: this.eventoId,
       tipoEntradaId: this.tipoEntradaId,
       cantidad: this.cantidad,
       total: this.total,
-      historial: [...this.historial, cambio],
+      historial: [...this.historial],
       entradas: this.entradas,
-    });
+    };
+  }
+}
+
+/** Por qué no se puede usar una entrada en ese estado (R5): el mensaje del `TRANSICION_INVALIDA`. */
+function motivoNoUsable(estado: EstadoCompra | null): string {
+  switch (estado) {
+    case EstadoCompra.UTILIZADA:
+      return "Esta entrada ya se utilizó.";
+    case EstadoCompra.PENDIENTE:
+      return "La compra de esta entrada todavía no se pagó.";
+    case EstadoCompra.CANCELADA:
+      return "La compra de esta entrada está cancelada.";
+    case EstadoCompra.REEMBOLSADA:
+      return "La compra de esta entrada fue reembolsada.";
+    default:
+      return "La entrada no es de esta compra.";
   }
 }
 

@@ -51,6 +51,8 @@ export interface RepositorioCompras {
   listarPorComprador(compradorId: string): Promise<Compra[]>;
   /** Todas las compras de ese evento, de todos los compradores y en cualquier estado (feature 008). */
   listarPorEvento(eventoId: string): Promise<Compra[]>;
+  /** La compra que tiene una entrada con ese código (canónico), de cualquier evento, o `null` (feature 008). */
+  buscarPorCodigoDeEntrada(codigo: string): Promise<Compra | null>;
   /** Las compras guardadas como PENDIENTE (vencidas o no) de esos eventos, en una sola lectura. */
   listarPendientesPorEventos(eventoIds: readonly string[]): Promise<Compra[]>;
   /** Cualquier compra, en cualquier estado (también una vencida), cuenta. */

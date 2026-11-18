@@ -1,6 +1,7 @@
 import { Router, type RequestHandler } from "express";
 import type { CategoriaController } from "../controllers/categoria.controller";
 import type { CompraController } from "../controllers/compra.controller";
+import type { EntradaController } from "../controllers/entrada.controller";
 import type { EventoController } from "../controllers/evento.controller";
 import type { SaludController } from "../controllers/salud.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
@@ -18,6 +19,7 @@ export interface ControllersApi {
   eventos: EventoController;
   tiposEntrada: TipoEntradaController;
   compras: CompraController;
+  entradas: EntradaController;
 }
 
 /** Router de `/api`. Recibe los controllers ya armados por el composition root. */

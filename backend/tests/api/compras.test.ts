@@ -511,11 +511,20 @@ describe("GET /api/compras (feature 007)", () => {
     }
   });
 
-  it("Martín → 200 con su compra CONFIRMADA del Festival, VIP, 2 entradas, sin historial ni compradorId", async () => {
+  it("Martín → 200 con la UTILIZADA de la Peña y la CONFIRMADA del Festival, sin historial ni compradorId", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-martin");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toHaveLength(1);
-    const [vista] = respuesta.body;
+    // La Peña empieza antes que el Festival: va primero (fecha ascendente).
+    expect(respuesta.body.map((c: { id: string }) => c.id)).toEqual([
+      "compra-martin-pena-general",
+      "compra-martin-festival-vip",
+    ]);
+    expect(respuesta.body[0]).toMatchObject({
+      estado: EstadoCompra.UTILIZADA,
+      entradasUsadas: 1,
+      diasRestantes: null,
+    });
+    const vista = respuesta.body[1];
     expect(vista).toMatchObject({
       id: "compra-martin-festival-vip",
       evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur", realizado: false },
@@ -532,7 +541,9 @@ describe("GET /api/compras (feature 007)", () => {
   });
 
   it("Martín: diasRestantes de su CONFIRMADA es el calculado para el reloj de la app (US2)", async () => {
-    const [vista] = (await listar(nuevaApp(), "usuario-martin")).body;
+    const vista = (await listar(nuevaApp(), "usuario-martin")).body.find(
+      (c: { id: string }) => c.id === "compra-martin-festival-vip",
+    );
     const esperado = diasRestantes(new Date(vista.evento.fechaHora), reloj.ahora());
     expect(esperado).toBeGreaterThan(0);
     expect(vista.diasRestantes).toBe(esperado);
@@ -592,7 +603,9 @@ describe("GET /api/compras (feature 007)", () => {
     const app = crearApp({ reloj: movible, repositorios });
     const { body: pendiente } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
 
-    const antes = (await listar(app, "usuario-sofia")).body;
+    const sinLaPena = (vistas: { id: string }[]) =>
+      vistas.filter((c) => c.id !== "compra-sofia-pena-con-cena");
+    const antes = sinLaPena((await listar(app, "usuario-sofia")).body);
     expect(antes).toEqual([
       expect.objectContaining({
         id: pendiente.id,
@@ -603,7 +616,7 @@ describe("GET /api/compras (feature 007)", () => {
     ]);
 
     movible.avanzar(15 * 60 * 1000);
-    const despues = (await listar(app, "usuario-sofia")).body;
+    const despues = sinLaPena((await listar(app, "usuario-sofia")).body);
     expect(despues).toEqual([
       expect.objectContaining({
         id: pendiente.id,

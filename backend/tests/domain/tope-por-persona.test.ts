@@ -127,3 +127,13 @@ describe("Tope por persona (R6)", () => {
     expect(entradasRestantes(kids, [vigente("kids", 1, 0), vigente("kids", 1, 0)])).toBe(0);
   });
 });
+
+describe("Tope por persona con compras UTILIZADA (feature 008, R9)", () => {
+  it("una compra UTILIZADA es vigente y cuenta para el tope", () => {
+    const confirmada = vigente("vip", 3, 360000);
+    const usada = confirmada.registrarUso(confirmada.entradas[0]!.codigo, "usuario-lucia", AHORA);
+    const vigentes = [usada].filter((compra) => compra.esVigente(AHORA));
+    expect(vigentes).toHaveLength(1);
+    expect(entradasRestantes(general, vigentes)).toBe(1);
+  });
+});

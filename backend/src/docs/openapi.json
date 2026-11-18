@@ -725,6 +725,224 @@
         }
       }
     },
+    "/eventos/{eventoId}/entradas/{codigo}": {
+      "get": {
+        "tags": ["Compras del evento"],
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/EventoId" },
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "description": "El código de la entrada, como lo ingresa el organizador: se normaliza (mayúsculas, sin espacios ni guiones). Hasta 32 caracteres.",
+            "schema": { "type": "string", "maxLength": 32, "example": "prcs-2b01" }
+          }
+        ],
+        "summary": "Buscar una entrada por su código",
+        "description": "Solo el organizador: la entrada de ese evento con ese código, con su compra al día y la ventana de uso. Que no se pueda usar no es un error: la respuesta trae su estado y el de la ventana. Lectura: no guarda nada. Orden de chequeos: 401 → 400 → 404 evento → 403 → 404 entrada.",
+        "responses": {
+          "200": {
+            "description": "La entrada",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EntradaDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      { "campo": "params.codigo", "mensaje": "Debe ser un texto de 1 a 32 caracteres." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador del evento puede ver sus compras."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento (`EVENTO_NO_ENCONTRADO`) o no hay una entrada con ese código en este evento (`ENTRADA_NO_ENCONTRADA`: inexistente o de otro evento)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "evento": {
+                    "summary": "Evento inexistente",
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "entrada": {
+                    "summary": "Entrada inexistente o de otro evento",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_NO_ENCONTRADA",
+                        "mensaje": "No hay ninguna entrada con ese código en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/entradas/{codigo}/uso": {
+      "post": {
+        "tags": ["Compras del evento"],
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/EventoId" },
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "description": "El código de la entrada, como lo ingresa el organizador: se normaliza (mayúsculas, sin espacios ni guiones). Hasta 32 caracteres.",
+            "schema": { "type": "string", "maxLength": 32, "example": "prcs-2b01" }
+          }
+        ],
+        "summary": "Registrar el uso de una entrada",
+        "description": "Solo el organizador, dentro de la ventana de uso (desde 4 h antes del inicio hasta 12 h después, inclusive) y bajo el cerrojo del evento: la entrada pasa a UTILIZADA y, si es la primera de la compra, también la compra. El cupo no cambia. Sin cuerpo (si llega uno, se ignora). Orden de chequeos: 401 → 400 → 404 evento → 403 → 404 entrada → 409 FUERA_DE_HORARIO_DE_USO → 409 TRANSICION_INVALIDA.",
+        "responses": {
+          "200": {
+            "description": "La entrada, ya UTILIZADA",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EntradaDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      { "campo": "params.codigo", "mensaje": "Debe ser un texto de 1 a 32 caracteres." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador puede modificar este evento."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento (`EVENTO_NO_ENCONTRADO`) o no hay una entrada con ese código en este evento (`ENTRADA_NO_ENCONTRADA`: inexistente o de otro evento)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "evento": {
+                    "summary": "Evento inexistente",
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "entrada": {
+                    "summary": "Entrada inexistente o de otro evento",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_NO_ENCONTRADA",
+                        "mensaje": "No hay ninguna entrada con ese código en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Fuera de la ventana de uso (`FUERA_DE_HORARIO_DE_USO`) o la entrada no está CONFIRMADA (`TRANSICION_INVALIDA`, con el mensaje según su estado)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "fueraDeHorario": {
+                    "summary": "Fuera de la ventana",
+                    "value": {
+                      "error": {
+                        "codigo": "FUERA_DE_HORARIO_DE_USO",
+                        "mensaje": "El ingreso se registra desde el 18/11 17:00 hasta el 19/11 09:00."
+                      }
+                    }
+                  },
+                  "yaUtilizada": {
+                    "summary": "Ya utilizada",
+                    "value": {
+                      "error": { "codigo": "TRANSICION_INVALIDA", "mensaje": "Esta entrada ya se utilizó." }
+                    }
+                  },
+                  "sinPagar": {
+                    "summary": "Compra PENDIENTE",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada todavía no se pagó."
+                      }
+                    }
+                  },
+                  "cancelada": {
+                    "summary": "Compra CANCELADA (también una pendiente vencida)",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada está cancelada."
+                      }
+                    }
+                  },
+                  "reembolsada": {
+                    "summary": "Compra REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada fue reembolsada."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/compras": {
       "get": {
         "tags": ["Compras"],
@@ -1533,7 +1751,9 @@
           "creadaEn",
           "venceEn",
           "venceEnLocal",
-          "historial"
+          "historial",
+          "entradas",
+          "entradasUsadas"
         ],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
@@ -1587,6 +1807,17 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/CambioEstadoCompraVista" },
             "description": "Cronológico; el primero es PENDIENTE"
+          },
+          "entradas": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EntradaVista" },
+            "description": "Sus entradas con código (feature 008): solo en CONFIRMADA o UTILIZADA; si no, []. Solo la ve su comprador."
+          },
+          "entradasUsadas": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0,
+            "description": "Cuántas de sus entradas se usaron (feature 008)"
           }
         }
       },
@@ -1632,7 +1863,8 @@
           "venceEn",
           "venceEnLocal",
           "diasRestantes",
-          "canceladaPor"
+          "canceladaPor",
+          "entradasUsadas"
         ],
         "properties": {
           "id": { "type": "string", "example": "compra-martin-festival-vip" },
@@ -1693,6 +1925,12 @@
             "enum": ["sistema", "usuario"],
             "nullable": true,
             "description": "Solo en CANCELADA: \"sistema\" si venció sin pagarse y \"usuario\" si la canceló su comprador; si no, null."
+          },
+          "entradasUsadas": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0,
+            "description": "Cuántas de sus entradas se usaron (feature 008)"
           }
         }
       },
@@ -1909,6 +2147,89 @@
             "description": "De la más nueva a la más vieja (desempate por id).",
             "items": { "$ref": "#/components/schemas/CompraDelEventoVista" }
           }
+        }
+      },
+      "EntradaVista": {
+        "type": "object",
+        "description": "Una entrada de una compra (feature 008): una por unidad comprada.",
+        "required": ["codigo", "estado", "usadaEn", "usadaEnLocal"],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "7K3MQ9TB",
+            "description": "Canónico: 8 caracteres de 0-9 y A-Z sin I, L, O ni U (la app lo muestra 7K3M-Q9TB)"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"],
+            "description": "Igual al de la compra hasta que se confirma; después, CONFIRMADA o UTILIZADA"
+          },
+          "usadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-18T23:15:00.000Z",
+            "description": "Cuándo se registró su uso; null si no se usó"
+          },
+          "usadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T20:15",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          }
+        }
+      },
+      "EntradaDelEventoVista": {
+        "type": "object",
+        "description": "Una entrada buscada por el organizador: la entrada, su compra (con el comprador) y la ventana de uso. Sin los códigos de las otras entradas.",
+        "required": ["codigo", "estado", "usadaEn", "usadaEnLocal", "compra", "ventanaDeUso"],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "7K3MQ9TB",
+            "description": "Canónico: 8 caracteres de 0-9 y A-Z sin I, L, O ni U (la app lo muestra 7K3M-Q9TB)"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"],
+            "description": "Igual al de la compra hasta que se confirma; después, CONFIRMADA o UTILIZADA"
+          },
+          "usadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-18T23:15:00.000Z",
+            "description": "Cuándo se registró su uso; null si no se usó"
+          },
+          "usadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T20:15",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "compra": {
+            "type": "object",
+            "required": ["id", "comprador", "tipoEntrada", "cantidad", "estado", "entradasUsadas"],
+            "properties": {
+              "id": { "type": "string", "example": "compra-sofia-pena-con-cena" },
+              "comprador": { "$ref": "#/components/schemas/CompradorVista" },
+              "tipoEntrada": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "nombre": { "type": "string", "example": "Con cena" }
+                }
+              },
+              "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+              "estado": {
+                "type": "string",
+                "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+              },
+              "entradasUsadas": { "type": "integer", "minimum": 0, "example": 1 }
+            }
+          },
+          "ventanaDeUso": { "$ref": "#/components/schemas/VentanaDeUsoVista" }
         }
       }
     },

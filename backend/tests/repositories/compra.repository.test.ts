@@ -12,6 +12,7 @@ function compra(
   tipoEntradaId = "tipo-a-general",
   compradorId = "usuario-martin",
 ) {
+  const historial = historialHasta(estado, compradorId);
   return new Compra({
     id,
     compradorId,
@@ -19,8 +20,8 @@ function compra(
     tipoEntradaId,
     cantidad: 1,
     total: 1000,
-    historial: historialHasta(estado, compradorId),
-    entradas: entradasDePrueba(1),
+    historial,
+    entradas: entradasDePrueba(1, historial),
   });
 }
 
@@ -136,6 +137,29 @@ describe("CompraRepository (en memoria)", () => {
     const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
     expect(await repositorio.listarPorEvento("evento-b")).toEqual([]);
     expect(await new CompraRepository().listarPorEvento("evento-a")).toEqual([]);
+  });
+
+  describe("buscarPorCodigoDeEntrada (feature 008)", () => {
+    it("la compra que tiene una entrada con ese código, de cualquier evento", async () => {
+      const deA = compra("compra-1", EstadoCompra.CONFIRMADA);
+      const deB = compra("compra-2", EstadoCompra.PENDIENTE, "evento-b", "tipo-b-vip");
+      const repositorio = new CompraRepository([deA, deB]);
+      expect(await repositorio.buscarPorCodigoDeEntrada(deA.entradas[0]!.codigo)).toBe(deA);
+      expect(await repositorio.buscarPorCodigoDeEntrada(deB.entradas[0]!.codigo)).toBe(deB);
+    });
+
+    it("un código inexistente → null", async () => {
+      const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
+      expect(await repositorio.buscarPorCodigoDeEntrada("ZZZZZZZZ")).toBeNull();
+      expect(await new CompraRepository().buscarPorCodigoDeEntrada("ZZZZZZZZ")).toBeNull();
+    });
+
+    it("ve lo guardado después de crearse", async () => {
+      const repositorio = new CompraRepository();
+      const nueva = compra("compra-1", EstadoCompra.CONFIRMADA);
+      await repositorio.guardar(nueva);
+      expect(await repositorio.buscarPorCodigoDeEntrada(nueva.entradas[0]!.codigo)).toBe(nueva);
+    });
   });
 
   it("guardar reemplaza la instancia del mismo id", async () => {

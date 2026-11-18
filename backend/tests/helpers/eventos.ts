@@ -92,7 +92,8 @@ export function evento({
 
 /**
  * El historial más simple que termina en `estado`: `[PENDIENTE]` o `[PENDIENTE, estado]`, todo por
- * el comprador y en `creadaEn` (fechas iguales consecutivas son válidas).
+ * el comprador y en `creadaEn` (fechas iguales consecutivas son válidas). UTILIZADA pasa por
+ * CONFIRMADA (`[PENDIENTE, CONFIRMADA, UTILIZADA]`), como exige `Compra` (feature 008).
  */
 export function historialHasta(
   estado: EstadoCompra,
@@ -101,7 +102,11 @@ export function historialHasta(
 ): CambioEstadoCompra[] {
   const autor = { tipo: "usuario", usuarioId: compradorId } as const;
   const alta = { estado: EstadoCompra.PENDIENTE, autor, fechaHora: creadaEn };
-  return estado === EstadoCompra.PENDIENTE ? [alta] : [alta, { estado, autor, fechaHora: creadaEn }];
+  if (estado === EstadoCompra.PENDIENTE) return [alta];
+  const final = { estado, autor, fechaHora: creadaEn };
+  return estado === EstadoCompra.UTILIZADA
+    ? [alta, { estado: EstadoCompra.CONFIRMADA, autor, fechaHora: creadaEn }, final]
+    : [alta, final];
 }
 
 let numeroCodigo = 0;
@@ -120,9 +125,14 @@ export function codigosDePrueba(cantidad: number): string[] {
   });
 }
 
-/** `cantidad` entradas sin cambios propios, con códigos de `codigosDePrueba`. */
-export function entradasDePrueba(cantidad: number): Entrada[] {
-  return codigosDePrueba(cantidad).map((codigo) => new Entrada({ codigo }));
+/**
+ * `cantidad` entradas con códigos de `codigosDePrueba`, sin cambios propios; si el `historial` dado
+ * termina en UTILIZADA, la primera entrada lleva ese cambio (la compra la exige usada).
+ */
+export function entradasDePrueba(cantidad: number, historial: readonly CambioEstadoCompra[] = []): Entrada[] {
+  const ultimo = historial[historial.length - 1];
+  const uso = ultimo?.estado === EstadoCompra.UTILIZADA ? [ultimo] : [];
+  return codigosDePrueba(cantidad).map((codigo, i) => new Entrada({ codigo, cambios: i === 0 ? uso : [] }));
 }
 
 export interface CambiosCompra {
@@ -134,7 +144,7 @@ export interface CambiosCompra {
   creadaEn?: Date;
   /** Reemplaza el historial que arma el atajo de `estado`. */
   historial?: CambioEstadoCompra[];
-  /** Por defecto, `cantidad` entradas con códigos de `codigosDePrueba`. */
+  /** Por defecto, `cantidad` entradas de `entradasDePrueba` (en una UTILIZADA, la primera usada). */
   entradas?: Entrada[];
 }
 
@@ -152,6 +162,7 @@ export function compra(
     ...cambios
   }: CambiosCompra = {},
 ): Compra {
+  const historialFinal = historial ?? historialHasta(estado, compradorId, creadaEn);
   return new Compra({
     id: `compra-${tipoEntradaId}-${estado.toLowerCase()}`,
     compradorId,
@@ -159,8 +170,8 @@ export function compra(
     tipoEntradaId,
     cantidad,
     total: 1000,
-    historial: historial ?? historialHasta(estado, compradorId, creadaEn),
-    entradas: entradas ?? entradasDePrueba(cantidad),
+    historial: historialFinal,
+    entradas: entradas ?? entradasDePrueba(cantidad, historialFinal),
     ...cambios,
   });
 }

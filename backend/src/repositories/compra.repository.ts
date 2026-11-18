@@ -59,6 +59,14 @@ export class CompraRepository implements RepositorioCompras {
     return [...this.#compras.values()].filter((compra) => compra.eventoId === eventoId);
   }
 
+  /** Recorre las compras: con los datos del TP, un índice por código sería de más. */
+  async buscarPorCodigoDeEntrada(codigo: string): Promise<Compra | null> {
+    for (const compra of this.#compras.values()) {
+      if (compra.entradas.some((entrada) => entrada.codigo === codigo)) return compra;
+    }
+    return null;
+  }
+
   async listarPendientesPorEventos(eventoIds: readonly string[]): Promise<Compra[]> {
     const ids = new Set(eventoIds);
     return [...this.#compras.values()].filter(

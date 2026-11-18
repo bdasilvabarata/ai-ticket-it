@@ -30,7 +30,7 @@ describe("GET /api/usuarios", () => {
     ]);
     expect(
       respuesta.body.map((u: { cantidadEventosOrganizados: number }) => u.cantidadEventosOrganizados),
-    ).toEqual([3, 3, 2, 0, 0]);
+    ).toEqual([4, 3, 2, 0, 0]);
     for (const usuario of respuesta.body) {
       expect(Object.keys(usuario).sort()).toEqual(["apellido", "cantidadEventosOrganizados", "id", "nombre"]);
       expect(typeof usuario.id).toBe("string");
@@ -76,7 +76,7 @@ describe("GET /api/usuarios/:id", () => {
       id: LUCIA,
       nombre: "Lucía",
       apellido: "Álvarez",
-      cantidadEventosOrganizados: 3,
+      cantidadEventosOrganizados: 4,
     });
   });
 

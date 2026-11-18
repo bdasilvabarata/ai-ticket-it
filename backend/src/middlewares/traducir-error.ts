@@ -4,6 +4,7 @@ import {
   ConflictoError,
   CuerpoDemasiadoGrandeError,
   EntradaInvalidaError,
+  EntradaNoEncontradaError,
   ErrorAplicacion,
   JsonInvalidoError,
   type OrigenDeReferencia,
@@ -60,6 +61,7 @@ const STATUS: ReadonlyArray<readonly [ClaseDeError, number]> = [
   [SinPermisoError, 403],
   [NoEncontradoError, 404],
   [CompraNoEncontradaError, 404],
+  [EntradaNoEncontradaError, 404],
   [ConflictoError, 409],
   [CuerpoDemasiadoGrandeError, 413],
 ];

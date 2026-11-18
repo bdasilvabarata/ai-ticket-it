@@ -247,3 +247,70 @@ describe("Concurrencia: pago de una compra (feature 006)", () => {
     expect(vista.estado).toBe(EstadoCompra.CONFIRMADA);
   });
 });
+
+describe("Concurrencia: uso de entradas (feature 008, SC-006)", () => {
+  /** Un evento de Lucía que empieza en 2 h (ventana abierta) con una compra de Martín en `estado`. */
+  function armarUso(estado: EstadoCompra) {
+    return crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", en: 2 * 60 * MINUTO, tiposEntrada: [tipo({ id: "tipo-a-general" })] }),
+      ],
+      compras: [compra("evento-a", "tipo-a-general", estado, { id: "compra-martin", cantidad: 2 })],
+      reloj: relojMovible(),
+    });
+  }
+
+  it("10 usos simultáneos de la misma entrada → uno cumplido, nueve «Esta entrada ya se utilizó.» y un solo cambio", async () => {
+    const { entradaService, repositorioCompras } = armarUso(EstadoCompra.CONFIRMADA);
+    const codigo = (await repositorioCompras.buscarPorId("compra-martin"))!.entradas[0]!.codigo;
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: 10 }, () => entradaService.registrarUso("evento-a", codigo, "usuario-lucia")),
+    );
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of resultados.filter((r) => r.status === "rejected")) {
+      expect((r as PromiseRejectedResult).reason).toMatchObject({
+        codigo: "TRANSICION_INVALIDA",
+        message: "Esta entrada ya se utilizó.",
+      });
+    }
+    const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+    expect(guardada.entradas[0]!.cambios).toHaveLength(1);
+    expect(guardada.historial.filter((c) => c.estado === EstadoCompra.UTILIZADA)).toHaveLength(1);
+  });
+
+  it("usos simultáneos de dos entradas de la misma compra → las dos usadas y un único UTILIZADA en la compra", async () => {
+    const { entradaService, repositorioCompras } = armarUso(EstadoCompra.CONFIRMADA);
+    const [a, b] = (await repositorioCompras.buscarPorId("compra-martin"))!.entradas.map((e) => e.codigo);
+
+    const resultados = await Promise.allSettled([
+      entradaService.registrarUso("evento-a", a!, "usuario-lucia"),
+      entradaService.registrarUso("evento-a", b!, "usuario-lucia"),
+    ]);
+
+    expect(resultados.map((r) => r.status)).toEqual(["fulfilled", "fulfilled"]);
+    const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+    expect(guardada.entradasUsadas).toBe(2);
+    expect(guardada.historial.filter((c) => c.estado === EstadoCompra.UTILIZADA)).toHaveLength(1);
+  });
+
+  // Humo: hasta la 009 no existe cancelar una CONFIRMADA (la carrera real del caso borde); acá, sobre
+  // una PENDIENTE, el uso y la cancelación toman el mismo cerrojo.
+  it("un uso y una cancelación simultáneos sobre una PENDIENTE → la cancelación vale y el uso se rechaza", async () => {
+    const { entradaService, compraService, repositorioCompras } = armarUso(EstadoCompra.PENDIENTE);
+    const codigo = (await repositorioCompras.buscarPorId("compra-martin"))!.entradas[0]!.codigo;
+
+    const [uso, cancelacion] = await Promise.allSettled([
+      entradaService.registrarUso("evento-a", codigo, "usuario-lucia"),
+      compraService.cancelar("compra-martin", "usuario-martin"),
+    ]);
+
+    expect(uso.status).toBe("rejected");
+    expect((uso as PromiseRejectedResult).reason).toMatchObject({ codigo: "TRANSICION_INVALIDA" });
+    expect(cancelacion.status).toBe("fulfilled");
+    const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+    expect(guardada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(guardada.historial).toHaveLength(2);
+  });
+});

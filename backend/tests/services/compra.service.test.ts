@@ -79,6 +79,8 @@ describe("CompraService.crear", () => {
           fechaHoraLocal: "2026-11-10T12:00",
         },
       ],
+      entradas: [],
+      entradasUsadas: 0,
     });
     expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(48);
     const guardada = await repositorioCompras.buscarPorId(vista.id);
@@ -716,6 +718,7 @@ describe("CompraService.misCompras (feature 007)", () => {
       venceEnLocal: null,
       diasRestantes: 5,
       canceladaPor: null,
+      entradasUsadas: 0,
     });
     expect(vista).not.toHaveProperty("historial");
     expect(vista).not.toHaveProperty("compradorId");
@@ -1234,5 +1237,114 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     const usuarios = vi.spyOn(usuarioService, "obtenerPorIds");
     expect((await compraService.comprasDelEvento("evento-a", "usuario-lucia")).compras).toEqual([]);
     expect(usuarios).not.toHaveBeenCalled();
+  });
+});
+
+describe("Entradas en las vistas del comprador (feature 008, US3, R11, R14)", () => {
+  const usoDeLucia: CambioEstadoCompra = {
+    estado: EstadoCompra.UTILIZADA,
+    autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+    fechaHora: new Date(AHORA.getTime() + 30 * MINUTO),
+  };
+  /** Una compra de Sofía de 3 VIP en `estado`; en UTILIZADA, con la primera entrada usada por Lucía. */
+  const deSofia = (id: string, estado: EstadoCompra) =>
+    compra("evento-a", "tipo-a-vip", estado, { id, compradorId: "usuario-sofia", cantidad: 3 });
+  const utilizada = (id: string) => {
+    const confirmada = deSofia(id, EstadoCompra.CONFIRMADA);
+    return confirmada.registrarUso(confirmada.entradas[0]!.codigo, "usuario-lucia", usoDeLucia.fechaHora);
+  };
+  const codigosDe = (c: Compra) => c.entradas.map((entrada) => entrada.codigo);
+
+  it("obtener: entradas vacías en PENDIENTE y CANCELADA, con código y estado en CONFIRMADA y UTILIZADA", async () => {
+    const pendiente = deSofia("pendiente", EstadoCompra.PENDIENTE);
+    const cancelada = deSofia("cancelada", EstadoCompra.CANCELADA);
+    const confirmada = deSofia("confirmada", EstadoCompra.CONFIRMADA);
+    const usada = utilizada("usada");
+    const { compraService } = armar({ compras: [pendiente, cancelada, confirmada, usada] });
+
+    expect(await compraService.obtener("pendiente", "usuario-sofia")).toMatchObject({
+      entradas: [],
+      entradasUsadas: 0,
+    });
+    expect((await compraService.obtener("cancelada", "usuario-sofia")).entradas).toEqual([]);
+    expect((await compraService.obtener("confirmada", "usuario-sofia")).entradas).toEqual(
+      codigosDe(confirmada).map((codigo) => ({
+        codigo,
+        estado: EstadoCompra.CONFIRMADA,
+        usadaEn: null,
+        usadaEnLocal: null,
+      })),
+    );
+    const vistaUsada = await compraService.obtener("usada", "usuario-sofia");
+    expect(vistaUsada.estado).toBe(EstadoCompra.UTILIZADA);
+    expect(vistaUsada.entradasUsadas).toBe(1);
+    expect(vistaUsada.entradas).toEqual([
+      {
+        codigo: codigosDe(usada)[0],
+        estado: EstadoCompra.UTILIZADA,
+        usadaEn: "2026-11-10T15:30:00.000Z",
+        usadaEnLocal: "2026-11-10T12:30",
+      },
+      { codigo: codigosDe(usada)[1], estado: EstadoCompra.CONFIRMADA, usadaEn: null, usadaEnLocal: null },
+      { codigo: codigosDe(usada)[2], estado: EstadoCompra.CONFIRMADA, usadaEn: null, usadaEnLocal: null },
+    ]);
+  });
+
+  it("una PENDIENTE vencida (al día) no muestra códigos", async () => {
+    const reloj = relojMovible();
+    const { compraService } = armar({ reloj, compras: [deSofia("pendiente", EstadoCompra.PENDIENTE)] });
+    reloj.avanzar(15 * MINUTO);
+    expect(await compraService.obtener("pendiente", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      entradas: [],
+    });
+  });
+
+  it("crear y cancelar devuelven entradas vacías; pagar, los códigos que dio el repositorio", async () => {
+    const { compraService, repositorioCompras } = armar();
+    const creada = await compraService.crear("evento-a", "usuario-sofia", {
+      tipoEntradaId: "tipo-a-vip",
+      cantidad: 2,
+    });
+    expect(creada).toMatchObject({ entradas: [], entradasUsadas: 0 });
+    const pagada = await compraService.pagar(creada.id, "usuario-sofia");
+    const guardada = await repositorioCompras.buscarPorId(creada.id);
+    expect(pagada.entradas.map((e) => e.codigo)).toEqual(codigosDe(guardada!));
+    expect(pagada.entradas.every((e) => e.estado === EstadoCompra.CONFIRMADA)).toBe(true);
+
+    const otra = await compraService.crear("evento-a", "usuario-sofia", {
+      tipoEntradaId: "tipo-a-vip",
+      cantidad: 1,
+    });
+    expect((await compraService.cancelar(otra.id, "usuario-sofia")).entradas).toEqual([]);
+  });
+
+  it("misComprasDelEvento: confirmadas incluye las UTILIZADA con sus entradas (R9)", async () => {
+    const { compraService } = armar({
+      compras: [deSofia("confirmada", EstadoCompra.CONFIRMADA), utilizada("usada")],
+    });
+    const { confirmadas } = await compraService.misComprasDelEvento("evento-a", "usuario-sofia");
+    expect(confirmadas.map((c) => c.id).toSorted()).toEqual(["confirmada", "usada"]);
+    const usada = confirmadas.find((c) => c.id === "usada")!;
+    expect(usada).toMatchObject({ estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 });
+    expect(usada.entradas).toHaveLength(3);
+  });
+
+  it("misCompras: entradasUsadas sin entradas; diasRestantes solo en CONFIRMADA", async () => {
+    const { compraService } = armar({
+      compras: [deSofia("confirmada", EstadoCompra.CONFIRMADA), utilizada("usada")],
+    });
+    const vistas = await compraService.misCompras("usuario-sofia");
+    const porId = new Map(vistas.map((v) => [v.id, v]));
+    expect(porId.get("usada")).toMatchObject({ entradasUsadas: 1, diasRestantes: null });
+    expect(porId.get("confirmada")).toMatchObject({ entradasUsadas: 0, diasRestantes: 5 });
+    for (const vista of vistas) expect(vista).not.toHaveProperty("entradas");
+  });
+
+  it("comprasDelEvento: entradasUsadas real y sin códigos", async () => {
+    const { compraService } = armar({ compras: [utilizada("usada")] });
+    const { compras } = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
+    expect(compras[0]).toMatchObject({ estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 });
+    expect(compras[0]).not.toHaveProperty("entradas");
   });
 });

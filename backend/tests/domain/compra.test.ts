@@ -501,8 +501,9 @@ describe("Entrada dentro de la Compra (feature 008, R1)", () => {
       ]);
     });
 
-    it("con la compra confirmada, una entrada con su cambio propio tiene ese estado y usadaEn", () => {
+    it("con la compra utilizada, una entrada con su cambio propio tiene ese estado y usadaEn", () => {
       const compra = compraConfirmada({
+        historial: [pendiente, confirmada, usada],
         entradas: [
           new Entrada({ codigo: "7K3MQ9TB", cambios: [usada] }),
           new Entrada({ codigo: "7K3MQ9TC" }),
@@ -524,5 +525,121 @@ describe("Entrada dentro de la Compra (feature 008, R1)", () => {
     expect(codigosDe(compraPendiente().cancelar("usuario-martin", despues(MINUTO)))).toEqual(codigos);
     expect(codigosDe(compraPendiente().vencer())).toEqual(codigos);
     expect(codigosDe(compraPendiente().alDia(despues(PLAZO)))).toEqual(codigos);
+  });
+});
+
+describe("Compra.registrarUso (feature 008, R9)", () => {
+  const [codigoA, codigoB] = datos.entradas.map((entrada) => entrada.codigo) as [string, string];
+  const USO = despues(60 * MINUTO);
+  const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
+  const cambioDeUso = (fechaHora: Date): CambioEstadoCompra => ({
+    estado: EstadoCompra.UTILIZADA,
+    autor: porLucia,
+    fechaHora,
+  });
+
+  /** El error de dominio que lanza `operacion`. */
+  function errorDe(operacion: () => unknown): ReglaDeNegocioError {
+    try {
+      operacion();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ReglaDeNegocioError);
+      return error as ReglaDeNegocioError;
+    }
+    throw new Error("Debía lanzar ReglaDeNegocioError.");
+  }
+
+  it("sobre una CONFIRMADA: la entrada y la compra pasan a UTILIZADA con el mismo cambio", () => {
+    const original = compraConfirmada();
+    const usada = original.registrarUso(codigoA, "usuario-lucia", USO);
+    expect(usada).not.toBe(original);
+    expect(usada.estado).toBe(EstadoCompra.UTILIZADA);
+    expect(usada.historial).toEqual([pendiente, confirmada, cambioDeUso(USO)]);
+    const entrada = usada.entradas.find((e) => e.codigo === codigoA)!;
+    expect(entrada.cambios).toEqual([cambioDeUso(USO)]);
+    expect(entrada.usadaEn).toEqual(USO);
+    expect(usada.estadoDeEntrada(codigoA)).toBe(EstadoCompra.UTILIZADA);
+    expect(usada.estadoDeEntrada(codigoB)).toBe(EstadoCompra.CONFIRMADA);
+    expect(usada.entradasUsadas).toBe(1);
+    expect(original.estado).toBe(EstadoCompra.CONFIRMADA);
+    expect(original.entradasUsadas).toBe(0);
+    expect(original.estadoDeEntrada(codigoA)).toBe(EstadoCompra.CONFIRMADA);
+  });
+
+  it("una segunda entrada de una UTILIZADA: la entrada pasa a UTILIZADA y el historial no cambia", () => {
+    const primera = compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO);
+    const segunda = primera.registrarUso(codigoB, "usuario-lucia", despues(70 * MINUTO));
+    expect(segunda.historial).toEqual(primera.historial);
+    expect(segunda.estadoDeEntrada(codigoB)).toBe(EstadoCompra.UTILIZADA);
+    expect(segunda.entradas.find((e) => e.codigo === codigoB)!.usadaEn).toEqual(despues(70 * MINUTO));
+    expect(segunda.entradasUsadas).toBe(2);
+  });
+
+  it.each([
+    [
+      "UTILIZADA",
+      () => compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO),
+      "Esta entrada ya se utilizó.",
+    ],
+    ["PENDIENTE", () => compraPendiente(), "La compra de esta entrada todavía no se pagó."],
+    ["CANCELADA", () => compraCancelada(), "La compra de esta entrada está cancelada."],
+    [
+      "CANCELADA (vencida al día)",
+      () => compraPendiente().alDia(despues(PLAZO)),
+      "La compra de esta entrada está cancelada.",
+    ],
+    [
+      "REEMBOLSADA",
+      () =>
+        compraConfirmada({
+          historial: [
+            pendiente,
+            confirmada,
+            { estado: EstadoCompra.REEMBOLSADA, autor: porMartin, fechaHora: despues(10 * MINUTO) },
+          ],
+        }),
+      "La compra de esta entrada fue reembolsada.",
+    ],
+  ])("una entrada %s → TRANSICION_INVALIDA con su mensaje y nada cambia", (_estado, crear, mensaje) => {
+    const compra = crear();
+    const historial = [...compra.historial];
+    const error = errorDe(() => compra.registrarUso(codigoA, "usuario-lucia", despues(PLAZO * 8)));
+    expect(error.codigo).toBe("TRANSICION_INVALIDA");
+    expect(error.message).toBe(mensaje);
+    expect(compra.historial).toEqual(historial);
+  });
+
+  it("un código que no es de la compra → TRANSICION_INVALIDA (nunca un 404 desde el dominio)", () => {
+    const error = errorDe(() => compraConfirmada().registrarUso("ZZZZZZZZ", "usuario-lucia", USO));
+    expect(error.codigo).toBe("TRANSICION_INVALIDA");
+  });
+
+  describe("invariante: estado UTILIZADA ⇔ alguna entrada UTILIZADA", () => {
+    it("una CONFIRMADA con una entrada usada es inválida", () => {
+      expect(
+        camposInvalidos({
+          historial: [pendiente, confirmada],
+          entradas: [
+            new Entrada({ codigo: codigoA, cambios: [cambioDeUso(USO)] }),
+            new Entrada({ codigo: codigoB }),
+          ],
+        }),
+      ).toEqual(["entradas"]);
+    });
+
+    it("una UTILIZADA sin entradas usadas es inválida", () => {
+      expect(camposInvalidos({ historial: [pendiente, confirmada, cambioDeUso(USO)] })).toEqual(["entradas"]);
+    });
+  });
+
+  it("una UTILIZADA no se cancela (FR-020) y es vigente", () => {
+    const usada = compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO);
+    expect(errorDe(() => usada.cancelar("usuario-martin", USO)).codigo).toBe("TRANSICION_INVALIDA");
+    expect(usada.esVigente(despues(PLAZO * 10))).toBe(true);
+  });
+
+  it("las transiciones de una UTILIZADA conservan los cambios de sus entradas", () => {
+    const usada = compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO);
+    expect(usada.alDia(despues(PLAZO * 10))).toBe(usada);
   });
 });

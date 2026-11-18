@@ -53,14 +53,25 @@ export const compraPendiente: CompraVista = {
       fechaHoraLocal: "2026-11-12T15:20",
     },
   ],
+  entradas: [],
+  entradasUsadas: 0,
 };
 
-/** La misma compra, pagada por Martín. */
+/** Los códigos de las 2 entradas de la compra de la Maratón, una vez pagada. */
+export const CODIGOS_DE_LA_MARATON = ["7K3MQ9TB", "4HXP2RVA"] as const;
+
+/** La misma compra, pagada por Martín: con sus 2 entradas y sus códigos. */
 export const compraConfirmada: CompraVista = {
   ...compraPendiente,
   estado: EstadoCompra.CONFIRMADA,
   venceEn: null,
   venceEnLocal: null,
+  entradas: CODIGOS_DE_LA_MARATON.map((codigo) => ({
+    codigo,
+    estado: EstadoCompra.CONFIRMADA,
+    usadaEn: null,
+    usadaEnLocal: null,
+  })),
   historial: [
     ...compraPendiente.historial,
     {
@@ -123,7 +134,18 @@ export function miCompra(
   base: CompraVista = compraPendiente,
   cambios: Partial<MiCompraVista> = {},
 ): MiCompraVista {
-  const { id, evento, tipoEntrada, cantidad, total, estado, creadaEn, venceEn, venceEnLocal } = base;
+  const {
+    id,
+    evento,
+    tipoEntrada,
+    cantidad,
+    total,
+    estado,
+    creadaEn,
+    venceEn,
+    venceEnLocal,
+    entradasUsadas,
+  } = base;
   return {
     id,
     evento,
@@ -134,6 +156,7 @@ export function miCompra(
     creadaEn,
     venceEn,
     venceEnLocal,
+    entradasUsadas,
     diasRestantes: null,
     canceladaPor: null,
     ...cambios,

@@ -53,10 +53,17 @@ export interface CompraVista {
   venceEnLocal: string | null;
   /** En orden cronológico; el primero es siempre PENDIENTE. */
   historial: CambioEstadoCompraVista[];
+  /** Sus entradas con código (feature 008): solo en CONFIRMADA o UTILIZADA; si no, []. Solo la ve su comprador. */
+  entradas: EntradaVista[];
+  /** Cuántas de sus entradas se usaron (feature 008). */
+  entradasUsadas: number;
 }
 
-/** Una fila de "Mis compras" (feature 007): la compra al día con su evento y su tipo actuales, sin historial. */
-export type MiCompraVista = Omit<CompraVista, "compradorId" | "historial"> & {
+/**
+ * Una fila de "Mis compras" (feature 007): la compra al día con su evento y su tipo actuales, sin
+ * historial ni entradas (conserva `entradasUsadas`, feature 008).
+ */
+export type MiCompraVista = Omit<CompraVista, "compradorId" | "historial" | "entradas"> & {
   /** Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null. */
   diasRestantes: number | null;
   /** Solo en CANCELADA: "sistema" si venció sin pagarse, "usuario" si la canceló su comprador; si no, null. */
@@ -67,7 +74,7 @@ export type MiCompraVista = Omit<CompraVista, "compradorId" | "historial"> & {
 export interface MisComprasDelEventoVista {
   /** Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva. */
   pendientes: CompraVista[];
-  /** Sus compras CONFIRMADA de ese evento (sus entradas), de la más nueva a la más vieja. */
+  /** Sus compras CONFIRMADA y UTILIZADA de ese evento (sus entradas), de la más nueva a la más vieja. */
   confirmadas: CompraVista[];
   /** Cuántas entradas más puede comprar de cada tipo según su tope (todos los tipos; 0 si es el organizador). */
   restantesPorTipo: { tipoEntradaId: string; restantes: number }[];
