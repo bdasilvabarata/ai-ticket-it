@@ -1,15 +1,19 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 
 import {
+  normalizarCodigo,
   textoAccionDePago,
   textoAvisoDeMiCompra,
   textoCancelada,
   textoAvisoDeCompraDelEvento,
   textoCantidad,
+  textoCodigo,
+  textoCodigoAccesible,
   textoCompradaEl,
   textoDiasRestantes,
   textoEntradasConfirmadas,
   textoEntradasUsadas,
+  textoMotivoNoUsable,
   textoResumenDeTipo,
   textoTotal,
   textoVencimiento,
@@ -21,7 +25,9 @@ import {
   compraConfirmada,
   compraDelEvento,
   compraPendiente,
+  entradaDelEvento,
   miCompra,
+  ventanaDelFestival,
 } from "../../helpers/compras";
 
 describe("textoTotal", () => {
@@ -94,8 +100,7 @@ describe("textoAvisoDeMiCompra", () => {
     expect(textoAvisoDeMiCompra(confirmada({ diasRestantes: 10 }))).toBe("Faltan 10 días");
   });
 
-  it("UTILIZADA y REEMBOLSADA → sin aviso", () => {
-    expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.UTILIZADA }))).toBeNull();
+  it("REEMBOLSADA → sin aviso (UTILIZADA, desde la 008, dice sus entradas usadas)", () => {
     expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.REEMBOLSADA }))).toBeNull();
   });
 });
@@ -226,5 +231,69 @@ describe("textoResumenDeTipo (feature 008, US2)", () => {
     expect(textoResumenDeTipo(resumen(0, 0, 0, 0))).toBe(
       "0 disponibles · 0 pendientes · 0 vendidas · 0 usadas",
     );
+  });
+});
+
+describe("códigos de entrada (feature 008, US3)", () => {
+  it("textoCodigo los muestra en dos grupos de 4", () => {
+    expect(textoCodigo("7K3MQ9TB")).toBe("7K3M-Q9TB");
+  });
+
+  it("textoCodigoAccesible los separa de a un carácter para TalkBack", () => {
+    expect(textoCodigoAccesible("7K3MQ9TB")).toBe("7 K 3 M Q 9 T B");
+  });
+
+  it("normalizarCodigo: mayúsculas, sin espacios ni guiones", () => {
+    expect(normalizarCodigo(" 7k3m-q9tb ")).toBe("7K3MQ9TB");
+    expect(normalizarCodigo("7K3M Q9TB")).toBe("7K3MQ9TB");
+  });
+});
+
+describe("textoMotivoNoUsable (feature 008, US3)", () => {
+  it("CONFIRMADA con la ventana abierta → null (se puede usar)", () => {
+    expect(textoMotivoNoUsable(entradaDelEvento())).toBeNull();
+  });
+
+  it("la ventana no abierta va primero, como en el servidor", () => {
+    const esperado = "El ingreso se registra desde el 10/12 10:00 hasta el 11/12 02:00.";
+    for (const estado of ["antes", "despues"] as const) {
+      expect(textoMotivoNoUsable(entradaDelEvento({ ventanaDeUso: ventanaDelFestival(estado) }))).toBe(
+        esperado,
+      );
+      expect(
+        textoMotivoNoUsable(
+          entradaDelEvento({ estado: EstadoCompra.PENDIENTE, ventanaDeUso: ventanaDelFestival(estado) }),
+        ),
+      ).toBe(esperado);
+    }
+  });
+
+  it("según el estado de la entrada", () => {
+    expect(
+      textoMotivoNoUsable(
+        entradaDelEvento({
+          estado: EstadoCompra.UTILIZADA,
+          usadaEn: "2026-12-10T23:15:00.000Z",
+          usadaEnLocal: "2026-12-10T20:15",
+        }),
+      ),
+    ).toBe("Esta entrada ya se utilizó el 10/12 20:15.");
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.PENDIENTE }))).toBe(
+      "La compra de esta entrada todavía no se pagó.",
+    );
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.CANCELADA }))).toBe(
+      "La compra de esta entrada está cancelada.",
+    );
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.REEMBOLSADA }))).toBe(
+      "La compra de esta entrada fue reembolsada.",
+    );
+  });
+});
+
+describe("textoAvisoDeMiCompra con UTILIZADA (feature 008)", () => {
+  it("→ N de M entradas usadas", () => {
+    expect(
+      textoAvisoDeMiCompra(miCompra(compraConfirmada, { estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 })),
+    ).toBe("1 de 2 entradas usadas");
   });
 });

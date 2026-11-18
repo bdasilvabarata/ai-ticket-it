@@ -86,6 +86,7 @@ function Pila({ estado }: { estado: EstadoSesion }) {
         />
         {/* Las compras de un evento propio, para su organizador (feature 008). */}
         <Stack.Screen name="eventos/[eventoId]/compras" options={{ title: "Compras del evento" }} />
+        <Stack.Screen name="eventos/[eventoId]/ingreso" options={{ title: "Registrar ingreso" }} />
         {/* El detalle público desde Explorar (feature 005), también para un evento propio. */}
         <Stack.Screen name="explorar/[eventoId]/index" options={{ title: "Evento" }} />
         <Stack.Screen

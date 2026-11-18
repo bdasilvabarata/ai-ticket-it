@@ -3,6 +3,7 @@ import {
   type CompraDelEventoVista,
   type ComprasDelEventoVista,
   type CompraVista,
+  type EntradaDelEventoVista,
   type MiCompraVista,
   type MisComprasDelEventoVista,
   type VentanaDeUsoVista,
@@ -79,6 +80,31 @@ export const compraConfirmada: CompraVista = {
       autor: { tipo: "usuario", usuarioId: "usuario-martin" },
       fechaHora: "2026-11-12T18:25:00.000Z",
       fechaHoraLocal: "2026-11-12T15:25",
+    },
+  ],
+};
+
+/** La misma compra, con la primera entrada ya usada (feature 008): la compra queda UTILIZADA. */
+export const compraUtilizada: CompraVista = {
+  ...compraConfirmada,
+  estado: EstadoCompra.UTILIZADA,
+  entradasUsadas: 1,
+  entradas: [
+    {
+      codigo: CODIGOS_DE_LA_MARATON[0],
+      estado: EstadoCompra.UTILIZADA,
+      usadaEn: "2026-12-27T10:40:00.000Z",
+      usadaEnLocal: "2026-12-27T07:40",
+    },
+    { codigo: CODIGOS_DE_LA_MARATON[1], estado: EstadoCompra.CONFIRMADA, usadaEn: null, usadaEnLocal: null },
+  ],
+  historial: [
+    ...compraConfirmada.historial,
+    {
+      estado: EstadoCompra.UTILIZADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: "2026-12-27T10:40:00.000Z",
+      fechaHoraLocal: "2026-12-27T07:40",
     },
   ],
 };
@@ -211,5 +237,34 @@ export function comprasDelFestival(
     resumenPorTipo: [],
     compras,
     ...cambios,
+  };
+}
+
+/**
+ * `GET /eventos/evento-festival/entradas/7K3MQ9TB`: una entrada de Martín, 3 General del Festival,
+ * CONFIRMADA y con la ventana abierta, salvo que se cambie (`compra` se mezcla).
+ */
+export function entradaDelEvento(
+  cambios: Omit<Partial<EntradaDelEventoVista>, "compra"> & {
+    compra?: Partial<EntradaDelEventoVista["compra"]>;
+  } = {},
+): EntradaDelEventoVista {
+  const { compra, ...resto } = cambios;
+  return {
+    codigo: "7K3MQ9TB",
+    estado: EstadoCompra.CONFIRMADA,
+    usadaEn: null,
+    usadaEnLocal: null,
+    ventanaDeUso: ventanaDelFestival("abierta"),
+    ...resto,
+    compra: {
+      id: "compra-martin-general",
+      comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      cantidad: 3,
+      estado: EstadoCompra.CONFIRMADA,
+      entradasUsadas: 0,
+      ...compra,
+    },
   };
 }

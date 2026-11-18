@@ -1,8 +1,8 @@
 import type { ComprasDelEventoVista } from "@ai-ticket-it/shared";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
-import { PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
@@ -49,6 +49,13 @@ function Contenido({ vista }: { vista: ComprasDelEventoVista }) {
         <Text style={estilos.dato}>{textoFechaHora(vista.evento.fechaHoraLocal)}</Text>
       </View>
       <Text style={estilos.ventana}>{textoVentanaDeUso(vista.ventanaDeUso)}</Text>
+      {/* Siempre visible: si la ventana está cerrada, la pantalla de ingreso explica por qué. */}
+      <Boton
+        texto="Registrar ingreso"
+        alPresionar={() =>
+          router.push({ pathname: "/eventos/[eventoId]/ingreso", params: { eventoId: vista.evento.id } })
+        }
+      />
       <ResumenPorTipo resumen={vista.resumenPorTipo} />
       <View style={estilos.seccion}>
         <Text style={estilos.titulo} accessibilityRole="header">

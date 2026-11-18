@@ -4,6 +4,7 @@ import {
   EstadoCompra,
   type CompraDelEventoVista,
   type CompraVista,
+  type EntradaDelEventoVista,
   type MiCompraVista,
   type ResumenTipoEntradaVista,
   type VentanaDeUsoVista,
@@ -69,6 +70,8 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
     case EstadoCompra.CANCELADA:
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
+    case EstadoCompra.UTILIZADA:
+      return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
     default:
       return null;
   }
@@ -129,4 +132,42 @@ export function textoResumenDeTipo(resumen: ResumenTipoEntradaVista): string {
     contar(resumen.vendidas, "vendida"),
     contar(resumen.usadas, "usada"),
   ].join(" · ");
+}
+
+/** "7K3MQ9TB" → "7K3M-Q9TB": el código en dos grupos, para leerlo y dictarlo. */
+export function textoCodigo(codigo: string): string {
+  return `${codigo.slice(0, 4)}-${codigo.slice(4)}`;
+}
+
+/** "7K3MQ9TB" → "7 K 3 M Q 9 T B": TalkBack lo lee de a un carácter, no como una palabra. */
+export function textoCodigoAccesible(codigo: string): string {
+  return codigo.split("").join(" ");
+}
+
+/** " 7k3m-q9tb " → "7K3MQ9TB" (solo para la clave de la consulta; el servidor normaliza igual). */
+export function normalizarCodigo(texto: string): string {
+  return texto.replace(/[\s-]/g, "").toUpperCase();
+}
+
+/** Por qué no se puede registrar el ingreso con esa entrada, o `null` si se puede (contracts/app.md). */
+export function textoMotivoNoUsable(entrada: EntradaDelEventoVista): string | null {
+  const { ventanaDeUso } = entrada;
+  // La ventana va primero, como en el servidor (409 FUERA_DE_HORARIO_DE_USO antes que el estado).
+  if (ventanaDeUso.estado !== "abierta") {
+    return `El ingreso se registra desde el ${diaYHora(ventanaDeUso.desdeLocal)} hasta el ${diaYHora(ventanaDeUso.hastaLocal)}.`;
+  }
+  switch (entrada.estado) {
+    case EstadoCompra.UTILIZADA:
+      return entrada.usadaEnLocal === null
+        ? "Esta entrada ya se utilizó."
+        : `Esta entrada ya se utilizó el ${diaYHora(entrada.usadaEnLocal)}.`;
+    case EstadoCompra.PENDIENTE:
+      return "La compra de esta entrada todavía no se pagó.";
+    case EstadoCompra.CANCELADA:
+      return "La compra de esta entrada está cancelada.";
+    case EstadoCompra.REEMBOLSADA:
+      return "La compra de esta entrada fue reembolsada.";
+    default:
+      return null;
+  }
 }

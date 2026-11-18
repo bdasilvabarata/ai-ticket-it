@@ -1,4 +1,5 @@
 export { AvisoDeFormulario } from "./componentes/AvisoDeFormulario";
+export { CampoDeTexto } from "./componentes/CampoDeTexto";
 export { esNoEncontrado } from "./errores-de-formulario";
 export { textoCantidadTipos, textoCupo, textoFechaHora, textoPrecio } from "./formato";
 export { AgregarTipoEntrada } from "./pantallas/AgregarTipoEntrada";

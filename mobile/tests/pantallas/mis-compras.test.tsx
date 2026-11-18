@@ -2,7 +2,14 @@ import { EstadoCompra, type MiCompraVista } from "@ai-ticket-it/shared";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 import { router } from "expo-router";
 
-import { compraConfirmada, compraGratis, compraPendiente, conRestantes, miCompra } from "../helpers/compras";
+import {
+  compraConfirmada,
+  compraGratis,
+  compraPendiente,
+  compraUtilizada,
+  conRestantes,
+  miCompra,
+} from "../helpers/compras";
 import {
   CATALOGO_INICIAL,
   catalogo,
@@ -510,5 +517,13 @@ describe("Mis compras: la lista al día (US4)", () => {
     expect(screen.queryByRole("button", { name: /^Ver la compra de / })).toBeNull();
     expect(screen.queryByText("Festival Sonidos del Sur")).toBeNull();
     expect(pedidosDeLaLista(falso).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
+  });
+});
+
+describe("Mis compras: una UTILIZADA (feature 008, FR-012e)", () => {
+  it("la fila dice cuántas entradas se usaron junto a la etiqueta", async () => {
+    await abrirMisCompras([{ status: 200, json: [miCompra(compraUtilizada)] }]);
+    expect(await screen.findByText("1 de 2 entradas usadas")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Utilizada")).toBeOnTheScreen();
   });
 });

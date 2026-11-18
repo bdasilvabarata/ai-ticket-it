@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ComponentRef, type Ref } from "react";
 import { StyleSheet, Text, TextInput, View, type TextInputProps } from "react-native";
 
 import { tema } from "../../../componentes";
@@ -17,6 +17,9 @@ export interface PropsCampoDeTexto {
   multiline?: boolean;
   keyboardType?: TextInputProps["keyboardType"];
   autoCapitalize?: TextInputProps["autoCapitalize"];
+  autoCorrect?: boolean;
+  /** Para darle el foco desde la pantalla (por ejemplo, después de registrar un ingreso). */
+  ref?: Ref<ComponentRef<typeof TextInput>>;
 }
 
 /** Campo de texto con su etiqueta visible, una nota opcional y el error del servidor debajo. */
@@ -31,12 +34,15 @@ export function CampoDeTexto({
   multiline = false,
   keyboardType,
   autoCapitalize,
+  autoCorrect,
+  ref,
 }: PropsCampoDeTexto) {
   const [enfocado, setEnfocado] = useState(false);
   return (
     <View style={estilos.campo}>
       <Text style={estilos.etiqueta}>{etiqueta}</Text>
       <TextInput
+        ref={ref}
         accessibilityLabel={accessibilityLabel}
         value={valor}
         onChangeText={alCambiar}
@@ -44,6 +50,7 @@ export function CampoDeTexto({
         multiline={multiline}
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
+        autoCorrect={autoCorrect}
         textAlignVertical={multiline ? "top" : "center"}
         placeholderTextColor={tema.colores.textoSecundario}
         onFocus={() => setEnfocado(true)}

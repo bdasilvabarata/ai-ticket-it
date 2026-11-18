@@ -13,9 +13,11 @@ export {
   comprarEntradas,
   obtenerComprasDelEvento,
   obtenerCompra,
+  obtenerEntradaDelEvento,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
   pagarCompra,
+  registrarUsoDeEntrada,
 } from "./compras";
 export {
   actualizarEvento,
