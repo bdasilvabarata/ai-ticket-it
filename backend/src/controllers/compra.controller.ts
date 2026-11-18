@@ -1,4 +1,4 @@
-import type { CompraVista, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
+import type { CompraVista, MiCompraVista, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { CompraService } from "../services/compra.service";
@@ -18,6 +18,10 @@ export class CompraController {
   misComprasDelEvento = async (req: Request, res: Response<MisComprasDelEventoVista>): Promise<void> => {
     const { eventoId } = comprasDelEvento.leer(req, "params");
     res.json(await this.compraService.misComprasDelEvento(eventoId, usuarioActual(req).id));
+  };
+
+  misCompras = async (req: Request, res: Response<MiCompraVista[]>): Promise<void> => {
+    res.json(await this.compraService.misCompras(usuarioActual(req).id));
   };
 
   obtener = async (req: Request, res: Response<CompraVista>): Promise<void> => {

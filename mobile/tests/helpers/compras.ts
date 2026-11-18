@@ -1,4 +1,9 @@
-import { EstadoCompra, type CompraVista, type MisComprasDelEventoVista } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  type CompraVista,
+  type MiCompraVista,
+  type MisComprasDelEventoVista,
+} from "@ai-ticket-it/shared";
 
 import { maratonCompleta } from "./eventos";
 
@@ -105,3 +110,29 @@ export const compraGratis: CompraVista = {
   cantidad: 1,
   total: 0,
 };
+
+/**
+ * Una fila de "Mis compras" (feature 007) armada con una `CompraVista` (por defecto, la pendiente de
+ * la Maratón): sin `compradorId` ni `historial`, con `diasRestantes` y `canceladaPor` en `null` salvo
+ * que se cambien.
+ */
+export function miCompra(
+  base: CompraVista = compraPendiente,
+  cambios: Partial<MiCompraVista> = {},
+): MiCompraVista {
+  const { id, evento, tipoEntrada, cantidad, total, estado, creadaEn, venceEn, venceEnLocal } = base;
+  return {
+    id,
+    evento,
+    tipoEntrada,
+    cantidad,
+    total,
+    estado,
+    creadaEn,
+    venceEn,
+    venceEnLocal,
+    diasRestantes: null,
+    canceladaPor: null,
+    ...cambios,
+  };
+}

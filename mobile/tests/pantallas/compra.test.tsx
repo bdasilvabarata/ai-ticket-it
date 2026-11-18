@@ -11,8 +11,8 @@ import {
 } from "../helpers/compras";
 import { CATALOGO_INICIAL, catalogo, errorApi, maratonCompleta, maratonEnCatalogo } from "../helpers/eventos";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
-import { tituloDelHeader } from "../helpers/formulario";
-import { esperarPestanas } from "../helpers/pestanas";
+import { espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
+import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { diego, martin, todos } from "../helpers/usuarios";
 
@@ -21,15 +21,18 @@ type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 const EVENTO = "/eventos/evento-maraton-10k";
 const COMPRA = "/compras/compra-nueva";
 const PAGO = `${COMPRA}/pago`;
+const CANCELACION = `${COMPRA}/cancelacion`;
 
 interface Opciones {
   compra?: Lista;
   pago?: Lista;
+  cancelacion?: Lista;
 }
 
 function respuestas({
   compra = [{ status: 200, json: compraPendiente }],
   pago = [{ status: 200, json: compraConfirmada }],
+  cancelacion = [{ status: 200, json: compraCanceladaPorElComprador }],
 }: Opciones) {
   return porRuta({
     "/usuarios/actual": [{ status: 200, json: martin }],
@@ -40,6 +43,7 @@ function respuestas({
     [`${EVENTO}/mis-compras`]: [{ status: 200, json: conRestantes({ "tipo-maraton-inscripcion": 4 }) }],
     [`${EVENTO}/compras`]: [{ status: 201, json: compraPendiente }],
     [PAGO]: [porMetodo({ POST: pago })],
+    [CANCELACION]: [porMetodo({ POST: cancelacion })],
     [COMPRA]: compra,
   });
 }
@@ -225,6 +229,76 @@ describe("Tu compra (US2)", () => {
     await fireEvent.press(await screen.findByRole("button", { name: "Volver al evento" }));
 
     await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+  });
+
+  it("abierta desde Mis compras, Volver al evento lleva al detalle del evento y no a la lista", async () => {
+    const resultado = await renderConDependencias({
+      usuarioRecordado: martin.id,
+      respuestas: respuestas({ compra: [{ status: 200, json: compraConfirmada }] }),
+    });
+    await esperarPestanas();
+    await irAPestana("Mis compras");
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: "compra-nueva" } }));
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Volver al evento" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+  });
+});
+
+describe("Cancelar desde Tu compra", () => {
+  const TITULO = "¿Cancelar la compra de 2 entradas Inscripción?";
+
+  it("PENDIENTE: Cancelar pide confirmación; al confirmar manda un POST en nombre de Martín y se ve cancelada", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra({
+      compra: [
+        { status: 200, json: compraPendiente },
+        { status: 200, json: compraCanceladaPorElComprador },
+      ],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(0);
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(
+      await screen.findByText("Cancelaste esta compra: sus entradas volvieron a estar disponibles."),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();
+    const pedidos = resultado.falso.pedidosA(CANCELACION);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]?.metodo).toBe("POST");
+    expect(pedidos[0]?.encabezados["X-Usuario-Id"]).toBe(martin.id);
+  });
+
+  it("Volver en la confirmación no cancela nada", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra();
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Volver");
+
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(0);
+    expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+  });
+
+  it("sin servidor al cancelar: el aviso y la compra sigue pendiente", async () => {
+    const alertas = espiarAlertas();
+    await abrirCompra({ cancelacion: ["rechazar"] });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+  });
+
+  it("CONFIRMADA: no ofrece Cancelar compra", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraConfirmada }] });
+
+    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
   });
 });
 

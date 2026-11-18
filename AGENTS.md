@@ -45,7 +45,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `POST /eventos/:eventoId/compras` y `GET /eventos/:eventoId/mis-compras` (pendientes,
     confirmadas y restantes por tipo) en el router de eventos, `GET /compras/:compraId`,
     `POST /compras/:compraId/pago` y `POST /compras/:compraId/cancelacion` en `compras.routes.ts`;
-    todos con usuario, y una compra solo la ve, la paga y la cancela su comprador) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
+    todos con usuario, y una compra solo la ve, la paga y la cancela su comprador; la 007 suma
+    `GET /compras`: las del usuario actual como comprador, de todos los eventos, al día sin guardar
+    nada, ordenadas y como `MiCompraVista`, sin `historial` ni `compradorId`, con `diasRestantes` y
+    `canceladaPor`) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
     `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
@@ -63,6 +66,16 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `buscarPorId`, `listarPorEventoYComprador` y `listarPendientesPorEventos` (las guardadas
     `PENDIENTE`, vencidas o no); `existePorEvento` / `existePorTipoEntrada` cuentan toda compra,
     también una cancelada.
+  - **Mis compras** (feature 007): `RepositorioCompras.listarPorComprador` (todas, de todos los
+    eventos y en cualquier estado), `RepositorioEventos.listarPorIds` y `EventoService.obtenerPorIds`
+    (un `Map` en una sola lectura, sin cerrojo ni cupo al día; 404 si falta alguno).
+    `CompraService.misCompras` las pone al día, les busca los eventos en lote y las ordena con
+    `domain/orden-mis-compras.ts` (`compararMisCompras`: las de eventos no realizados primero por
+    fecha ascendente, las de realizados por fecha descendente, desempates `creadaEn` descendente →
+    `id`). `domain/dias-restantes.ts` (`diasRestantes(fechaHoraEvento, ahora)`: días de calendario
+    de Buenos Aires, `null` si el evento ya empezó) solo se calcula en una `CONFIRMADA`, en cada
+    consulta. `services/compra.vistas.ts` arma `datosComunes` y, a partir de él, `aCompraVista`
+    (la de la 006) y `aMiCompraVista`.
   - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
     nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
     (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
@@ -126,7 +139,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
     son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
     `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y `compras/[compraId]`
-    ("Tu compra"). El lint prohíbe importar
+    ("Tu compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
   - **Base** (no importa features):
     - `src/api/` — el cliente HTTP y un archivo por recurso con sus funciones de endpoint,
@@ -140,7 +153,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     - `src/consultas/` — `QueryClient` (sin reintentos propios; todo error de query o mutation va a
       la sesión vía `QueryCache`/`MutationCache`), claves en `claves.ts` (`catalogo` es la excepción
       documentada: **sin usuario**, porque el catálogo es el mismo para todos; la 006 suma
-      `misComprasDelEvento(usuarioId, eventoId)` y `compra(usuarioId, compraId)`) y `cliente-api.tsx`
+      `misComprasDelEvento(usuarioId, eventoId)` y `compra(usuarioId, compraId)`, y la 007,
+      `misCompras(usuarioId)`, con el usuario en la posición 1 y sin compartir prefijo con
+      `mis-compras-del-evento`) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -187,10 +202,18 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       organizador de este evento", "Ver mis entradas" y "Tus compras pendientes" con "Pagar" y
       "Cancelar"), `MisEntradasDelEvento`, `ComprarEntradas` (`SelectorCantidad`
       y total estimado; el tope lo informa el servidor en `restantesPorTipo`), `Compra` ("Tu compra":
-      `ResumenCompra` y "Pagar"/"Confirmar", dibujada siempre desde `useCompra`, así un pago con la
+      `ResumenCompra`, "Pagar"/"Confirmar" y "Cancelar compra" en una `PENDIENTE`; "Volver al evento"
+      va a `explorar/[eventoId]` con `dismissTo`, también si se llegó desde "Mis compras"; dibujada siempre desde `useCompra`, así un pago con la
       respuesta perdida muestra el estado real), `useMisComprasDelEvento`/`useCompra`, las mutations
       `useComprarEntradas`/`usePagarCompra`/`useCancelarCompra` (sin reintentos; al terminar invalidan el evento para
-      todos los usuarios, `misComprasDelEvento`, la compra y `["catalogo"]`) y `formato.ts`.
+      todos los usuarios, `misComprasDelEvento`, `misCompras`, la compra y `["catalogo"]`) y
+      `formato.ts` (con `textoAccionDePago`, "Pagar"/"Confirmar", que comparten "Tu compra" y la
+      lista). La 007 suma la pestaña `MisCompras` (`useMisCompras`, `SegunConsulta`, vacío con "Ir
+      a Explorar") con una `FilaMiCompra` por compra (los datos tocables abren "Tu compra"; en una
+      `PENDIENTE`, "Pagar" va **como hermano** de ese `Pressable`, nunca adentro, para que TalkBack
+      los enfoque por separado), avisos por estado (`textoAvisoDeMiCompra`, `textoDiasRestantes`) y
+      la lista al día: vuelve a pedirse en cada foco salvo el primero (`useFocusEffect`) y al
+      vencer la próxima pendiente (`useRefrescarAlVencer` con `vencimientos.ts`).
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la
@@ -211,7 +234,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     guarda (`@ts-expect-error` sobre una ruta inexistente).
   - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
     `renderConDependencias` (la app real con `fetch` falso; si un test no registra lo que pide
-    Explorar al entrar —el catálogo y las categorías— o el detalle —`mis-compras`— responde vacío) y `crearFetchFalso`/`porRuta`
+    Explorar al entrar —el catálogo y las categorías—, el detalle —`mis-compras`— o la pestaña
+    "Mis compras" —`GET /compras`— responde vacío) y `crearFetchFalso`/`porRuta`
     (registra método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
     `conexion/` y `pantallas/`, y los de cada feature en `features/<dominio>/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.

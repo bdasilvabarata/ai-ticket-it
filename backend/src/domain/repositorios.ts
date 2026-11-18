@@ -27,6 +27,8 @@ export interface RepositorioEventos {
   siguienteId(): string;
   listar(): Promise<Evento[]>;
   buscarPorId(id: string): Promise<Evento | null>;
+  /** Los que existen de esos ids (posiblemente ninguno), sin repetir: para `obtenerPorIds`. */
+  listarPorIds(ids: readonly string[]): Promise<Evento[]>;
   /** Cantidad de eventos (pasados y futuros) por id de organizador; los que no organizan no aparecen. */
   contarPorOrganizador(ids: string[]): Promise<Map<string, number>>;
   /** Los eventos que organiza el usuario (posiblemente ninguno). */
@@ -43,6 +45,8 @@ export interface RepositorioCompras {
   buscarPorId(id: string): Promise<Compra | null>;
   /** Las compras de esa persona en ese evento, en cualquier estado (posiblemente ninguna). */
   listarPorEventoYComprador(eventoId: string, compradorId: string): Promise<Compra[]>;
+  /** Las compras de esa persona en todos los eventos, en cualquier estado (posiblemente ninguna). */
+  listarPorComprador(compradorId: string): Promise<Compra[]>;
   /** Las compras guardadas como PENDIENTE (vencidas o no) de esos eventos, en una sola lectura. */
   listarPendientesPorEventos(eventoIds: readonly string[]): Promise<Compra[]>;
   /** Cualquier compra, en cualquier estado (también una vencida), cuenta. */

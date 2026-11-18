@@ -23,12 +23,14 @@ const creadas: Dependencias[] = [];
 
 /**
  * Lo que pide la app sin que el test lo pida y responde vacío si no lo registra: el catálogo y las
- * categorías (Explorar) y las compras del usuario en el evento (el detalle, feature 006, R19).
+ * categorías (Explorar), las compras del usuario en el evento (el detalle, feature 006, R19) y todas
+ * sus compras ("Mis compras", feature 007).
  */
 function respuestaDeExplorar(url: string): RespuestaFalsa | null {
   if (/\/eventos\?/.test(url)) return { status: 200, json: { eventos: [], hayEventosProximos: false } };
   if (url.endsWith("/categorias")) return { status: 200, json: [] };
   if (/\/eventos\/[^/]+\/mis-compras$/.test(url)) return { status: 200, json: sinCompras };
+  if (/\/api\/compras$/.test(url)) return { status: 200, json: [] };
   return null;
 }
 

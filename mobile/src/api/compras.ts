@@ -1,4 +1,4 @@
-import type { CompraVista, DatosCompra, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
+import type { CompraVista, DatosCompra, MiCompraVista, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
@@ -37,6 +37,17 @@ export function obtenerCompra(
   opciones: { signal?: AbortSignal } = {},
 ): Promise<CompraVista> {
   return cliente.get<CompraVista>(rutaDeLaCompra(compraId), { signal: opciones.signal });
+}
+
+/**
+ * `GET /compras` (feature 007): las compras del usuario actual como comprador, de todos los eventos,
+ * al día y en el orden del servidor.
+ */
+export function obtenerMisCompras(
+  cliente: ClienteApi,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<MiCompraVista[]> {
+  return cliente.get<MiCompraVista[]>("/compras", { signal: opciones.signal });
 }
 
 /** `POST /compras/:compraId/pago`, sin cuerpo: pago simulado. No se reintenta solo. */

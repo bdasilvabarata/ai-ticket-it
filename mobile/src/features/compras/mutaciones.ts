@@ -17,7 +17,7 @@ const delEvento =
 
 /**
  * Registra una compra. Al terminar invalida el evento (todos los usuarios; ante un 404 sin volver a
- * pedirlo), las compras del usuario en ese evento y el catálogo.
+ * pedirlo), las compras del usuario en ese evento, todas sus compras ("Mis compras") y el catálogo.
  */
 export function useComprarEntradas(usuarioId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -32,6 +32,7 @@ export function useComprarEntradas(usuarioId: string, eventoId: string) {
           refetchType: noEncontrado ? "none" : "active",
         }),
         queryClient.invalidateQueries({ queryKey: claves.misComprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
       ]);
     },
@@ -41,8 +42,8 @@ export function useComprarEntradas(usuarioId: string, eventoId: string) {
 /**
  * Paga (simulado) una compra. Con éxito escribe la respuesta en la consulta de la compra; al
  * terminar, con éxito o error, invalida la compra (el estado real lo dice el servidor: vencida, ya
- * confirmada o con la respuesta perdida), las compras del usuario en el evento, el evento (todos los
- * usuarios: el cupo pudo volver) y el catálogo.
+ * confirmada o con la respuesta perdida), las compras del usuario en el evento y en "Mis compras", el
+ * evento (todos los usuarios: el cupo pudo volver) y el catálogo.
  */
 export function usePagarCompra(usuarioId: string, compraId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -56,6 +57,7 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
       Promise.all([
         queryClient.invalidateQueries({ queryKey: claves.compra(usuarioId, compraId) }),
         queryClient.invalidateQueries({ queryKey: claves.misComprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
       ]),
@@ -64,8 +66,8 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
 
 /**
  * Cancela una compra pendiente (sin esperar a que venza). Al terminar, con éxito o error, invalida lo
- * mismo que el pago: la compra, las compras del usuario en el evento, el evento (todos los usuarios:
- * su cupo volvió) y el catálogo.
+ * mismo que el pago: la compra, las compras del usuario en el evento y en "Mis compras", el evento
+ * (todos los usuarios: su cupo volvió) y el catálogo.
  */
 export function useCancelarCompra(usuarioId: string, compraId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -79,6 +81,7 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
       Promise.all([
         queryClient.invalidateQueries({ queryKey: claves.compra(usuarioId, compraId) }),
         queryClient.invalidateQueries({ queryKey: claves.misComprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
       ]),

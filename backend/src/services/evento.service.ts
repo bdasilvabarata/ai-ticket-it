@@ -216,6 +216,20 @@ export class EventoService {
     });
   }
 
+  /**
+   * Búsqueda en lote para otro service (feature 007, `CompraService.misCompras`): un `Map` por id en
+   * una sola lectura, sin tomar el cerrojo ni guardar nada. Los eventos se devuelven como están
+   * guardados (sin cupo al día: quien los usa no muestra cupo). Si falta alguno, 404 como
+   * `obtenerOFallar`.
+   */
+  async obtenerPorIds(ids: readonly string[]): Promise<Map<string, Evento>> {
+    const eventos = new Map((await this.#eventos.listarPorIds(ids)).map((e) => [e.id, e]));
+    if (ids.some((id) => !eventos.has(id))) {
+      throw new NoEncontradoError("EVENTO_NO_ENCONTRADO", "No existe el evento.");
+    }
+    return eventos;
+  }
+
   /** Único lugar que busca un evento por id y lanza 404 si no existe. Lo usan los otros services. */
   async obtenerOFallar(id: string): Promise<Evento> {
     const evento = await this.#eventos.buscarPorId(id);

@@ -27,6 +27,10 @@ export class EventoRepository implements RepositorioEventos {
     return this.#eventos.get(id) ?? null;
   }
 
+  async listarPorIds(ids: readonly string[]): Promise<Evento[]> {
+    return [...new Set(ids)].flatMap((id) => this.#eventos.get(id) ?? []);
+  }
+
   async contarPorOrganizador(ids: string[]): Promise<Map<string, number>> {
     const buscados = new Set(ids);
     const cantidades = new Map<string, number>();

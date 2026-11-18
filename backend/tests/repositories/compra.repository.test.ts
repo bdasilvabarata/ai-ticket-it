@@ -76,6 +76,24 @@ describe("CompraRepository (en memoria)", () => {
     expect(await repositorio.listarPorEventoYComprador("evento-c", "usuario-martin")).toEqual([]);
   });
 
+  it("listarPorComprador: las de esa persona en todos los eventos y en cualquier estado", async () => {
+    const repositorio = new CompraRepository([
+      compra("a-pendiente", EstadoCompra.PENDIENTE),
+      compra("a-confirmada", EstadoCompra.CONFIRMADA),
+      compra("b-cancelada", EstadoCompra.CANCELADA, "evento-b", "tipo-b-vip"),
+      compra("de-diego", EstadoCompra.CONFIRMADA, "evento-a", "tipo-a-general", "usuario-diego"),
+      compra("de-diego-b", EstadoCompra.PENDIENTE, "evento-b", "tipo-b-vip", "usuario-diego"),
+    ]);
+    const ids = (await repositorio.listarPorComprador("usuario-martin")).map((c) => c.id);
+    expect(ids.toSorted()).toEqual(["a-confirmada", "a-pendiente", "b-cancelada"]);
+  });
+
+  it("listarPorComprador: un comprador sin compras → []", async () => {
+    const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
+    expect(await repositorio.listarPorComprador("usuario-lucia")).toEqual([]);
+    expect(await new CompraRepository().listarPorComprador("usuario-martin")).toEqual([]);
+  });
+
   it("listarPendientesPorEventos: solo las guardadas PENDIENTE (vencidas o no) de esos eventos", async () => {
     const hace1Dia = new Date("2026-11-09T15:00:00.000Z");
     const repositorio = new CompraRepository([
