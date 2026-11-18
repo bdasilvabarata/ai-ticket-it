@@ -133,6 +133,14 @@ export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuar
       </View>
 
       <View style={estilos.seccion}>
+        <Text style={estilos.titulo} accessibilityRole="header">
+          Compras
+        </Text>
+        {/* Por la ruta tipada: `eventos` no importa `compras` (sería un ciclo). */}
+        <Boton variante="aviso" texto="Ver compras" alPresionar={() => verCompras(evento.id)} />
+      </View>
+
+      <View style={estilos.seccion}>
         <AvisoDeFormulario mensaje={avisoEliminar} />
         <Boton
           variante="aviso"
@@ -144,6 +152,11 @@ export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuar
       </View>
     </PantallaDesplazable>
   );
+}
+
+/** "Compras del evento" (feature 008), por la ruta tipada. */
+function verCompras(eventoId: string) {
+  router.push({ pathname: "/eventos/[eventoId]/compras", params: { eventoId } });
 }
 
 const estilos = StyleSheet.create({

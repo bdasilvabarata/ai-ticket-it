@@ -1,4 +1,10 @@
-import type { CompraVista, DatosCompra, MiCompraVista, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
+import type {
+  ComprasDelEventoVista,
+  CompraVista,
+  DatosCompra,
+  MiCompraVista,
+  MisComprasDelEventoVista,
+} from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
@@ -26,6 +32,20 @@ export function obtenerMisComprasDelEvento(
   opciones: { signal?: AbortSignal } = {},
 ): Promise<MisComprasDelEventoVista> {
   return cliente.get<MisComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/mis-compras`, {
+    signal: opciones.signal,
+  });
+}
+
+/**
+ * `GET /eventos/:eventoId/compras` (feature 008): todas las compras del evento, al día, con la
+ * ventana de uso y el resumen por tipo. Solo para su organizador (si no, 403).
+ */
+export function obtenerComprasDelEvento(
+  cliente: ClienteApi,
+  eventoId: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<ComprasDelEventoVista> {
+  return cliente.get<ComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/compras`, {
     signal: opciones.signal,
   });
 }

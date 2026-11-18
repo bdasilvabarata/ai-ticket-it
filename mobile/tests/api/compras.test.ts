@@ -1,6 +1,8 @@
 import {
   comprarEntradas,
   crearClienteApi,
+  ErrorDeApi,
+  obtenerComprasDelEvento,
   obtenerCompra,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
@@ -114,6 +116,38 @@ describe("obtenerMisCompras", () => {
     const controlador = new AbortController();
     await obtenerMisCompras(cliente, { signal: controlador.signal });
     expect(get).toHaveBeenCalledWith("/compras", { signal: controlador.signal });
+  });
+});
+
+describe("obtenerComprasDelEvento (feature 008)", () => {
+  it("pide GET /eventos/:id/compras con el usuario actual, sin cuerpo, y devuelve la vista", async () => {
+    const vista = { evento: { id: "evento a/b" }, ventanaDeUso: {}, resumenPorTipo: [], compras: [] };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+
+    await expect(obtenerComprasDelEvento(cliente, "evento a/b")).resolves.toEqual(vista);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/eventos/evento%20a%2Fb/compras`, metodo: "GET" });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: {} });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerComprasDelEvento(cliente, "evento-festival", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/eventos/evento-festival/compras", { signal: controlador.signal });
+  });
+
+  it("un 403 llega como ErrorDeApi con su código", async () => {
+    const { cliente } = armar({
+      status: 403,
+      json: {
+        error: { codigo: "SIN_PERMISO", mensaje: "Solo el organizador del evento puede ver sus compras." },
+      },
+    });
+    const error = await obtenerComprasDelEvento(cliente, "evento-festival").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({ status: 403, codigo: "SIN_PERMISO" });
   });
 });
 

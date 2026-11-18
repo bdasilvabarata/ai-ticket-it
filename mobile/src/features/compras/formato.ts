@@ -1,6 +1,12 @@
 // Textos derivados de una compra, puros (sin React ni `Intl`), como los de `eventos`.
 
-import { EstadoCompra, type CompraVista, type MiCompraVista } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  type CompraDelEventoVista,
+  type CompraVista,
+  type MiCompraVista,
+  type VentanaDeUsoVista,
+} from "@ai-ticket-it/shared";
 
 import { textoPrecio } from "../eventos";
 
@@ -62,6 +68,52 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
     case EstadoCompra.CANCELADA:
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
+    default:
+      return null;
+  }
+}
+
+// Feature 008: "Compras del evento" (organizador).
+
+/** "2026-11-18T15:20" → "18/11 15:20" (fecha y hora de pared, sin convertir zonas). */
+function diaYHora(fechaHoraLocal: string): string {
+  return `${fechaHoraLocal.slice(8, 10)}/${fechaHoraLocal.slice(5, 7)} ${fechaHoraLocal.slice(11, 16)}`;
+}
+
+/** "2026-11-18T15:20" (hora de pared de Buenos Aires) → "Comprada el 18/11 15:20". */
+export function textoCompradaEl(creadaEnLocal: string): string {
+  return `Comprada el ${diaYHora(creadaEnLocal)}`;
+}
+
+/** Cuándo se pueden registrar ingresos, según el estado que decidió el servidor (contracts/app.md). */
+export function textoVentanaDeUso(ventana: VentanaDeUsoVista): string {
+  switch (ventana.estado) {
+    case "antes":
+      return `Podés registrar ingresos desde el ${diaYHora(ventana.desdeLocal)}`;
+    case "abierta":
+      return `Ingresos habilitados hasta el ${diaYHora(ventana.hastaLocal)}`;
+    case "despues":
+      return `Los ingresos se registraron hasta el ${diaYHora(ventana.hastaLocal)}`;
+  }
+}
+
+/** (1, 3) → "1 de 3 entradas usadas"; (1, 1) → "1 de 1 entrada usada". */
+export function textoEntradasUsadas(usadas: number, cantidad: number): string {
+  return cantidad === 1 ? `${usadas} de 1 entrada usada` : `${usadas} de ${cantidad} entradas usadas`;
+}
+
+/** El aviso que va junto al estado de una fila de "Compras del evento", o `null` si no lleva. */
+export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): string | null {
+  switch (compra.estado) {
+    case EstadoCompra.PENDIENTE:
+      return compra.venceEnLocal === null
+        ? null
+        : `Puede pagarla hasta las ${compra.venceEnLocal.slice(11, 16)}`;
+    case EstadoCompra.CANCELADA:
+      if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
+      return compra.canceladaPor === "usuario" ? "La canceló el comprador" : null;
+    case EstadoCompra.UTILIZADA:
+      return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
     default:
       return null;
   }

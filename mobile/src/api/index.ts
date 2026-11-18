@@ -11,6 +11,7 @@ export { listarCategorias } from "./categorias";
 export {
   cancelarCompra,
   comprarEntradas,
+  obtenerComprasDelEvento,
   obtenerCompra,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
