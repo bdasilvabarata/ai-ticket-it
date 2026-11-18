@@ -1,7 +1,7 @@
 import { EstadoCompra, type CompraVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
 import { useRef, type ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
 import {
@@ -16,8 +16,8 @@ import {
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { ResumenCompra } from "../componentes/ResumenCompra";
-import { textoAccionDePago, textoCancelada, textoVencimiento } from "../formato";
-import { usePagarCompra } from "../mutaciones";
+import { textoAccionDePago, textoCancelada, textoCantidad, textoVencimiento } from "../formato";
+import { useCancelarCompra, usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
 
 /**
@@ -32,6 +32,13 @@ export function Compra() {
 }
 
 const irAExplorar = () => router.dismissTo("/");
+
+/**
+ * Al detalle del evento de la compra, venga de donde venga "Tu compra": si el detalle está en la pila
+ * (se llegó desde él) vuelve a él; si no (desde "Mis compras"), reemplaza esta pantalla por el detalle.
+ */
+const irAlEvento = (eventoId: string) =>
+  router.dismissTo({ pathname: "/explorar/[eventoId]", params: { eventoId } });
 
 function SegunLaCompra({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
   const consulta = useCompra(usuarioId, compraId);
@@ -93,7 +100,7 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
         <Pago usuarioId={usuarioId} compra={compra} />
       ) : (
         <View style={estilos.acciones}>
-          <Boton variante="aviso" texto="Volver al evento" alPresionar={() => router.back()} />
+          <Boton variante="aviso" texto="Volver al evento" alPresionar={() => irAlEvento(compra.evento.id)} />
           {compra.estado === EstadoCompra.CONFIRMADA ? (
             <Boton variante="texto" texto="Ir a Explorar" alPresionar={irAExplorar} />
           ) : null}
@@ -107,33 +114,46 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
  * El aviso de un pago fallido (contracts/app.md, "Errores del pago"). Los 409 no avisan: la compra
  * se vuelve a pedir y su estado real (vencida o ya confirmada) reemplaza a esta parte de la pantalla.
  */
-function mensajeDelError(error: unknown): string | null {
+function mensajeDelError(error: unknown, sinServidor: string): string | null {
   if (!error) return null;
-  if (error instanceof ServidorNoDisponibleError) return "No se pudo pagar. Probá de nuevo.";
+  if (error instanceof ServidorNoDisponibleError) return sinServidor;
   if (error instanceof ErrorDeApi) return error.status === 409 ? null : error.mensaje;
   return "Ocurrió un error inesperado.";
 }
 
 /**
- * Hasta cuándo se puede pagar y "Pagar" ("Confirmar" si es gratis). Solo se muestra con la compra
- * `PENDIENTE`, así que el aviso de un pago fallido desaparece apenas la relectura trae otro estado.
+ * Hasta cuándo se puede pagar, "Pagar" ("Confirmar" si es gratis) y "Cancelar compra", que tras
+ * confirmarlo la cancela sin esperar a que venza. Solo se muestra con la compra `PENDIENTE`, así que
+ * el aviso de un pago o una cancelación fallidos desaparece apenas la relectura trae otro estado.
  */
 function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista }) {
   const pagar = usePagarCompra(usuarioId, compra.id, compra.evento.id);
-  // Marca sincrónica: un segundo toque antes de que se vuelva a dibujar no manda otro pedido.
+  const cancelar = useCancelarCompra(usuarioId, compra.id, compra.evento.id);
+  // Marca sincrónica: un segundo toque antes de que se vuelva a dibujar no manda otro pedido (ni
+  // pagar y cancelar a la vez).
   const enviando = useRef(false);
   const gratis = compra.total === 0;
-  const error = mensajeDelError(pagar.error);
+  const error =
+    mensajeDelError(pagar.error, "No se pudo pagar. Probá de nuevo.") ??
+    mensajeDelError(cancelar.error, "No se pudo cancelar. Probá de nuevo.");
+  const descripcion = `${textoCantidad(compra.cantidad)} ${compra.tipoEntrada.nombre}`;
 
-  const alPagar = () => {
+  const enviar = (mutacion: typeof pagar | typeof cancelar) => {
     if (enviando.current) return;
     enviando.current = true;
-    pagar.mutate(undefined, {
+    mutacion.mutate(undefined, {
       onSettled: () => {
         enviando.current = false;
       },
     });
   };
+  const alPagar = () => enviar(pagar);
+
+  const confirmarCancelar = () =>
+    Alert.alert(`¿Cancelar la compra de ${descripcion}?`, "Sus entradas vuelven a estar disponibles.", [
+      { text: "Volver", style: "cancel" },
+      { text: "Cancelar compra", style: "destructive", onPress: () => enviar(cancelar) },
+    ]);
 
   return (
     <>
@@ -144,7 +164,16 @@ function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista })
           texto={textoAccionDePago(compra.total)}
           textoEnCurso={gratis ? "Confirmando…" : "Pagando…"}
           enCurso={pagar.isPending}
+          deshabilitado={cancelar.isPending}
           alPresionar={alPagar}
+        />
+        <Boton
+          variante="texto"
+          texto="Cancelar compra"
+          textoEnCurso="Cancelando…"
+          enCurso={cancelar.isPending}
+          deshabilitado={pagar.isPending}
+          alPresionar={confirmarCancelar}
         />
       </View>
     </>

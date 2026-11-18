@@ -202,7 +202,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       organizador de este evento", "Ver mis entradas" y "Tus compras pendientes" con "Pagar" y
       "Cancelar"), `MisEntradasDelEvento`, `ComprarEntradas` (`SelectorCantidad`
       y total estimado; el tope lo informa el servidor en `restantesPorTipo`), `Compra` ("Tu compra":
-      `ResumenCompra` y "Pagar"/"Confirmar", dibujada siempre desde `useCompra`, así un pago con la
+      `ResumenCompra`, "Pagar"/"Confirmar" y "Cancelar compra" en una `PENDIENTE`; "Volver al evento"
+      va a `explorar/[eventoId]` con `dismissTo`, también si se llegó desde "Mis compras"; dibujada siempre desde `useCompra`, así un pago con la
       respuesta perdida muestra el estado real), `useMisComprasDelEvento`/`useCompra`, las mutations
       `useComprarEntradas`/`usePagarCompra`/`useCancelarCompra` (sin reintentos; al terminar invalidan el evento para
       todos los usuarios, `misComprasDelEvento`, `misCompras`, la compra y `["catalogo"]`) y
