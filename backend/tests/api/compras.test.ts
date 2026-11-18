@@ -726,6 +726,42 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
     }
   });
 
+  it("resumenPorTipo (US2): cada tipo del Festival en su orden, con las cantidades del seed y el cupo del detalle", async () => {
+    const app = nuevaApp();
+    const { body } = await comprasDelEvento(app, "usuario-lucia");
+    expect(body.resumenPorTipo).toEqual([
+      {
+        tipoEntrada: { id: GENERAL, nombre: "General" },
+        disponibles: await cupoDe(app, GENERAL),
+        pendientes: 0,
+        vendidas: 0,
+        usadas: 0,
+      },
+      {
+        tipoEntrada: { id: VIP, nombre: "VIP" },
+        disponibles: await cupoDe(app, VIP),
+        pendientes: 0,
+        vendidas: 2,
+        usadas: 0,
+      },
+      {
+        tipoEntrada: { id: BACKSTAGE, nombre: "Backstage" },
+        disponibles: await cupoDe(app, BACKSTAGE),
+        pendientes: 0,
+        vendidas: 0,
+        usadas: 0,
+      },
+    ]);
+  });
+
+  it("resumenPorTipo: una compra sin pagar suma a pendientes y descuenta disponibles", async () => {
+    const app = nuevaApp();
+    const antes = (await comprasDelEvento(app, "usuario-lucia")).body.resumenPorTipo[1];
+    await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
+    const despues = (await comprasDelEvento(app, "usuario-lucia")).body.resumenPorTipo[1];
+    expect(despues).toMatchObject({ disponibles: antes.disponibles - 2, pendientes: 2, vendidas: 2 });
+  });
+
   it("query y cuerpo se ignoran", async () => {
     const respuesta = await request(nuevaApp())
       .get(`${FESTIVAL}/compras?estado=PENDIENTE&orden=x`)

@@ -6,12 +6,13 @@ import { PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
+import { ResumenPorTipo } from "../componentes/ResumenPorTipo";
 import { textoVentanaDeUso } from "../formato";
 import { useComprasDelEvento } from "../useComprasDelEvento";
 
 /**
  * "Compras del evento" (feature 008, UC-02): todas las compras de un evento propio, al día, con la
- * ventana de uso. Solo se llega desde un evento del organizador ("Ver compras"); el permiso lo
+ * ventana de uso y la disponibilidad por tipo. Solo se llega desde un evento del organizador ("Ver compras"); el permiso lo
  * decide el servidor.
  */
 export function ComprasDelEvento() {
@@ -48,6 +49,7 @@ function Contenido({ vista }: { vista: ComprasDelEventoVista }) {
         <Text style={estilos.dato}>{textoFechaHora(vista.evento.fechaHoraLocal)}</Text>
       </View>
       <Text style={estilos.ventana}>{textoVentanaDeUso(vista.ventanaDeUso)}</Text>
+      <ResumenPorTipo resumen={vista.resumenPorTipo} />
       <View style={estilos.seccion}>
         <Text style={estilos.titulo} accessibilityRole="header">
           Compras

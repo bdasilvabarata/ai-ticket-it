@@ -10,6 +10,7 @@ import {
   textoDiasRestantes,
   textoEntradasConfirmadas,
   textoEntradasUsadas,
+  textoResumenDeTipo,
   textoTotal,
   textoVencimiento,
   textoVentanaDeUso,
@@ -196,5 +197,34 @@ describe("textoAvisoDeCompraDelEvento (feature 008)", () => {
   it("CONFIRMADA y REEMBOLSADA → null", () => {
     expect(textoAvisoDeCompraDelEvento(compraDelEvento())).toBeNull();
     expect(textoAvisoDeCompraDelEvento(compraDelEvento({ estado: EstadoCompra.REEMBOLSADA }))).toBeNull();
+  });
+});
+
+describe("textoResumenDeTipo (feature 008, US2)", () => {
+  const resumen = (disponibles: number, pendientes: number, vendidas: number, usadas: number) => ({
+    tipoEntrada: { id: "tipo-general", nombre: "General" },
+    disponibles,
+    pendientes,
+    vendidas,
+    usadas,
+  });
+
+  it("los cuatro números separados por ·, en plural", () => {
+    expect(textoResumenDeTipo(resumen(117, 0, 3, 2))).toBe(
+      "117 disponibles · 0 pendientes · 3 vendidas · 2 usadas",
+    );
+  });
+
+  it("en singular cuando vale 1", () => {
+    expect(textoResumenDeTipo(resumen(1, 1, 1, 1))).toBe("1 disponible · 1 pendiente · 1 vendida · 1 usada");
+    expect(textoResumenDeTipo(resumen(117, 0, 3, 1))).toBe(
+      "117 disponibles · 0 pendientes · 3 vendidas · 1 usada",
+    );
+  });
+
+  it("todo en 0, en plural", () => {
+    expect(textoResumenDeTipo(resumen(0, 0, 0, 0))).toBe(
+      "0 disponibles · 0 pendientes · 0 vendidas · 0 usadas",
+    );
   });
 });

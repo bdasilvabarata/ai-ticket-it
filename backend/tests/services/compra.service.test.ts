@@ -1078,7 +1078,7 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     }
   });
 
-  it("el evento y la ventana de uso según el reloj; resumenPorTipo vacío hasta la US2", async () => {
+  it("el evento y la ventana de uso según el reloj", async () => {
     // evento-a empieza en AHORA + 5 días: la ventana va de 4 h antes a 12 h después.
     const inicio = new Date(AHORA.getTime() + 5 * DIA);
     const reloj = relojMovible();
@@ -1098,7 +1098,6 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
       hastaLocal: "2026-11-16T00:00",
       estado: "antes",
     });
-    expect(vista.resumenPorTipo).toEqual([]);
 
     reloj.avanzar(5 * DIA - 4 * 60 * MINUTO);
     expect((await compraService.comprasDelEvento("evento-a", "usuario-lucia")).ventanaDeUso.estado).toBe(
@@ -1166,6 +1165,68 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     expect(guardarCompra).not.toHaveBeenCalled();
     expect(guardarEvento).not.toHaveBeenCalled();
     expect(ejecutar).not.toHaveBeenCalled();
+  });
+
+  describe("resumenPorTipo (US2)", () => {
+    // Un tipo de cupo 10 con 3 entradas sin pagar y 2 pagadas: el guardado ya tiene 5 disponibles.
+    const conCupo = tipo({ id: "tipo-c-general", nombre: "General", cupo: 5 });
+    const sinCompras = tipo({ id: "tipo-c-platea", nombre: "Platea", cupo: 30 });
+    const armarResumen = (reloj = relojMovible()) => ({
+      reloj,
+      ...armar({
+        eventos: [evento({ id: "evento-c", tiposEntrada: [conCupo, sinCompras] })],
+        compras: [
+          compra("evento-c", "tipo-c-general", EstadoCompra.PENDIENTE, { id: "p1", cantidad: 2 }),
+          compra("evento-c", "tipo-c-general", EstadoCompra.PENDIENTE, { id: "p2", cantidad: 1 }),
+          compra("evento-c", "tipo-c-general", EstadoCompra.CONFIRMADA, { id: "c1", cantidad: 2 }),
+        ],
+        reloj,
+      }),
+    });
+
+    it("uno por tipo en el orden del evento: 5 · 3 · 2 · 0, y un tipo sin compras con su cupo y ceros", async () => {
+      const { compraService } = armarResumen();
+      const { resumenPorTipo } = await compraService.comprasDelEvento("evento-c", "usuario-lucia");
+      expect(resumenPorTipo).toEqual([
+        {
+          tipoEntrada: { id: "tipo-c-general", nombre: "General" },
+          disponibles: 5,
+          pendientes: 3,
+          vendidas: 2,
+          usadas: 0,
+        },
+        {
+          tipoEntrada: { id: "tipo-c-platea", nombre: "Platea" },
+          disponibles: 30,
+          pendientes: 0,
+          vendidas: 0,
+          usadas: 0,
+        },
+      ]);
+    });
+
+    it("15 minutos después: 8 · 0 · 2 · 0, sin guardar nada", async () => {
+      const { compraService, reloj, repositorioCompras, repositorioEventos } = armarResumen();
+      const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+      const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+      reloj.avanzar(15 * MINUTO);
+
+      const { resumenPorTipo } = await compraService.comprasDelEvento("evento-c", "usuario-lucia");
+
+      expect(resumenPorTipo[0]).toMatchObject({ disponibles: 8, pendientes: 0, vendidas: 2, usadas: 0 });
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+    });
+
+    it("los disponibles son los mismos que los del detalle en el mismo instante (SC-003)", async () => {
+      const { compraService, eventoService, reloj } = armarResumen();
+      for (const minutos of [0, 15]) {
+        reloj.avanzar(minutos * MINUTO);
+        const { resumenPorTipo } = await compraService.comprasDelEvento("evento-c", "usuario-lucia");
+        const detalle = await eventoService.obtener("evento-c");
+        expect(resumenPorTipo.map((r) => r.disponibles)).toEqual(detalle.tiposEntrada.map((t) => t.cupo));
+      }
+    });
   });
 
   it("sin compras, no pide usuarios", async () => {

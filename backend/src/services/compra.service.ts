@@ -7,7 +7,7 @@ import {
   type MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
 import { Compra } from "../domain/compra";
-import { compararComprasDelEvento } from "../domain/compras-del-evento";
+import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import { compararMisCompras } from "../domain/orden-mis-compras";
 import type { Reloj } from "../domain/reloj";
@@ -16,7 +16,13 @@ import type { Usuario } from "../domain/usuario";
 import { entradasRestantes, exigirTopePorPersona } from "../domain/tope-por-persona";
 import { CompraNoEncontradaError, SinPermisoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aCompraDelEventoVista, aCompraVista, aMiCompraVista, aVentanaDeUsoVista } from "./compra.vistas";
+import {
+  aCompraDelEventoVista,
+  aCompraVista,
+  aMiCompraVista,
+  aResumenTipoEntradaVista,
+  aVentanaDeUsoVista,
+} from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import type { TipoEntradaService } from "./tipo-entrada.service";
 import type { UsuarioService } from "./usuario.service";
@@ -243,7 +249,8 @@ export class CompraService {
         realizado: evento.estaRealizado(ahora),
       },
       ventanaDeUso: aVentanaDeUsoVista(evento.fechaHora, ahora),
-      resumenPorTipo: [],
+      // El evento ya llega con el cupo al día y las compras, al día: sin guardar nada (R7).
+      resumenPorTipo: resumenPorTipo(evento.tiposEntrada, compras).map(aResumenTipoEntradaVista),
       // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
       compras: compras.map((compra) =>
         aCompraDelEventoVista(

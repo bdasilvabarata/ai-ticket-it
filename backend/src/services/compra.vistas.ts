@@ -4,9 +4,11 @@ import {
   type CompraDelEventoVista,
   type CompraVista,
   type MiCompraVista,
+  type ResumenTipoEntradaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 import type { CambioEstadoCompra, Compra } from "../domain/compra";
+import type { ResumenDeTipo } from "../domain/compras-del-evento";
 import { diasRestantes } from "../domain/dias-restantes";
 import type { Evento, TipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
@@ -121,5 +123,16 @@ export function aVentanaDeUsoVista(fechaHora: Date, ahora: Date): VentanaDeUsoVi
     desdeLocal: horaDeBuenosAires(ventana.desde),
     hastaLocal: horaDeBuenosAires(ventana.hasta),
     estado: estadoDeVentana(ventana, ahora),
+  };
+}
+
+/** Cómo viene la venta de un tipo (feature 008, FR-007): el tipo con su id y nombre, y los números. */
+export function aResumenTipoEntradaVista(resumen: ResumenDeTipo): ResumenTipoEntradaVista {
+  return {
+    tipoEntrada: { id: resumen.tipoEntrada.id, nombre: resumen.tipoEntrada.nombre },
+    disponibles: resumen.disponibles,
+    pendientes: resumen.pendientes,
+    vendidas: resumen.vendidas,
+    usadas: resumen.usadas,
   };
 }

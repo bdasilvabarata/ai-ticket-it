@@ -5,6 +5,7 @@ import {
   type CompraDelEventoVista,
   type CompraVista,
   type MiCompraVista,
+  type ResumenTipoEntradaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
@@ -117,4 +118,15 @@ export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): strin
     default:
       return null;
   }
+}
+
+/** Cómo viene la venta de un tipo: "117 disponibles · 0 pendientes · 3 vendidas · 1 usada". */
+export function textoResumenDeTipo(resumen: ResumenTipoEntradaVista): string {
+  const contar = (n: number, singular: string) => `${n} ${n === 1 ? singular : `${singular}s`}`;
+  return [
+    contar(resumen.disponibles, "disponible"),
+    contar(resumen.pendientes, "pendiente"),
+    contar(resumen.vendidas, "vendida"),
+    contar(resumen.usadas, "usada"),
+  ].join(" · ");
 }

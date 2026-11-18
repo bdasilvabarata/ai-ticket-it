@@ -214,3 +214,69 @@ describe("Compras del evento (feature 008, US1)", () => {
     expect(pedido?.encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
   });
 });
+
+describe("Compras del evento: disponibilidad por tipo (feature 008, US2)", () => {
+  const resumen = [
+    {
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      disponibles: 117,
+      pendientes: 0,
+      vendidas: 3,
+      usadas: 1,
+    },
+    {
+      tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+      disponibles: 1,
+      pendientes: 1,
+      vendidas: 1,
+      usadas: 0,
+    },
+    {
+      tipoEntrada: { id: "tipo-festival-backstage", nombre: "Backstage" },
+      disponibles: 0,
+      pendientes: 2,
+      vendidas: 1,
+      usadas: 0,
+    },
+  ];
+
+  it('sección "Disponibilidad por tipo" con cada tipo y sus números, en el orden de la respuesta', async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([martinConfirmada], { resumenPorTipo: resumen }) },
+    ]);
+    expect(await screen.findByRole("header", { name: "Disponibilidad por tipo" })).toBeOnTheScreen();
+
+    const general = screen.getByLabelText("General: 117 disponibles · 0 pendientes · 3 vendidas · 1 usada");
+    expect(within(general).getByText("General")).toBeOnTheScreen();
+    expect(
+      within(general).getByText("117 disponibles · 0 pendientes · 3 vendidas · 1 usada"),
+    ).toBeOnTheScreen();
+    expect(screen.getByText("1 disponible · 1 pendiente · 1 vendida · 0 usadas")).toBeOnTheScreen();
+
+    const nombres = screen
+      .getAllByLabelText(/^(General|VIP|Backstage)(, Agotado)?: /)
+      .map((fila) => String(fila.props.accessibilityLabel).split(/[:,]/)[0]);
+    expect(nombres).toEqual(["General", "VIP", "Backstage"]);
+  });
+
+  it('con 0 disponibles, la marca "Agotado" en texto (FR-008)', async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([], { resumenPorTipo: resumen }) },
+    ]);
+    const backstage = await screen.findByLabelText(
+      "Backstage, Agotado: 0 disponibles · 2 pendientes · 1 vendida · 0 usadas",
+    );
+    expect(within(backstage).getByText("Agotado")).toBeOnTheScreen();
+    expect(screen.getAllByText("Agotado")).toHaveLength(1);
+  });
+
+  it("la disponibilidad va entre la ventana de uso y las compras", async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([martinConfirmada], { resumenPorTipo: resumen }) },
+    ]);
+    const encabezados = (await screen.findAllByRole("header")).map((h) => h.props.children);
+    const disponibilidad = encabezados.indexOf("Disponibilidad por tipo");
+    expect(disponibilidad).toBeGreaterThan(encabezados.indexOf("Festival Sonidos del Sur"));
+    expect(disponibilidad).toBeLessThan(encabezados.indexOf("Compras"));
+  });
+});
