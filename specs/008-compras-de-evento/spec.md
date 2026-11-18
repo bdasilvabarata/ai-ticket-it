@@ -30,7 +30,8 @@ refresco después de registrar un uso; la restricción de todo esto al organizad
 consultas y la operación del servidor que lo sostienen.
 
 **No incluye**: cancelar o reembolsar una compra confirmada, ni por el comprador ni por el
-organizador (009); el chat de la compra (010); reseñar (011); escanear códigos QR o cualquier
+organizador (009; la 009 también prueba la carrera entre el uso de una entrada y la cancelación
+de su compra confirmada); el chat de la compra (010); reseñar (011); escanear códigos QR o cualquier
 lector físico (el código es texto que se ingresa a mano; el QR llega en el futuro); exportar la
 lista; paginación, búsqueda o filtros dentro de la lista; notificar al
 comprador del uso; deshacer un uso registrado; estadísticas de venta más allá de los disponibles
@@ -157,13 +158,14 @@ de la misma compra siguen como estaban.
 reseñas (011) e impide la cancelación (009). Sin ella, el ciclo de vida de la compra queda
 incompleto.
 
-**Independent Test**: con el reloj del servidor fijado dentro de la ventana permitida (FR-016),
-elegir a Martín y anotar el código de su entrada "VIP" del Festival; elegir a Lucía, abrir las
-compras del Festival, ingresar ese código, confirmar y ver la entrada como "Utilizada"; volver a
-Martín y verificar que su entrada figura "Utilizada"; con una compra de 3 entradas, usar una y
-verificar que las otras dos siguen `CONFIRMADA`; verificar por el lado del servidor que un código
-inexistente, de otro evento, de una entrada no confirmada o ya utilizada se rechaza, y que lo
-intenta otro usuario también.
+**Independent Test**: con el servidor recién arrancado (el seed incluye un evento cuya ventana de
+uso está abierta, FR-016), elegir a Sofía y anotar el código de una de sus dos entradas de ese
+evento; elegir a Lucía, abrir las compras del evento, ingresar ese código, confirmar y ver la
+entrada como "Utilizada"; volver a Sofía y verificar que esa entrada figura "Utilizada" y la otra
+sigue "Confirmada"; en la compra de 3 entradas con 1 ya usada, usar otra y verificar "2 de 3
+entradas usadas"; verificar por el lado del servidor que un código inexistente, de otro evento
+(por ejemplo, uno del Festival, cuya ventana además está cerrada), de una entrada no confirmada o
+ya utilizada se rechaza, y que también se rechaza el intento de otro usuario.
 
 **Acceptance Scenarios**:
 
@@ -361,9 +363,11 @@ verificar el error con reintento.
 - **FR-023**: La pantalla DEBE volver a pedir los datos al volver a enfocarse, y nunca mostrar
   datos de otro usuario tras un cambio de usuario.
 - **FR-024**: Ante un evento inexistente, la app DEBE informarlo y volver a Mis eventos.
-- **FR-025**: Los controles de la pantalla DEBEN ser accesibles (etiqueta en todo control sin
-  texto propio; la acción de registrar uso enfocable por separado de los datos de la fila) y
-  usables en 360 px de ancho.
+- **FR-025**: Las pantallas "Compras del evento" y "Registrar ingreso" DEBEN ser accesibles
+  (etiqueta en todo control sin texto propio; cada fila de compra, no tocable, se lee como un
+  único elemento que resume comprador, tipo, cantidad, total y estado; el campo del código y sus
+  botones, enfocables por separado; cada código se lee de a un carácter) y usables en 360 px de
+  ancho.
 
 ### Key Entities
 
