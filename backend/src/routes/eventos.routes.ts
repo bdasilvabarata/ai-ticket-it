@@ -36,6 +36,13 @@ export function crearEventosRouter(
   router.delete("/:eventoId", requerirUsuario, eventoPorId.middleware, controller.eliminar);
   // Compras (feature 006): en nombre del usuario actual.
   router.post("/:eventoId/compras", requerirUsuario, compraNueva.middleware, controllers.compras.crear);
+  // Compras del evento (feature 008): solo su organizador (el 403 lo decide el service).
+  router.get(
+    "/:eventoId/compras",
+    requerirUsuario,
+    comprasDelEvento.middleware,
+    controllers.compras.comprasDelEvento,
+  );
   router.get(
     "/:eventoId/mis-compras",
     requerirUsuario,

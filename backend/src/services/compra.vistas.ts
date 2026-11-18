@@ -1,13 +1,17 @@
 import {
   EstadoCompra,
   type CambioEstadoCompraVista,
+  type CompraDelEventoVista,
   type CompraVista,
   type MiCompraVista,
+  type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 import type { CambioEstadoCompra, Compra } from "../domain/compra";
 import { diasRestantes } from "../domain/dias-restantes";
-import type { Evento } from "../domain/evento";
+import type { Evento, TipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
+import type { Usuario } from "../domain/usuario";
+import { estadoDeVentana, ventanaDeUso } from "../domain/ventana-de-uso";
 
 // Vistas explícitas de compras (principio V): campos elegidos, nunca la entidad completa.
 
@@ -77,5 +81,45 @@ export function aMiCompraVista(compra: Compra, evento: Evento, ahora: Date): MiC
     ...datosComunes(compra, evento, ahora),
     diasRestantes: confirmada ? diasRestantes(evento.fechaHora, ahora) : null,
     canceladaPor: cancelada ? (compra.fueVencida() ? "sistema" : "usuario") : null,
+  };
+}
+
+/**
+ * Una fila de "Compras del evento" (feature 008): la compra tal como llega (al día), su comprador y
+ * su tipo actual, **sin códigos** de entrada ni historial (FR-012b). `venceEn` solo si está
+ * PENDIENTE y `canceladaPor` solo si está CANCELADA.
+ */
+export function aCompraDelEventoVista(
+  compra: Compra,
+  comprador: Usuario,
+  tipo: TipoEntrada | null,
+): CompraDelEventoVista {
+  const pendiente = compra.estado === EstadoCompra.PENDIENTE;
+  const cancelada = compra.estado === EstadoCompra.CANCELADA;
+  return {
+    id: compra.id,
+    comprador: { id: comprador.id, nombre: comprador.nombre, apellido: comprador.apellido },
+    tipoEntrada: { id: compra.tipoEntradaId, nombre: tipo?.nombre ?? "" },
+    cantidad: compra.cantidad,
+    total: compra.total,
+    estado: compra.estado,
+    creadaEn: compra.creadaEn.toISOString(),
+    creadaEnLocal: horaDeBuenosAires(compra.creadaEn),
+    venceEn: pendiente ? compra.venceEn.toISOString() : null,
+    venceEnLocal: pendiente ? horaDeBuenosAires(compra.venceEn) : null,
+    canceladaPor: cancelada ? (compra.fueVencida() ? "sistema" : "usuario") : null,
+    entradasUsadas: compra.entradas.filter((entrada) => entrada.usadaEn !== null).length,
+  };
+}
+
+/** La ventana de uso de un evento que empieza en `fechaHora`, con su estado en `ahora` (FR-016). */
+export function aVentanaDeUsoVista(fechaHora: Date, ahora: Date): VentanaDeUsoVista {
+  const ventana = ventanaDeUso(fechaHora);
+  return {
+    desde: ventana.desde.toISOString(),
+    hasta: ventana.hasta.toISOString(),
+    desdeLocal: horaDeBuenosAires(ventana.desde),
+    hastaLocal: horaDeBuenosAires(ventana.hasta),
+    estado: estadoDeVentana(ventana, ahora),
   };
 }

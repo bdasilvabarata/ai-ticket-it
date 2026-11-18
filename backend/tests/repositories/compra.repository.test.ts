@@ -120,6 +120,24 @@ describe("CompraRepository (en memoria)", () => {
     expect(await repositorio.listarPendientesPorEventos([])).toEqual([]);
   });
 
+  it("listarPorEvento: todas las de ese evento, de todos los compradores y en cualquier estado", async () => {
+    const repositorio = new CompraRepository([
+      compra("a-pendiente", EstadoCompra.PENDIENTE),
+      compra("a-cancelada", EstadoCompra.CANCELADA),
+      compra("a-utilizada", EstadoCompra.UTILIZADA, "evento-a", "tipo-a-general", "usuario-sofia"),
+      compra("a-de-diego", EstadoCompra.CONFIRMADA, "evento-a", "tipo-a-vip", "usuario-diego"),
+      compra("b-confirmada", EstadoCompra.CONFIRMADA, "evento-b", "tipo-b-vip"),
+    ]);
+    const ids = (await repositorio.listarPorEvento("evento-a")).map((c) => c.id);
+    expect(ids.toSorted()).toEqual(["a-cancelada", "a-de-diego", "a-pendiente", "a-utilizada"]);
+  });
+
+  it("listarPorEvento: un evento sin compras → []", async () => {
+    const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
+    expect(await repositorio.listarPorEvento("evento-b")).toEqual([]);
+    expect(await new CompraRepository().listarPorEvento("evento-a")).toEqual([]);
+  });
+
   it("guardar reemplaza la instancia del mismo id", async () => {
     const pendiente = compra("compra-1", EstadoCompra.PENDIENTE);
     const repositorio = new CompraRepository([pendiente]);

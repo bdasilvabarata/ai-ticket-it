@@ -715,3 +715,71 @@ describe("EventoService: cupo al día con compras vencidas (feature 006, R3)", (
     });
   });
 });
+
+describe("EventoService.leerDelOrganizador (feature 008, R6)", () => {
+  const MINUTO = 60 * 1000;
+  const vip = (cupo: number) => tipo({ id: "tipo-a-vip", nombre: "VIP", cupo });
+  /** 2 VIP de Martín, PENDIENTE desde AHORA: vence a los 15 minutos. */
+  const pendienteDe2 = () =>
+    compra("evento-a", "tipo-a-vip", EstadoCompra.PENDIENTE, { id: "compra-pendiente", cantidad: 2 });
+
+  function armar() {
+    return crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a", tiposEntrada: [vip(48)] })],
+      compras: [pendienteDe2()],
+    });
+  }
+
+  it("evento inexistente → 404 EVENTO_NO_ENCONTRADO, antes que el permiso", async () => {
+    const { eventoService } = armar();
+    await expect(eventoService.leerDelOrganizador("evento-x", "usuario-martin", AHORA)).rejects.toMatchObject(
+      {
+        constructor: NoEncontradoError,
+        codigo: "EVENTO_NO_ENCONTRADO",
+      },
+    );
+  });
+
+  it("otro usuario → 403 con el mensaje de las compras", async () => {
+    const { eventoService } = armar();
+    await expect(eventoService.leerDelOrganizador("evento-a", "usuario-martin", AHORA)).rejects.toMatchObject(
+      {
+        constructor: SinPermisoError,
+        codigo: "SIN_PERMISO",
+        mensaje: "Solo el organizador del evento puede ver sus compras.",
+      },
+    );
+  });
+
+  it("el organizador → el evento con el cupo al día (el mismo que obtener)", async () => {
+    const { eventoService } = armar();
+    const ahora = new Date(AHORA.getTime() + 15 * MINUTO);
+    const alDia = await eventoService.leerDelOrganizador("evento-a", "usuario-lucia", ahora);
+    expect(alDia.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(50);
+    const antes = await eventoService.leerDelOrganizador(
+      "evento-a",
+      "usuario-lucia",
+      new Date(AHORA.getTime() + 14 * MINUTO),
+    );
+    expect(antes.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(48);
+  });
+
+  it("no guarda nada ni toma el cerrojo", async () => {
+    const { eventoService, repositorioEventos, repositorioCompras, cerrojo } = armar();
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    await eventoService.leerDelOrganizador(
+      "evento-a",
+      "usuario-lucia",
+      new Date(AHORA.getTime() + 15 * MINUTO),
+    );
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(ejecutar).not.toHaveBeenCalled();
+    expect((await repositorioCompras.buscarPorId("compra-pendiente"))?.estado).toBe(EstadoCompra.PENDIENTE);
+    expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
+      48,
+    );
+  });
+});

@@ -542,6 +542,27 @@
           }
         }
       ]
+    },
+    {
+      "name": "Compras del evento",
+      "item": [
+        {
+          "name": "Listar compras (Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Listar compras (otro usuario, 403)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        }
+      ]
     }
   ]
 }

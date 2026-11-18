@@ -65,7 +65,14 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
   });
   const tipoEntradaService = new TipoEntradaService({ eventos, compras, eventoService, cerrojo, reloj });
   // Las compras le piden el evento y su cupo a sus dueños, bajo el mismo cerrojo (research R4).
-  const compraService = new CompraService({ compras, eventoService, tipoEntradaService, cerrojo, reloj });
+  const compraService = new CompraService({
+    compras,
+    eventoService,
+    tipoEntradaService,
+    usuarioService,
+    cerrojo,
+    reloj,
+  });
 
   const controllers = {
     salud: new SaludController(),

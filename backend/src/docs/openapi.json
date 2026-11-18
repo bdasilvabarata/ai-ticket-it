@@ -12,7 +12,8 @@
     { "name": "Categorías", "description": "Catálogo de categorías de eventos" },
     { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
     { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
-    { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" }
+    { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" },
+    { "name": "Compras del evento", "description": "Las compras de un evento, para su organizador (UC-02)" }
   ],
   "paths": {
     "/salud": {
@@ -591,6 +592,68 @@
                       }
                     }
                   }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Compras del evento"],
+        "summary": "Compras del evento",
+        "description": "Solo el organizador: todas las compras del evento, de todos los compradores y en todos los estados, al día (una PENDIENTE vencida sale CANCELADA por el sistema), con la ventana de uso y el resumen por tipo. También con el evento realizado. Lectura: no guarda nada. Query y cuerpo se ignoran.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Las compras del evento",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ComprasDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador del evento puede ver sus compras."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
                 }
               }
             }
@@ -1706,6 +1769,147 @@
             }
           }
         ]
+      },
+      "CompradorVista": {
+        "type": "object",
+        "description": "Quien hizo la compra (feature 008).",
+        "required": ["id", "nombre", "apellido"],
+        "properties": {
+          "id": { "type": "string", "example": "usuario-martin" },
+          "nombre": { "type": "string", "example": "Martín" },
+          "apellido": { "type": "string", "example": "Benítez" }
+        }
+      },
+      "VentanaDeUsoVista": {
+        "type": "object",
+        "description": "Cuándo se pueden registrar ingresos: desde 4 h antes del inicio hasta 12 h después, ambos extremos inclusive. `estado` según el reloj del servidor al responder.",
+        "required": ["desde", "hasta", "desdeLocal", "hastaLocal", "estado"],
+        "properties": {
+          "desde": { "type": "string", "format": "date-time", "example": "2026-11-18T20:00:00.000Z" },
+          "hasta": { "type": "string", "format": "date-time", "example": "2026-11-19T12:00:00.000Z" },
+          "desdeLocal": {
+            "type": "string",
+            "example": "2026-11-18T17:00",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "hastaLocal": {
+            "type": "string",
+            "example": "2026-11-19T09:00",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "estado": { "type": "string", "enum": ["antes", "abierta", "despues"] }
+        }
+      },
+      "ResumenTipoEntradaVista": {
+        "type": "object",
+        "description": "Cómo viene la venta de un tipo: `disponibles` es el cupo al día; `pendientes`, las entradas de compras PENDIENTE no vencidas; `vendidas`, las de CONFIRMADA y UTILIZADA; `usadas`, las entradas UTILIZADA (subconjunto de vendidas).",
+        "required": ["tipoEntrada", "disponibles", "pendientes", "vendidas", "usadas"],
+        "properties": {
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "General" } }
+          },
+          "disponibles": { "type": "integer", "minimum": 0, "example": 117 },
+          "pendientes": { "type": "integer", "minimum": 0, "example": 0 },
+          "vendidas": { "type": "integer", "minimum": 0, "example": 3 },
+          "usadas": { "type": "integer", "minimum": 0, "example": 1 }
+        }
+      },
+      "CompraDelEventoVista": {
+        "type": "object",
+        "description": "Una fila de \"Compras del evento\": la compra al día con su comprador, sin códigos de entrada ni historial.",
+        "required": [
+          "id",
+          "comprador",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "creadaEnLocal",
+          "venceEn",
+          "venceEnLocal",
+          "canceladaPor",
+          "entradasUsadas"
+        ],
+        "properties": {
+          "id": { "type": "string", "example": "compra-martin-festival-vip" },
+          "comprador": { "$ref": "#/components/schemas/CompradorVista" },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "General" } }
+          },
+          "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "example": "2026-11-18T18:20:00.000Z" },
+          "creadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T15:35",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "canceladaPor": {
+            "type": "string",
+            "enum": ["sistema", "usuario"],
+            "nullable": true,
+            "description": "Solo en CANCELADA: el sistema si venció sin pagarse, si no, su comprador; si no, null"
+          },
+          "entradasUsadas": { "type": "integer", "minimum": 0, "example": 0 }
+        }
+      },
+      "ComprasDelEventoVista": {
+        "type": "object",
+        "description": "Todas las compras de un evento, al día, para su organizador.",
+        "required": ["evento", "ventanaDeUso", "resumenPorTipo", "compras"],
+        "properties": {
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-festival-sonidos-del-sur" },
+              "nombre": { "type": "string", "example": "Festival Sonidos del Sur" },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-22T19:00",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": { "type": "boolean" }
+            }
+          },
+          "ventanaDeUso": { "$ref": "#/components/schemas/VentanaDeUsoVista" },
+          "resumenPorTipo": {
+            "type": "array",
+            "description": "Uno por tipo, en el orden del evento.",
+            "items": { "$ref": "#/components/schemas/ResumenTipoEntradaVista" }
+          },
+          "compras": {
+            "type": "array",
+            "description": "De la más nueva a la más vieja (desempate por id).",
+            "items": { "$ref": "#/components/schemas/CompraDelEventoVista" }
+          }
+        }
       }
     },
     "responses": {

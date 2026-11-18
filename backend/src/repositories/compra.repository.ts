@@ -55,6 +55,10 @@ export class CompraRepository implements RepositorioCompras {
     return [...this.#compras.values()].filter((compra) => compra.compradorId === compradorId);
   }
 
+  async listarPorEvento(eventoId: string): Promise<Compra[]> {
+    return [...this.#compras.values()].filter((compra) => compra.eventoId === eventoId);
+  }
+
   async listarPendientesPorEventos(eventoIds: readonly string[]): Promise<Compra[]> {
     const ids = new Set(eventoIds);
     return [...this.#compras.values()].filter(

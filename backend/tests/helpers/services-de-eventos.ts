@@ -73,6 +73,7 @@ export function crearServicesDeEventos({
     compras: repositorioCompras,
     eventoService,
     tipoEntradaService,
+    usuarioService,
     cerrojo,
     reloj,
   });
@@ -81,6 +82,7 @@ export function crearServicesDeEventos({
     eventoService,
     tipoEntradaService,
     compraService,
+    usuarioService,
     cerrojo,
     repositorioEventos,
     repositorioCompras,
