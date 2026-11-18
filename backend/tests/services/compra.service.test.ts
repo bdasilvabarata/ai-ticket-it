@@ -109,6 +109,24 @@ describe("CompraService.crear", () => {
     expect(await repositorioCompras.listarPorEventoYComprador("evento-a", "usuario-sofia")).toHaveLength(2);
   });
 
+  it("la compra guardada tiene una entrada por unidad con los códigos que dio el repositorio (008)", async () => {
+    const { compraService, repositorioCompras } = armar();
+    const siguientesCodigos = vi.spyOn(repositorioCompras, "siguientesCodigosDeEntrada");
+
+    const vista = await compraService.crear("evento-a", "usuario-sofia", {
+      tipoEntradaId: "tipo-a-vip",
+      cantidad: 3,
+    });
+
+    expect(siguientesCodigos).toHaveBeenCalledTimes(1);
+    expect(siguientesCodigos).toHaveBeenCalledWith(3);
+    const guardada = await repositorioCompras.buscarPorId(vista.id);
+    expect(guardada?.entradas.map((entrada) => entrada.codigo)).toEqual(
+      siguientesCodigos.mock.results[0]?.value,
+    );
+    expect(guardada?.entradas).toHaveLength(3);
+  });
+
   describe("orden de los rechazos (R2): con dos a la vez, gana el primero", () => {
     /** Ejecuta el alta y verifica el error, y que el cupo y las compras quedaron igual. */
     async function rechazo(

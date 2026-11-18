@@ -42,6 +42,8 @@ export interface RepositorioEventos {
 export interface RepositorioCompras {
   /** Un id nuevo para una compra (UUID v4). */
   siguienteId(): string;
+  /** `cantidad` códigos nuevos, distintos entre sí y de todos los guardados (feature 008, R2). */
+  siguientesCodigosDeEntrada(cantidad: number): string[];
   buscarPorId(id: string): Promise<Compra | null>;
   /** Las compras de esa persona en ese evento, en cualquier estado (posiblemente ninguna). */
   listarPorEventoYComprador(eventoId: string, compradorId: string): Promise<Compra[]>;

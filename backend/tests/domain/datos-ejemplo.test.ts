@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { crearDatosEjemplo } from "../../src/seed/datos-ejemplo";
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
+import { esCodigoValido } from "../../src/domain/codigo-de-entrada";
 import { Compra } from "../../src/domain/compra";
 import { Evento, TipoEntrada } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
@@ -201,6 +202,13 @@ describe("crearDatosEjemplo", () => {
       },
     ]);
     expect(vencida?.fueVencida()).toBe(true);
+  });
+
+  it("cada compra tiene una entrada por unidad, con códigos válidos y distintos entre todas (008, R2)", () => {
+    for (const compra of compras) expect(compra.entradas).toHaveLength(compra.cantidad);
+    const codigos = compras.flatMap((compra) => compra.entradas.map((entrada) => entrada.codigo));
+    expect(codigos.every(esCodigoValido)).toBe(true);
+    expect(new Set(codigos).size).toBe(codigos.length);
   });
 
   it("ninguna compra queda PENDIENTE y los cupos del Festival siguen VIP 50 y Backstage 3", () => {

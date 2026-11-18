@@ -1,8 +1,9 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
-import { Compra } from "../../src/domain/compra";
+import { ALFABETO_DE_CODIGO, esCodigoValido } from "../../src/domain/codigo-de-entrada";
+import { Compra, Entrada } from "../../src/domain/compra";
 import { CompraRepository } from "../../src/repositories/compra.repository";
-import { historialHasta } from "../helpers/eventos";
+import { entradasDePrueba, historialHasta } from "../helpers/eventos";
 
 function compra(
   id: string,
@@ -19,6 +20,7 @@ function compra(
     cantidad: 1,
     total: 1000,
     historial: historialHasta(estado, compradorId),
+    entradas: entradasDePrueba(1),
   });
 }
 
@@ -106,6 +108,7 @@ describe("CompraRepository (en memoria)", () => {
         cantidad: 2,
         total: 2000,
         historial: historialHasta(EstadoCompra.PENDIENTE, "usuario-diego", hace1Dia),
+        entradas: entradasDePrueba(2),
       }),
       compra("a-confirmada", EstadoCompra.CONFIRMADA),
       compra("a-cancelada", EstadoCompra.CANCELADA),
@@ -138,5 +141,51 @@ describe("CompraRepository (en memoria)", () => {
     const segundo = new CompraRepository(iniciales);
     await primero.guardar(compra("compra-2", EstadoCompra.CONFIRMADA, "evento-b", "tipo-b-vip"));
     expect(await segundo.existePorEvento("evento-b")).toBe(false);
+  });
+
+  describe("siguientesCodigosDeEntrada (feature 008, R2)", () => {
+    it("devuelve `cantidad` códigos válidos", () => {
+      const codigos = new CompraRepository().siguientesCodigosDeEntrada(3);
+      expect(codigos).toHaveLength(3);
+      expect(codigos.every(esCodigoValido)).toBe(true);
+    });
+
+    it("son distintos entre sí", () => {
+      const codigos = new CompraRepository().siguientesCodigosDeEntrada(50);
+      expect(new Set(codigos).size).toBe(50);
+    });
+
+    /** Un generador que da, carácter por carácter, los códigos dados en orden. */
+    const darCodigos = (...codigos: string[]) => {
+      const indices = codigos
+        .join("")
+        .split("")
+        .map((caracter) => ALFABETO_DE_CODIGO.indexOf(caracter));
+      return () => {
+        const indice = indices.shift();
+        if (indice === undefined) throw new Error("El generador se quedó sin códigos.");
+        return indice;
+      };
+    };
+
+    it("reintenta si el código ya está guardado en otra compra", () => {
+      const guardada = new Compra({
+        id: "compra-guardada",
+        compradorId: "usuario-martin",
+        eventoId: "evento-a",
+        tipoEntradaId: "tipo-a-general",
+        cantidad: 1,
+        total: 1000,
+        historial: historialHasta(EstadoCompra.CONFIRMADA, "usuario-martin"),
+        entradas: [new Entrada({ codigo: "AAAAAAAA" })],
+      });
+      const repositorio = new CompraRepository([guardada], darCodigos("AAAAAAAA", "BBBBBBBB"));
+      expect(repositorio.siguientesCodigosDeEntrada(1)).toEqual(["BBBBBBBB"]);
+    });
+
+    it("reintenta si el código ya salió en el mismo pedido", () => {
+      const repositorio = new CompraRepository([], darCodigos("CCCCCCCC", "CCCCCCCC", "DDDDDDDD"));
+      expect(repositorio.siguientesCodigosDeEntrada(2)).toEqual(["CCCCCCCC", "DDDDDDDD"]);
+    });
   });
 });

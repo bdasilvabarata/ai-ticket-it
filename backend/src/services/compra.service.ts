@@ -83,6 +83,7 @@ export class CompraService {
         eventoId,
         tipo,
         cantidad,
+        codigos: this.#compras.siguientesCodigosDeEntrada(cantidad),
         ahora,
       });
       await this.#compras.guardar(compra);

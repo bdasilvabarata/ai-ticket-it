@@ -1,6 +1,7 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { ReglaDeNegocioError } from "./errores";
 import type { TipoEntrada } from "./evento";
+import { esCodigoValido } from "./codigo-de-entrada";
 import { esEnteroNoNegativo, Invariantes } from "./invariantes";
 
 /** Quién hizo un cambio de estado: un usuario o el sistema (el vencimiento). */
@@ -23,6 +24,8 @@ export interface PropiedadesCompra {
   total: number;
   /** En orden cronológico; el primero es siempre PENDIENTE. Es la única fuente del estado (R5). */
   historial: CambioEstadoCompra[];
+  /** Una por unidad (`entradas.length === cantidad`), cada una con su código (feature 008, R1). */
+  entradas: readonly Entrada[];
 }
 
 /** Lo que necesita `Compra.registrar`: el tipo comprado (con su precio vigente) y el instante del alta. */
@@ -32,7 +35,60 @@ export interface DatosDeAlta {
   eventoId: string;
   tipo: TipoEntrada;
   cantidad: number;
+  /** Los códigos de las entradas, uno por unidad: los da el repositorio (R2). */
+  codigos: readonly string[];
   ahora: Date;
+}
+
+export interface PropiedadesEntrada {
+  codigo: string;
+  /** Sus cambios propios, posteriores a la confirmación de la compra (por defecto, ninguno). */
+  cambios?: readonly CambioEstadoCompra[];
+}
+
+/**
+ * Una entrada de una compra (feature 008, R1): vive dentro del agregado `Compra` y se guarda con
+ * él. Su código es su identificador (único en el sistema). Su estado se deriva: igual al de la
+ * compra hasta que esta se confirma; después, el de su último cambio propio o `CONFIRMADA`.
+ */
+export class Entrada {
+  readonly codigo: string;
+  readonly cambios: readonly CambioEstadoCompra[];
+
+  constructor({ codigo, cambios = [] }: PropiedadesEntrada) {
+    this.codigo = codigo;
+    this.cambios = Object.freeze(cambios.map((cambio) => Object.freeze({ ...cambio })));
+  }
+
+  /** El estado de esta entrada en `compra` (FR-012a): no se guarda dos veces, no se desincroniza. */
+  estadoEn(compra: Compra): EstadoCompra {
+    if (compra.estado !== EstadoCompra.CONFIRMADA && compra.estado !== EstadoCompra.UTILIZADA) {
+      return compra.estado;
+    }
+    return this.cambios[this.cambios.length - 1]?.estado ?? EstadoCompra.CONFIRMADA;
+  }
+
+  /** Cuándo se registró su uso, o `null`. */
+  get usadaEn(): Date | null {
+    return this.cambios.find((cambio) => cambio.estado === EstadoCompra.UTILIZADA)?.fechaHora ?? null;
+  }
+}
+
+/**
+ * Tantas entradas como la cantidad (si la cantidad es válida; si no, ya lo informa ese campo),
+ * códigos con formato y distintos, y cambios propios solo si la compra llegó a CONFIRMADA.
+ */
+function sonEntradasValidas(propiedades: PropiedadesCompra): boolean {
+  const { entradas, cantidad, historial } = propiedades;
+  const cantidadValida = Number.isInteger(cantidad) && cantidad >= 1;
+  const codigos = entradas.map((entrada) => entrada.codigo);
+  const llegoAConfirmada = historial.some((cambio) => cambio.estado === EstadoCompra.CONFIRMADA);
+  return (
+    (!cantidadValida || entradas.length === cantidad) &&
+    codigos.every(esCodigoValido) &&
+    new Set(codigos).size === codigos.length &&
+    (llegoAConfirmada || entradas.every((entrada) => entrada.cambios.length === 0))
+  );
 }
 
 const ESTADOS = new Set<string>(Object.values(EstadoCompra));
@@ -59,7 +115,8 @@ function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
  * nueva. El alta es `Compra.registrar` (PENDIENTE). Transiciones de esta feature:
  * `PENDIENTE → CONFIRMADA` (el pago del comprador), `PENDIENTE → CANCELADA` por el sistema
  * (vencimiento a los 15 minutos) y `PENDIENTE → CANCELADA` por el comprador (la cancela antes de
- * pagarla); las de la 008 y la 009 se suman después.
+ * pagarla); las de la 008 y la 009 se suman después. Desde la 008 lleva sus `entradas`, una por unidad
+ * con su código; sus transiciones las conservan.
  */
 export class Compra {
   readonly id: string;
@@ -69,6 +126,7 @@ export class Compra {
   readonly cantidad: number;
   readonly total: number;
   readonly historial: readonly CambioEstadoCompra[];
+  readonly entradas: readonly Entrada[];
 
   constructor(propiedades: PropiedadesCompra) {
     new Invariantes()
@@ -83,6 +141,11 @@ export class Compra {
         "historial",
         "Debe empezar en PENDIENTE, con estados válidos y fechas válidas no decrecientes.",
       )
+      .exigir(
+        sonEntradasValidas(propiedades),
+        "entradas",
+        "Debe haber una por unidad, con códigos válidos y distintos, y cambios propios solo si la compra se confirmó.",
+      )
       .verificar();
     this.id = propiedades.id;
     this.compradorId = propiedades.compradorId;
@@ -91,6 +154,7 @@ export class Compra {
     this.cantidad = propiedades.cantidad;
     this.total = propiedades.total;
     this.historial = Object.freeze(propiedades.historial.map((cambio) => Object.freeze({ ...cambio })));
+    this.entradas = Object.freeze([...propiedades.entradas]);
   }
 
   /**
@@ -98,7 +162,7 @@ export class Compra {
    * historial arranca en PENDIENTE por el comprador en `ahora`. Las reglas de la compra (realizado,
    * propio evento, tope y cupo) ya las verificaron el evento y el service.
    */
-  static registrar({ id, compradorId, eventoId, tipo, cantidad, ahora }: DatosDeAlta): Compra {
+  static registrar({ id, compradorId, eventoId, tipo, cantidad, codigos, ahora }: DatosDeAlta): Compra {
     return new Compra({
       id,
       compradorId,
@@ -113,7 +177,13 @@ export class Compra {
           fechaHora: ahora,
         },
       ],
+      entradas: codigos.map((codigo) => new Entrada({ codigo })),
     });
+  }
+
+  /** El estado derivado de la entrada con ese código, o `null` si no es de esta compra. */
+  estadoDeEntrada(codigo: string): EstadoCompra | null {
+    return this.entradas.find((entrada) => entrada.codigo === codigo)?.estadoEn(this) ?? null;
   }
 
   /** El estado del último cambio. */
@@ -227,6 +297,7 @@ export class Compra {
       cantidad: this.cantidad,
       total: this.total,
       historial: [...this.historial, cambio],
+      entradas: this.entradas,
     });
   }
 }

@@ -4,6 +4,7 @@ import { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import { TipoEntrada } from "../../src/domain/evento";
 import { entradasRestantes, exigirTopePorPersona } from "../../src/domain/tope-por-persona";
+import { entradasDePrueba } from "../helpers/eventos";
 
 const AHORA = new Date("2026-11-10T15:00:00.000Z");
 const autor = { tipo: "usuario", usuarioId: "usuario-martin" } as const;
@@ -32,6 +33,7 @@ function vigente(
     cantidad,
     total,
     historial: estado === EstadoCompra.PENDIENTE ? [alta] : [alta, { estado, autor, fechaHora: AHORA }],
+    entradas: entradasDePrueba(cantidad),
   });
 }
 

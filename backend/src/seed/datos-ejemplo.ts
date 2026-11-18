@@ -1,6 +1,6 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { Categoria, type DatosCategoria } from "../domain/categoria";
-import { Compra } from "../domain/compra";
+import { Compra, Entrada } from "../domain/compra";
 import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../domain/hora-buenos-aires";
 import { Usuario, type DatosUsuario } from "../domain/usuario";
@@ -213,6 +213,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { estado: EstadoCompra.PENDIENTE, autor: porMartin, fechaHora: haceMartin },
         { estado: EstadoCompra.CONFIRMADA, autor: porMartin, fechaHora: masMinutos(haceMartin, 5) },
       ],
+      entradas: [new Entrada({ codigo: "FSVP7M01" }), new Entrada({ codigo: "FSVP7M02" })],
     }),
     new Compra({
       id: "compra-diego-festival-general",
@@ -233,6 +234,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
           fechaHora: masMinutos(haceDiego, LIMITES_COMPRA.minutosParaPagar),
         },
       ],
+      entradas: [new Entrada({ codigo: "FSGD1E60" })],
     }),
   ];
 
