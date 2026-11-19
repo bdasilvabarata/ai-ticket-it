@@ -243,7 +243,7 @@ el resumen, informa un evento inexistente y nunca mezcla usuarios.
 con otro usuario y volver → aparece; servidor caído → error con reintento; evento borrado → aviso y
 vuelta a Mis eventos.
 
-- [ ] T036 [US4] Test en `mobile/tests/pantallas/compras-del-evento.test.tsx` (se amplía). Casos:
+- [X] T036 [US4] Test en `mobile/tests/pantallas/compras-del-evento.test.tsx` (se amplía). Casos:
   - **vacío** (FR-022): sin compras, la ventana y el resumen se ven igual y la lista dice "Todavía nadie compró entradas" (el vacío **no** reemplaza la pantalla);
   - **foco** (FR-023, US4-3): ir a "Registrar ingreso" (u otra pantalla) y volver hace un segundo `GET …/compras`; el primer foco no duplica el pedido del montaje;
   - **después de un uso** (US3-9): registrar un ingreso y volver → la lista muestra la compra `UTILIZADA` con "1 de N entradas usadas" y el resumen con la usada;

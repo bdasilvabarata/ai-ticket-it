@@ -8,6 +8,11 @@ import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../compon
 import { CampoDeTexto } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { TarjetaEntrada } from "../componentes/TarjetaEntrada";
+import {
+  esEventoInexistente,
+  salirPorEventoInexistente,
+  useSalirSiNoExisteElEvento,
+} from "../evento-inexistente";
 import { normalizarCodigo, textoMotivoNoUsable } from "../formato";
 import { useRegistrarUso } from "../mutaciones";
 import { useEntradaDelEvento } from "../useEntradaDelEvento";
@@ -36,6 +41,7 @@ function Ingreso({ usuarioId, eventoId }: { usuarioId: string; eventoId: string 
   const consulta = useEntradaDelEvento(usuarioId, eventoId, codigo);
   const registrar = useRegistrarUso(usuarioId, eventoId);
   const normalizado = normalizarCodigo(texto);
+  useSalirSiNoExisteElEvento(consulta.error);
 
   const buscar = () => {
     setAviso(null);
@@ -60,12 +66,17 @@ function Ingreso({ usuarioId, eventoId }: { usuarioId: string; eventoId: string 
               campo.current?.focus();
             },
             // El servidor manda: su mensaje (ya utilizada, fuera de horario…); la entrada se vuelve a pedir.
-            onError: (error) =>
+            onError: (error) => {
+              if (esEventoInexistente(error)) {
+                salirPorEventoInexistente();
+                return;
+              }
               setAviso({
                 tipo: "error",
                 mensaje:
                   error instanceof ErrorDeApi ? error.mensaje : "No se pudo registrar. Probá de nuevo.",
-              }),
+              });
+            },
           });
         },
       },

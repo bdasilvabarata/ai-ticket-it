@@ -1,7 +1,13 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
-import { fireEvent, screen, waitFor, within } from "expo-router/testing-library";
+import { router } from "expo-router";
+import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 
-import { compraDelEvento, comprasDelFestival, ventanaDelFestival } from "../helpers/compras";
+import {
+  compraDelEvento,
+  comprasDelFestival,
+  entradaDelEvento,
+  ventanaDelFestival,
+} from "../helpers/compras";
 import {
   errorApi,
   festival,
@@ -11,10 +17,10 @@ import {
   nocheDeRock,
 } from "../helpers/eventos";
 import { porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
-import { tituloDelHeader } from "../helpers/formulario";
+import { alertasCon, escribir, espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { lucia, todos } from "../helpers/usuarios";
+import { diego, lucia, todos } from "../helpers/usuarios";
 
 // "Compras del evento" (feature 008, US1; contracts/app.md, "`ComprasDelEvento`").
 
@@ -23,8 +29,11 @@ type Lista = (RespuestaFalsa | FuncionRespuesta)[];
 const RUTA = "/eventos/evento-festival/compras";
 const FILA_FESTIVAL = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 
-/** Abre Mis eventos con Lucía, toca el Festival (editable) y después "Ver compras". */
-async function abrirComprasDelFestival(compras: Lista) {
+/**
+ * Abre Mis eventos con Lucía, toca el Festival (editable) y después "Ver compras". `extra` suma o
+ * reemplaza rutas del servidor falso.
+ */
+async function abrirComprasDelFestival(compras: Lista, extra: Record<string, Lista> = {}) {
   const resultado = await renderConDependencias({
     usuarioRecordado: lucia.id,
     respuestas: porRuta({
@@ -34,6 +43,7 @@ async function abrirComprasDelFestival(compras: Lista) {
       "/categorias": [{ status: 200, json: [{ id: "categoria-musica", nombre: "Música", descripcion: "" }] }],
       [RUTA]: compras,
       "/eventos/evento-festival": [{ status: 200, json: festivalCompleto }],
+      ...extra,
     }),
   });
   await esperarPestanas();
@@ -278,5 +288,163 @@ describe("Compras del evento: disponibilidad por tipo (feature 008, US2)", () =>
     const disponibilidad = encabezados.indexOf("Disponibilidad por tipo");
     expect(disponibilidad).toBeGreaterThan(encabezados.indexOf("Festival Sonidos del Sur"));
     expect(disponibilidad).toBeLessThan(encabezados.indexOf("Compras"));
+  });
+});
+
+describe("Compras del evento: al día y ante fallas (feature 008, US4)", () => {
+  const ENTRADA = "/eventos/evento-festival/entradas/7K3MQ9TB";
+  const USO = `${ENTRADA}/uso`;
+  const CAMPO = "Código de la entrada";
+  const CONFIRMAR = "¿Registrar el ingreso?";
+  const NO_EXISTE = "No existe el evento.";
+  const noExiste: RespuestaFalsa = { status: 404, json: errorApi("EVENTO_NO_ENCONTRADO", NO_EXISTE) };
+  const resumenGeneral = (usadas: number) => [
+    {
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      disponibles: 117,
+      pendientes: 0,
+      vendidas: 3,
+      usadas,
+    },
+  ];
+
+  type Resultado = Awaited<ReturnType<typeof abrirComprasDelFestival>>;
+
+  async function irARegistrarIngreso(resultado: Resultado) {
+    await fireEvent.press(await screen.findByRole("button", { name: "Registrar ingreso" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-festival/ingreso"));
+  }
+
+  async function buscar(texto: string) {
+    await escribir(CAMPO, texto);
+    await fireEvent.press(screen.getByRole("button", { name: "Buscar" }));
+  }
+
+  it("sin compras se ven la ventana y el resumen, y la lista dice el vacío (FR-022)", async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([], { resumenPorTipo: resumenGeneral(0) }) },
+    ]);
+    expect(await screen.findByText("Todavía nadie compró entradas")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Festival Sonidos del Sur" })).toBeOnTheScreen();
+    expect(screen.getByText("Podés registrar ingresos desde el 10/12 10:00")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Disponibilidad por tipo" })).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Compras" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Registrar ingreso" })).toBeOnTheScreen();
+  });
+
+  it("volver a la pantalla vuelve a pedir la lista; el primer foco no duplica el pedido (FR-023)", async () => {
+    const resultado = await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([martinConfirmada]) },
+    ]);
+    await screen.findByText("Martín Benítez");
+    expect(pedidosDeLaLista(resultado)).toHaveLength(1);
+
+    await irARegistrarIngreso(resultado);
+    expect(pedidosDeLaLista(resultado)).toHaveLength(1);
+    await act(() => router.back());
+
+    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(pedidosDeLaLista(resultado)).toHaveLength(2));
+  });
+
+  it("después de registrar un ingreso, al volver la compra está UTILIZADA y el resumen la cuenta (US3-9)", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival(
+      [
+        { status: 200, json: comprasDelFestival([martinConfirmada], { resumenPorTipo: resumenGeneral(0) }) },
+        {
+          status: 200,
+          json: comprasDelFestival([compraDelEvento({ estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 })], {
+            resumenPorTipo: resumenGeneral(1),
+          }),
+        },
+      ],
+      {
+        [USO]: [{ status: 200, json: entradaDelEvento({ estado: EstadoCompra.UTILIZADA }) }],
+        [ENTRADA]: [{ status: 200, json: entradaDelEvento() }],
+      },
+    );
+    await screen.findByText("Martín Benítez");
+    await irARegistrarIngreso(resultado);
+    await buscar("7K3MQ9TB");
+    await fireEvent.press(await screen.findByRole("button", { name: "Registrar ingreso" }));
+    await tocarEnAlerta(alertas, CONFIRMAR, "Registrar");
+    await screen.findByText("Ingreso registrado: Martín Benítez · General");
+
+    await act(() => router.back());
+
+    const utilizada = await screen.findByLabelText(
+      "Martín Benítez, General, 3 entradas, $ 18.000, Utilizada",
+    );
+    expect(within(utilizada).getByText("1 de 3 entradas usadas")).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText("General: 117 disponibles · 0 pendientes · 3 vendidas · 1 usada"),
+    ).toBeOnTheScreen();
+  });
+
+  it('un 404 del evento avisa "No existe el evento." y vuelve a Mis eventos (FR-024)', async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([noExiste]);
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, NO_EXISTE)).toHaveLength(1);
+  });
+
+  it("en Registrar ingreso, un 404 del evento al buscar también vuelve a Mis eventos", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([]) }], {
+      [ENTRADA]: [noExiste],
+    });
+    await irARegistrarIngreso(resultado);
+    await buscar("7K3MQ9TB");
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, NO_EXISTE)).toHaveLength(1);
+  });
+
+  it("en Registrar ingreso, un 404 del evento al registrar también vuelve a Mis eventos", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([]) }], {
+      [USO]: [noExiste],
+      [ENTRADA]: [{ status: 200, json: entradaDelEvento() }],
+    });
+    await irARegistrarIngreso(resultado);
+    await buscar("7K3MQ9TB");
+    await fireEvent.press(await screen.findByRole("button", { name: "Registrar ingreso" }));
+    await tocarEnAlerta(alertas, CONFIRMAR, "Registrar");
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, NO_EXISTE)).toHaveLength(1);
+  });
+
+  it("al cambiar de usuario nunca se ven las compras de Lucía y el pedido lleva el usuario nuevo (US4-4)", async () => {
+    const delUsuario = (init: RequestInit | undefined) =>
+      (init?.headers as Record<string, string> | undefined)?.["X-Usuario-Id"];
+    const resultado = await abrirComprasDelFestival(
+      [
+        (_url, init) =>
+          delUsuario(init) === diego.id
+            ? "colgar"
+            : { status: 200, json: comprasDelFestival([martinConfirmada]) },
+      ],
+      {
+        "/usuarios/actual": [
+          (_url, init) => ({ status: 200, json: delUsuario(init) === diego.id ? diego : lucia }),
+        ],
+      },
+    );
+    await screen.findByText("Martín Benítez");
+
+    await act(() => router.navigate("/perfil"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Cambiar usuario" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Diego Fernández" }));
+    expect(await screen.findByText("Diego Fernández")).toBeOnTheScreen();
+    await act(() =>
+      router.push({ pathname: "/eventos/[eventoId]/compras", params: { eventoId: "evento-festival" } }),
+    );
+
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(screen.queryByText("Martín Benítez")).toBeNull();
+    expect(pedidosDeLaLista(resultado).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
   });
 });

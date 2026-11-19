@@ -7,8 +7,10 @@ import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
 import { ResumenPorTipo } from "../componentes/ResumenPorTipo";
+import { useSalirSiNoExisteElEvento } from "../evento-inexistente";
 import { textoVentanaDeUso } from "../formato";
 import { useComprasDelEvento } from "../useComprasDelEvento";
+import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
  * "Compras del evento" (feature 008, UC-02): todas las compras de un evento propio, al día, con la
@@ -26,6 +28,9 @@ const SIN_COMPRAS = "Todavía nadie compró entradas";
 
 function ListaDeComprasDelEvento({ usuarioId, eventoId }: { usuarioId: string; eventoId: string }) {
   const consulta = useComprasDelEvento(usuarioId, eventoId);
+  // Al volver (de "Registrar ingreso" u otra pantalla) refleja compras, usos y vencimientos (FR-023).
+  useRefrescarAlFocalizar(consulta.refetch);
+  useSalirSiNoExisteElEvento(consulta.error);
   return (
     <View style={estilos.pantalla}>
       {/*
