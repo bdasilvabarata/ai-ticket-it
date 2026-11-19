@@ -140,7 +140,11 @@ function Accion({
 }) {
   const motivo = textoMotivoNoUsable(entrada);
   if (motivo !== null) {
-    return <Text style={estilos.motivo}>{motivo}</Text>;
+    return (
+      <Text style={estilos.motivo} accessibilityLiveRegion="polite">
+        {motivo}
+      </Text>
+    );
   }
   return (
     <Boton
