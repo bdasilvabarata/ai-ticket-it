@@ -17,8 +17,8 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 004 | **Crear evento** con tipos de entrada (precio y cupo) y catálogo de categorías | UC-04 | P1 | 001, 003 | integrada |
 | 005 | **Explorar eventos**: búsqueda textual, filtro por categoría, detalle del evento y ordenamiento por precio, fecha y puntaje del organizador | UC-03, UC-11 | P1 | 001, 003, 004 (categorías, detalle del evento y cupo) | integrada |
 | 006 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (cerrojo por evento y compra mínima), 005 (detalle del evento) | integrada |
-| 007 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 006 | en PR |
-| 008 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 004, 006 | tasks |
+| 007 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 006 | integrada |
+| 008 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 004, 006 | en PR |
 | 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | pendiente |
 | 010 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 007, 008 | pendiente |
 | 011 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008 | pendiente |
@@ -84,10 +84,15 @@ graph LR
   jest-expo necesita configurar `transformIgnorePatterns` para transformar `@ai-ticket-it/shared`.
 - 006: ~~¿cuánto dura una compra `PENDIENTE` sin pagar? ¿expira y libera cupo?~~ Resuelta en su
   clarify: vence a los 15 minutos y libera el cupo; se puede pagar aunque el evento haya empezado.
-- 008: ¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
-  evento)? ¿con qué dato la identifica?
+- 008: ~~¿desde cuándo puede el organizador registrar el uso de una entrada (solo el día del
+  evento)? ¿con qué dato la identifica?~~ Resuelta en su clarify: dentro de la ventana de uso
+  (desde 4 h antes hasta 12 h después del inicio, inclusive), por **entrada**, con el código de 8
+  caracteres que solo ve el comprador; con la primera entrada usada la compra pasa a `UTILIZADA`.
 - 009: ¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
-  organizador? Plazo **decidido** (revisión del plan de la 006): el de la constitución, hasta que el
+  organizador? Hoy `POST /compras/:compraId/cancelacion` (006) solo acepta una `PENDIENTE` y la app
+  muestra "Cancelar compra" solo en ellas: cancelar una `CONFIRMADA` es de la 009, que también
+  tiene que rechazar la cancelación de una entrada ya usada (una `UTILIZADA` nunca se cancela,
+  008) y correr bajo el cerrojo del evento, como el uso. Plazo **decidido** (revisión del plan de la 006): el de la constitución, hasta que el
   evento empieza o la entrada se usa, sin plazo extra. Una `PENDIENTE` vence a los 15 minutos (006).
 - 011: ¿se puede editar o borrar una reseña?
 
