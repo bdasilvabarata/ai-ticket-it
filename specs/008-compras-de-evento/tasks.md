@@ -268,7 +268,7 @@ muestra datos de otro usuario.
 - [X] T040 Validar a mano las secciones "Pedidos directos" y "Recorrido en la app" de `specs/008-compras-de-evento/quickstart.md` y anotar cualquier desvío debajo de esta tarea.
   - "Pedidos directos" (2026-11-18, `npm start` con el seed, curl): los 12 pedidos dan lo esperado, sin desvíos. Peña con la ventana `abierta`, General 117 · 0 · 3 · 1 y Con cena 38 · 0 · 2 · 0; Martín `403`, sin header `401`, evento inexistente `404`; Sofía ve `PRCS2B01`/`PRCS2B02` `CONFIRMADA`; `prcs-2b01` se encuentra y se usa (`UTILIZADA`), otra vez → `409` "Esta entrada ya se utilizó."; `PRCS2B02` → `200` con el historial `PENDIENTE → CONFIRMADA → UTILIZADA` (un solo cambio `UTILIZADA`); el código de Sofía en el Festival → `404 ENTRADA_NO_ENCONTRADA`; `FSVP7M01` → `409 FUERA_DE_HORARIO_DE_USO` "…desde el 18/12 10:00 hasta el 19/12 02:00."; después, Con cena 38 · 0 · 2 · 2 (cupo sin cambios).
   - "Recorrido en la app" probado a mano en Expo Go (2026-11-19): sin desvíos. Cancelar una compra ya pagada todavía no se puede (no hay botón y el backend responde TRANSICION_INVALIDA): es de la 009, no un desvío.
-- [ ] T041 En `docs/backlog.md`, pasar la 008 a `en PR`, y abrir el PR de `feature/008-compras-de-evento` a `development` con las cuatro verificaciones del CI en verde.
+- [X] T041 En `docs/backlog.md`, pasar la 008 a `en PR`, y abrir el PR de `feature/008-compras-de-evento` a `development` con las cuatro verificaciones del CI en verde.
 
 ---
 
