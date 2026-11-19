@@ -15,8 +15,15 @@ import {
 } from "../../../componentes";
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
+import { ListaDeEntradas } from "../componentes/ListaDeEntradas";
 import { ResumenCompra } from "../componentes/ResumenCompra";
-import { textoAccionDePago, textoCancelada, textoCantidad, textoVencimiento } from "../formato";
+import {
+  textoAccionDePago,
+  textoCancelada,
+  textoCantidad,
+  textoEntradasUsadas,
+  textoVencimiento,
+} from "../formato";
 import { useCancelarCompra, usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
 
@@ -96,17 +103,36 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
         </Text>
       ) : null}
       <ResumenCompra compra={compra} />
+      {conEntradas(compra) ? <TusEntradas compra={compra} /> : null}
       {compra.estado === EstadoCompra.PENDIENTE ? (
         <Pago usuarioId={usuarioId} compra={compra} />
       ) : (
         <View style={estilos.acciones}>
           <Boton variante="aviso" texto="Volver al evento" alPresionar={() => irAlEvento(compra.evento.id)} />
-          {compra.estado === EstadoCompra.CONFIRMADA ? (
+          {conEntradas(compra) ? (
             <Boton variante="texto" texto="Ir a Explorar" alPresionar={irAExplorar} />
           ) : null}
         </View>
       )}
     </PantallaDesplazable>
+  );
+}
+
+/** Una compra pagada (confirmada o con alguna entrada usada): la única que muestra sus códigos (R14). */
+const conEntradas = (compra: CompraVista) =>
+  compra.estado === EstadoCompra.CONFIRMADA || compra.estado === EstadoCompra.UTILIZADA;
+
+function TusEntradas({ compra }: { compra: CompraVista }) {
+  return (
+    <View style={estilos.entradas}>
+      <Text style={estilos.seccion} accessibilityRole="header">
+        Tus entradas
+      </Text>
+      {compra.entradasUsadas > 0 ? (
+        <Text style={estilos.dato}>{textoEntradasUsadas(compra.entradasUsadas, compra.cantidad)}</Text>
+      ) : null}
+      <ListaDeEntradas entradas={compra.entradas} />
+    </View>
   );
 }
 
@@ -192,5 +218,7 @@ const estilos = StyleSheet.create({
   textoAviso: { ...tema.tipografia.mensaje, color: tema.colores.texto, textAlign: "center" },
   mensaje: { ...tema.tipografia.mensaje, color: tema.colores.texto },
   dato: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
+  entradas: { gap: tema.espacio.chico },
+  seccion: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
   acciones: { alignItems: "flex-start", gap: tema.espacio.chico },
 });

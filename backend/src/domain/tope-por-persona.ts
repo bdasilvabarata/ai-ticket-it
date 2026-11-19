@@ -14,7 +14,7 @@ const sumarCantidades = (compras: readonly Compra[]): number =>
  * Cuántas entradas más de `tipo` puede comprar la persona según su tope (no según el cupo). Tipo
  * gratis: 1 menos sus entradas gratis de **ese** tipo. Tipo pago: 4 menos sus entradas pagas de todo
  * el evento. Nunca menos de 0. `vigentes` son sus compras de ese evento que cuentan para el tope
- * (PENDIENTE no vencidas y CONFIRMADA): esta función no filtra por estado.
+ * (PENDIENTE no vencidas, CONFIRMADA y UTILIZADA): esta función no filtra por estado.
  */
 export function entradasRestantes(tipo: TipoEntrada, vigentes: readonly Compra[]): number {
   const restantes = tipo.esGratis()

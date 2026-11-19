@@ -1,11 +1,11 @@
-import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useRef } from "react";
+import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
 import { ListaVacia, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { FilaMiCompra } from "../componentes/FilaMiCompra";
 import { useMisCompras } from "../useMisCompras";
+import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 import { useRefrescarAlVencer } from "../useRefrescarAlVencer";
 
 /**
@@ -19,26 +19,6 @@ export function MisCompras() {
 }
 
 const irAExplorar = () => router.navigate("/");
-
-/**
- * Vuelve a pedir la lista cada vez que la pestaña recupera el foco (R8), salvo el primero: el
- * montaje ya la pidió. Las pestañas no se desmontan al cambiar de una a otra y el `focusManager` de
- * TanStack solo mira el `AppState`. El callback de `useFocusEffect` es estable (lee `refetch` de una
- * ref): si cambiara su identidad estando enfocada, el hook lo volvería a correr y pediría la lista.
- */
-function useRefrescarAlFocalizar(refetch: () => unknown) {
-  const refetchActual = useRef(refetch);
-  useEffect(() => {
-    refetchActual.current = refetch;
-  }, [refetch]);
-  const yaEnfocada = useRef(false);
-  useFocusEffect(
-    useCallback(() => {
-      if (yaEnfocada.current) void refetchActual.current();
-      yaEnfocada.current = true;
-    }, []),
-  );
-}
 
 function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
   const consulta = useMisCompras(usuarioId);

@@ -1,6 +1,14 @@
 // Textos derivados de una compra, puros (sin React ni `Intl`), como los de `eventos`.
 
-import { EstadoCompra, type CompraVista, type MiCompraVista } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  type CompraDelEventoVista,
+  type CompraVista,
+  type EntradaDelEventoVista,
+  type MiCompraVista,
+  type ResumenTipoEntradaVista,
+  type VentanaDeUsoVista,
+} from "@ai-ticket-it/shared";
 
 import { textoPrecio } from "../eventos";
 
@@ -62,6 +70,103 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
     case EstadoCompra.CANCELADA:
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
+    case EstadoCompra.UTILIZADA:
+      return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
+    default:
+      return null;
+  }
+}
+
+// Feature 008: "Compras del evento" (organizador).
+
+/** "2026-11-18T15:20" → "18/11 15:20" (fecha y hora de pared, sin convertir zonas). */
+function diaYHora(fechaHoraLocal: string): string {
+  return `${fechaHoraLocal.slice(8, 10)}/${fechaHoraLocal.slice(5, 7)} ${fechaHoraLocal.slice(11, 16)}`;
+}
+
+/** "2026-11-18T15:20" (hora de pared de Buenos Aires) → "Comprada el 18/11 15:20". */
+export function textoCompradaEl(creadaEnLocal: string): string {
+  return `Comprada el ${diaYHora(creadaEnLocal)}`;
+}
+
+/** Cuándo se pueden registrar ingresos, según el estado que decidió el servidor (contracts/app.md). */
+export function textoVentanaDeUso(ventana: VentanaDeUsoVista): string {
+  switch (ventana.estado) {
+    case "antes":
+      return `Podés registrar ingresos desde el ${diaYHora(ventana.desdeLocal)}`;
+    case "abierta":
+      return `Ingresos habilitados hasta el ${diaYHora(ventana.hastaLocal)}`;
+    case "despues":
+      return `Los ingresos se registraron hasta el ${diaYHora(ventana.hastaLocal)}`;
+  }
+}
+
+/** (1, 3) → "1 de 3 entradas usadas"; (1, 1) → "1 de 1 entrada usada". */
+export function textoEntradasUsadas(usadas: number, cantidad: number): string {
+  return cantidad === 1 ? `${usadas} de 1 entrada usada` : `${usadas} de ${cantidad} entradas usadas`;
+}
+
+/** El aviso que va junto al estado de una fila de "Compras del evento", o `null` si no lleva. */
+export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): string | null {
+  switch (compra.estado) {
+    case EstadoCompra.PENDIENTE:
+      return compra.venceEnLocal === null
+        ? null
+        : `Puede pagarla hasta las ${compra.venceEnLocal.slice(11, 16)}`;
+    case EstadoCompra.CANCELADA:
+      if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
+      return compra.canceladaPor === "usuario" ? "La canceló el comprador" : null;
+    case EstadoCompra.UTILIZADA:
+      return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
+    default:
+      return null;
+  }
+}
+
+/** Cómo viene la venta de un tipo: "117 disponibles · 0 pendientes · 3 vendidas · 1 usada". */
+export function textoResumenDeTipo(resumen: ResumenTipoEntradaVista): string {
+  const contar = (n: number, singular: string) => `${n} ${n === 1 ? singular : `${singular}s`}`;
+  return [
+    contar(resumen.disponibles, "disponible"),
+    contar(resumen.pendientes, "pendiente"),
+    contar(resumen.vendidas, "vendida"),
+    contar(resumen.usadas, "usada"),
+  ].join(" · ");
+}
+
+/** "7K3MQ9TB" → "7K3M-Q9TB": el código en dos grupos, para leerlo y dictarlo. */
+export function textoCodigo(codigo: string): string {
+  return `${codigo.slice(0, 4)}-${codigo.slice(4)}`;
+}
+
+/** "7K3MQ9TB" → "7 K 3 M Q 9 T B": TalkBack lo lee de a un carácter, no como una palabra. */
+export function textoCodigoAccesible(codigo: string): string {
+  return codigo.split("").join(" ");
+}
+
+/** " 7k3m-q9tb " → "7K3MQ9TB" (solo para la clave de la consulta; el servidor normaliza igual). */
+export function normalizarCodigo(texto: string): string {
+  return texto.replace(/[\s-]/g, "").toUpperCase();
+}
+
+/** Por qué no se puede registrar el ingreso con esa entrada, o `null` si se puede (contracts/app.md). */
+export function textoMotivoNoUsable(entrada: EntradaDelEventoVista): string | null {
+  const { ventanaDeUso } = entrada;
+  // La ventana va primero, como en el servidor (409 FUERA_DE_HORARIO_DE_USO antes que el estado).
+  if (ventanaDeUso.estado !== "abierta") {
+    return `El ingreso se registra desde el ${diaYHora(ventanaDeUso.desdeLocal)} hasta el ${diaYHora(ventanaDeUso.hastaLocal)}.`;
+  }
+  switch (entrada.estado) {
+    case EstadoCompra.UTILIZADA:
+      return entrada.usadaEnLocal === null
+        ? "Esta entrada ya se utilizó."
+        : `Esta entrada ya se utilizó el ${diaYHora(entrada.usadaEnLocal)}.`;
+    case EstadoCompra.PENDIENTE:
+      return "La compra de esta entrada todavía no se pagó.";
+    case EstadoCompra.CANCELADA:
+      return "La compra de esta entrada está cancelada.";
+    case EstadoCompra.REEMBOLSADA:
+      return "La compra de esta entrada fue reembolsada.";
     default:
       return null;
   }

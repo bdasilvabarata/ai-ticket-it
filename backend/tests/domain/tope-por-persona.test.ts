@@ -4,6 +4,7 @@ import { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import { TipoEntrada } from "../../src/domain/evento";
 import { entradasRestantes, exigirTopePorPersona } from "../../src/domain/tope-por-persona";
+import { entradasDePrueba } from "../helpers/eventos";
 
 const AHORA = new Date("2026-11-10T15:00:00.000Z");
 const autor = { tipo: "usuario", usuarioId: "usuario-martin" } as const;
@@ -32,6 +33,7 @@ function vigente(
     cantidad,
     total,
     historial: estado === EstadoCompra.PENDIENTE ? [alta] : [alta, { estado, autor, fechaHora: AHORA }],
+    entradas: entradasDePrueba(cantidad),
   });
 }
 
@@ -123,5 +125,15 @@ describe("Tope por persona (R6)", () => {
   it("nunca menos de 0", () => {
     expect(entradasRestantes(general, [vigente("vip", 4, 480000), vigente("general", 2, 90000)])).toBe(0);
     expect(entradasRestantes(kids, [vigente("kids", 1, 0), vigente("kids", 1, 0)])).toBe(0);
+  });
+});
+
+describe("Tope por persona con compras UTILIZADA (feature 008, R9)", () => {
+  it("una compra UTILIZADA es vigente y cuenta para el tope", () => {
+    const confirmada = vigente("vip", 3, 360000);
+    const usada = confirmada.registrarUso(confirmada.entradas[0]!.codigo, "usuario-lucia", AHORA);
+    const vigentes = [usada].filter((compra) => compra.esVigente(AHORA));
+    expect(vigentes).toHaveLength(1);
+    expect(entradasRestantes(general, vigentes)).toBe(1);
   });
 });

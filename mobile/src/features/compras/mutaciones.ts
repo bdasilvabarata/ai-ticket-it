@@ -1,7 +1,7 @@
-import type { DatosCompra } from "@ai-ticket-it/shared";
-import { useMutation, useQueryClient, type Query } from "@tanstack/react-query";
+import type { DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
+import { useMutation, useQueryClient, type Query, type UseMutationResult } from "@tanstack/react-query";
 
-import { cancelarCompra, comprarEntradas, ErrorDeApi, pagarCompra } from "../../api";
+import { cancelarCompra, comprarEntradas, ErrorDeApi, pagarCompra, registrarUsoDeEntrada } from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
@@ -84,6 +84,37 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
         queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+      ]),
+  });
+}
+
+/**
+ * Registra el ingreso con una entrada (feature 008), en nombre del organizador de la pantalla. Sin
+ * reintentos. Con éxito escribe la entrada en su consulta; al terminar, con éxito o error, invalida
+ * "Compras del evento", la entrada, el evento (todos los usuarios), el catálogo y, por prefijo, las
+ * vistas del comprador de cualquier usuario (`compra`, `mis-compras`, `mis-compras-del-evento`).
+ */
+export function useRegistrarUso(
+  usuarioId: string,
+  eventoId: string,
+): UseMutationResult<EntradaDelEventoVista, Error, string> {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (codigo: string) => registrarUsoDeEntrada(cliente, eventoId, codigo, { usuarioId }),
+    onSuccess: (entrada, codigo) => {
+      queryClient.setQueryData(claves.entradaDelEvento(usuarioId, eventoId, codigo), entrada);
+    },
+    onSettled: (_entrada, _error, codigo) =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: claves.comprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: claves.entradaDelEvento(usuarioId, eventoId, codigo) }),
+        queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
+        queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+        // El comprador es otro usuario y puede estar en la caché de este dispositivo (R13).
+        queryClient.invalidateQueries({ queryKey: ["compra"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
       ]),
   });
 }

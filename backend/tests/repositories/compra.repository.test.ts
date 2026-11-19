@@ -1,8 +1,9 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
-import { Compra } from "../../src/domain/compra";
+import { ALFABETO_DE_CODIGO, esCodigoValido } from "../../src/domain/codigo-de-entrada";
+import { Compra, Entrada } from "../../src/domain/compra";
 import { CompraRepository } from "../../src/repositories/compra.repository";
-import { historialHasta } from "../helpers/eventos";
+import { entradasDePrueba, historialHasta } from "../helpers/eventos";
 
 function compra(
   id: string,
@@ -11,6 +12,7 @@ function compra(
   tipoEntradaId = "tipo-a-general",
   compradorId = "usuario-martin",
 ) {
+  const historial = historialHasta(estado, compradorId);
   return new Compra({
     id,
     compradorId,
@@ -18,7 +20,8 @@ function compra(
     tipoEntradaId,
     cantidad: 1,
     total: 1000,
-    historial: historialHasta(estado, compradorId),
+    historial,
+    entradas: entradasDePrueba(1, historial),
   });
 }
 
@@ -106,6 +109,7 @@ describe("CompraRepository (en memoria)", () => {
         cantidad: 2,
         total: 2000,
         historial: historialHasta(EstadoCompra.PENDIENTE, "usuario-diego", hace1Dia),
+        entradas: entradasDePrueba(2),
       }),
       compra("a-confirmada", EstadoCompra.CONFIRMADA),
       compra("a-cancelada", EstadoCompra.CANCELADA),
@@ -115,6 +119,47 @@ describe("CompraRepository (en memoria)", () => {
     const ids = (await repositorio.listarPendientesPorEventos(["evento-a", "evento-b"])).map((c) => c.id);
     expect(ids.toSorted()).toEqual(["a-pendiente", "a-pendiente-vencida", "b-pendiente"]);
     expect(await repositorio.listarPendientesPorEventos([])).toEqual([]);
+  });
+
+  it("listarPorEvento: todas las de ese evento, de todos los compradores y en cualquier estado", async () => {
+    const repositorio = new CompraRepository([
+      compra("a-pendiente", EstadoCompra.PENDIENTE),
+      compra("a-cancelada", EstadoCompra.CANCELADA),
+      compra("a-utilizada", EstadoCompra.UTILIZADA, "evento-a", "tipo-a-general", "usuario-sofia"),
+      compra("a-de-diego", EstadoCompra.CONFIRMADA, "evento-a", "tipo-a-vip", "usuario-diego"),
+      compra("b-confirmada", EstadoCompra.CONFIRMADA, "evento-b", "tipo-b-vip"),
+    ]);
+    const ids = (await repositorio.listarPorEvento("evento-a")).map((c) => c.id);
+    expect(ids.toSorted()).toEqual(["a-cancelada", "a-de-diego", "a-pendiente", "a-utilizada"]);
+  });
+
+  it("listarPorEvento: un evento sin compras → []", async () => {
+    const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
+    expect(await repositorio.listarPorEvento("evento-b")).toEqual([]);
+    expect(await new CompraRepository().listarPorEvento("evento-a")).toEqual([]);
+  });
+
+  describe("buscarPorCodigoDeEntrada (feature 008)", () => {
+    it("la compra que tiene una entrada con ese código, de cualquier evento", async () => {
+      const deA = compra("compra-1", EstadoCompra.CONFIRMADA);
+      const deB = compra("compra-2", EstadoCompra.PENDIENTE, "evento-b", "tipo-b-vip");
+      const repositorio = new CompraRepository([deA, deB]);
+      expect(await repositorio.buscarPorCodigoDeEntrada(deA.entradas[0]!.codigo)).toBe(deA);
+      expect(await repositorio.buscarPorCodigoDeEntrada(deB.entradas[0]!.codigo)).toBe(deB);
+    });
+
+    it("un código inexistente → null", async () => {
+      const repositorio = new CompraRepository([compra("compra-1", EstadoCompra.CONFIRMADA)]);
+      expect(await repositorio.buscarPorCodigoDeEntrada("ZZZZZZZZ")).toBeNull();
+      expect(await new CompraRepository().buscarPorCodigoDeEntrada("ZZZZZZZZ")).toBeNull();
+    });
+
+    it("ve lo guardado después de crearse", async () => {
+      const repositorio = new CompraRepository();
+      const nueva = compra("compra-1", EstadoCompra.CONFIRMADA);
+      await repositorio.guardar(nueva);
+      expect(await repositorio.buscarPorCodigoDeEntrada(nueva.entradas[0]!.codigo)).toBe(nueva);
+    });
   });
 
   it("guardar reemplaza la instancia del mismo id", async () => {
@@ -138,5 +183,51 @@ describe("CompraRepository (en memoria)", () => {
     const segundo = new CompraRepository(iniciales);
     await primero.guardar(compra("compra-2", EstadoCompra.CONFIRMADA, "evento-b", "tipo-b-vip"));
     expect(await segundo.existePorEvento("evento-b")).toBe(false);
+  });
+
+  describe("siguientesCodigosDeEntrada (feature 008, R2)", () => {
+    it("devuelve `cantidad` códigos válidos", () => {
+      const codigos = new CompraRepository().siguientesCodigosDeEntrada(3);
+      expect(codigos).toHaveLength(3);
+      expect(codigos.every(esCodigoValido)).toBe(true);
+    });
+
+    it("son distintos entre sí", () => {
+      const codigos = new CompraRepository().siguientesCodigosDeEntrada(50);
+      expect(new Set(codigos).size).toBe(50);
+    });
+
+    /** Un generador que da, carácter por carácter, los códigos dados en orden. */
+    const darCodigos = (...codigos: string[]) => {
+      const indices = codigos
+        .join("")
+        .split("")
+        .map((caracter) => ALFABETO_DE_CODIGO.indexOf(caracter));
+      return () => {
+        const indice = indices.shift();
+        if (indice === undefined) throw new Error("El generador se quedó sin códigos.");
+        return indice;
+      };
+    };
+
+    it("reintenta si el código ya está guardado en otra compra", () => {
+      const guardada = new Compra({
+        id: "compra-guardada",
+        compradorId: "usuario-martin",
+        eventoId: "evento-a",
+        tipoEntradaId: "tipo-a-general",
+        cantidad: 1,
+        total: 1000,
+        historial: historialHasta(EstadoCompra.CONFIRMADA, "usuario-martin"),
+        entradas: [new Entrada({ codigo: "AAAAAAAA" })],
+      });
+      const repositorio = new CompraRepository([guardada], darCodigos("AAAAAAAA", "BBBBBBBB"));
+      expect(repositorio.siguientesCodigosDeEntrada(1)).toEqual(["BBBBBBBB"]);
+    });
+
+    it("reintenta si el código ya salió en el mismo pedido", () => {
+      const repositorio = new CompraRepository([], darCodigos("CCCCCCCC", "CCCCCCCC", "DDDDDDDD"));
+      expect(repositorio.siguientesCodigosDeEntrada(2)).toEqual(["CCCCCCCC", "DDDDDDDD"]);
+    });
   });
 });

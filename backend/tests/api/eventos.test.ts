@@ -23,6 +23,7 @@ const idsDelCatalogo = (respuesta: request.Response) =>
   (respuesta.body.eventos as { id: string }[]).map((e) => e.id);
 
 const PROXIMOS_POR_FECHA = [
+  "evento-pena-en-la-rueda",
   "evento-noche-de-rock",
   "evento-clasico-de-basquet",
   "evento-hamlet",
@@ -32,7 +33,7 @@ const PROXIMOS_POR_FECHA = [
 ];
 
 describe("GET /api/eventos (catálogo)", () => {
-  it("es público: los 6 próximos del seed por fecha, con hayEventosProximos", async () => {
+  it("es público: los 7 próximos del seed por fecha, con hayEventosProximos", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos");
     expect(respuesta.status).toBe(200);
     expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
@@ -102,8 +103,11 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
     ]);
   });
 
-  it("categoriaId=categoria-musica → solo Noche de Rock (Jazz en el Patio ya se realizó)", async () => {
-    expect(idsDelCatalogo(await catalogo("categoriaId=categoria-musica"))).toEqual(["evento-noche-de-rock"]);
+  it("categoriaId=categoria-musica → la Peña y Noche de Rock (Jazz en el Patio ya se realizó)", async () => {
+    expect(idsDelCatalogo(await catalogo("categoriaId=categoria-musica"))).toEqual([
+      "evento-pena-en-la-rueda",
+      "evento-noche-de-rock",
+    ]);
   });
 
   it.each(["categoriaId=categoria-stand-up", "texto=rock&categoriaId=categoria-deportes"])(
@@ -147,10 +151,11 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
 describe("GET /api/eventos: orden (US4)", () => {
   const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
 
-  it("orden=precio → Maratón, Charla, Clásico, Noche de Rock, Hamlet, Festival", async () => {
+  it("orden=precio → Maratón, Charla, Peña, Clásico, Noche de Rock, Hamlet, Festival", async () => {
     expect(idsDelCatalogo(await catalogo("orden=precio"))).toEqual([
       "evento-maraton-10k",
       "evento-charla-ia-aplicada",
+      "evento-pena-en-la-rueda",
       "evento-clasico-de-basquet",
       "evento-noche-de-rock",
       "evento-hamlet",
@@ -169,6 +174,7 @@ describe("GET /api/eventos: orden (US4)", () => {
       "evento-hamlet",
       "evento-noche-de-rock",
       "evento-clasico-de-basquet",
+      "evento-pena-en-la-rueda",
       "evento-charla-ia-aplicada",
       "evento-maraton-10k",
     ]);
@@ -204,15 +210,16 @@ describe("GET /api/eventos/mios", () => {
     esperarError(await request(nuevaApp()).get("/api/eventos/mios"), 401, "USUARIO_NO_IDENTIFICADO");
   });
 
-  it("Lucía ve Noche de Rock, Festival y Maratón, en ese orden", async () => {
+  it("Lucía ve la Peña, Noche de Rock, Festival y Maratón, en ese orden", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.map((e: { id: string }) => e.id)).toEqual([
+      "evento-pena-en-la-rueda",
       "evento-noche-de-rock",
       "evento-festival-sonidos-del-sur",
       "evento-maraton-10k",
     ]);
-    expect(respuesta.body[1]).toEqual({
+    expect(respuesta.body[2]).toEqual({
       id: "evento-festival-sonidos-del-sur",
       nombre: "Festival Sonidos del Sur",
       categoria: { id: "categoria-festivales", nombre: "Festivales" },
@@ -319,7 +326,7 @@ describe("POST /api/eventos", () => {
     const app = nuevaApp();
     esperarError(await crearEvento(app, cuerpoNuevo(), null), 401, "USUARIO_NO_IDENTIFICADO");
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
-    expect(mios.body).toHaveLength(3);
+    expect(mios.body).toHaveLength(4);
   });
 
   it("responde 400 con un detalle por campo", async () => {
@@ -523,6 +530,7 @@ describe("PUT /api/eventos/:eventoId", () => {
     // En Mis eventos pasa a su nueva posición (después del Festival).
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
     expect(mios.body.map((e: { id: string }) => e.id)).toEqual([
+      "evento-pena-en-la-rueda",
       "evento-festival-sonidos-del-sur",
       "evento-noche-de-rock",
       "evento-maraton-10k",
@@ -607,7 +615,7 @@ describe("DELETE /api/eventos/:eventoId", () => {
       "EVENTO_CON_COMPRAS",
     );
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
-    expect(mios.body).toHaveLength(3);
+    expect(mios.body).toHaveLength(4);
   });
 });
 

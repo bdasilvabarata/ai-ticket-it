@@ -7,6 +7,7 @@ import {
   compraConfirmada,
   compraGratis,
   compraPendiente,
+  compraUtilizada,
   conRestantes,
 } from "../helpers/compras";
 import { CATALOGO_INICIAL, catalogo, errorApi, maratonCompleta, maratonEnCatalogo } from "../helpers/eventos";
@@ -388,5 +389,38 @@ describe("Tu compra con conexión inestable (US4)", () => {
     await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
     expect(await screen.findByText("No tenés permiso para ver esta compra.")).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: "Pagar" })).toBeNull();
+  });
+});
+
+describe("Tu compra: tus entradas (feature 008, FR-012b, R14)", () => {
+  it("CONFIRMADA: Tus entradas con una fila por entrada, su código en grupos y su estado", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraConfirmada }] });
+
+    expect(await screen.findByRole("header", { name: "Tus entradas" })).toBeOnTheScreen();
+    expect(screen.getByText("7K3M-Q9TB")).toBeOnTheScreen();
+    expect(screen.getByText("4HXP-2RVA")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Entrada 1, código 7 K 3 M Q 9 T B, Confirmada")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Entrada 2, código 4 H X P 2 R V A, Confirmada")).toBeOnTheScreen();
+  });
+
+  it.each([
+    ["PENDIENTE", compraPendiente],
+    ["CANCELADA", compraCancelada],
+  ])("%s: ningún código", async (_estado, compra) => {
+    await abrirCompra({ compra: [{ status: 200, json: compra }] });
+    await screen.findByText("Total: $ 60.000");
+    expect(screen.queryByText("Tus entradas")).toBeNull();
+    expect(screen.queryByText("7K3M-Q9TB")).toBeNull();
+  });
+
+  it("UTILIZADA: sus entradas con su estado, cuántas se usaron y lo de una pagada, sin acciones nuevas", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraUtilizada }] });
+
+    expect(await screen.findByText("1 de 2 entradas usadas")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Entrada 1, código 7 K 3 M Q 9 T B, Utilizada")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Entrada 2, código 4 H X P 2 R V A, Confirmada")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Ir a Explorar" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /Pagar|Cancelar/ })).toBeNull();
   });
 });

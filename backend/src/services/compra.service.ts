@@ -1,20 +1,31 @@
 import {
   EstadoCompra,
+  type ComprasDelEventoVista,
   type CompraVista,
   type DatosCompra,
   type MiCompraVista,
   type MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
 import { Compra } from "../domain/compra";
+import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-evento";
+import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import { compararMisCompras } from "../domain/orden-mis-compras";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
+import type { Usuario } from "../domain/usuario";
 import { entradasRestantes, exigirTopePorPersona } from "../domain/tope-por-persona";
 import { CompraNoEncontradaError, SinPermisoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
-import { aCompraVista, aMiCompraVista } from "./compra.vistas";
+import {
+  aCompraDelEventoVista,
+  aCompraVista,
+  aMiCompraVista,
+  aResumenTipoEntradaVista,
+  aVentanaDeUsoVista,
+} from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import type { TipoEntradaService } from "./tipo-entrada.service";
+import type { UsuarioService } from "./usuario.service";
 
 /** Solo quien hizo la compra puede verla, pagarla o cancelarla (403; el mensaje es el de la 006). */
 function exigirQueEsSuya(compra: Compra, usuarioId: string): void {
@@ -27,6 +38,7 @@ export interface DependenciasCompraService {
   compras: RepositorioCompras;
   eventoService: EventoService;
   tipoEntradaService: TipoEntradaService;
+  usuarioService: UsuarioService;
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
@@ -41,13 +53,22 @@ export class CompraService {
   readonly #compras: RepositorioCompras;
   readonly #eventoService: EventoService;
   readonly #tipoEntradaService: TipoEntradaService;
+  readonly #usuarioService: UsuarioService;
   readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
-  constructor({ compras, eventoService, tipoEntradaService, cerrojo, reloj }: DependenciasCompraService) {
+  constructor({
+    compras,
+    eventoService,
+    tipoEntradaService,
+    usuarioService,
+    cerrojo,
+    reloj,
+  }: DependenciasCompraService) {
     this.#compras = compras;
     this.#eventoService = eventoService;
     this.#tipoEntradaService = tipoEntradaService;
+    this.#usuarioService = usuarioService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
   }
@@ -83,6 +104,7 @@ export class CompraService {
         eventoId,
         tipo,
         cantidad,
+        codigos: this.#compras.siguientesCodigosDeEntrada(cantidad),
         ahora,
       });
       await this.#compras.guardar(compra);
@@ -149,7 +171,7 @@ export class CompraService {
 
   /**
    * Lo que el detalle del evento necesita saber del usuario actual: sus compras pendientes no
-   * vencidas (de la más vieja a la más nueva), sus confirmadas (de la más nueva a la más vieja) y cuántas entradas más puede comprar de cada tipo
+   * vencidas (de la más vieja a la más nueva), sus confirmadas y utilizadas (de la más nueva a la más vieja) y cuántas entradas más puede comprar de cada tipo
    * (0 en todos si organiza el evento). Lectura: sin cerrojo, con un `ahora` y sin guardar.
    */
   async misComprasDelEvento(eventoId: string, usuarioId: string): Promise<MisComprasDelEventoVista> {
@@ -165,8 +187,11 @@ export class CompraService {
         .filter((compra) => compra.estado === EstadoCompra.PENDIENTE)
         .toSorted((a, b) => a.creadaEn.getTime() - b.creadaEn.getTime())
         .map((compra) => aCompraVista(compra, evento, ahora)),
+      // Las UTILIZADA también: "Ver mis entradas" muestra sus códigos (feature 008, R9).
       confirmadas: suyas
-        .filter((compra) => compra.estado === EstadoCompra.CONFIRMADA)
+        .filter(
+          (compra) => compra.estado === EstadoCompra.CONFIRMADA || compra.estado === EstadoCompra.UTILIZADA,
+        )
         .toSorted((a, b) => b.creadaEn.getTime() - a.creadaEn.getTime())
         .map((compra) => aCompraVista(compra, evento, ahora)),
       restantesPorTipo: evento.tiposEntrada.map((tipo) => ({
@@ -203,7 +228,44 @@ export class CompraService {
       .map(({ vista }) => vista);
   }
 
-  /** Sus compras de ese evento que cuentan para el tope en `ahora` (PENDIENTE no vencidas y CONFIRMADA). */
+  /**
+   * "Compras del evento" (feature 008, R6): todas las compras del evento, de todos los compradores y
+   * en todos los estados, **al día**, solo para su organizador (404 → 403). Lectura: un `ahora`, sin
+   * cerrojo y sin guardar. Lecturas fijas (FR-002): el evento, sus pendientes (cupo al día), sus
+   * compras y los compradores en lote (sin compras, ninguna de usuarios).
+   */
+  async comprasDelEvento(eventoId: string, usuarioId: string): Promise<ComprasDelEventoVista> {
+    const ahora = this.#reloj.ahora();
+    const evento = await this.#eventoService.leerDelOrganizador(eventoId, usuarioId, ahora);
+    const compras = (await this.#compras.listarPorEvento(eventoId))
+      .map((compra) => compra.alDia(ahora))
+      .toSorted(compararComprasDelEvento);
+    const compradores =
+      compras.length === 0
+        ? new Map<string, Usuario>()
+        : await this.#usuarioService.obtenerPorIds([...new Set(compras.map((c) => c.compradorId))]);
+    return {
+      evento: {
+        id: evento.id,
+        nombre: evento.nombre,
+        fechaHoraLocal: horaDeBuenosAires(evento.fechaHora),
+        realizado: evento.estaRealizado(ahora),
+      },
+      ventanaDeUso: aVentanaDeUsoVista(evento.fechaHora, ahora),
+      // El evento ya llega con el cupo al día y las compras, al día: sin guardar nada (R7).
+      resumenPorTipo: resumenPorTipo(evento.tiposEntrada, compras).map(aResumenTipoEntradaVista),
+      // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
+      compras: compras.map((compra) =>
+        aCompraDelEventoVista(
+          compra,
+          compradores.get(compra.compradorId)!,
+          evento.buscarTipoEntrada(compra.tipoEntradaId),
+        ),
+      ),
+    };
+  }
+
+  /** Sus compras de ese evento que cuentan para el tope en `ahora` (PENDIENTE no vencidas, CONFIRMADA y UTILIZADA). */
   async #vigentes(eventoId: string, compradorId: string, ahora: Date): Promise<Compra[]> {
     return (await this.#compras.listarPorEventoYComprador(eventoId, compradorId)).filter((compra) =>
       compra.esVigente(ahora),

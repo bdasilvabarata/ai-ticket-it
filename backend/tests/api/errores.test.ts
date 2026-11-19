@@ -118,6 +118,19 @@ describe("statusDe", () => {
     }
   });
 
+  it("EntradaNoEncontradaError → 404 ENTRADA_NO_ENCONTRADA (feature 008)", async () => {
+    const error = new errores.EntradaNoEncontradaError();
+    expect(statusDe(error)).toBe(404);
+    const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");
+    expect(respuesta.status).toBe(404);
+    expect(respuesta.body).toEqual({
+      error: {
+        codigo: "ENTRADA_NO_ENCONTRADA",
+        mensaje: "No hay ninguna entrada con ese código en este evento.",
+      },
+    });
+  });
+
   it("una referencia inválida responde 400 ENTRADA_INVALIDA con el detalle sobre body.<campo>", async () => {
     const error = new errores.ReferenciaInvalidaError("categoriaId", "No existe la categoría.");
     const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");

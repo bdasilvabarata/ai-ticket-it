@@ -1,8 +1,10 @@
 import { Router, type RequestHandler } from "express";
 import type { CompraController } from "../controllers/compra.controller";
+import type { EntradaController } from "../controllers/entrada.controller";
 import type { EventoController } from "../controllers/evento.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
 import { compraNueva, comprasDelEvento } from "../validations/compra.validation";
+import { entradaPorCodigo } from "../validations/entrada.validation";
 import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 import {
   tipoEntradaEditado,
@@ -19,8 +21,24 @@ function crearTiposEntradaRouter(controller: TipoEntradaController, requerirUsua
   return router;
 }
 
+/**
+ * `/eventos/:eventoId/entradas` (feature 008): buscar una entrada por su código y registrar su uso.
+ * Requieren usuario (el organizador; el 403 lo decide el service).
+ */
+function crearEntradasRouter(controller: EntradaController, requerirUsuario: RequestHandler): Router {
+  const router = Router({ mergeParams: true });
+  router.get("/:codigo", requerirUsuario, entradaPorCodigo.middleware, controller.obtener);
+  router.post("/:codigo/uso", requerirUsuario, entradaPorCodigo.middleware, controller.registrarUso);
+  return router;
+}
+
 export function crearEventosRouter(
-  controllers: { eventos: EventoController; tiposEntrada: TipoEntradaController; compras: CompraController },
+  controllers: {
+    eventos: EventoController;
+    tiposEntrada: TipoEntradaController;
+    compras: CompraController;
+    entradas: EntradaController;
+  },
   requerirUsuario: RequestHandler,
 ): Router {
   const { eventos: controller } = controllers;
@@ -36,6 +54,13 @@ export function crearEventosRouter(
   router.delete("/:eventoId", requerirUsuario, eventoPorId.middleware, controller.eliminar);
   // Compras (feature 006): en nombre del usuario actual.
   router.post("/:eventoId/compras", requerirUsuario, compraNueva.middleware, controllers.compras.crear);
+  // Compras del evento (feature 008): solo su organizador (el 403 lo decide el service).
+  router.get(
+    "/:eventoId/compras",
+    requerirUsuario,
+    comprasDelEvento.middleware,
+    controllers.compras.comprasDelEvento,
+  );
   router.get(
     "/:eventoId/mis-compras",
     requerirUsuario,
@@ -43,5 +68,6 @@ export function crearEventosRouter(
     controllers.compras.misComprasDelEvento,
   );
   router.use("/:eventoId/tipos-entrada", crearTiposEntradaRouter(controllers.tiposEntrada, requerirUsuario));
+  router.use("/:eventoId/entradas", crearEntradasRouter(controllers.entradas, requerirUsuario));
   return router;
 }

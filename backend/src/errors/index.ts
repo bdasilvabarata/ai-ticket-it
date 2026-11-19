@@ -75,6 +75,13 @@ export class CompraNoEncontradaError extends ErrorAplicacion {
   }
 }
 
+/** No hay una entrada con ese código en el evento (feature 008): inexistente o de otro evento. HTTP: 404. */
+export class EntradaNoEncontradaError extends ErrorAplicacion {
+  constructor() {
+    super("ENTRADA_NO_ENCONTRADA", "No hay ninguna entrada con ese código en este evento.");
+  }
+}
+
 /** Conflicto de estado o de cupo (ej.: una regla del dominio). HTTP: 409. */
 export class ConflictoError extends ErrorAplicacion {
   constructor(codigo: string, mensaje: string) {

@@ -11,10 +11,13 @@ export { listarCategorias } from "./categorias";
 export {
   cancelarCompra,
   comprarEntradas,
+  obtenerComprasDelEvento,
   obtenerCompra,
+  obtenerEntradaDelEvento,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
   pagarCompra,
+  registrarUsoDeEntrada,
 } from "./compras";
 export {
   actualizarEvento,

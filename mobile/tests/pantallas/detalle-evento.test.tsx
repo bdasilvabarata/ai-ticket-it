@@ -19,6 +19,7 @@ import {
   compraConfirmada,
   compraGratis,
   compraPendiente,
+  compraUtilizada,
   conRestantes,
 } from "../helpers/compras";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
@@ -497,6 +498,15 @@ describe("Detalle del evento: ver mis entradas (corrección de la 006)", () => {
     await fireEvent.press(screen.getByRole("button", { name: "Ver la compra de 2 entradas Inscripción" }));
     await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
     expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("cuenta también las compras UTILIZADA (feature 008)", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conConfirmadas(compraUtilizada) }]),
+    );
+    expect(await screen.findByText("Tenés 2 entradas confirmadas para este evento")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Ver mis entradas" })).toBeOnTheScreen();
   });
 
   it("sin compras confirmadas no aparece Ver mis entradas", async () => {

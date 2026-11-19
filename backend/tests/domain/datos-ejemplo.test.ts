@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { crearDatosEjemplo } from "../../src/seed/datos-ejemplo";
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
+import { esCodigoValido } from "../../src/domain/codigo-de-entrada";
 import { Compra } from "../../src/domain/compra";
 import { Evento, TipoEntrada } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
@@ -27,10 +28,10 @@ describe("crearDatosEjemplo", () => {
     expect(categorias).toHaveLength(6);
   });
 
-  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 3, 3 y 2; Diego y Valentina ninguno", () => {
+  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 4, 3 y 2; Diego y Valentina ninguno", () => {
     expect(usuarios).toHaveLength(5);
     const cuenta = contarPorOrganizador();
-    expect(cuenta.get("usuario-lucia")).toBe(3);
+    expect(cuenta.get("usuario-lucia")).toBe(4);
     expect(cuenta.get("usuario-martin")).toBe(3);
     expect(cuenta.get("usuario-sofia")).toBe(2);
     expect(cuenta.has("usuario-diego")).toBe(false);
@@ -40,8 +41,8 @@ describe("crearDatosEjemplo", () => {
     expect(usuarios.length - organizan.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("tiene 8 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
-    expect(eventos).toHaveLength(8);
+  it("tiene 9 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
+    expect(eventos).toHaveLength(9);
     expect(new Set(eventos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(2);
     expect(new Set(eventos.map((evento) => evento.categoriaId)).size).toBeGreaterThanOrEqual(2);
     for (const evento of eventos) expect(evento.tiposEntrada.length).toBeGreaterThanOrEqual(1);
@@ -84,10 +85,10 @@ describe("crearDatosEjemplo", () => {
     expect(eventos.find((e) => e.id === "evento-hamlet")?.estaAgotado()).toBe(true);
   });
 
-  it("tiene 6 eventos próximos y 2 realizados", () => {
+  it("tiene 7 eventos próximos y 2 realizados", () => {
     const realizados = eventos.filter((evento) => evento.estaRealizado(ahora));
     expect(realizados).toHaveLength(2);
-    expect(eventos.length - realizados.length).toBe(6);
+    expect(eventos.length - realizados.length).toBe(7);
   });
 
   it("usa precios y cupos enteros no negativos", () => {
@@ -143,37 +144,102 @@ describe("crearDatosEjemplo", () => {
   });
 
   it("tiene dos compras sobre el Festival (de Lucía y próximo): una confirmada y una cancelada", () => {
-    expect(compras.map((c) => [c.id, c.compradorId, c.tipoEntradaId, c.cantidad, c.total, c.estado])).toEqual(
+    const delFestival = compras.filter((c) => c.eventoId === "evento-festival-sonidos-del-sur");
+    expect(
+      delFestival.map((c) => [c.id, c.compradorId, c.tipoEntradaId, c.cantidad, c.total, c.estado]),
+    ).toEqual([
       [
-        [
-          "compra-martin-festival-vip",
-          "usuario-martin",
-          "tipo-festival-sonidos-del-sur-vip",
-          2,
-          240000,
-          EstadoCompra.CONFIRMADA,
-        ],
-        [
-          "compra-diego-festival-general",
-          "usuario-diego",
-          "tipo-festival-sonidos-del-sur-general",
-          1,
-          45000,
-          EstadoCompra.CANCELADA,
-        ],
+        "compra-martin-festival-vip",
+        "usuario-martin",
+        "tipo-festival-sonidos-del-sur-vip",
+        2,
+        240000,
+        EstadoCompra.CONFIRMADA,
       ],
-    );
+      [
+        "compra-diego-festival-general",
+        "usuario-diego",
+        "tipo-festival-sonidos-del-sur-general",
+        1,
+        45000,
+        EstadoCompra.CANCELADA,
+      ],
+    ]);
     const festival = eventos.find((e) => e.id === "evento-festival-sonidos-del-sur");
     expect(festival?.organizadorId).toBe("usuario-lucia");
     expect(festival?.estaRealizado(ahora)).toBe(false);
     const idsUsuarios = new Set(usuarios.map((u) => u.id));
     for (const compra of compras) {
+      const suEvento = eventos.find((e) => e.id === compra.eventoId);
       expect(compra).toBeInstanceOf(Compra);
       expect(compra.id).toMatch(/^compra(-[a-z0-9]+)+$/);
-      expect(compra.eventoId).toBe("evento-festival-sonidos-del-sur");
-      expect(festival?.buscarTipoEntrada(compra.tipoEntradaId)).not.toBeNull();
+      expect(suEvento?.buscarTipoEntrada(compra.tipoEntradaId)).not.toBeNull();
       expect(idsUsuarios.has(compra.compradorId)).toBe(true);
     }
+  });
+
+  describe("la Peña en La Rueda, con la ventana de uso abierta (feature 008, R12)", () => {
+    const pena = eventos.find((e) => e.id === "evento-pena-en-la-rueda")!;
+    const deLaPena = compras.filter((c) => c.eventoId === pena.id);
+
+    it("es de Lucía, de Música, a la hora en punto más cercana a ahora + 2 h, con sus dos tipos", () => {
+      expect(pena).toMatchObject({ nombre: "Peña en La Rueda", organizadorId: "usuario-lucia" });
+      expect(pena.categoriaId).toBe("categoria-musica");
+      // ahora es 15:30 UTC: + 2 h = 17:30 → 18:00.
+      expect(pena.fechaHora).toEqual(new Date("2026-11-03T18:00:00.000Z"));
+      expect(pena.tiposEntrada.map((t) => [t.id, t.nombre, t.precio])).toEqual([
+        ["tipo-pena-en-la-rueda-general", "General", 6000],
+        ["tipo-pena-en-la-rueda-con-cena", "Con cena", 15000],
+      ]);
+    });
+
+    it.each([0, 29, 30, 31, 59].map((minutos) => minutos * 60 * 1000))(
+      "con el arranque desplazado %d ms, su ventana está abierta al arrancar y 12 h después",
+      (desfase) => {
+        const arranque = new Date(ahora.getTime() + desfase);
+        const otra = crearDatosEjemplo(arranque).eventos.find((e) => e.id === pena.id)!;
+        const desde = otra.fechaHora.getTime() - 4 * HORA;
+        const hasta = otra.fechaHora.getTime() + 12 * HORA;
+        expect(desde).toBeLessThanOrEqual(arranque.getTime());
+        expect(hasta).toBeGreaterThanOrEqual(arranque.getTime() + 12 * HORA);
+        expect(otra.fechaHora.getTime() % HORA).toBe(0);
+      },
+    );
+
+    it("Martín, 3 General UTILIZADA con 1 usada por Lucía; Sofía, 2 Con cena CONFIRMADA", () => {
+      expect(
+        deLaPena.map((c) => [c.id, c.compradorId, c.tipoEntradaId, c.cantidad, c.total, c.estado]),
+      ).toEqual([
+        [
+          "compra-martin-pena-general",
+          "usuario-martin",
+          "tipo-pena-en-la-rueda-general",
+          3,
+          18000,
+          EstadoCompra.UTILIZADA,
+        ],
+        [
+          "compra-sofia-pena-con-cena",
+          "usuario-sofia",
+          "tipo-pena-en-la-rueda-con-cena",
+          2,
+          30000,
+          EstadoCompra.CONFIRMADA,
+        ],
+      ]);
+      const deMartin = deLaPena[0]!;
+      expect(deMartin.entradasUsadas).toBe(1);
+      const uso = deMartin.historial[deMartin.historial.length - 1]!;
+      expect(uso.autor).toEqual({ tipo: "usuario", usuarioId: "usuario-lucia" });
+      // El uso fue dentro de la ventana y antes del arranque.
+      expect(uso.fechaHora.getTime()).toBeGreaterThanOrEqual(pena.fechaHora.getTime() - 4 * HORA);
+      expect(uso.fechaHora.getTime()).toBeLessThanOrEqual(ahora.getTime());
+    });
+
+    it("el cupo descuenta las compras vigentes: General 120 − 3 y Con cena 40 − 2", () => {
+      expect(pena.buscarTipoEntrada("tipo-pena-en-la-rueda-general")?.cupo).toBe(117);
+      expect(pena.buscarTipoEntrada("tipo-pena-en-la-rueda-con-cena")?.cupo).toBe(38);
+    });
   });
 
   it("las compras tienen historial coherente (R10): una pagada y una vencida por el sistema", () => {
@@ -201,6 +267,13 @@ describe("crearDatosEjemplo", () => {
       },
     ]);
     expect(vencida?.fueVencida()).toBe(true);
+  });
+
+  it("cada compra tiene una entrada por unidad, con códigos válidos y distintos entre todas (008, R2)", () => {
+    for (const compra of compras) expect(compra.entradas).toHaveLength(compra.cantidad);
+    const codigos = compras.flatMap((compra) => compra.entradas.map((entrada) => entrada.codigo));
+    expect(codigos.every(esCodigoValido)).toBe(true);
+    expect(new Set(codigos).size).toBe(codigos.length);
   });
 
   it("ninguna compra queda PENDIENTE y los cupos del Festival siguen VIP 50 y Backstage 3", () => {

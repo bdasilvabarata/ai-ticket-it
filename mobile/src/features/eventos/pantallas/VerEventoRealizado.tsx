@@ -1,13 +1,17 @@
 import type { EventoVista } from "@ai-ticket-it/shared";
+import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
-import { PantallaDesplazable, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable, tema } from "../../../componentes";
 import { AvisoDeFormulario } from "../componentes/AvisoDeFormulario";
 import { ListaTiposEntrada } from "../componentes/ListaTiposEntrada";
 import { MarcaRealizado } from "../componentes/MarcaRealizado";
 import { textoFechaHora } from "../formato";
 
-/** Un evento realizado, en solo lectura (FR-006a): sin acciones y sin confirmar al salir. */
+/**
+ * Un evento realizado, en solo lectura (FR-006a): sin acciones de edición y sin confirmar al salir;
+ * solo "Ver compras" (feature 008), que no lo modifica.
+ */
 export function VerEventoRealizado({ evento, aviso }: { evento: EventoVista; aviso: string | null }) {
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
@@ -38,6 +42,19 @@ export function VerEventoRealizado({ evento, aviso }: { evento: EventoVista; avi
           Tipos de entrada
         </Text>
         <ListaTiposEntrada tipos={evento.tiposEntrada} />
+      </View>
+      <View style={estilos.datos}>
+        <Text style={estilos.titulo} accessibilityRole="header">
+          Compras
+        </Text>
+        {/* Por la ruta tipada: `eventos` no importa `compras` (sería un ciclo). */}
+        <Boton
+          variante="aviso"
+          texto="Ver compras"
+          alPresionar={() =>
+            router.push({ pathname: "/eventos/[eventoId]/compras", params: { eventoId: evento.id } })
+          }
+        />
       </View>
     </PantallaDesplazable>
   );

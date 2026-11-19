@@ -3,10 +3,17 @@ export { LIMITES_COMPRA } from "./compra";
 export type {
   AutorCambioEstadoVista,
   CambioEstadoCompraVista,
+  CompraDelEventoVista,
+  CompradorVista,
+  ComprasDelEventoVista,
   CompraVista,
   DatosCompra,
+  EntradaDelEventoVista,
+  EntradaVista,
   MiCompraVista,
   MisComprasDelEventoVista,
+  ResumenTipoEntradaVista,
+  VentanaDeUsoVista,
 } from "./compra";
 export { EstadoCompra } from "./estado-compra";
 export type { DetalleError, ErrorApi } from "./errores";

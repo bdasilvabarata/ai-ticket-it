@@ -29,7 +29,11 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   uno o más **TipoEntrada** embebidos.
 - **TipoEntrada**: nombre, descripción, precio y cupo. Pertenece a un único evento.
 - **Compra**: comprador, evento, tipo de entrada, cantidad, total, estado, historial de
-  **CambioEstadoCompra** (estado, quién, fecha y hora) y **Mensajes** (usuario, texto, enviado).
+  **CambioEstadoCompra** (estado, quién, fecha y hora), sus **Entradas** y **Mensajes** (usuario,
+  texto, enviado).
+- **Entrada**: una por unidad comprada, creada al registrar la compra; un **código** propio, corto
+  y legible, que no se repite entre entradas (es su identificador), un estado y sus cambios de
+  estado propios. Pertenece a una única compra y vive dentro de su agregado.
 - **Resenia**: comprador, evento, puntuación y detalle.
 
 ### Reglas de Dominio (invariantes)
@@ -54,6 +58,14 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   - `CONFIRMADA → UTILIZADA` (el organizador registra el ingreso)
   - `CONFIRMADA → CANCELADA → REEMBOLSADA`
   Todo cambio de estado DEBE registrar un `CambioEstadoCompra` con quién y cuándo.
+- **Estado de una entrada**: hasta que la compra se confirma, el estado de cada entrada es el de
+  la compra (también al vencer una pendiente: sus entradas quedan canceladas) y no se guarda por
+  separado. Desde `CONFIRMADA`, cada entrada cambia de estado por separado: el organizador
+  registra el uso de una entrada (`CONFIRMADA → UTILIZADA`), con su propio cambio de estado
+  (quién y cuándo). El uso de la **primera** entrada pasa la compra a `UTILIZADA` (con su cambio
+  de estado, mismo autor y fecha y hora); las demás siguen `CONFIRMADA` y se pueden usar igual,
+  sin sumar cambios a la compra. Una compra está `UTILIZADA` si y solo si al menos una de sus
+  entradas lo está.
 - **Cancelación**: una compra `CONFIRMADA` NO PUEDE cancelarse una vez que el evento empezó
   (desde su fecha y hora de inicio, inclusive, según el reloj del servidor), y una `UTILIZADA`
   no se cancela nunca. Una compra `PENDIENTE` SÍ PUEDE pasar a `CANCELADA` con el evento ya
@@ -189,6 +201,9 @@ revoca el anti-patrón "un service que llama a otro service" de la investigació
   servidor (`crypto.randomUUID()`). Los datos de ejemplo usan **ids legibles y fijos** en
   kebab-case con el tipo como prefijo (`usuario-lucia`, `evento-noche-de-rock`), estables entre
   arranques para que la app, la demo, Postman y los tests puedan referirlos.
+- **Códigos de entrada**: una entrada no tiene id aparte; su identificador es el código, que
+  también da el repositorio (como los ids) y DEBE ser único entre todas las entradas. En los
+  datos de ejemplo, los códigos son fijos.
 - Las operaciones que protegen invariantes cumplen la regla de **operaciones atómicas por
   evento** del dominio: verificar y modificar en un mismo tramo síncrono o bajo el cerrojo del
   evento. El cerrojo es una única instancia por app, inyectada por constructor desde el
@@ -346,4 +361,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.4.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-12
+**Version**: 2.5.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-18

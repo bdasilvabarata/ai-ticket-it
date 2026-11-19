@@ -511,11 +511,20 @@ describe("GET /api/compras (feature 007)", () => {
     }
   });
 
-  it("Martín → 200 con su compra CONFIRMADA del Festival, VIP, 2 entradas, sin historial ni compradorId", async () => {
+  it("Martín → 200 con la UTILIZADA de la Peña y la CONFIRMADA del Festival, sin historial ni compradorId", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-martin");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toHaveLength(1);
-    const [vista] = respuesta.body;
+    // La Peña empieza antes que el Festival: va primero (fecha ascendente).
+    expect(respuesta.body.map((c: { id: string }) => c.id)).toEqual([
+      "compra-martin-pena-general",
+      "compra-martin-festival-vip",
+    ]);
+    expect(respuesta.body[0]).toMatchObject({
+      estado: EstadoCompra.UTILIZADA,
+      entradasUsadas: 1,
+      diasRestantes: null,
+    });
+    const vista = respuesta.body[1];
     expect(vista).toMatchObject({
       id: "compra-martin-festival-vip",
       evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur", realizado: false },
@@ -532,7 +541,9 @@ describe("GET /api/compras (feature 007)", () => {
   });
 
   it("Martín: diasRestantes de su CONFIRMADA es el calculado para el reloj de la app (US2)", async () => {
-    const [vista] = (await listar(nuevaApp(), "usuario-martin")).body;
+    const vista = (await listar(nuevaApp(), "usuario-martin")).body.find(
+      (c: { id: string }) => c.id === "compra-martin-festival-vip",
+    );
     const esperado = diasRestantes(new Date(vista.evento.fechaHora), reloj.ahora());
     expect(esperado).toBeGreaterThan(0);
     expect(vista.diasRestantes).toBe(esperado);
@@ -592,7 +603,9 @@ describe("GET /api/compras (feature 007)", () => {
     const app = crearApp({ reloj: movible, repositorios });
     const { body: pendiente } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
 
-    const antes = (await listar(app, "usuario-sofia")).body;
+    const sinLaPena = (vistas: { id: string }[]) =>
+      vistas.filter((c) => c.id !== "compra-sofia-pena-con-cena");
+    const antes = sinLaPena((await listar(app, "usuario-sofia")).body);
     expect(antes).toEqual([
       expect.objectContaining({
         id: pendiente.id,
@@ -603,7 +616,7 @@ describe("GET /api/compras (feature 007)", () => {
     ]);
 
     movible.avanzar(15 * 60 * 1000);
-    const despues = (await listar(app, "usuario-sofia")).body;
+    const despues = sinLaPena((await listar(app, "usuario-sofia")).body);
     expect(despues).toEqual([
       expect.objectContaining({
         id: pendiente.id,
@@ -632,5 +645,142 @@ describe("GET /api/compras (feature 007)", () => {
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toMatchObject({ id: "compra-martin-festival-vip", compradorId: "usuario-martin" });
     expect(respuesta.body.historial).toBeInstanceOf(Array);
+  });
+});
+
+const comprasDelEvento = (app: App, usuarioId?: string, evento = FESTIVAL) => {
+  const pedido = request(app).get(`${evento}/compras`);
+  return usuarioId === undefined ? pedido : pedido.set("X-Usuario-Id", usuarioId);
+};
+
+describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
+  it("sin header → 401 USUARIO_NO_IDENTIFICADO", async () => {
+    const respuesta = await comprasDelEvento(nuevaApp());
+    expect(respuesta.status).toBe(401);
+    expect(respuesta.body.error.codigo).toBe("USUARIO_NO_IDENTIFICADO");
+  });
+
+  it("evento inexistente → 404 EVENTO_NO_ENCONTRADO (antes que el permiso)", async () => {
+    const respuesta = await comprasDelEvento(nuevaApp(), "usuario-martin", "/api/eventos/evento-inexistente");
+    expect(respuesta.status).toBe(404);
+    expect(respuesta.body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+
+  it("Martín (comprador, no organizador) sobre el Festival de Lucía → 403 SIN_PERMISO", async () => {
+    const respuesta = await comprasDelEvento(nuevaApp(), "usuario-martin");
+    expect(respuesta.status).toBe(403);
+    expect(respuesta.body.error).toEqual({
+      codigo: "SIN_PERMISO",
+      mensaje: "Solo el organizador del evento puede ver sus compras.",
+    });
+  });
+
+  it("Lucía → 200 con la forma de ComprasDelEventoVista, de la más nueva a la más vieja", async () => {
+    const respuesta = await comprasDelEvento(nuevaApp(), "usuario-lucia");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({
+      evento: {
+        id: "evento-festival-sonidos-del-sur",
+        nombre: expect.any(String),
+        fechaHoraLocal: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+        realizado: false,
+      },
+      ventanaDeUso: {
+        desde: expect.any(String),
+        hasta: expect.any(String),
+        desdeLocal: expect.any(String),
+        hastaLocal: expect.any(String),
+        estado: "antes",
+      },
+      resumenPorTipo: expect.any(Array),
+      compras: [
+        expect.objectContaining({
+          id: "compra-diego-festival-general",
+          comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
+          tipoEntrada: { id: GENERAL, nombre: "General" },
+          estado: EstadoCompra.CANCELADA,
+          canceladaPor: "sistema",
+          venceEn: null,
+        }),
+        expect.objectContaining({
+          id: "compra-martin-festival-vip",
+          comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
+          tipoEntrada: { id: VIP, nombre: "VIP" },
+          cantidad: 2,
+          estado: EstadoCompra.CONFIRMADA,
+          canceladaPor: null,
+          entradasUsadas: 0,
+        }),
+      ],
+    });
+    for (const fila of respuesta.body.compras) {
+      expect(fila).not.toHaveProperty("entradas");
+      expect(fila).not.toHaveProperty("historial");
+    }
+  });
+
+  it("una pendiente vencida sale CANCELADA por el sistema, y un segundo GET sigue igual (no se guardó nada)", async () => {
+    const movible = relojMovible(new Date("2026-11-10T15:00:00.000Z"));
+    const app = crearApp({ reloj: movible });
+    const { body: nueva } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
+
+    const antes = await comprasDelEvento(app, "usuario-lucia");
+    expect(antes.body.compras[0]).toMatchObject({ id: nueva.id, estado: EstadoCompra.PENDIENTE });
+
+    movible.avanzar(15 * 60 * 1000);
+    for (let i = 0; i < 2; i += 1) {
+      const { body } = await comprasDelEvento(app, "usuario-lucia");
+      expect(body.compras[0]).toMatchObject({
+        id: nueva.id,
+        estado: EstadoCompra.CANCELADA,
+        canceladaPor: "sistema",
+        venceEn: null,
+      });
+    }
+  });
+
+  it("resumenPorTipo (US2): cada tipo del Festival en su orden, con las cantidades del seed y el cupo del detalle", async () => {
+    const app = nuevaApp();
+    const { body } = await comprasDelEvento(app, "usuario-lucia");
+    expect(body.resumenPorTipo).toEqual([
+      {
+        tipoEntrada: { id: GENERAL, nombre: "General" },
+        disponibles: await cupoDe(app, GENERAL),
+        pendientes: 0,
+        vendidas: 0,
+        usadas: 0,
+      },
+      {
+        tipoEntrada: { id: VIP, nombre: "VIP" },
+        disponibles: await cupoDe(app, VIP),
+        pendientes: 0,
+        vendidas: 2,
+        usadas: 0,
+      },
+      {
+        tipoEntrada: { id: BACKSTAGE, nombre: "Backstage" },
+        disponibles: await cupoDe(app, BACKSTAGE),
+        pendientes: 0,
+        vendidas: 0,
+        usadas: 0,
+      },
+    ]);
+  });
+
+  it("resumenPorTipo: una compra sin pagar suma a pendientes y descuenta disponibles", async () => {
+    const app = nuevaApp();
+    const antes = (await comprasDelEvento(app, "usuario-lucia")).body.resumenPorTipo[1];
+    await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
+    const despues = (await comprasDelEvento(app, "usuario-lucia")).body.resumenPorTipo[1];
+    expect(despues).toMatchObject({ disponibles: antes.disponibles - 2, pendientes: 2, vendidas: 2 });
+  });
+
+  it("query y cuerpo se ignoran", async () => {
+    const respuesta = await request(nuevaApp())
+      .get(`${FESTIVAL}/compras?estado=PENDIENTE&orden=x`)
+      .set("X-Usuario-Id", "usuario-lucia")
+      .send({ cualquiera: 1 });
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.compras).toHaveLength(2);
   });
 });

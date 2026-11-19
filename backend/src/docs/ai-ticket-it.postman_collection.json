@@ -542,6 +542,51 @@
           }
         }
       ]
+    },
+    {
+      "name": "Compras del evento",
+      "item": [
+        {
+          "name": "Listar compras (Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Listar compras (otro usuario, 403)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        },
+        {
+          "name": "Buscar entrada de Sofía en la Peña (minúsculas y guion)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/prcs-2b01" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Registrar uso de la entrada de Sofía",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/PRCS2B01/uso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Registrar uso otra vez (ya utilizada) → 409 TRANSICION_INVALIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/PRCS2B01/uso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        }
+      ]
     }
   ]
 }

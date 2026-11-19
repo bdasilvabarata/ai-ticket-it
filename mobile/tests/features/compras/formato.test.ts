@@ -1,21 +1,33 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 
 import {
+  normalizarCodigo,
   textoAccionDePago,
   textoAvisoDeMiCompra,
   textoCancelada,
+  textoAvisoDeCompraDelEvento,
   textoCantidad,
+  textoCodigo,
+  textoCodigoAccesible,
+  textoCompradaEl,
   textoDiasRestantes,
   textoEntradasConfirmadas,
+  textoEntradasUsadas,
+  textoMotivoNoUsable,
+  textoResumenDeTipo,
   textoTotal,
   textoVencimiento,
+  textoVentanaDeUso,
 } from "../../../src/features/compras/formato";
 import {
   compraCancelada,
   compraCanceladaPorElComprador,
   compraConfirmada,
+  compraDelEvento,
   compraPendiente,
+  entradaDelEvento,
   miCompra,
+  ventanaDelFestival,
 } from "../../helpers/compras";
 
 describe("textoTotal", () => {
@@ -88,8 +100,7 @@ describe("textoAvisoDeMiCompra", () => {
     expect(textoAvisoDeMiCompra(confirmada({ diasRestantes: 10 }))).toBe("Faltan 10 días");
   });
 
-  it("UTILIZADA y REEMBOLSADA → sin aviso", () => {
-    expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.UTILIZADA }))).toBeNull();
+  it("REEMBOLSADA → sin aviso (UTILIZADA, desde la 008, dice sus entradas usadas)", () => {
     expect(textoAvisoDeMiCompra(confirmada({ estado: EstadoCompra.REEMBOLSADA }))).toBeNull();
   });
 });
@@ -120,5 +131,169 @@ describe("textoAvisoDeMiCompra: pendientes y canceladas (US3)", () => {
       });
     expect(textoAvisoDeMiCompra(cancelada("sistema"))).toBe("Venció sin pagarse");
     expect(textoAvisoDeMiCompra(cancelada("usuario"))).toBe("La cancelaste");
+  });
+});
+
+describe("textoCompradaEl (feature 008)", () => {
+  it('"2026-11-18T15:20" → Comprada el 18/11 15:20 (sin convertir zonas)', () => {
+    expect(textoCompradaEl("2026-11-18T15:20")).toBe("Comprada el 18/11 15:20");
+  });
+});
+
+describe("textoVentanaDeUso (feature 008)", () => {
+  const ventana = (estado: "antes" | "abierta" | "despues") => ({
+    desde: "2026-11-18T20:00:00.000Z",
+    hasta: "2026-11-19T12:00:00.000Z",
+    desdeLocal: "2026-11-18T17:00",
+    hastaLocal: "2026-11-19T09:00",
+    estado,
+  });
+
+  it("abierta → Ingresos habilitados hasta el 19/11 09:00", () => {
+    expect(textoVentanaDeUso(ventana("abierta"))).toBe("Ingresos habilitados hasta el 19/11 09:00");
+  });
+
+  it("antes → Podés registrar ingresos desde el 18/11 17:00", () => {
+    expect(textoVentanaDeUso(ventana("antes"))).toBe("Podés registrar ingresos desde el 18/11 17:00");
+  });
+
+  it("despues → Los ingresos se registraron hasta el 19/11 09:00", () => {
+    expect(textoVentanaDeUso(ventana("despues"))).toBe("Los ingresos se registraron hasta el 19/11 09:00");
+  });
+});
+
+describe("textoEntradasUsadas (feature 008)", () => {
+  it("(1, 3) → 1 de 3 entradas usadas; (1, 1) → 1 de 1 entrada usada", () => {
+    expect(textoEntradasUsadas(1, 3)).toBe("1 de 3 entradas usadas");
+    expect(textoEntradasUsadas(1, 1)).toBe("1 de 1 entrada usada");
+    expect(textoEntradasUsadas(2, 4)).toBe("2 de 4 entradas usadas");
+  });
+});
+
+describe("textoAvisoDeCompraDelEvento (feature 008)", () => {
+  it("PENDIENTE → Puede pagarla hasta las 15:35", () => {
+    const pendiente = compraDelEvento({
+      estado: EstadoCompra.PENDIENTE,
+      venceEn: "2026-11-18T18:35:00.000Z",
+      venceEnLocal: "2026-11-18T15:35",
+    });
+    expect(textoAvisoDeCompraDelEvento(pendiente)).toBe("Puede pagarla hasta las 15:35");
+  });
+
+  it("CANCELADA por el sistema → Venció sin pagarse; por el comprador → La canceló el comprador", () => {
+    expect(
+      textoAvisoDeCompraDelEvento(
+        compraDelEvento({ estado: EstadoCompra.CANCELADA, canceladaPor: "sistema" }),
+      ),
+    ).toBe("Venció sin pagarse");
+    expect(
+      textoAvisoDeCompraDelEvento(
+        compraDelEvento({ estado: EstadoCompra.CANCELADA, canceladaPor: "usuario" }),
+      ),
+    ).toBe("La canceló el comprador");
+  });
+
+  it("UTILIZADA → N de M entradas usadas", () => {
+    expect(
+      textoAvisoDeCompraDelEvento(compraDelEvento({ estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 })),
+    ).toBe("1 de 3 entradas usadas");
+  });
+
+  it("CONFIRMADA y REEMBOLSADA → null", () => {
+    expect(textoAvisoDeCompraDelEvento(compraDelEvento())).toBeNull();
+    expect(textoAvisoDeCompraDelEvento(compraDelEvento({ estado: EstadoCompra.REEMBOLSADA }))).toBeNull();
+  });
+});
+
+describe("textoResumenDeTipo (feature 008, US2)", () => {
+  const resumen = (disponibles: number, pendientes: number, vendidas: number, usadas: number) => ({
+    tipoEntrada: { id: "tipo-general", nombre: "General" },
+    disponibles,
+    pendientes,
+    vendidas,
+    usadas,
+  });
+
+  it("los cuatro números separados por ·, en plural", () => {
+    expect(textoResumenDeTipo(resumen(117, 0, 3, 2))).toBe(
+      "117 disponibles · 0 pendientes · 3 vendidas · 2 usadas",
+    );
+  });
+
+  it("en singular cuando vale 1", () => {
+    expect(textoResumenDeTipo(resumen(1, 1, 1, 1))).toBe("1 disponible · 1 pendiente · 1 vendida · 1 usada");
+    expect(textoResumenDeTipo(resumen(117, 0, 3, 1))).toBe(
+      "117 disponibles · 0 pendientes · 3 vendidas · 1 usada",
+    );
+  });
+
+  it("todo en 0, en plural", () => {
+    expect(textoResumenDeTipo(resumen(0, 0, 0, 0))).toBe(
+      "0 disponibles · 0 pendientes · 0 vendidas · 0 usadas",
+    );
+  });
+});
+
+describe("códigos de entrada (feature 008, US3)", () => {
+  it("textoCodigo los muestra en dos grupos de 4", () => {
+    expect(textoCodigo("7K3MQ9TB")).toBe("7K3M-Q9TB");
+  });
+
+  it("textoCodigoAccesible los separa de a un carácter para TalkBack", () => {
+    expect(textoCodigoAccesible("7K3MQ9TB")).toBe("7 K 3 M Q 9 T B");
+  });
+
+  it("normalizarCodigo: mayúsculas, sin espacios ni guiones", () => {
+    expect(normalizarCodigo(" 7k3m-q9tb ")).toBe("7K3MQ9TB");
+    expect(normalizarCodigo("7K3M Q9TB")).toBe("7K3MQ9TB");
+  });
+});
+
+describe("textoMotivoNoUsable (feature 008, US3)", () => {
+  it("CONFIRMADA con la ventana abierta → null (se puede usar)", () => {
+    expect(textoMotivoNoUsable(entradaDelEvento())).toBeNull();
+  });
+
+  it("la ventana no abierta va primero, como en el servidor", () => {
+    const esperado = "El ingreso se registra desde el 10/12 10:00 hasta el 11/12 02:00.";
+    for (const estado of ["antes", "despues"] as const) {
+      expect(textoMotivoNoUsable(entradaDelEvento({ ventanaDeUso: ventanaDelFestival(estado) }))).toBe(
+        esperado,
+      );
+      expect(
+        textoMotivoNoUsable(
+          entradaDelEvento({ estado: EstadoCompra.PENDIENTE, ventanaDeUso: ventanaDelFestival(estado) }),
+        ),
+      ).toBe(esperado);
+    }
+  });
+
+  it("según el estado de la entrada", () => {
+    expect(
+      textoMotivoNoUsable(
+        entradaDelEvento({
+          estado: EstadoCompra.UTILIZADA,
+          usadaEn: "2026-12-10T23:15:00.000Z",
+          usadaEnLocal: "2026-12-10T20:15",
+        }),
+      ),
+    ).toBe("Esta entrada ya se utilizó el 10/12 20:15.");
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.PENDIENTE }))).toBe(
+      "La compra de esta entrada todavía no se pagó.",
+    );
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.CANCELADA }))).toBe(
+      "La compra de esta entrada está cancelada.",
+    );
+    expect(textoMotivoNoUsable(entradaDelEvento({ estado: EstadoCompra.REEMBOLSADA }))).toBe(
+      "La compra de esta entrada fue reembolsada.",
+    );
+  });
+});
+
+describe("textoAvisoDeMiCompra con UTILIZADA (feature 008)", () => {
+  it("→ N de M entradas usadas", () => {
+    expect(
+      textoAvisoDeMiCompra(miCompra(compraConfirmada, { estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 })),
+    ).toBe("1 de 2 entradas usadas");
   });
 });

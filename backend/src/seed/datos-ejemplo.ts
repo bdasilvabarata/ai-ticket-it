@@ -1,6 +1,6 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { Categoria, type DatosCategoria } from "../domain/categoria";
-import { Compra } from "../domain/compra";
+import { Compra, Entrada } from "../domain/compra";
 import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../domain/hora-buenos-aires";
 import { Usuario, type DatosUsuario } from "../domain/usuario";
@@ -73,6 +73,9 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   const martin = "usuario-martin";
   const sofia = "usuario-sofia";
   const proximo = new Date(Math.round((ahora.getTime() + 24 * HORA_MS) / HORA_MS) * HORA_MS);
+  // La hora en punto más cercana a `ahora + 2 h` (feature 008, R12): su ventana de uso (4 h antes,
+  // 12 h después) está abierta desde el arranque y durante al menos 12 horas, para la demo del ingreso.
+  const enUnRato = new Date(Math.round((ahora.getTime() + 2 * HORA_MS) / HORA_MS) * HORA_MS);
 
   const eventosSinIds: EventoSinIds[] = [
     {
@@ -177,6 +180,20 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { nombre: "Carrera kids", descripcion: "Circuito de 2 km para menores de 12.", precio: 0, cupo: 200 },
       ],
     },
+    {
+      slug: "pena-en-la-rueda",
+      nombre: "Peña en La Rueda",
+      descripcion: "Folklore en vivo, con baile y cena criolla.",
+      categoriaId: categoriaId("Música"),
+      fechaHora: enUnRato,
+      multimedia: [imagen("pena-la-rueda")],
+      organizadorId: lucia,
+      // Los cupos ya descuentan las compras vigentes de abajo: General 120 − 3, Con cena 40 − 2.
+      tiposEntrada: [
+        { nombre: "General", descripcion: "Acceso al salón.", precio: 6000, cupo: 117 },
+        { nombre: "Con cena", descripcion: "Mesa con cena criolla incluida.", precio: 15000, cupo: 38 },
+      ],
+    },
   ];
 
   const eventos = eventosSinIds.map(
@@ -213,6 +230,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { estado: EstadoCompra.PENDIENTE, autor: porMartin, fechaHora: haceMartin },
         { estado: EstadoCompra.CONFIRMADA, autor: porMartin, fechaHora: masMinutos(haceMartin, 5) },
       ],
+      entradas: [new Entrada({ codigo: "FSVP7M01" }), new Entrada({ codigo: "FSVP7M02" })],
     }),
     new Compra({
       id: "compra-diego-festival-general",
@@ -233,8 +251,55 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
           fechaHora: masMinutos(haceDiego, LIMITES_COMPRA.minutosParaPagar),
         },
       ],
+      entradas: [new Entrada({ codigo: "FSGD1E60" })],
     }),
   ];
+
+  // Compras sobre la Peña (feature 008, R12), con la ventana de uso abierta: Martín, 3 General
+  // pagadas con 1 entrada ya usada (la compra UTILIZADA, "1 de 3"); Sofía, 2 Con cena pagadas sin
+  // usar (sus códigos son los de la demo y de Postman).
+  const pena = "pena-en-la-rueda";
+  const porLucia = { tipo: "usuario", usuarioId: lucia } as const;
+  const porSofia = { tipo: "usuario", usuarioId: sofia } as const;
+  const usoDeMartin = {
+    estado: EstadoCompra.UTILIZADA,
+    autor: porLucia,
+    fechaHora: new Date(ahora.getTime() - HORA_MS / 2),
+  };
+  const haceSofia = new Date(ahora.getTime() - 3 * HORA_MS);
+  compras.push(
+    new Compra({
+      id: "compra-martin-pena-general",
+      compradorId: martin,
+      eventoId: `evento-${pena}`,
+      tipoEntradaId: `tipo-${pena}-general`,
+      cantidad: 3,
+      total: 18000,
+      historial: [
+        { estado: EstadoCompra.PENDIENTE, autor: porMartin, fechaHora: haceMartin },
+        { estado: EstadoCompra.CONFIRMADA, autor: porMartin, fechaHora: masMinutos(haceMartin, 5) },
+        usoDeMartin,
+      ],
+      entradas: [
+        new Entrada({ codigo: "PRGM3A01", cambios: [usoDeMartin] }),
+        new Entrada({ codigo: "PRGM3A02" }),
+        new Entrada({ codigo: "PRGM3A03" }),
+      ],
+    }),
+    new Compra({
+      id: "compra-sofia-pena-con-cena",
+      compradorId: sofia,
+      eventoId: `evento-${pena}`,
+      tipoEntradaId: `tipo-${pena}-con-cena`,
+      cantidad: 2,
+      total: 30000,
+      historial: [
+        { estado: EstadoCompra.PENDIENTE, autor: porSofia, fechaHora: haceSofia },
+        { estado: EstadoCompra.CONFIRMADA, autor: porSofia, fechaHora: masMinutos(haceSofia, 5) },
+      ],
+      entradas: [new Entrada({ codigo: "PRCS2B01" }), new Entrada({ codigo: "PRCS2B02" })],
+    }),
+  );
 
   return {
     categorias: datosCategorias.map((datos) => new Categoria(datos)),

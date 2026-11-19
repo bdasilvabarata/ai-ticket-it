@@ -5,7 +5,7 @@ import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import type { RepositorioCompras, RepositorioEventos } from "../../src/domain/repositorios";
 import type { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
-import { evento, historialHasta, tipo } from "../helpers/eventos";
+import { entradasDePrueba, evento, historialHasta, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 // FR-029 / SC-008: pedidos simultáneos sobre un mismo evento dan el mismo resultado que de a uno.
@@ -116,6 +116,7 @@ describe("concurrencia sobre un mismo evento (cerrojo compartido)", () => {
             cantidad: 1,
             total: 1000,
             historial: historialHasta(EstadoCompra.CONFIRMADA, "usuario-martin"),
+            entradas: entradasDePrueba(1),
           }),
         );
       });

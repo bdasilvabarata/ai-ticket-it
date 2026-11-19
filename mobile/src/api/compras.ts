@@ -1,9 +1,18 @@
-import type { CompraVista, DatosCompra, MiCompraVista, MisComprasDelEventoVista } from "@ai-ticket-it/shared";
+import type {
+  ComprasDelEventoVista,
+  CompraVista,
+  DatosCompra,
+  EntradaDelEventoVista,
+  MiCompraVista,
+  MisComprasDelEventoVista,
+} from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
 const rutaDelEvento = (eventoId: string) => `/eventos/${encodeURIComponent(eventoId)}`;
 const rutaDeLaCompra = (compraId: string) => `/compras/${encodeURIComponent(compraId)}`;
+const rutaDeLaEntrada = (eventoId: string, codigo: string) =>
+  `${rutaDelEvento(eventoId)}/entradas/${encodeURIComponent(codigo)}`;
 
 /**
  * `POST /eventos/:eventoId/compras`: solo el tipo y la cantidad (el total lo calcula el servidor). Va
@@ -27,6 +36,48 @@ export function obtenerMisComprasDelEvento(
 ): Promise<MisComprasDelEventoVista> {
   return cliente.get<MisComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/mis-compras`, {
     signal: opciones.signal,
+  });
+}
+
+/**
+ * `GET /eventos/:eventoId/compras` (feature 008): todas las compras del evento, al día, con la
+ * ventana de uso y el resumen por tipo. Solo para su organizador (si no, 403).
+ */
+export function obtenerComprasDelEvento(
+  cliente: ClienteApi,
+  eventoId: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<ComprasDelEventoVista> {
+  return cliente.get<ComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/compras`, {
+    signal: opciones.signal,
+  });
+}
+
+/**
+ * `GET /eventos/:eventoId/entradas/:codigo` (feature 008): la entrada de ese evento con ese código
+ * (el servidor lo normaliza), con su compra y la ventana de uso. Solo para el organizador.
+ */
+export function obtenerEntradaDelEvento(
+  cliente: ClienteApi,
+  eventoId: string,
+  codigo: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<EntradaDelEventoVista> {
+  return cliente.get<EntradaDelEventoVista>(rutaDeLaEntrada(eventoId, codigo), { signal: opciones.signal });
+}
+
+/**
+ * `POST /eventos/:eventoId/entradas/:codigo/uso` (feature 008), sin cuerpo: registra el ingreso con
+ * esa entrada, en nombre del usuario de la pantalla. No se reintenta solo.
+ */
+export function registrarUsoDeEntrada(
+  cliente: ClienteApi,
+  eventoId: string,
+  codigo: string,
+  { usuarioId }: { usuarioId: string },
+): Promise<EntradaDelEventoVista> {
+  return cliente.post<EntradaDelEventoVista>(`${rutaDeLaEntrada(eventoId, codigo)}/uso`, undefined, {
+    usuarioId,
   });
 }
 

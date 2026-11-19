@@ -26,6 +26,18 @@ export const claves = {
    * `mis-compras-del-evento`: invalidar una no toca la otra.
    */
   misCompras: (usuarioId: string) => ["mis-compras", usuarioId] as const,
+  /**
+   * Todas las compras de un evento, leídas por su organizador (feature 008). No comparte prefijo con
+   * `mis-compras-del-evento`.
+   */
+  comprasDelEvento: (usuarioId: string, eventoId: string) =>
+    ["compras-del-evento", usuarioId, eventoId] as const,
+  /**
+   * Una entrada de un evento buscada por su organizador (feature 008), con el código normalizado
+   * (mayúsculas, sin espacios ni guiones).
+   */
+  entradaDelEvento: (usuarioId: string, eventoId: string, codigo: string) =>
+    ["entrada-del-evento", usuarioId, eventoId, codigo] as const,
   /** Una compra, leída por su comprador (feature 006). */
   compra: (usuarioId: string, compraId: string) => ["compra", usuarioId, compraId] as const,
   /**

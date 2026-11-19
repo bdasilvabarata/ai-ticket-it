@@ -36,7 +36,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - `domain/` son clases con comportamiento (sin Express ni IO) y las interfaces de
     repositorio de las que dependen los services.
   - `repositories/` son repositorios **en memoria** (un `Map` privado por repositorio); no hay
-    base de datos. `seed/` arma los datos de ejemplo y `crearRepositoriosDeEjemplo()`;
+    base de datos. `seed/` arma los datos de ejemplo y `crearRepositoriosDeEjemplo()` (desde la
+    008, con "Peña en La Rueda" de Lucía a la hora en punto más cercana a `ahora + 2 h` del
+    arranque: su ventana de uso está abierta para probar "Registrar ingreso");
     `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
@@ -48,7 +50,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     todos con usuario, y una compra solo la ve, la paga y la cancela su comprador; la 007 suma
     `GET /compras`: las del usuario actual como comprador, de todos los eventos, al día sin guardar
     nada, ordenadas y como `MiCompraVista`, sin `historial` ni `compradorId`, con `diasRestantes` y
-    `canceladaPor`) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
+    `canceladaPor`; la 008 suma `GET /eventos/:eventoId/compras`: solo para su organizador, al día y
+    sin guardar, `ComprasDelEventoVista` con la ventana de uso, el resumen por tipo y las compras de
+    todos los compradores **sin códigos**), `entradas` (feature 008: router hijo
+    `eventos/:eventoId/entradas` con `GET /:codigo` y `POST /:codigo/uso`, solo el organizador;
+    `EntradaService` con `obtener` (lectura) y `registrarUso` (bajo el cerrojo); orden de chequeos
+    del uso: 401 → 400 → 404 `EVENTO_NO_ENCONTRADO` → 403 → 404 `ENTRADA_NO_ENCONTRADA`
+    (`EntradaNoEncontradaError`, también para un código de otro evento o con formato inválido) →
+    409 `FUERA_DE_HORARIO_DE_USO` → 409 `TRANSICION_INVALIDA`) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
     `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
@@ -61,7 +70,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - **Compras** (feature 006): `domain/compra.ts` es una `Compra` con **historial** de cambios de
     estado (`{ estado, autor: usuario | sistema, fechaHora }`; el estado es el del último, el primero
     siempre `PENDIENTE`) y transiciones que devuelven una `Compra` nueva (`registrar`, `pagar`,
-    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
+    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia` y, en la 008, `registrarUso`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
     aplica `LIMITES_COMPRA` sobre las compras **vigentes**. `RepositorioCompras` suma `siguienteId`,
     `buscarPorId`, `listarPorEventoYComprador` y `listarPendientesPorEventos` (las guardadas
     `PENDIENTE`, vencidas o no); `existePorEvento` / `existePorTipoEntrada` cuentan toda compra,
@@ -76,6 +85,25 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     de Buenos Aires, `null` si el evento ya empezó) solo se calcula en una `CONFIRMADA`, en cada
     consulta. `services/compra.vistas.ts` arma `datosComunes` y, a partir de él, `aCompraVista`
     (la de la 006) y `aMiCompraVista`.
+  - **Entradas y uso** (feature 008): cada `Compra` tiene una `Entrada` por unidad
+    (`domain/compra.ts`: `codigo` y sus cambios propios, sin id aparte). El código lo da el
+    repositorio (`siguientesCodigosDeEntrada(cantidad)`, únicos entre todas las compras) y lo valida
+    y normaliza `domain/codigo-de-entrada.ts` (8 caracteres Crockford, se muestra `XXXX-XXXX`). El
+    estado de una entrada se **deriva** del de la compra hasta que se confirma; después,
+    `Compra.registrarUso(codigo, organizadorId, ahora)` la pasa a `UTILIZADA` y, con la **primera**
+    usada, también la compra (un único cambio `UTILIZADA` en su historial). `esVigente` incluye
+    `UTILIZADA` (cuenta para el tope) y una `UTILIZADA` no se cancela. `domain/ventana-de-uso.ts`
+    (del inicio − 4 h al inicio + 12 h, inclusive; `estadoDeVentana`: `antes` · `abierta` ·
+    `despues`; `exigirVentanaAbierta`) y `domain/compras-del-evento.ts` (`resumenPorTipo` en el orden
+    del evento y `compararComprasDelEvento`: `creadaEn` descendente → `id`) son puros.
+    `RepositorioCompras` suma `listarPorEvento` y `buscarPorCodigoDeEntrada`.
+    `EventoService.leerDelOrganizador(id, usuarioId, ahora)` es la lectura del organizador (404 →
+    403 → cupo al día, sin guardar ni cerrojo). `CompraService` recibe también `UsuarioService`
+    (compradores en lote) y `comprasDelEvento` hace cuatro lecturas fijas. Los códigos solo llegan
+    al comprador (`CompraVista.entradas`, vacía salvo en `CONFIRMADA`/`UTILIZADA`; `entradasUsadas`
+    también en `MiCompraVista`), y `mis-compras.confirmadas` incluye las `UTILIZADA`.
+    `registrarUso` toma el cerrojo del evento, lee `ahora` adentro, materializa con
+    `obtenerDelOrganizador`, relee la compra por código y hace **un** `guardar`; el cupo no cambia.
   - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
     nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
     (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
@@ -115,8 +143,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `obtenerPorIds`) y `ReseniaService` para el organizador y su puntaje; `ReseniaService` recibe
     los eventos por parámetro y no depende de `EventoService` (sin ciclos). `EventoService` recibe
     también `VencimientoService`, y `CompraService` (dueño de `Compra`, con `obtenerOFallar`) recibe
-    `EventoService` y `TipoEntradaService`; cada uno escribe solo su agregado. `app.ts` los arma en
-    el orden `VencimientoService → EventoService → TipoEntradaService → CompraService`. Orden de
+    `EventoService` y `TipoEntradaService`; cada uno escribe solo su agregado. `EntradaService`
+    (feature 008) escribe con `RepositorioCompras` y recibe `EventoService` y `UsuarioService`, **no**
+    `CompraService`. `app.ts` los arma en el orden `VencimientoService → EventoService →
+    TipoEntradaService → CompraService → EntradaService`. Orden de
     chequeos del alta: 401 → 400 forma → 404 evento → 400 `body.tipoEntradaId` → 409
     `EVENTO_REALIZADO` → `COMPRA_PROPIO_EVENTO` → `TOPE_POR_PERSONA` → `CUPO_INSUFICIENTE`; del
     pago: 401 → 400 → 404 `COMPRA_NO_ENCONTRADA` → 403 → 409 `COMPRA_VENCIDA` →
@@ -139,7 +169,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
     son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
     `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y `compras/[compraId]`
-    ("Tu compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007). El lint prohíbe importar
+    ("Tu compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
+    organizador (feature 008) son `eventos/[eventoId]/compras` (`ComprasDelEvento`) y
+    `eventos/[eventoId]/ingreso` (`RegistrarIngreso`). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
   - **Base** (no importa features):
     - `src/api/` — el cliente HTTP y un archivo por recurso con sus funciones de endpoint,
@@ -155,7 +187,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       documentada: **sin usuario**, porque el catálogo es el mismo para todos; la 006 suma
       `misComprasDelEvento(usuarioId, eventoId)` y `compra(usuarioId, compraId)`, y la 007,
       `misCompras(usuarioId)`, con el usuario en la posición 1 y sin compartir prefijo con
-      `mis-compras-del-evento`) y `cliente-api.tsx`
+      `mis-compras-del-evento`; la 008, `comprasDelEvento(usuarioId, eventoId)` y
+      `entradaDelEvento(usuarioId, eventoId, codigo)`) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -213,7 +246,20 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `PENDIENTE`, "Pagar" va **como hermano** de ese `Pressable`, nunca adentro, para que TalkBack
       los enfoque por separado), avisos por estado (`textoAvisoDeMiCompra`, `textoDiasRestantes`) y
       la lista al día: vuelve a pedirse en cada foco salvo el primero (`useFocusEffect`) y al
-      vencer la próxima pendiente (`useRefrescarAlVencer` con `vencimientos.ts`).
+      vencer la próxima pendiente (`useRefrescarAlVencer` con `vencimientos.ts`). La 008 suma, para
+      el organizador, `ComprasDelEvento` (ventana de uso, `ResumenPorTipo` con "Agotado" y una
+      `FilaCompraDelEvento` no tocable por compra; vacío "Todavía nadie compró entradas" sin tapar
+      el resumen) y `RegistrarIngreso` (buscar el código con `useEntradaDelEvento`, `TarjetaEntrada`,
+      el motivo de `textoMotivoNoUsable` en lugar del botón y confirmar con `Alert`); la mutation
+      `useRegistrarUso` (sin reintentos) invalida `comprasDelEvento`, la entrada, el evento, el
+      catálogo y, **por prefijo**, `["compra"]`, `["mis-compras"]` y `["mis-compras-del-evento"]`
+      (el comprador es otro usuario que puede estar en la caché). Las dos pantallas se refrescan al
+      volver con `useRefrescarAlFocalizar` (compartido con `MisCompras`) y ante un 404 del evento
+      salen a "Mis eventos" con `useSalirSiNoExisteElEvento` (`evento-inexistente.ts`). Para el
+      comprador, `ListaDeEntradas` muestra los códigos ("Tus entradas") en "Tu compra" y en "Ver mis
+      entradas", y "N de M entradas usadas" acompaña a una `UTILIZADA`. "Ver compras", en la edición
+      y la solo lectura del evento propio, está en `eventos` y navega **por la ruta tipada** (sin
+      importar `compras`).
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la

@@ -266,6 +266,18 @@ export class EventoService {
   }
 
   /**
+   * Contraparte de lectura de `obtenerDelOrganizador` (feature 008, R6): 404 → 403 → el evento con el
+   * cupo al día **sin guardar nada** y sin cerrojo. La usa "Compras del evento".
+   */
+  async leerDelOrganizador(id: string, usuarioId: string, ahora: Date): Promise<Evento> {
+    const evento = await this.obtenerOFallar(id);
+    if (!evento.esOrganizadoPor(usuarioId)) {
+      throw new SinPermisoError("Solo el organizador del evento puede ver sus compras.");
+    }
+    return (await this.#conCupoAlDia([evento], ahora))[0] ?? evento;
+  }
+
+  /**
    * Los eventos como se ven en `ahora`: a cada uno le suma el cupo de sus compras pendientes vencidas,
    * **sin guardar nada** (lectura, sin cerrojo; R3). Una sola lectura de compras para todos (sin N+1).
    */

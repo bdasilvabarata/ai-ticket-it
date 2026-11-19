@@ -26,7 +26,7 @@ const datosCompraSchema = z.object({
 /** `POST /eventos/:eventoId/compras`. */
 export const compraNueva = crearValidacion({ params: paramsEvento, body: datosCompraSchema });
 
-/** `GET /eventos/:eventoId/mis-compras`. */
+/** `GET /eventos/:eventoId/mis-compras` y `GET /eventos/:eventoId/compras` (feature 008): solo el id del evento. */
 export const comprasDelEvento = crearValidacion({ params: paramsEvento });
 
 /** `GET /compras/:compraId` y `POST /compras/:compraId/pago`. */

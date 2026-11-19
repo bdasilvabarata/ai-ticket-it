@@ -1,11 +1,15 @@
 import {
   comprarEntradas,
   crearClienteApi,
+  ErrorDeApi,
+  obtenerComprasDelEvento,
   obtenerCompra,
+  obtenerEntradaDelEvento,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
   cancelarCompra,
   pagarCompra,
+  registrarUsoDeEntrada,
 } from "../../src/api";
 import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
 
@@ -117,6 +121,38 @@ describe("obtenerMisCompras", () => {
   });
 });
 
+describe("obtenerComprasDelEvento (feature 008)", () => {
+  it("pide GET /eventos/:id/compras con el usuario actual, sin cuerpo, y devuelve la vista", async () => {
+    const vista = { evento: { id: "evento a/b" }, ventanaDeUso: {}, resumenPorTipo: [], compras: [] };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+
+    await expect(obtenerComprasDelEvento(cliente, "evento a/b")).resolves.toEqual(vista);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/eventos/evento%20a%2Fb/compras`, metodo: "GET" });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: {} });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerComprasDelEvento(cliente, "evento-festival", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/eventos/evento-festival/compras", { signal: controlador.signal });
+  });
+
+  it("un 403 llega como ErrorDeApi con su código", async () => {
+    const { cliente } = armar({
+      status: 403,
+      json: {
+        error: { codigo: "SIN_PERMISO", mensaje: "Solo el organizador del evento puede ver sus compras." },
+      },
+    });
+    const error = await obtenerComprasDelEvento(cliente, "evento-festival").catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({ status: 403, codigo: "SIN_PERMISO" });
+  });
+});
+
 describe("pagarCompra", () => {
   it("envía POST /compras/:id/pago sin cuerpo, en nombre del usuario dado", async () => {
     const { cliente, falso } = armar({ status: 200, json: { id: "compra-1" } });
@@ -141,5 +177,61 @@ describe("cancelarCompra", () => {
     });
     expect(falso.pedidos[0].cuerpo).toBeUndefined();
     expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-sofia");
+  });
+});
+
+describe("obtenerEntradaDelEvento (feature 008)", () => {
+  it("pide GET /eventos/:id/entradas/:codigo con el usuario actual, el código escapado y sin cuerpo", async () => {
+    const vista = { codigo: "7K3MQ9TB" };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+
+    await expect(obtenerEntradaDelEvento(cliente, "evento-festival", "7K3M Q9/TB")).resolves.toEqual(vista);
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/eventos/evento-festival/entradas/7K3M%20Q9%2FTB`,
+      metodo: "GET",
+    });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: {} });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerEntradaDelEvento(cliente, "evento-festival", "7K3MQ9TB", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/eventos/evento-festival/entradas/7K3MQ9TB", {
+      signal: controlador.signal,
+    });
+  });
+});
+
+describe("registrarUsoDeEntrada (feature 008)", () => {
+  it("envía POST /eventos/:id/entradas/:codigo/uso sin cuerpo, en nombre del usuario dado", async () => {
+    const { cliente, falso } = armar({ status: 200, json: { codigo: "7K3MQ9TB" } });
+    await expect(
+      registrarUsoDeEntrada(cliente, "evento-festival", "7K3M/Q9TB", { usuarioId: "usuario-lucia" }),
+    ).resolves.toEqual({ codigo: "7K3MQ9TB" });
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/eventos/evento-festival/entradas/7K3M%2FQ9TB/uso`,
+      metodo: "POST",
+    });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
+  });
+
+  it("un 409 llega como ErrorDeApi con su mensaje", async () => {
+    const { cliente } = armar({
+      status: 409,
+      json: { error: { codigo: "TRANSICION_INVALIDA", mensaje: "Esta entrada ya se utilizó." } },
+    });
+    const error = await registrarUsoDeEntrada(cliente, "evento-festival", "7K3MQ9TB", {
+      usuarioId: "usuario-lucia",
+    }).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({
+      status: 409,
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "Esta entrada ya se utilizó.",
+    });
   });
 });
