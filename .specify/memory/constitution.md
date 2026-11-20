@@ -15,7 +15,8 @@ es `docs/consigna/consigna.md` (casos de uso UC-01 a UC-12).
 - **Comprador**: explora y busca eventos, compra entradas, ve sus compras, chatea sobre una
   compra, la cancela y reseña eventos a los que asistió.
 - **Organizador**: crea eventos y sus tipos de entrada, ve las compras de sus eventos,
-  responde mensajes y registra el uso de entradas.
+  confirma los reembolsos de las compras canceladas de sus eventos, responde mensajes y
+  registra el uso de entradas.
 
 Ambos roles son un mismo **Usuario** (como en el diagrama de la consigna): una persona puede
 comprar entradas y también organizar eventos. El rol se determina por la relación con el
@@ -238,8 +239,8 @@ contra el contrato, y que la app muestre mensajes de error útiles.
 - No hay registro ni contraseñas (fuera del alcance del TP). La app elige un usuario de los
   precargados y el backend lo identifica por el header `X-Usuario-Id` mediante un middleware.
 - Los services DEBEN verificar la relación con el recurso: un comprador solo ve y opera sus
-  compras; un organizador solo ve las compras de sus eventos; el chat de una compra es solo de
-  sus dos partes.
+  compras; un organizador solo ve las compras de sus eventos y solo confirma sus reembolsos; el
+  chat de una compra es solo de sus dos partes.
 - Las respuestas DEBEN devolver vistas explícitas (campos elegidos), no documentos completos.
 
 **Rationale**: permite demostrar ambos roles en un mismo dispositivo sin implementar
@@ -361,4 +362,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.5.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-18
+**Version**: 2.5.1 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-20
