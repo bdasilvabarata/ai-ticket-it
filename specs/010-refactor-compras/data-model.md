@@ -78,6 +78,9 @@ Se conservan sin cambios de comportamiento: `registrar`, `pagar`, `cancelar`, `v
 `canceladaDesde`, `cambioDeCancelacion`, `cupoLiberadoPorTipo`; mismos códigos, mensajes y orden
 de los errores (FR-013).
 
+Si `compra.ts` pasa de 300 líneas, `cupoLiberadoPorTipo` se mueve a `domain/vencimiento.ts` sin
+cambiar su firma (plan, Complexity Tracking).
+
 ### Reembolso (valor derivado)
 
 ```ts

@@ -31,8 +31,9 @@ agregado propio: descartado en el backlog.
 ## R2. Invariantes de `Compra`: una lista de reglas con nombre
 
 **Decision**: `domain/reglas-de-compra.ts` exporta `REGLAS_DE_COMPRA: readonly ReglaDeCompra[]`
-con `ReglaDeCompra { nombre; campo; mensaje; cumple(propiedades): boolean }` y los predicados que
-también usa la compra (`pasoPorConfirmada`, `canceladaTrasConfirmar`). El constructor de `Compra`
+con `ReglaDeCompra { nombre; campo; mensaje; cumple(propiedades): boolean }` y `pasoPorConfirmada`,
+el único predicado que también usa la compra (para `fueConfirmada`); `esCantidadValida`,
+`ultimoEstado` y `canceladaTrasConfirmar` son privados del módulo. El constructor de `Compra`
 hace `for (const regla of REGLAS_DE_COMPRA) invariantes.exigir(regla.cumple(p), regla.campo,
 regla.mensaje)` y `verificar()`. Las once reglas y sus mensajes están en `data-model.md`. Cuando una
 regla solo tiene sentido si otra se cumple (una entrada por unidad exige una cantidad entera ≥ 1),

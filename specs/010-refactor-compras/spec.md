@@ -321,8 +321,8 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
   reglas en su propio módulo) y lo justifica.
 - **FR-012**: La compra DEBE exponer su **reembolso** como un único valor derivado de su
   historial y su total, sin guardarse aparte: "pendiente" (cancelada, se confirmó antes y es paga),
-  "confirmado" (reembolsada) o ninguno. Las vistas, la confirmación del reembolso y la semilla
-  DEBEN usar ese valor en lugar de combinar por su cuenta si tiene un reembolso pendiente y desde
+  "confirmado" (reembolsada) o ninguno. Las vistas, la confirmación del reembolso y los tests
+  que lo verifican (incluidos los de la semilla) DEBEN usar ese valor en lugar de combinar por su cuenta si tiene un reembolso pendiente y desde
   qué estado se canceló.
 - **FR-013**: Las transiciones de la compra (registrar, pagar, cancelar, vencer, registrar el uso,
   confirmar el reembolso, ponerse al día) y sus errores DEBEN conservar su comportamiento: mismos

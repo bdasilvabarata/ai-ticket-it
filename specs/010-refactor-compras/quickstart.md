@@ -12,8 +12,9 @@ Sobre la rama recién creada, igual a `development`:
 npm test && npm run lint && npm run typecheck && npm run format:check
 ```
 
-**Snapshot de la semilla por la API**: un script temporal (en el scratchpad, **no se commitea**)
-arma `crearApp({ reloj: relojFijo(INSTANTE) })` con un instante fijo y, con supertest, guarda en un
+**Snapshot de la semilla por la API**: un script temporal en
+`node_modules/.cache/010-refactor-compras/snapshot.ts` (fuera de git, **no se commitea**; sobrevive
+entre sesiones, a diferencia del scratchpad; ver T003) arma `crearApp({ reloj: relojFijo(INSTANTE) })` con un instante fijo y, con supertest, guarda en un
 JSON las respuestas de estos pedidos:
 
 | Pedido | Como |
@@ -25,7 +26,8 @@ JSON las respuestas de estos pedidos:
 | `GET /api/eventos/:eventoId/mis-compras` de los eventos con compras | cada comprador |
 | `GET /api/eventos` y `GET /api/eventos/:eventoId` de los eventos con compras | sin usuario |
 
-Se guarda como `antes.json`. Al terminar la feature se corre el mismo script → `despues.json`, y
+Se guarda como `node_modules/.cache/010-refactor-compras/antes.json`. Al terminar la feature se
+corre el mismo script → `node_modules/.cache/010-refactor-compras/despues.json`, y
 `diff antes.json despues.json` DEBE estar vacío (FR-004, US1 escenario 8).
 
 ## 2. Ciclo de TDD (durante cada fase)

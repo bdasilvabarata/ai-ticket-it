@@ -98,7 +98,8 @@ backend/src/
 │   ├── compra.ts               # Compra (≤ 300 líneas): transiciones, derivados, reembolso; re-exporta Entrada
 │   ├── compras-del-evento.ts   # resumenPorTipo usa compra.entradasUsadas
 │   ├── hora-buenos-aires.ts    # (opcional) diaDeCalendarioDeBuenosAires
-│   └── dias-restantes.ts       # (opcional) sin split
+│   ├── dias-restantes.ts       # (opcional) sin split
+│   └── vencimiento.ts          # (solo si compra.ts pasa de 300) cupoLiberadoPorTipo
 ├── services/
 │   ├── compra.service.ts       # + obtenerPorCodigoOFallar, + registrarUso
 │   ├── entrada.service.ts      # recibe CompraService; sin RepositorioCompras ni cerrojo
@@ -130,6 +131,10 @@ Lo nuevo son dos módulos puros en `backend/src/domain/` y dos componentes inter
 
 ## Orden de implementación (para `/speckit-tasks`)
 
+Es el orden lógico de los tramos. La numeración de fases que manda es la de `tasks.md`: los puntos
+2 y 3 de esta lista son allí las Fases 3 y 4, la Fase 2 (Foundational) queda vacía y el cierre
+(backlog y PR) es una fase propia.
+
 Cada fase deja todo en verde y es un commit (AGENTS.md, "Implement por fases"):
 
 1. **Setup**: rama al día, suite completa en verde como línea de base y snapshot de la semilla por
@@ -139,14 +144,16 @@ Cada fase deja todo en verde y es un commit (AGENTS.md, "Implement por fases"):
    `reglas-de-compra.ts` con sus tests primero; `compra.ts` las usa; semilla, ayudantes de tests y
    tests de dominio/services adaptados sin perder casos (R10).
 4. **US1 – `compra.reembolso`** (punto 4): reemplaza a `tieneReembolsoPendiente`; vistas y
-   `confirmarReembolso` lo usan.
+   `confirmarReembolso` lo usan. Cierra US1 con la aclaración PATCH de la constitución (R9), para
+   que el código y la constitución describan la misma entrada desde el primer commit del modelo.
 5. **US2 – vistas compuestas** (punto 5).
 6. **US2 – un solo dueño** (punto 6): `CompraService.obtenerPorCodigoOFallar` y `registrarUso`;
    `EntradaService` delega; `app.ts` y `services-de-eventos.ts`.
 7. **US3 – app** (puntos 2 y 7): invalidaciones de `useRegistrarUso` (con la excepción del test) y
    "Registrar ingreso" en piezas.
-8. **Documentación** (punto 8): AGENTS.md, skills si aplica, constitución PATCH, backlog.
+8. **Documentación** (punto 8): AGENTS.md, skills si aplica, comparación con la línea de base.
 9. **Opcional (US4)**: `useEnvioUnico` y `diasRestantes` sin `split`.
+10. **Cierre**: backlog (estado y opcionales hechos) y PR, con o sin el punto 9.
 
 ## Complexity Tracking
 
@@ -154,5 +161,6 @@ Cada fase deja todo en verde y es un commit (AGENTS.md, "Implement por fases"):
 |---|---|---|
 | `domain/entrada.ts` (~70 líneas) | La entrada tiene comportamiento propio (`usar`, `cancelar`, `usada`, `estadoPropio`, `motivoNoUsable`) y la 012 la va a leer sola; separarla es lo que baja `compra.ts` de 536 a ≤ 300 (SC-005) | Dejarla en `compra.ts`: no se llega a ≤ 300 sin borrar documentación |
 | `domain/reglas-de-compra.ts` (~110 líneas) | Once reglas con nombre, mensaje y predicado propio (FR-009) se leen y prueban una por una; el constructor de `Compra` solo las recorre | Reglas como métodos privados de `Compra`: vuelve a concentrar todo en el mismo archivo |
+| `domain/vencimiento.ts` (**solo si hace falta**, ~15 líneas) | Si tras sacar `Entrada` y las reglas `compra.ts` sigue pasando de 300 líneas (SC-005), `cupoLiberadoPorTipo` sale de la compra: opera sobre una lista de compras, no sobre una, y solo la usa `VencimientoService` | Recortar JSDoc de reglas o transiciones para llegar a 300: pierde la documentación que la 011 y la 012 necesitan |
 | `componentes/BuscadorDeCodigo.tsx`, `ResultadoDeIngreso.tsx` | Lo pide FR-019 (piezas con nombre propio, sin ternarios anidados) | Funciones internas en la pantalla: la pantalla sigue de 165+ líneas y mezcla los dos bloques |
 | `useEnvioUnico.ts` (opcional) | Deduplica la marca sincrónica de doble envío de dos pantallas (FR-020) | Dejar el `useRef` repetido (es lo que pasa si no se hace la fase opcional) |
