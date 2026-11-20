@@ -19,7 +19,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 006 | **Comprar entradas**: elegir tipo y cantidad sin superar el cupo, compra `PENDIENTE` y pago simulado → `CONFIRMADA` | UC-12 | P1 | 004 (cerrojo por evento y compra mínima), 005 (detalle del evento) | integrada |
 | 007 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 006 | integrada |
 | 008 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 004, 006 | en PR |
-| 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | pendiente |
+| 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | plan |
 | 010 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 007, 008 | pendiente |
 | 011 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008 | pendiente |
 | 012 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 005 | pendiente |
@@ -88,8 +88,9 @@ graph LR
   evento)? ¿con qué dato la identifica?~~ Resuelta en su clarify: dentro de la ventana de uso
   (desde 4 h antes hasta 12 h después del inicio, inclusive), por **entrada**, con el código de 8
   caracteres que solo ve el comprador; con la primera entrada usada la compra pasa a `UTILIZADA`.
-- 009: ¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
-  organizador? Hoy `POST /compras/:compraId/cancelacion` (006) solo acepta una `PENDIENTE` y la app
+- 009: ~~¿el reembolso es inmediato (`CANCELADA → REEMBOLSADA` automático) o lo confirma el
+  organizador?~~ Resuelta en su clarify: lo confirma el organizador desde "Compras del evento", sin
+  plazo; las compras gratis no se reembolsan. Hoy `POST /compras/:compraId/cancelacion` (006) solo acepta una `PENDIENTE` y la app
   muestra "Cancelar compra" solo en ellas: cancelar una `CONFIRMADA` es de la 009, que también
   tiene que rechazar la cancelación de una entrada ya usada (una `UTILIZADA` nunca se cancela,
   008) y correr bajo el cerrojo del evento, como el uso. Plazo **decidido** (revisión del plan de la 006): el de la constitución, hasta que el
