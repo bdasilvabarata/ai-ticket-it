@@ -2,6 +2,7 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it, vi } from "vitest";
 import { AHORA, DIA, compra, evento, relojMovible, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
+import type { Cerrojo } from "../../src/services/cerrojo-por-clave";
 
 // Mismo enfoque que concurrencia.test.ts (004): `Promise.allSettled` sobre los services reales; los
 // repositorios devuelven promesas y cada `await` cede el turno, así que sin cerrojo las operaciones
@@ -312,5 +313,211 @@ describe("Concurrencia: uso de entradas (feature 008, SC-006)", () => {
     const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
     expect(guardada.estado).toBe(EstadoCompra.CANCELADA);
     expect(guardada.historial).toHaveLength(2);
+  });
+});
+
+describe("Concurrencia: cancelación y reembolso (feature 009, US4, SC-005)", () => {
+  const INICIO = 2 * 60 * MINUTO;
+
+  /**
+   * Un evento de Lucía que empieza en 2 h (ventana de uso abierta y sin empezar) con General en
+   * `cupo` y una compra CONFIRMADA de Martín de `cantidad` entradas.
+   */
+  function armarCancelacion({ cupo = 7, cantidad = 3 }: { cupo?: number; cantidad?: number } = {}) {
+    const reloj = relojMovible();
+    const servicios = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a", en: INICIO, tiposEntrada: [tipo({ id: "tipo-a-general", cupo })] })],
+      compras: [
+        compra("evento-a", "tipo-a-general", EstadoCompra.CONFIRMADA, { id: "compra-martin", cantidad }),
+      ],
+      reloj,
+    });
+    const cupoGuardado = async () =>
+      (await servicios.repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-general")?.cupo;
+    return { ...servicios, reloj, cupoGuardado };
+  }
+
+  const rechazo = (r: PromiseSettledResult<unknown>) => (r as PromiseRejectedResult).reason as Error;
+
+  /** Toma el cerrojo de `evento-a` y no lo suelta hasta `liberar()`; resuelve cuando ya lo tiene. */
+  async function bloquear(cerrojo: Cerrojo) {
+    let liberar = () => {};
+    let bloqueo: Promise<void> = Promise.resolve();
+    await new Promise<void>((tomado) => {
+      bloqueo = cerrojo.ejecutar("evento-a", () => {
+        tomado();
+        return new Promise<void>((resolver) => (liberar = resolver));
+      });
+    });
+    return { liberar: () => liberar(), bloqueo };
+  }
+
+  /** Deja correr las lecturas previas al cerrojo (los repositorios en memoria resuelven en microtareas). */
+  const dejarCorrer = () => new Promise<void>((resolver) => setTimeout(resolver, 0));
+
+  /**
+   * Las dos operaciones esperando a la vez el cerrojo del evento, encoladas en el orden dado, y
+   * devueltas siempre como [a, b]. Lanzarlas con un `Promise.allSettled` desnudo deja ganar siempre
+   * a la misma (`cancelar` lee la compra antes de tomar el cerrojo), así que se las encola con el
+   * cerrojo tomado para recorrer los dos desenlaces.
+   */
+  async function enCarrera<A, B>(
+    cerrojo: Cerrojo,
+    a: () => Promise<A>,
+    b: () => Promise<B>,
+    primeroA: boolean,
+  ): Promise<[PromiseSettledResult<A>, PromiseSettledResult<B>]> {
+    const { liberar, bloqueo } = await bloquear(cerrojo);
+    let pa: Promise<A> | undefined;
+    let pb: Promise<B> | undefined;
+    if (primeroA) pa = a();
+    else pb = b();
+    await dejarCorrer();
+    if (primeroA) pb = b();
+    else pa = a();
+    await dejarCorrer();
+    liberar();
+    await bloqueo;
+    return Promise.allSettled([pa!, pb!]);
+  }
+
+  it("uso ‖ cancelación de la misma CONFIRMADA, 20 veces alternando el orden → siempre gana exactamente uno, con historial y cupo coherentes", async () => {
+    const ganadores = new Set<string>();
+    for (let i = 0; i < 20; i += 1) {
+      const { entradaService, compraService, repositorioCompras, cerrojo, cupoGuardado } = armarCancelacion();
+      const codigo = (await repositorioCompras.buscarPorId("compra-martin"))!.entradas[0]!.codigo;
+
+      const [uso, cancelacion] = await enCarrera(
+        cerrojo,
+        () => entradaService.registrarUso("evento-a", codigo, "usuario-lucia"),
+        () => compraService.cancelar("compra-martin", "usuario-martin"),
+        i % 2 === 0,
+      );
+
+      expect([uso.status, cancelacion.status].toSorted()).toEqual(["fulfilled", "rejected"]);
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      const usadas = guardada.entradas.filter((e) => e.tieneCambioA(EstadoCompra.UTILIZADA));
+      const canceladas = guardada.entradas.filter((e) => e.tieneCambioA(EstadoCompra.CANCELADA));
+      expect(usadas.length === 0 || canceladas.length === 0).toBe(true);
+
+      if (uso.status === "fulfilled") {
+        ganadores.add("uso");
+        expect(rechazo(cancelacion)).toMatchObject({
+          codigo: "TRANSICION_INVALIDA",
+          message: "Ya se usó una entrada de esta compra: no se puede cancelar.",
+        });
+        expect(guardada.estado).toBe(EstadoCompra.UTILIZADA);
+        expect(guardada.historial.some((c) => c.estado === EstadoCompra.CANCELADA)).toBe(false);
+        expect(await cupoGuardado()).toBe(7);
+      } else {
+        ganadores.add("cancelacion");
+        expect(rechazo(uso)).toMatchObject({
+          codigo: "TRANSICION_INVALIDA",
+          message: "La compra de esta entrada está cancelada.",
+        });
+        expect(guardada.estado).toBe(EstadoCompra.CANCELADA);
+        expect(guardada.historial).toHaveLength(3);
+        expect(guardada.historial.filter((c) => c.estado === EstadoCompra.CANCELADA)).toHaveLength(1);
+        expect(usadas).toHaveLength(0);
+        expect(await cupoGuardado()).toBe(10);
+      }
+    }
+    // Con el orden alternado gana cada una según quién llega primero al cerrojo.
+    expect(ganadores).toEqual(new Set(["uso", "cancelacion"]));
+  });
+
+  it("10 cancelaciones simultáneas de la misma CONFIRMADA → una cumplida, nueve «La compra ya está cancelada.» y el cupo devuelto una vez", async () => {
+    const { compraService, repositorioCompras, cupoGuardado } = armarCancelacion();
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: 10 }, () => compraService.cancelar("compra-martin", "usuario-martin")),
+    );
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of resultados.filter((r) => r.status === "rejected")) {
+      expect(rechazo(r)).toMatchObject({
+        codigo: "TRANSICION_INVALIDA",
+        message: "La compra ya está cancelada.",
+      });
+    }
+    const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+    expect(guardada.historial.filter((c) => c.estado === EstadoCompra.CANCELADA)).toHaveLength(1);
+    expect(await cupoGuardado()).toBe(10);
+  });
+
+  it("10 confirmarReembolso simultáneos → uno cumplido, nueve «El reembolso de esta compra ya se confirmó.» y un solo REEMBOLSADA", async () => {
+    const { compraService, repositorioCompras, cupoGuardado } = armarCancelacion();
+    await compraService.cancelar("compra-martin", "usuario-martin");
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: 10 }, () => compraService.confirmarReembolso("compra-martin", "usuario-lucia")),
+    );
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of resultados.filter((r) => r.status === "rejected")) {
+      expect(rechazo(r)).toMatchObject({
+        codigo: "TRANSICION_INVALIDA",
+        message: "El reembolso de esta compra ya se confirmó.",
+      });
+    }
+    const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+    expect(guardada.estado).toBe(EstadoCompra.REEMBOLSADA);
+    expect(guardada.historial.filter((c) => c.estado === EstadoCompra.REEMBOLSADA)).toHaveLength(1);
+    expect(await cupoGuardado()).toBe(10);
+  });
+
+  it("cancelación ‖ compra nueva del mismo tipo con el cupo agotado → cupo final = inicial − comprado + devuelto, nunca negativo ni de más", async () => {
+    const vistos = new Set<string>();
+    for (let i = 0; i < 10; i += 1) {
+      const { compraService, repositorioEventos, cerrojo, cupoGuardado } = armarCancelacion({
+        cupo: 0,
+        cantidad: 2,
+      });
+      const guardar = repositorioEventos.guardar.bind(repositorioEventos);
+      const cupos: number[] = [];
+      vi.spyOn(repositorioEventos, "guardar").mockImplementation(async (guardado) => {
+        cupos.push(guardado.buscarTipoEntrada("tipo-a-general")?.cupo ?? -1);
+        await guardar(guardado);
+      });
+
+      const [cancelacion, compraNueva] = await enCarrera(
+        cerrojo,
+        () => compraService.cancelar("compra-martin", "usuario-martin"),
+        () =>
+          compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-general", cantidad: 2 }),
+        i % 2 === 0,
+      );
+
+      expect(cancelacion.status).toBe("fulfilled");
+      if (compraNueva.status === "rejected") {
+        expect(rechazo(compraNueva)).toMatchObject({ codigo: "CUPO_INSUFICIENTE" });
+      }
+      vistos.add(compraNueva.status);
+      const comprado = compraNueva.status === "fulfilled" ? 2 : 0;
+      expect(await cupoGuardado()).toBe(0 - comprado + 2);
+      expect(cupos.every((cupo) => cupo >= 0 && cupo <= 2)).toBe(true);
+    }
+    // Si la cancelación llega primero, la compra nueva entra; si no, se rechaza por cupo.
+    expect(vistos).toEqual(new Set(["fulfilled", "rejected"]));
+  });
+
+  it("el evento empieza entre la lectura y la cancelación → EVENTO_REALIZADO (el reloj se lee dentro del cerrojo, US4-4)", async () => {
+    const { compraService, repositorioCompras, cerrojo, reloj, cupoGuardado } = armarCancelacion();
+    expect((await compraService.obtener("compra-martin", "usuario-martin")).cancelable).toBe(true);
+
+    // La cancelación espera el cerrojo; mientras, el evento empieza.
+    const { liberar, bloqueo } = await bloquear(cerrojo);
+    const cancelacion = compraService.cancelar("compra-martin", "usuario-martin");
+    await dejarCorrer();
+    reloj.avanzar(INICIO);
+    liberar();
+    await bloqueo;
+
+    await expect(cancelacion).rejects.toMatchObject({
+      codigo: "EVENTO_REALIZADO",
+      message: "El evento ya empezó: ya no se puede cancelar la compra.",
+    });
+    expect((await repositorioCompras.buscarPorId("compra-martin"))!.estado).toBe(EstadoCompra.CONFIRMADA);
+    expect(await cupoGuardado()).toBe(7);
   });
 });

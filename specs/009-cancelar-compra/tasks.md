@@ -224,7 +224,7 @@ serializan en el cerrojo del evento: se aplica exactamente lo que corresponde y 
 **Independent Test**: reloj dentro de la ventana y antes del inicio; N repeticiones de uso y
 cancelación simultáneos de la misma compra → siempre una sola gana, historial y cupo coherentes.
 
-- [ ] T026 [US4] Test en `backend/tests/services/concurrencia-compras.test.ts` (se amplía), con reloj fijo dentro de la ventana de uso y antes del inicio. Casos (US4, FR-014, SC-005):
+- [X] T026 [US4] Test en `backend/tests/services/concurrencia-compras.test.ts` (se amplía), con reloj fijo dentro de la ventana de uso y antes del inicio. Casos (US4, FR-014, SC-005):
   - uso de una entrada ‖ cancelación de su compra `CONFIRMADA`, repetido N (20) veces con compras nuevas y alternando el orden de lanzamiento: **exactamente uno** resuelve; si ganó el uso, la cancelación da `TRANSICION_INVALIDA` "Ya se usó una entrada…" y la compra queda `UTILIZADA` con el cupo sin devolver; si ganó la cancelación, el uso da `TRANSICION_INVALIDA` "La compra de esta entrada está cancelada.", la compra queda `CANCELADA` con un único cambio nuevo y el cupo devuelto una vez; nunca conviven entradas usadas y canceladas (el constructor lo impediría);
   - N (10) cancelaciones simultáneas de la misma `CONFIRMADA` → una `200` y las demás `TRANSICION_INVALIDA` "La compra ya está cancelada."; el cupo sube `cantidad` **una** vez y el historial suma **un** `CANCELADA`;
   - N (10) `confirmarReembolso` simultáneos → uno resuelve y los demás `TRANSICION_INVALIDA` "El reembolso de esta compra ya se confirmó."; **un** `REEMBOLSADA`;
