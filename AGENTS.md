@@ -38,7 +38,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - `repositories/` son repositorios **en memoria** (un `Map` privado por repositorio); no hay
     base de datos. `seed/` arma los datos de ejemplo y `crearRepositoriosDeEjemplo()` (desde la
     008, con "Peña en La Rueda" de Lucía a la hora en punto más cercana a `ahora + 2 h` del
-    arranque: su ventana de uso está abierta para probar "Registrar ingreso");
+    arranque: su ventana de uso está abierta para probar "Registrar ingreso"; desde la 009, con dos
+    compras canceladas del Maratón de Lucía: la de Diego con el reembolso pendiente y la de
+    Valentina `REEMBOLSADA`);
     `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
@@ -52,7 +54,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     nada, ordenadas y como `MiCompraVista`, sin `historial` ni `compradorId`, con `diasRestantes` y
     `canceladaPor`; la 008 suma `GET /eventos/:eventoId/compras`: solo para su organizador, al día y
     sin guardar, `ComprasDelEventoVista` con la ventana de uso, el resumen por tipo y las compras de
-    todos los compradores **sin códigos**), `entradas` (feature 008: router hijo
+    todos los compradores **sin códigos**; la 009 amplía `POST /compras/:compraId/cancelacion` a una
+    `CONFIRMADA` —antes del inicio del evento y sin entradas usadas; orden de rechazos 401 → 400 →
+    404 `COMPRA_NO_ENCONTRADA` → 403 → 409 `COMPRA_VENCIDA` → 409 `EVENTO_REALIZADO` (solo en una
+    `CONFIRMADA`; una `PENDIENTE` se cancela también con el evento empezado) → 409
+    `TRANSICION_INVALIDA`— y suma `POST /compras/:compraId/reembolso`: solo el organizador del
+    evento, sin plazo, bajo el cerrojo con `obtenerDelOrganizador`, **un** `guardar` (el cupo no
+    cambia) y responde `CompraDelEventoVista`; rechazos 401 → 400 → 404 → 403 → 409
+    `TRANSICION_INVALIDA`), `entradas` (feature 008: router hijo
     `eventos/:eventoId/entradas` con `GET /:codigo` y `POST /:codigo/uso`, solo el organizador;
     `EntradaService` con `obtener` (lectura) y `registrarUso` (bajo el cerrojo); orden de chequeos
     del uso: 401 → 400 → 404 `EVENTO_NO_ENCONTRADO` → 403 → 404 `ENTRADA_NO_ENCONTRADA`
@@ -70,7 +79,16 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   - **Compras** (feature 006): `domain/compra.ts` es una `Compra` con **historial** de cambios de
     estado (`{ estado, autor: usuario | sistema, fechaHora }`; el estado es el del último, el primero
     siempre `PENDIENTE`) y transiciones que devuelven una `Compra` nueva (`registrar`, `pagar`,
-    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia` y, en la 008, `registrarUso`). `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
+    `cancelar` —una `PENDIENTE` por su comprador—, `vencer`, `alDia` y, en la 008, `registrarUso`).
+    La 009 cambia la firma a `cancelar(usuarioId, ahora, inicioDelEvento)` (también una
+    `CONFIRMADA`, hasta el inicio exclusive, con un cambio propio `CANCELADA` en cada entrada) y suma
+    `confirmarReembolso(organizadorId, ahora)` (`CANCELADA → REEMBOLSADA`) y
+    `motivoNoCancelable(inicioDelEvento, ahora)` (`evento-empezado` · `entrada-usada` · `cancelada` ·
+    `reembolsada` o `null`). Lo nuevo se **deriva del historial**, sin campos guardados:
+    `fueConfirmada`, `canceladaDesde` (`PENDIENTE`/`CONFIRMADA` en una `CANCELADA` o
+    `REEMBOLSADA`), `cambioDeCancelacion` y `tieneReembolsoPendiente()` (`CANCELADA` ∧ pasó por
+    `CONFIRMADA` ∧ `total > 0`; una gratis cancelada no tiene reembolso); un `REEMBOLSADA` solo es
+    el último cambio y sigue a un `CANCELADA`. `domain/tope-por-persona.ts` (`entradasRestantes`, `exigirTopePorPersona`)
     aplica `LIMITES_COMPRA` sobre las compras **vigentes**. `RepositorioCompras` suma `siguienteId`,
     `buscarPorId`, `listarPorEventoYComprador` y `listarPendientesPorEventos` (las guardadas
     `PENDIENTE`, vencidas o no); `existePorEvento` / `existePorTipoEntrada` cuentan toda compra,
@@ -92,7 +110,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     estado de una entrada se **deriva** del de la compra hasta que se confirma; después,
     `Compra.registrarUso(codigo, organizadorId, ahora)` la pasa a `UTILIZADA` y, con la **primera**
     usada, también la compra (un único cambio `UTILIZADA` en su historial). `esVigente` incluye
-    `UTILIZADA` (cuenta para el tope) y una `UTILIZADA` no se cancela. `domain/ventana-de-uso.ts`
+    `UTILIZADA` (cuenta para el tope) y una `UTILIZADA` no se cancela. Al cancelar una confirmada
+    (009), cada entrada suma su cambio propio `CANCELADA` (`Entrada.cancelar`); `estadoEn` devuelve el
+    de la compra solo si nunca se confirmó, y `entradasCoherentes` exige, en una `CANCELADA` o
+    `REEMBOLSADA` después de confirmada, un único cambio propio `CANCELADA` por entrada (su código
+    ya no sirve en "Registrar ingreso"). `domain/ventana-de-uso.ts`
     (del inicio − 4 h al inicio + 12 h, inclusive; `estadoDeVentana`: `antes` · `abierta` ·
     `despues`; `exigirVentanaAbierta`) y `domain/compras-del-evento.ts` (`resumenPorTipo` en el orden
     del evento y `compararComprasDelEvento`: `creadaEn` descendente → `id`) son puros.
@@ -104,6 +126,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     también en `MiCompraVista`), y `mis-compras.confirmadas` incluye las `UTILIZADA`.
     `registrarUso` toma el cerrojo del evento, lee `ahora` adentro, materializa con
     `obtenerDelOrganizador`, relee la compra por código y hace **un** `guardar`; el cupo no cambia.
+  - **Cancelación y reembolso** (feature 009): las vistas suman `canceladaDesde` y `reembolso`
+    (`ReembolsoVista`: `pendiente` · `confirmado` con el `monto` = total, o `null`) en
+    `CompraVista`, `MiCompraVista` y `CompraDelEventoVista` (`aReembolsoVista` en
+    `compra.vistas.ts`), y `cancelable`/`motivoNoCancelable` (tipo `MotivoNoCancelable` de `shared/`)
+    solo en `CompraVista`, calculados al día en cada consulta. `canceladaPor` sale del cambio a
+    `CANCELADA` y llega también en una `REEMBOLSADA`. `CompraService.cancelar` de una confirmada
+    guarda primero la compra y después el evento con el cupo devuelto (como la de una pendiente);
+    `CompraService.confirmarReembolso` lee la compra afuera solo para saber qué cerrojo tomar.
   - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
     nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
     (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
@@ -257,7 +287,19 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       volver con `useRefrescarAlFocalizar` (compartido con `MisCompras`) y ante un 404 del evento
       salen a "Mis eventos" con `useSalirSiNoExisteElEvento` (`evento-inexistente.ts`). Para el
       comprador, `ListaDeEntradas` muestra los códigos ("Tus entradas") en "Tu compra" y en "Ver mis
-      entradas", y "N de M entradas usadas" acompaña a una `UTILIZADA`. "Ver compras", en la edición
+      entradas", y "N de M entradas usadas" acompaña a una `UTILIZADA`. La 009 suma, en "Tu
+      compra", la sección `Cancelacion` de una confirmada: "Cancelar compra" solo si el servidor dice
+      `cancelable` (confirmado con `Alert` y `textoConfirmarCancelacion`; un 409 se muestra con el
+      mensaje del servidor) o, en su lugar, el motivo de `textoMotivoNoCancelable`, y "Te devolvimos
+      $ N" en una `REEMBOLSADA`; avisos de reembolso pendiente o confirmado en las tres listas. Para
+      el organizador, "Confirmar reembolso" en `FilaCompraDelEvento` (solo con `reembolso.estado ===
+      "pendiente"`), **como hermano** del bloque accesible de la fila, con la mutation
+      `useConfirmarReembolso(usuarioId, eventoId)` (`confirmarReembolso` de `src/api`, sin
+      reintentos; una para todas las filas, con la fila en curso en `variables`), que invalida
+      `comprasDelEvento` y, por prefijo, `["entrada-del-evento"]`, `["compra"]`, `["mis-compras"]` y
+      `["mis-compras-del-evento"]` (no el evento ni el catálogo: el cupo no cambia).
+      `useCancelarCompra` invalida además, por prefijo, `["compras-del-evento"]` y
+      `["entrada-del-evento"]` (lo del organizador). "Ver compras", en la edición
       y la solo lectura del evento propio, está en `eventos` y navega **por la ruta tipada** (sin
       importar `compras`).
   - **Conectores** (los únicos fuera de `features/` que importan features):

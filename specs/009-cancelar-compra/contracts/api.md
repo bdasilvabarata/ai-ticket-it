@@ -70,7 +70,7 @@ X-Usuario-Id: usuario-martin
 }
 ```
 
-Después, `GET /api/eventos/evento-festival-sonidos-del-sur` muestra el cupo de VIP en 50 (48 + 2),
+Después, `GET /api/eventos/evento-festival-sonidos-del-sur` muestra el cupo de VIP en 52 (50 + 2: el seed ya descuenta las de Martín),
 también en el catálogo y para cualquier usuario, y `GET /api/eventos/:id/mis-compras` de Martín
 vuelve a dar `restantes` 4 para los tipos pagos.
 

@@ -25,8 +25,8 @@ Cada bloque arranca con el servidor recién iniciado (los datos vuelven al seed 
 |---|---|---|
 | 1 | `GET /api/compras/compra-martin-festival-vip` como Martín | `CONFIRMADA`, `cancelable: true`, `motivoNoCancelable: null`, `reembolso: null` |
 | 2 | `POST /api/compras/compra-martin-festival-vip/cancelacion` como Martín | 200, `CANCELADA`, `canceladaDesde: "CONFIRMADA"`, `reembolso: { "pendiente", 240000 }`, `entradas: []`; el historial termina en `CANCELADA` por Martín |
-| 3 | `GET /api/eventos/evento-festival-sonidos-del-sur` | VIP con cupo 50 (subió 2) |
-| 4 | repetir 2 | 409 `TRANSICION_INVALIDA` "La compra ya está cancelada."; el cupo sigue en 50 |
+| 3 | `GET /api/eventos/evento-festival-sonidos-del-sur` | VIP con cupo 52 (subió 2 desde los 50 del seed) |
+| 4 | repetir 2 | 409 `TRANSICION_INVALIDA` "La compra ya está cancelada."; el cupo sigue en 52 |
 | 5 | `GET /api/compras/compra-martin-pena-general` como Martín | `UTILIZADA`, `cancelable: false`, `motivoNoCancelable: "entrada-usada"` |
 | 6 | `POST /api/compras/compra-martin-pena-general/cancelacion` como Martín | 409 `TRANSICION_INVALIDA` "Ya se usó una entrada…" |
 | 7 | `POST /api/compras/compra-sofia-pena-con-cena/cancelacion` como Lucía | 403 `SIN_PERMISO` |
@@ -54,7 +54,7 @@ pedidos.
    muestra "Cancelar compra". Tocarlo: el `Alert` dice 2 entradas, $ 240.000, que el organizador
    confirma el reembolso y que no se puede deshacer. "Volver" no cambia nada; "Cancelar compra"
    deja la compra "Cancelada" con "Cancelaste esta compra. El organizador tiene que confirmar el
-   reembolso de $ 240.000" y sin la lista de entradas. "Volver al evento": VIP muestra 50
+   reembolso de $ 240.000" y sin la lista de entradas. "Volver al evento": VIP muestra 52
    disponibles y "Comprar" deja elegir hasta 4.
 2. **No cancelable (US3)**: Martín → "Mis compras" → "Peña en La Rueda": en lugar del botón dice "Ya
    usaste una entrada". En "Mis compras" ninguna fila tiene "Cancelar".
