@@ -72,9 +72,11 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
 }
 
 /**
- * Cancela una compra pendiente (sin esperar a que venza). Al terminar, con éxito o error, invalida lo
- * mismo que el pago: la compra, las compras del usuario en el evento y en "Mis compras", el evento
- * (todos los usuarios: su cupo volvió) y el catálogo.
+ * Cancela una compra pendiente (sin esperar a que venza) o, desde la 009, una confirmada. Al terminar,
+ * con éxito o error, invalida lo mismo que el pago: la compra, las compras del usuario en el evento y
+ * en "Mis compras", el evento (todos los usuarios: su cupo volvió) y el catálogo; y, por prefijo, lo
+ * que ve el organizador ("Compras del evento" y la entrada buscada en "Registrar ingreso"), que es
+ * otro usuario y puede estar en la caché de este dispositivo (R10).
  */
 export function useCancelarCompra(usuarioId: string, compraId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -91,6 +93,8 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
         queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+        queryClient.invalidateQueries({ queryKey: ["compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
       ]),
   });
 }

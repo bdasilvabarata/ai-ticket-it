@@ -1,7 +1,10 @@
+import type { QueryClient } from "@tanstack/react-query";
 import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
 import { router } from "expo-router";
 
+import { claves } from "../../src/consultas/claves";
 import {
+  CODIGOS_DE_LA_MARATON,
   compraCancelada,
   compraCanceladaDesdeConfirmada,
   compraCanceladaPorElComprador,
@@ -19,7 +22,7 @@ import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "
 import { espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { diego, martin, todos } from "../helpers/usuarios";
+import { diego, lucia, martin, todos } from "../helpers/usuarios";
 
 type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 
@@ -545,6 +548,102 @@ describe("Cancelar una compra confirmada desde Tu compra (feature 009, US1)", ()
 
     expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+});
+
+describe("Cancelar una confirmada: lo que se refresca después (feature 009, US5, FR-021, FR-022, R10)", () => {
+  const TITULO = "¿Cancelar la compra de 2 entradas Inscripción?";
+  const AVISO = "Cancelaste esta compra. El organizador tiene que confirmar el reembolso de $ 60.000";
+  const EVENTO_ID = "evento-maraton-10k";
+  const CODIGO = CODIGOS_DE_LA_MARATON[0];
+
+  /**
+   * Siembra consultas que la pantalla no tiene montadas (así quedan invalidadas sin volver a pedirse):
+   * las de Lucía como organizadora y las del comprador que no están a la vista.
+   */
+  function sembrar(queryClient: QueryClient) {
+    const sembradas = [
+      claves.comprasDelEvento(lucia.id, EVENTO_ID),
+      claves.entradaDelEvento(lucia.id, EVENTO_ID, CODIGO),
+      claves.evento(lucia.id, EVENTO_ID),
+      claves.misComprasDelEvento(martin.id, EVENTO_ID),
+      claves.misCompras(martin.id),
+      claves.catalogo({ texto: "maraton", categoriaId: null, orden: "fecha", sentido: "asc" }),
+    ];
+    for (const clave of sembradas) queryClient.setQueryData(clave, { sembrada: true });
+    return sembradas;
+  }
+
+  async function cancelarDesdeTuCompra(opciones: Opciones) {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra(opciones);
+    const sembradas = sembrar(resultado.deps.queryClient);
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+    return { resultado, sembradas };
+  }
+
+  const invalidada = (queryClient: QueryClient, clave: readonly unknown[]) =>
+    queryClient.getQueryState(clave)?.isInvalidated;
+
+  it("con éxito invalida lo de la 006 y, por prefijo, Compras del evento y la entrada buscada por Lucía", async () => {
+    const { resultado, sembradas } = await cancelarDesdeTuCompra({
+      compra: [
+        { status: 200, json: compraConfirmada },
+        { status: 200, json: compraCanceladaDesdeConfirmada },
+      ],
+      cancelacion: [{ status: 200, json: compraCanceladaDesdeConfirmada }],
+    });
+
+    expect(await screen.findByText(AVISO)).toBeOnTheScreen();
+    for (const clave of sembradas) {
+      await waitFor(() => expect(invalidada(resultado.deps.queryClient, clave)).toBe(true));
+    }
+  });
+
+  it("con éxito escribe la respuesta en la compra: se ve cancelada aunque la relectura no llegue", async () => {
+    const { resultado } = await cancelarDesdeTuCompra({
+      compra: [{ status: 200, json: compraConfirmada }, "colgar"],
+      cancelacion: [{ status: 200, json: compraCanceladaDesdeConfirmada }],
+    });
+
+    expect(await screen.findByText(AVISO)).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(resultado.deps.queryClient.getQueryData(claves.compra(martin.id, "compra-nueva"))).toEqual(
+      compraCanceladaDesdeConfirmada,
+    );
+  });
+
+  it("con error también invalida Compras del evento y la entrada de Lucía", async () => {
+    const { resultado } = await cancelarDesdeTuCompra({
+      compra: [{ status: 200, json: compraConfirmada }],
+      cancelacion: ["rechazar"],
+    });
+
+    expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
+    const queryClient = resultado.deps.queryClient;
+    expect(invalidada(queryClient, claves.comprasDelEvento(lucia.id, EVENTO_ID))).toBe(true);
+    expect(invalidada(queryClient, claves.entradaDelEvento(lucia.id, EVENTO_ID, CODIGO))).toBe(true);
+  });
+
+  it("respuesta perdida: la relectura muestra la compra cancelada de verdad y la cancelación no se reintenta sola", async () => {
+    // El servidor aplica la cancelación, pero la respuesta no llega.
+    let cancelada = false;
+    const { resultado } = await cancelarDesdeTuCompra({
+      compra: [() => ({ status: 200, json: cancelada ? compraCanceladaDesdeConfirmada : compraConfirmada })],
+      cancelacion: [
+        () => {
+          cancelada = true;
+          return "rechazar";
+        },
+      ],
+    });
+
+    expect(await screen.findByText(AVISO)).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
+    await act(() => jest.advanceTimersByTimeAsync(70_000));
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(1);
   });
 });
 

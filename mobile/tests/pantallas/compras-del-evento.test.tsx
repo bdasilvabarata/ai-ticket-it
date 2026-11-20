@@ -594,6 +594,31 @@ describe("Compras del evento: confirmar el reembolso (feature 009, US2)", () => 
     expect(await screen.findByText(mensaje)).toBeOnTheScreen();
   });
 
+  it("reembolso aplicado con la respuesta perdida: la relectura muestra la fila real, sin botón", async () => {
+    const alertas = espiarAlertas();
+    let reembolsado = false;
+    const resultado = await abrirComprasDelFestival([() => (reembolsado ? releida : conPendiente)], {
+      [REEMBOLSO]: [
+        () => {
+          reembolsado = true;
+          return "rechazar";
+        },
+      ],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+
+    expect(
+      await screen.findByLabelText(
+        "Diego Fernández, VIP, 2 entradas, $ 240.000, Reembolsada, Reembolso confirmado",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Confirmar reembolso" })).toBeNull();
+    await act(() => jest.advanceTimersByTimeAsync(70_000));
+    expect(postsDeReembolso(resultado)).toHaveLength(1);
+  });
+
   it("sin servidor: «No se pudo confirmar el reembolso. Probá de nuevo.»", async () => {
     const alertas = espiarAlertas();
     await abrirComprasDelFestival([conPendiente], { [REEMBOLSO]: ["rechazar"] });
@@ -601,5 +626,70 @@ describe("Compras del evento: confirmar el reembolso (feature 009, US2)", () => 
     await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
     expect(await screen.findByText("No se pudo confirmar el reembolso. Probá de nuevo.")).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Confirmar reembolso" })).toBeOnTheScreen();
+  });
+});
+
+describe("Compras del evento después de una cancelación (feature 009, US5)", () => {
+  const FILA_DIEGO =
+    "Diego Fernández, VIP, 2 entradas, $ 240.000, Cancelada, La canceló el comprador · Reembolso pendiente de $ 240.000";
+  // Las 2 VIP de Diego ya no cuentan como vendidas: volvieron a estar disponibles (lo dice el servidor).
+  const resumen = [
+    {
+      tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+      disponibles: 3,
+      pendientes: 0,
+      vendidas: 0,
+      usadas: 0,
+    },
+  ];
+
+  it("la cancelada desde confirmada con su estado, quién la canceló y el reembolso; el resumen tal como llega", async () => {
+    await abrirComprasDelFestival([
+      {
+        status: 200,
+        json: comprasDelFestival([diegoConReembolsoPendiente], { resumenPorTipo: resumen }),
+      },
+    ]);
+
+    const fila = await screen.findByLabelText(FILA_DIEGO);
+    expect(within(fila).getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(
+      within(fila).getByText("La canceló el comprador · Reembolso pendiente de $ 240.000"),
+    ).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText("VIP: 3 disponibles · 0 pendientes · 0 vendidas · 0 usadas"),
+    ).toBeOnTheScreen();
+  });
+
+  it("al cambiar de usuario con la lista de Lucía cargada nunca se ven sus compras ni «Confirmar reembolso» (US5-7)", async () => {
+    const delUsuario = (init: RequestInit | undefined) =>
+      (init?.headers as Record<string, string> | undefined)?.["X-Usuario-Id"];
+    const resultado = await abrirComprasDelFestival(
+      [
+        (_url, init) =>
+          delUsuario(init) === diego.id
+            ? "colgar"
+            : { status: 200, json: comprasDelFestival([diegoConReembolsoPendiente]) },
+      ],
+      {
+        "/usuarios/actual": [
+          (_url, init) => ({ status: 200, json: delUsuario(init) === diego.id ? diego : lucia }),
+        ],
+      },
+    );
+    expect(await screen.findByRole("button", { name: "Confirmar reembolso" })).toBeOnTheScreen();
+
+    await act(() => router.navigate("/perfil"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Cambiar usuario" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Diego Fernández" }));
+    expect(await screen.findByText("Diego Fernández")).toBeOnTheScreen();
+    await act(() =>
+      router.push({ pathname: "/eventos/[eventoId]/compras", params: { eventoId: "evento-festival" } }),
+    );
+
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_DIEGO)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Confirmar reembolso" })).toBeNull();
+    expect(pedidosDeLaLista(resultado).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
   });
 });
