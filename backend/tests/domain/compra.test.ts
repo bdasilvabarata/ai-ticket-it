@@ -1,14 +1,9 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
-import {
-  Compra,
-  cupoLiberadoPorTipo,
-  Entrada,
-  type CambioEstadoCompra,
-  type PropiedadesCompra,
-} from "../../src/domain/compra";
+import { Compra, Entrada, type CambioEstadoCompra, type PropiedadesCompra } from "../../src/domain/compra";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
 import { TipoEntrada } from "../../src/domain/evento";
+import { cupoLiberadoPorTipo } from "../../src/domain/vencimiento";
 import { entradasDePrueba } from "../helpers/eventos";
 
 const CREADA = new Date("2026-11-10T15:00:00.000Z");
@@ -806,23 +801,29 @@ describe("Cancelación y reembolso derivados del historial (feature 009, R3, R4,
     });
   });
 
-  describe("tieneReembolsoPendiente", () => {
-    it("true en una paga CANCELADA después de confirmada", () => {
-      expect(compraCanceladaDesdeConfirmada().tieneReembolsoPendiente()).toBe(true);
+  describe("reembolso (tabla de data-model, feature 010)", () => {
+    it("REEMBOLSADA → confirmado", () => {
+      expect(compraReembolsada().reembolso).toBe("confirmado");
     });
 
-    it("false en la gratis, la pendiente cancelada, la vencida, la REEMBOLSADA y los demás estados", () => {
-      for (const compra of [
-        compraCanceladaDesdeConfirmada({ total: 0 }),
-        compraCancelada(),
-        compraVencida(),
-        compraReembolsada(),
-        compraPendiente(),
-        compraConfirmada(),
-        compraUtilizada(),
-      ]) {
-        expect(compra.tieneReembolsoPendiente()).toBe(false);
-      }
+    it("CANCELADA después de confirmada y paga → pendiente", () => {
+      expect(compraCanceladaDesdeConfirmada().reembolso).toBe("pendiente");
+    });
+
+    it("CANCELADA después de confirmada y gratis → null", () => {
+      expect(compraCanceladaDesdeConfirmada({ total: 0 }).reembolso).toBeNull();
+    });
+
+    it("CANCELADA desde pendiente o vencida (también al día) → null", () => {
+      expect(compraCancelada().reembolso).toBeNull();
+      expect(compraVencida().reembolso).toBeNull();
+      expect(compraPendiente().alDia(despues(PLAZO)).reembolso).toBeNull();
+    });
+
+    it("PENDIENTE, CONFIRMADA y UTILIZADA → null", () => {
+      expect(compraPendiente().reembolso).toBeNull();
+      expect(compraConfirmada().reembolso).toBeNull();
+      expect(compraUtilizada().reembolso).toBeNull();
     });
   });
 
@@ -988,7 +989,7 @@ describe("Compra.cancelar de una CONFIRMADA (feature 009, R1)", () => {
     expect(cancelada.entradas.map((entrada) => entrada.codigo)).toEqual(codigos);
     expect(cancelada.canceladaDesde).toBe("CONFIRMADA");
     expect(cancelada.cambioDeCancelacion).toEqual(cambioDeCancelacion(antesDelInicio));
-    expect(cancelada.tieneReembolsoPendiente()).toBe(true);
+    expect(cancelada.reembolso).toBe("pendiente");
     expect(cancelada.esVigente(antesDelInicio)).toBe(false);
     expect(original.estado).toBe(EstadoCompra.CONFIRMADA);
     expect(original.entradas.every((entrada) => !entrada.usada && !entrada.cancelada)).toBe(true);
@@ -998,7 +999,7 @@ describe("Compra.cancelar de una CONFIRMADA (feature 009, R1)", () => {
     const cancelada = compraConfirmada({ total: 0 }).cancelar("usuario-martin", antesDelInicio, INICIO);
     expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
     expect(cancelada.entradas.every((e) => e.cancelada)).toBe(true);
-    expect(cancelada.tieneReembolsoPendiente()).toBe(false);
+    expect(cancelada.reembolso).toBeNull();
   });
 
   it("la PENDIENTE sigue como en la 006: CANCELADA sin cambios en sus entradas; vencida → COMPRA_VENCIDA", () => {
@@ -1153,7 +1154,7 @@ describe("Compra.confirmarReembolso (feature 009, R5)", () => {
     for (const entrada of reembolsada.entradas) expect(entrada.cancelacion).toEqual(cancelacionDeEntrada);
     expect(reembolsada.canceladaDesde).toBe("CONFIRMADA");
     expect(reembolsada.cambioDeCancelacion).toEqual(cancelacion);
-    expect(reembolsada.tieneReembolsoPendiente()).toBe(false);
+    expect(reembolsada.reembolso).toBe("confirmado");
     expect(original.estado).toBe(EstadoCompra.CANCELADA);
   });
 

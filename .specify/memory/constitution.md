@@ -1,3 +1,14 @@
+<!--
+Sync Impact Report
+- Versión: 2.5.1 → 2.5.2 (PATCH: aclaración de redacción, ninguna regla cambia; feature 010).
+- Secciones modificadas: "Entidades" (la Entrada guarda su uso y su cancelación, cada uno con
+  quién y cuándo, en lugar de "un estado y sus cambios de estado propios") y "Estado de una
+  entrada" ("con su propio cambio de estado" → "registrando su uso").
+- Secciones agregadas / eliminadas: ninguna.
+- Plantillas: plan-template.md, spec-template.md y tasks-template.md ✅ sin cambios necesarios.
+- Pendientes: AGENTS.md describe la Entrada nueva en la Fase 9 de la 010 (T017).
+-->
+
 # AI Ticket It — Constitution
 
 ## Dominio del Sistema
@@ -33,8 +44,9 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   **CambioEstadoCompra** (estado, quién, fecha y hora), sus **Entradas** y **Mensajes** (usuario,
   texto, enviado).
 - **Entrada**: una por unidad comprada, creada al registrar la compra; un **código** propio, corto
-  y legible, que no se repite entre entradas (es su identificador), un estado y sus cambios de
-  estado propios. Pertenece a una única compra y vive dentro de su agregado.
+  y legible, que no se repite entre entradas (es su identificador), su **uso** y su
+  **cancelación**, cada uno con quién y cuándo (o ninguno). Pertenece a una única compra y vive
+  dentro de su agregado.
 - **Resenia**: comprador, evento, puntuación y detalle.
 
 ### Reglas de Dominio (invariantes)
@@ -62,8 +74,8 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
 - **Estado de una entrada**: hasta que la compra se confirma, el estado de cada entrada es el de
   la compra (también al vencer una pendiente: sus entradas quedan canceladas) y no se guarda por
   separado. Desde `CONFIRMADA`, cada entrada cambia de estado por separado: el organizador
-  registra el uso de una entrada (`CONFIRMADA → UTILIZADA`), con su propio cambio de estado
-  (quién y cuándo). El uso de la **primera** entrada pasa la compra a `UTILIZADA` (con su cambio
+  registra el uso de una entrada (`CONFIRMADA → UTILIZADA`), registrando su uso (quién y
+  cuándo). El uso de la **primera** entrada pasa la compra a `UTILIZADA` (con su cambio
   de estado, mismo autor y fecha y hora); las demás siguen `CONFIRMADA` y se pueden usar igual,
   sin sumar cambios a la compra. Una compra está `UTILIZADA` si y solo si al menos una de sus
   entradas lo está.
@@ -362,4 +374,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.5.1 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-20
+**Version**: 2.5.2 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-20

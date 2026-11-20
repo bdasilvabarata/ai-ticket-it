@@ -7,6 +7,9 @@ import { pasoPorConfirmada, REGLAS_DE_COMPRA } from "./reglas-de-compra";
 
 export { Entrada, type RegistroDeEntrada } from "./entrada";
 
+/** El reembolso de una compra cancelada después de confirmada y paga (feature 010, R5). */
+export type EstadoDeReembolso = "pendiente" | "confirmado";
+
 /** Quién hizo un cambio de estado: un usuario o el sistema (el vencimiento). */
 export type AutorDelCambio = { tipo: "usuario"; usuarioId: string } | { tipo: "sistema" };
 
@@ -44,6 +47,11 @@ export interface DatosDeAlta {
 }
 
 const PLAZO_PARA_PAGAR_MS = LIMITES_COMPRA.minutosParaPagar * 60 * 1000;
+
+/** Un cambio de estado hecho por un usuario en `fechaHora`. */
+function cambioPorUsuario(estado: EstadoCompra, usuarioId: string, fechaHora: Date): CambioEstadoCompra {
+  return { estado, autor: { tipo: "usuario", usuarioId }, fechaHora };
+}
 
 /**
  * Una compra de entradas de un tipo, con su historial de estados (feature 006). El estado, el alta
@@ -97,13 +105,7 @@ export class Compra {
       tipoEntradaId: tipo.id,
       cantidad,
       total: tipo.precio * cantidad,
-      historial: [
-        {
-          estado: EstadoCompra.PENDIENTE,
-          autor: { tipo: "usuario", usuarioId: compradorId },
-          fechaHora: ahora,
-        },
-      ],
+      historial: [cambioPorUsuario(EstadoCompra.PENDIENTE, compradorId, ahora)],
       entradas: codigos.map((codigo) => new Entrada({ codigo })),
     });
   }
@@ -146,14 +148,7 @@ export class Compra {
     );
     const historial =
       this.estado === EstadoCompra.CONFIRMADA
-        ? [
-            ...this.historial,
-            {
-              estado: EstadoCompra.UTILIZADA,
-              autor: { tipo: "usuario", usuarioId: organizadorId },
-              fechaHora: ahora,
-            } as const,
-          ]
+        ? [...this.historial, cambioPorUsuario(EstadoCompra.UTILIZADA, organizadorId, ahora)]
         : [...this.historial];
     return new Compra({ ...this.#propiedades(), historial, entradas });
   }
@@ -174,9 +169,15 @@ export class Compra {
     return this.historial.find((cambio) => cambio.estado === EstadoCompra.CANCELADA) ?? null;
   }
 
-  /** CANCELADA después de confirmada y paga: falta que el organizador confirme el reembolso (feature 009, R4). */
-  tieneReembolsoPendiente(): boolean {
-    return this.estado === EstadoCompra.CANCELADA && this.fueConfirmada && this.total > 0;
+  /**
+   * El reembolso, derivado del historial (feature 010, R5): `confirmado` en una REEMBOLSADA;
+   * `pendiente` en una CANCELADA después de confirmada y paga (falta que el organizador lo confirme);
+   * si no (también en una gratis o cancelada antes de pagar), `null`.
+   */
+  get reembolso(): EstadoDeReembolso | null {
+    if (this.estado === EstadoCompra.REEMBOLSADA) return "confirmado";
+    if (this.estado === EstadoCompra.CANCELADA && this.fueConfirmada && this.total > 0) return "pendiente";
+    return null;
   }
 
   /**
@@ -266,11 +267,7 @@ export class Compra {
     if (this.estado !== EstadoCompra.PENDIENTE) {
       throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "La compra no está pendiente de pago.");
     }
-    return this.#conCambio({
-      estado: EstadoCompra.CONFIRMADA,
-      autor: { tipo: "usuario", usuarioId },
-      fechaHora: ahora,
-    });
+    return this.#conCambio(cambioPorUsuario(EstadoCompra.CONFIRMADA, usuarioId, ahora));
   }
 
   /**
@@ -284,11 +281,7 @@ export class Compra {
     if (this.estaVencida(ahora) || this.fueVencida()) {
       throw new ReglaDeNegocioError("COMPRA_VENCIDA", "La compra venció: pasaron 15 minutos sin pagarla.");
     }
-    const cambio: CambioEstadoCompra = {
-      estado: EstadoCompra.CANCELADA,
-      autor: { tipo: "usuario", usuarioId },
-      fechaHora: ahora,
-    };
+    const cambio = cambioPorUsuario(EstadoCompra.CANCELADA, usuarioId, ahora);
     if (this.estado === EstadoCompra.PENDIENTE) return this.#conCambio(cambio);
     const motivo = this.motivoNoCancelable(inicioDelEvento, ahora);
     if (motivo === "evento-empezado") {
@@ -308,21 +301,17 @@ export class Compra {
   /**
    * CANCELADA (paga, desde confirmada) → REEMBOLSADA por su organizador en `ahora` (feature 009, R5).
    * Sin plazo: no mira la fecha del evento. Las entradas no cambian y el cupo tampoco. El permiso lo
-   * verifica el service antes. Ya REEMBOLSADA → `TRANSICION_INVALIDA` «ya se confirmó»; sin reembolso
-   * pendiente → `TRANSICION_INVALIDA` «no tiene un reembolso pendiente».
+   * verifica el service antes. Según `reembolso`: `confirmado` → `TRANSICION_INVALIDA` «ya se
+   * confirmó»; `null` → `TRANSICION_INVALIDA` «no tiene un reembolso pendiente».
    */
   confirmarReembolso(organizadorId: string, ahora: Date): Compra {
-    if (this.estado === EstadoCompra.REEMBOLSADA) {
+    if (this.reembolso === "confirmado") {
       throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "El reembolso de esta compra ya se confirmó.");
     }
-    if (!this.tieneReembolsoPendiente()) {
+    if (this.reembolso === null) {
       throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "Esta compra no tiene un reembolso pendiente.");
     }
-    return this.#conCambio({
-      estado: EstadoCompra.REEMBOLSADA,
-      autor: { tipo: "usuario", usuarioId: organizadorId },
-      fechaHora: ahora,
-    });
+    return this.#conCambio(cambioPorUsuario(EstadoCompra.REEMBOLSADA, organizadorId, ahora));
   }
 
   /** La compra como se ve en `ahora`, sin guardarla: vencida si correspondía, si no, esta misma. */
@@ -359,16 +348,3 @@ const MENSAJE_NO_CANCELABLE: Record<Exclude<MotivoNoCancelable, "evento-empezado
   cancelada: "La compra ya está cancelada.",
   reembolsada: "La compra ya fue reembolsada.",
 };
-
-/**
- * Las entradas que liberan las compras vencidas en `ahora` (PENDIENTE pasado el plazo), sumadas por
- * `tipoEntradaId`. Las demás no cuentan. Sin vencidas, un `Map` vacío.
- */
-export function cupoLiberadoPorTipo(compras: readonly Compra[], ahora: Date): Map<string, number> {
-  const liberado = new Map<string, number>();
-  for (const compra of compras) {
-    if (!compra.estaVencida(ahora)) continue;
-    liberado.set(compra.tipoEntradaId, (liberado.get(compra.tipoEntradaId) ?? 0) + compra.cantidad);
-  }
-  return liberado;
-}

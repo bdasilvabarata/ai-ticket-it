@@ -44,13 +44,11 @@ export function aEntradaVista(entrada: Entrada, compra: Compra): EntradaVista {
 }
 
 /**
- * El reembolso de la compra (feature 009, R7): `pendiente` si falta que el organizador lo confirme,
- * `confirmado` en una REEMBOLSADA y, si no (también en una gratis), `null`. El monto es el total.
+ * El reembolso de la compra (feature 009, R7), tal como lo da `compra.reembolso` (feature 010): el
+ * monto es el total; sin reembolso (también en una gratis), `null`.
  */
 export function aReembolsoVista(compra: Compra): ReembolsoVista | null {
-  if (compra.tieneReembolsoPendiente()) return { estado: "pendiente", monto: compra.total };
-  if (compra.estado === EstadoCompra.REEMBOLSADA) return { estado: "confirmado", monto: compra.total };
-  return null;
+  return compra.reembolso ? { estado: compra.reembolso, monto: compra.total } : null;
 }
 
 /** Quién la canceló, según el cambio a CANCELADA (también en una REEMBOLSADA, 009); si no hay, `null`. */

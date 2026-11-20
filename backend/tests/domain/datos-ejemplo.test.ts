@@ -307,7 +307,7 @@ describe("crearDatosEjemplo", () => {
         { estado: EstadoCompra.CONFIRMADA, autor: diego, fechaHora: haceDias(3, 5) },
         { estado: EstadoCompra.CANCELADA, autor: diego, fechaHora: haceDias(1) },
       ]);
-      expect(compra?.tieneReembolsoPendiente()).toBe(true);
+      expect(compra?.reembolso).toBe("pendiente");
       expect(compra?.entradas.map((e) => [e.codigo, compra.estadoDe(e)])).toEqual([
         ["MZDF1C01", EstadoCompra.CANCELADA],
       ]);
@@ -323,7 +323,7 @@ describe("crearDatosEjemplo", () => {
         { estado: EstadoCompra.CANCELADA, autor: valentina, fechaHora: haceDias(2) },
         { estado: EstadoCompra.REEMBOLSADA, autor: lucia, fechaHora: haceDias(1) },
       ]);
-      expect(compra?.tieneReembolsoPendiente()).toBe(false);
+      expect(compra?.reembolso).toBe("confirmado");
       expect(compra?.entradas.map((e) => e.codigo)).toEqual(["MZVG2R01", "MZVG2R02"]);
     });
 
