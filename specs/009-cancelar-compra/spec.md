@@ -346,7 +346,8 @@ la respuesta y verificar que se muestra el estado real; cortar el servidor y ver
 - **FR-010**: Los rechazos de la cancelación DEBEN seguir el orden de US3, escenario 7. El
   rechazo por evento ya empezado (`EVENTO_REALIZADO`) solo se aplica a una compra `CONFIRMADA`;
   cualquier otro estado no cancelable se rechaza como transición inválida, empiece o no el evento,
-  y la `PENDIENTE` sigue la regla de la 006.
+  y la `PENDIENTE` sigue la regla de la 006 (una vencida "al día" se rechaza porque venció, antes
+  que el evento empezado y la transición inválida).
 
 **Confirmar el reembolso (organizador)**
 
@@ -401,10 +402,11 @@ la respuesta y verificar que se muestra el estado real; cortar el servidor y ver
   el comprador y el monto; en una reembolsada, que el reembolso se confirmó.
 - **FR-021**: Las escrituras (cancelar y confirmar el reembolso) NO DEBEN reintentarse solas;
   mientras una está en curso, la app NO DEBE mandar otro pedido. Al terminar (con éxito o error),
-  la app DEBE volver a pedir todas las vistas afectadas: la compra, "Mis compras", las compras del
-  evento del comprador, el evento, el catálogo, las compras del evento del organizador y la
-  entrada buscada en "Registrar ingreso", también las de otro usuario que estén guardadas en la
-  app (comprador y organizador pueden usar el mismo dispositivo).
+  la app DEBE volver a pedir las vistas que esa acción afecta, también las de otro usuario que
+  estén guardadas en la app (comprador y organizador pueden usar el mismo dispositivo). Cancelar
+  afecta la compra, "Mis compras", las compras del evento del comprador, el evento, el catálogo,
+  las compras del evento del organizador y la entrada buscada en "Registrar ingreso". Confirmar el
+  reembolso afecta las mismas salvo el evento y el catálogo, porque no cambia el cupo.
 - **FR-022**: Ante un rechazo, la app DEBE mostrar el mensaje del servidor y redibujar la pantalla
   con el estado real; ante una respuesta perdida o el servidor caído, igual.
 - **FR-023**: Los controles nuevos DEBEN ser accesibles (los botones con su texto; el motivo y los

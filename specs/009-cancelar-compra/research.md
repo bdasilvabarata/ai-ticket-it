@@ -226,8 +226,9 @@ la compra `CONFIRMADA`, así que sin el mensaje el usuario no sabría qué pasó
   "Confirmar reembolso". El error se muestra en la fila (`AvisoDeFormulario`).
 - **Mutation nueva** `useConfirmarReembolso(usuarioId, eventoId)` en `mutaciones.ts`, con el
   `compraId` como variable (`mutate(compraId)`), sin reintentos. `isPending` + `variables`
-  deshabilitan el botón de esa fila mientras va el pedido; una marca sincrónica en la fila evita el
-  doble toque.
+  deshabilitan el botón de esa fila mientras va el pedido; una marca sincrónica en la pantalla
+  (`ComprasDelEvento`, compartida por todas las filas, como dice contracts/app.md) evita el doble
+  toque y dos pedidos a la vez.
 
 **Rationale**: SC-002 (acción + confirmación). La estructura de la fila con el botón aparte es la
 que ya validó TalkBack en la 007.
