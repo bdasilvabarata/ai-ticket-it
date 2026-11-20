@@ -1,6 +1,6 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
-import type { CambioEstadoCompra, PropiedadesCompra } from "../../src/domain/compra";
+import type { AutorDelCambio, CambioEstadoCompra, PropiedadesCompra } from "../../src/domain/compra";
 import { Entrada } from "../../src/domain/entrada";
 import { pasoPorConfirmada, REGLAS_DE_COMPRA, type ReglaDeCompra } from "../../src/domain/reglas-de-compra";
 
@@ -10,7 +10,11 @@ const despues = (minutos: number) => new Date(T0.getTime() + minutos * MINUTO);
 
 const porMartin = { tipo: "usuario", usuarioId: "usuario-martin" } as const;
 const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
-const cambio = (estado: EstadoCompra, minutos: number, autor = porMartin): CambioEstadoCompra => ({
+const cambio = (
+  estado: EstadoCompra,
+  minutos: number,
+  autor: AutorDelCambio = porMartin,
+): CambioEstadoCompra => ({
   estado,
   autor,
   fechaHora: despues(minutos),
