@@ -104,9 +104,14 @@ export function historialHasta(
   const alta = { estado: EstadoCompra.PENDIENTE, autor, fechaHora: creadaEn };
   if (estado === EstadoCompra.PENDIENTE) return [alta];
   const final = { estado, autor, fechaHora: creadaEn };
-  return estado === EstadoCompra.UTILIZADA
-    ? [alta, { estado: EstadoCompra.CONFIRMADA, autor, fechaHora: creadaEn }, final]
-    : [alta, final];
+  const confirmacion = { estado: EstadoCompra.CONFIRMADA, autor, fechaHora: creadaEn };
+  if (estado === EstadoCompra.UTILIZADA) return [alta, confirmacion, final];
+  if (estado === EstadoCompra.REEMBOLSADA) {
+    const cancelacion = { estado: EstadoCompra.CANCELADA, autor, fechaHora: creadaEn };
+    const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
+    return [alta, confirmacion, cancelacion, { estado, autor: porLucia, fechaHora: creadaEn }];
+  }
+  return [alta, final];
 }
 
 let numeroCodigo = 0;
@@ -131,6 +136,11 @@ export function codigosDePrueba(cantidad: number): string[] {
  */
 export function entradasDePrueba(cantidad: number, historial: readonly CambioEstadoCompra[] = []): Entrada[] {
   const ultimo = historial[historial.length - 1];
+  const fueConfirmada = historial.some((cambio) => cambio.estado === EstadoCompra.CONFIRMADA);
+  const cancelacion = historial.find((cambio) => cambio.estado === EstadoCompra.CANCELADA);
+  if (fueConfirmada && cancelacion) {
+    return codigosDePrueba(cantidad).map((codigo) => new Entrada({ codigo, cambios: [cancelacion] }));
+  }
   const uso = ultimo?.estado === EstadoCompra.UTILIZADA ? [ultimo] : [];
   return codigosDePrueba(cantidad).map((codigo, i) => new Entrada({ codigo, cambios: i === 0 ? uso : [] }));
 }

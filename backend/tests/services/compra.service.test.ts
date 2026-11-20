@@ -81,6 +81,10 @@ describe("CompraService.crear", () => {
       ],
       entradas: [],
       entradasUsadas: 0,
+      canceladaDesde: null,
+      reembolso: null,
+      cancelable: true,
+      motivoNoCancelable: null,
     });
     expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(48);
     const guardada = await repositorioCompras.buscarPorId(vista.id);
@@ -719,6 +723,8 @@ describe("CompraService.misCompras (feature 007)", () => {
       diasRestantes: 5,
       canceladaPor: null,
       entradasUsadas: 0,
+      canceladaDesde: null,
+      reembolso: null,
     });
     expect(vista).not.toHaveProperty("historial");
     expect(vista).not.toHaveProperty("compradorId");
@@ -775,7 +781,7 @@ describe("CompraService.misCompras (feature 007)", () => {
     expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(cupoAntes);
   });
 
-  it("canceladaPor: sistema si venció (también ya materializada), usuario si la canceló; null en otro estado", async () => {
+  it("canceladaPor: sistema si venció (también ya materializada), usuario si la canceló (también en REEMBOLSADA, 009); null en otro estado", async () => {
     const { compraService } = armar({
       compras: [
         vencidaMaterializada("vencida"),
@@ -794,12 +800,14 @@ describe("CompraService.misCompras (feature 007)", () => {
     expect(porId.get("pendiente")?.canceladaPor).toBeNull();
     expect(porId.get("confirmada")?.canceladaPor).toBeNull();
     for (const vista of vistas) {
-      expect(vista.canceladaPor !== null).toBe(vista.estado === EstadoCompra.CANCELADA);
+      expect(vista.canceladaPor !== null).toBe(
+        vista.estado === EstadoCompra.CANCELADA || vista.estado === EstadoCompra.REEMBOLSADA,
+      );
       expect(vista.venceEn !== null).toBe(vista.estado === EstadoCompra.PENDIENTE);
     }
   });
 
-  it("UTILIZADA y REEMBOLSADA se devuelven con su estado, canceladaPor null y diasRestantes null", async () => {
+  it("UTILIZADA y REEMBOLSADA se devuelven con su estado y diasRestantes null; canceladaPor usuario en la REEMBOLSADA (009)", async () => {
     const { compraService } = armar({
       compras: [
         deSofia("utilizada", "evento-a", "tipo-a-vip", EstadoCompra.UTILIZADA),
@@ -814,7 +822,7 @@ describe("CompraService.misCompras (feature 007)", () => {
       diasRestantes,
     }));
     expect(resumen.toSorted((a, b) => a.id.localeCompare(b.id))).toEqual([
-      { id: "reembolsada", estado: EstadoCompra.REEMBOLSADA, canceladaPor: null, diasRestantes: null },
+      { id: "reembolsada", estado: EstadoCompra.REEMBOLSADA, canceladaPor: "usuario", diasRestantes: null },
       { id: "utilizada", estado: EstadoCompra.UTILIZADA, canceladaPor: null, diasRestantes: null },
     ]);
   });
@@ -1026,6 +1034,8 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
       venceEnLocal: null,
       canceladaPor: null,
       entradasUsadas: 0,
+      canceladaDesde: null,
+      reembolso: null,
     });
     expect(vista.compras[1]).toMatchObject({ estado: EstadoCompra.CANCELADA, canceladaPor: "usuario" });
     expect(vista.compras[0]).toMatchObject({
@@ -1067,7 +1077,7 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     expect((await repositorioCompras.buscarPorId("pendiente"))?.estado).toBe(EstadoCompra.PENDIENTE);
   });
 
-  it("venceEn solo en PENDIENTE y canceladaPor solo en CANCELADA, en todos los estados", async () => {
+  it("venceEn solo en PENDIENTE y canceladaPor solo en CANCELADA o REEMBOLSADA (009), en todos los estados", async () => {
     const { compraService } = armar({
       compras: Object.values(EstadoCompra).map((estado) =>
         de(`compra-${estado}`, "usuario-martin", "tipo-a-vip", estado),
@@ -1077,7 +1087,9 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     expect(compras).toHaveLength(Object.values(EstadoCompra).length);
     for (const fila of compras) {
       expect(fila.venceEn !== null).toBe(fila.estado === EstadoCompra.PENDIENTE);
-      expect(fila.canceladaPor !== null).toBe(fila.estado === EstadoCompra.CANCELADA);
+      expect(fila.canceladaPor !== null).toBe(
+        fila.estado === EstadoCompra.CANCELADA || fila.estado === EstadoCompra.REEMBOLSADA,
+      );
     }
   });
 
@@ -1346,5 +1358,237 @@ describe("Entradas en las vistas del comprador (feature 008, US3, R11, R14)", ()
     const { compras } = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
     expect(compras[0]).toMatchObject({ estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 });
     expect(compras[0]).not.toHaveProperty("entradas");
+  });
+});
+
+describe("Cancelación y reembolso en las vistas (feature 009, R6, R7)", () => {
+  // El Festival (evento-a) empieza a las 15:00 UTC del 15/11, 5 días después de AHORA.
+  const HASTA_EL_INICIO = 5 * DIA;
+  const porSofia = { tipo: "usuario", usuarioId: "usuario-sofia" } as const;
+  const porLuciaAutor = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
+  const enAhora = (
+    estado: EstadoCompra,
+    autor: CambioEstadoCompra["autor"] = porSofia,
+  ): CambioEstadoCompra => ({
+    estado,
+    autor,
+    fechaHora: AHORA,
+  });
+  const desdeConfirmada = [
+    enAhora(EstadoCompra.PENDIENTE),
+    enAhora(EstadoCompra.CONFIRMADA),
+    enAhora(EstadoCompra.CANCELADA),
+  ];
+  const deSofia = (
+    id: string,
+    estado: EstadoCompra,
+    cambios: { tipoEntradaId?: string; total?: number; historial?: CambioEstadoCompra[] } = {},
+  ) => {
+    const { tipoEntradaId = "tipo-a-vip", ...resto } = cambios;
+    return compra("evento-a", tipoEntradaId, estado, {
+      id,
+      compradorId: "usuario-sofia",
+      cantidad: 2,
+      total: 240000,
+      ...resto,
+    });
+  };
+  const confirmada = () => deSofia("confirmada", EstadoCompra.CONFIRMADA);
+  const utilizada = () => deSofia("utilizada", EstadoCompra.UTILIZADA);
+  const canceladaDesdeConfirmada = () =>
+    deSofia("cancelada-desde-confirmada", EstadoCompra.CANCELADA, { historial: desdeConfirmada });
+  const reembolsada = () =>
+    deSofia("reembolsada", EstadoCompra.REEMBOLSADA, {
+      historial: [...desdeConfirmada, enAhora(EstadoCompra.REEMBOLSADA, porLuciaAutor)],
+    });
+  const gratisCanceladaDesdeConfirmada = () =>
+    deSofia("gratis", EstadoCompra.CANCELADA, {
+      tipoEntradaId: "tipo-a-kids",
+      total: 0,
+      historial: desdeConfirmada,
+    });
+  const pendienteCancelada = () => deSofia("pendiente-cancelada", EstadoCompra.CANCELADA);
+  const todas = () => [
+    confirmada(),
+    utilizada(),
+    canceladaDesdeConfirmada(),
+    reembolsada(),
+    gratisCanceladaDesdeConfirmada(),
+    pendienteCancelada(),
+  ];
+
+  /** Los servicios con `todas` y los repositorios espiados: ninguna lectura guarda nada. */
+  function armarEspiado(reloj = relojMovible()) {
+    const servicios = armar({ compras: todas(), reloj });
+    const guardarCompra = vi.spyOn(servicios.repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(servicios.repositorioEventos, "guardar");
+    return { ...servicios, reloj, guardarCompra, guardarEvento };
+  }
+
+  describe("CompraService.obtener", () => {
+    it("una CONFIRMADA antes del inicio es cancelable; al inicio, ya no (evento-empezado)", async () => {
+      const { compraService, reloj, guardarCompra, guardarEvento } = armarEspiado();
+
+      expect(await compraService.obtener("confirmada", "usuario-sofia")).toMatchObject({
+        canceladaDesde: null,
+        reembolso: null,
+        cancelable: true,
+        motivoNoCancelable: null,
+      });
+      reloj.avanzar(HASTA_EL_INICIO - MINUTO);
+      expect(await compraService.obtener("confirmada", "usuario-sofia")).toMatchObject({
+        cancelable: true,
+        motivoNoCancelable: null,
+      });
+      reloj.avanzar(MINUTO);
+      expect(await compraService.obtener("confirmada", "usuario-sofia")).toMatchObject({
+        cancelable: false,
+        motivoNoCancelable: "evento-empezado",
+      });
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+    });
+
+    it("una UTILIZADA → entrada-usada, con o sin el evento empezado", async () => {
+      const { compraService, reloj } = armarEspiado();
+      expect(await compraService.obtener("utilizada", "usuario-sofia")).toMatchObject({
+        cancelable: false,
+        motivoNoCancelable: "entrada-usada",
+        canceladaDesde: null,
+        reembolso: null,
+      });
+      reloj.avanzar(HASTA_EL_INICIO);
+      expect(await compraService.obtener("utilizada", "usuario-sofia")).toMatchObject({
+        motivoNoCancelable: "entrada-usada",
+      });
+    });
+
+    it("una paga CANCELADA desde confirmada: reembolso pendiente del total y sin entradas", async () => {
+      const { compraService } = armarEspiado();
+      expect(await compraService.obtener("cancelada-desde-confirmada", "usuario-sofia")).toMatchObject({
+        estado: EstadoCompra.CANCELADA,
+        canceladaDesde: "CONFIRMADA",
+        reembolso: { estado: "pendiente", monto: 240000 },
+        entradas: [],
+        cancelable: false,
+        motivoNoCancelable: "cancelada",
+      });
+    });
+
+    it("una REEMBOLSADA: reembolso confirmado del total", async () => {
+      const { compraService } = armarEspiado();
+      expect(await compraService.obtener("reembolsada", "usuario-sofia")).toMatchObject({
+        estado: EstadoCompra.REEMBOLSADA,
+        canceladaDesde: "CONFIRMADA",
+        reembolso: { estado: "confirmado", monto: 240000 },
+        entradas: [],
+        cancelable: false,
+        motivoNoCancelable: "reembolsada",
+      });
+    });
+
+    it("una gratis cancelada desde confirmada o una pendiente cancelada: sin reembolso", async () => {
+      const { compraService } = armarEspiado();
+      expect(await compraService.obtener("gratis", "usuario-sofia")).toMatchObject({
+        canceladaDesde: "CONFIRMADA",
+        reembolso: null,
+        motivoNoCancelable: "cancelada",
+      });
+      expect(await compraService.obtener("pendiente-cancelada", "usuario-sofia")).toMatchObject({
+        canceladaDesde: "PENDIENTE",
+        reembolso: null,
+        motivoNoCancelable: "cancelada",
+      });
+    });
+  });
+
+  it("misComprasDelEvento: sus CompraVista traen si se pueden cancelar, sin guardar nada", async () => {
+    const { compraService, guardarCompra, guardarEvento } = armarEspiado();
+    const vista = await compraService.misComprasDelEvento("evento-a", "usuario-sofia");
+    const porId = new Map(vista.confirmadas.map((c) => [c.id, c]));
+    expect(porId.get("confirmada")).toMatchObject({
+      cancelable: true,
+      motivoNoCancelable: null,
+      reembolso: null,
+    });
+    expect(porId.get("utilizada")).toMatchObject({ cancelable: false, motivoNoCancelable: "entrada-usada" });
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+  });
+
+  it("las respuestas de pagar y cancelar (pendiente) traen los campos nuevos", async () => {
+    const pendiente = (id: string) => deSofia(id, EstadoCompra.PENDIENTE);
+    const { compraService } = armar({ compras: [pendiente("a-pagar"), pendiente("a-cancelar")] });
+
+    expect(await compraService.pagar("a-pagar", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CONFIRMADA,
+      canceladaDesde: null,
+      reembolso: null,
+      cancelable: true,
+      motivoNoCancelable: null,
+    });
+    expect(await compraService.cancelar("a-cancelar", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaDesde: "PENDIENTE",
+      reembolso: null,
+      cancelable: false,
+      motivoNoCancelable: "cancelada",
+    });
+  });
+
+  it("misCompras trae canceladaDesde y reembolso pero no cancelable ni motivoNoCancelable", async () => {
+    const { compraService, guardarCompra, guardarEvento } = armarEspiado();
+    const vistas = await compraService.misCompras("usuario-sofia");
+    const porId = new Map(vistas.map((v) => [v.id, v]));
+
+    for (const vista of vistas) {
+      expect(vista).not.toHaveProperty("cancelable");
+      expect(vista).not.toHaveProperty("motivoNoCancelable");
+    }
+    expect(porId.get("cancelada-desde-confirmada")).toMatchObject({
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 240000 },
+      canceladaPor: "usuario",
+    });
+    expect(porId.get("reembolsada")).toMatchObject({
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "confirmado", monto: 240000 },
+      canceladaPor: "usuario",
+    });
+    expect(porId.get("gratis")).toMatchObject({ canceladaDesde: "CONFIRMADA", reembolso: null });
+    expect(porId.get("pendiente-cancelada")).toMatchObject({ canceladaDesde: "PENDIENTE", reembolso: null });
+    expect(porId.get("confirmada")).toMatchObject({
+      canceladaDesde: null,
+      reembolso: null,
+      canceladaPor: null,
+    });
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+  });
+
+  it("comprasDelEvento trae canceladaDesde y reembolso, y canceladaPor también en una REEMBOLSADA", async () => {
+    const { compraService, guardarCompra, guardarEvento } = armarEspiado();
+    const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
+    const porId = new Map(vista.compras.map((c) => [c.id, c]));
+
+    expect(porId.get("cancelada-desde-confirmada")).toMatchObject({
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 240000 },
+      canceladaPor: "usuario",
+    });
+    expect(porId.get("reembolsada")).toMatchObject({
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "confirmado", monto: 240000 },
+      canceladaPor: "usuario",
+    });
+    expect(porId.get("gratis")).toMatchObject({ canceladaDesde: "CONFIRMADA", reembolso: null });
+    expect(porId.get("pendiente-cancelada")).toMatchObject({ canceladaDesde: "PENDIENTE", reembolso: null });
+    expect(porId.get("confirmada")).toMatchObject({ canceladaDesde: null, reembolso: null });
+    for (const fila of vista.compras) {
+      expect(fila).not.toHaveProperty("entradas");
+      expect(fila).not.toHaveProperty("cancelable");
+    }
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
   });
 });

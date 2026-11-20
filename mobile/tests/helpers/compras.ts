@@ -56,6 +56,10 @@ export const compraPendiente: CompraVista = {
   ],
   entradas: [],
   entradasUsadas: 0,
+  canceladaDesde: null,
+  reembolso: null,
+  cancelable: true,
+  motivoNoCancelable: null,
 };
 
 /** Los códigos de las 2 entradas de la compra de la Maratón, una vez pagada. */
@@ -89,6 +93,8 @@ export const compraUtilizada: CompraVista = {
   ...compraConfirmada,
   estado: EstadoCompra.UTILIZADA,
   entradasUsadas: 1,
+  cancelable: false,
+  motivoNoCancelable: "entrada-usada",
   entradas: [
     {
       codigo: CODIGOS_DE_LA_MARATON[0],
@@ -115,6 +121,9 @@ export const compraCancelada: CompraVista = {
   estado: EstadoCompra.CANCELADA,
   venceEn: null,
   venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
   historial: [
     ...compraPendiente.historial,
     {
@@ -132,6 +141,9 @@ export const compraCanceladaPorElComprador: CompraVista = {
   estado: EstadoCompra.CANCELADA,
   venceEn: null,
   venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
   historial: [
     ...compraPendiente.historial,
     {
@@ -153,8 +165,8 @@ export const compraGratis: CompraVista = {
 
 /**
  * Una fila de "Mis compras" (feature 007) armada con una `CompraVista` (por defecto, la pendiente de
- * la Maratón): sin `compradorId` ni `historial`, con `diasRestantes` y `canceladaPor` en `null` salvo
- * que se cambien.
+ * la Maratón): sin `compradorId`, `historial`, `entradas`, `cancelable` ni `motivoNoCancelable`, con
+ * `diasRestantes` y `canceladaPor` en `null` salvo que se cambien.
  */
 export function miCompra(
   base: CompraVista = compraPendiente,
@@ -171,6 +183,8 @@ export function miCompra(
     venceEn,
     venceEnLocal,
     entradasUsadas,
+    canceladaDesde,
+    reembolso,
   } = base;
   return {
     id,
@@ -183,6 +197,8 @@ export function miCompra(
     venceEn,
     venceEnLocal,
     entradasUsadas,
+    canceladaDesde,
+    reembolso,
     diasRestantes: null,
     canceladaPor: null,
     ...cambios,
@@ -191,8 +207,15 @@ export function miCompra(
 
 // Datos de "Compras del evento" (feature 008): el Festival de Lucía (10/12 14:00).
 
-/** Una fila de "Compras del evento": Martín, 3 General del Festival, CONFIRMADA, salvo que se cambie. */
+/**
+ * Una fila de "Compras del evento": Martín, 3 General del Festival, CONFIRMADA, salvo que se cambie.
+ * Si no se dan, `canceladaDesde` y `reembolso` siguen al estado (feature 009): una CANCELADA, desde
+ * PENDIENTE y sin reembolso; una REEMBOLSADA, desde CONFIRMADA con el reembolso confirmado.
+ */
 export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): CompraDelEventoVista {
+  const estado = cambios.estado ?? EstadoCompra.CONFIRMADA;
+  const total = cambios.total ?? 18000;
+  const reembolsada = estado === EstadoCompra.REEMBOLSADA;
   return {
     id: "compra-martin-general",
     comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
@@ -206,6 +229,8 @@ export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): Co
     venceEnLocal: null,
     canceladaPor: null,
     entradasUsadas: 0,
+    canceladaDesde: reembolsada ? "CONFIRMADA" : estado === EstadoCompra.CANCELADA ? "PENDIENTE" : null,
+    reembolso: reembolsada ? { estado: "confirmado", monto: total } : null,
     ...cambios,
   };
 }

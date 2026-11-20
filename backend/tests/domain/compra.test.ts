@@ -13,6 +13,7 @@ import { entradasDePrueba } from "../helpers/eventos";
 
 const CREADA = new Date("2026-11-10T15:00:00.000Z");
 const MINUTO = 60 * 1000;
+const DIA = 24 * 60 * MINUTO;
 const PLAZO = LIMITES_COMPRA.minutosParaPagar * MINUTO;
 const despues = (ms: number) => new Date(CREADA.getTime() + ms);
 
@@ -51,6 +52,36 @@ const compraCancelada = (cambios: Partial<PropiedadesCompra> = {}) =>
         pendiente,
         { estado: EstadoCompra.CANCELADA, autor: porMartin, fechaHora: despues(MINUTO) },
       ],
+      ...cambios,
+    }),
+  );
+
+const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
+/** El comprador cancela la compra ya confirmada (feature 009). */
+const cancelacion: CambioEstadoCompra = {
+  estado: EstadoCompra.CANCELADA,
+  autor: porMartin,
+  fechaHora: despues(10 * MINUTO),
+};
+const reembolso: CambioEstadoCompra = {
+  estado: EstadoCompra.REEMBOLSADA,
+  autor: porLucia,
+  fechaHora: despues(20 * MINUTO),
+};
+/** Las entradas de `datos`, cada una con su cambio propio CANCELADA (feature 009, R3). */
+const entradasCanceladas = () =>
+  datos.entradas.map((entrada) => new Entrada({ codigo: entrada.codigo, cambios: [cancelacion] }));
+/** Una CANCELADA por su comprador después de confirmada, armada con el constructor. */
+const compraCanceladaDesdeConfirmada = (cambios: Partial<PropiedadesCompra> = {}) =>
+  new Compra(
+    con({ historial: [pendiente, confirmada, cancelacion], entradas: entradasCanceladas(), ...cambios }),
+  );
+/** Una REEMBOLSADA (cancelada después de confirmada y reembolsada por Lucía), armada con el constructor. */
+const compraReembolsada = (cambios: Partial<PropiedadesCompra> = {}) =>
+  new Compra(
+    con({
+      historial: [pendiente, confirmada, cancelacion, reembolso],
+      entradas: entradasCanceladas(),
       ...cambios,
     }),
   );
@@ -531,7 +562,6 @@ describe("Entrada dentro de la Compra (feature 008, R1)", () => {
 describe("Compra.registrarUso (feature 008, R9)", () => {
   const [codigoA, codigoB] = datos.entradas.map((entrada) => entrada.codigo) as [string, string];
   const USO = despues(60 * MINUTO);
-  const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
   const cambioDeUso = (fechaHora: Date): CambioEstadoCompra => ({
     estado: EstadoCompra.UTILIZADA,
     autor: porLucia,
@@ -588,18 +618,8 @@ describe("Compra.registrarUso (feature 008, R9)", () => {
       () => compraPendiente().alDia(despues(PLAZO)),
       "La compra de esta entrada está cancelada.",
     ],
-    [
-      "REEMBOLSADA",
-      () =>
-        compraConfirmada({
-          historial: [
-            pendiente,
-            confirmada,
-            { estado: EstadoCompra.REEMBOLSADA, autor: porMartin, fechaHora: despues(10 * MINUTO) },
-          ],
-        }),
-      "La compra de esta entrada fue reembolsada.",
-    ],
+    // Desde la 009 (R3), las entradas de una REEMBOLSADA tienen su cambio propio CANCELADA.
+    ["REEMBOLSADA", () => compraReembolsada(), "La compra de esta entrada está cancelada."],
   ])("una entrada %s → TRANSICION_INVALIDA con su mensaje y nada cambia", (_estado, crear, mensaje) => {
     const compra = crear();
     const historial = [...compra.historial];
@@ -641,5 +661,264 @@ describe("Compra.registrarUso (feature 008, R9)", () => {
   it("las transiciones de una UTILIZADA conservan los cambios de sus entradas", () => {
     const usada = compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO);
     expect(usada.alDia(despues(PLAZO * 10))).toBe(usada);
+  });
+});
+
+describe("Cancelación y reembolso derivados del historial (feature 009, R3, R4, R6)", () => {
+  const INICIO = despues(DIA);
+  const antesDelInicio = new Date(INICIO.getTime() - MINUTO);
+  const codigos = datos.entradas.map((entrada) => entrada.codigo);
+  const usoDeA: CambioEstadoCompra = {
+    estado: EstadoCompra.UTILIZADA,
+    autor: porLucia,
+    fechaHora: despues(60 * MINUTO),
+  };
+  const compraUtilizada = () =>
+    compraConfirmada({
+      historial: [pendiente, confirmada, usoDeA],
+      entradas: [
+        new Entrada({ codigo: codigos[0]!, cambios: [usoDeA] }),
+        new Entrada({ codigo: codigos[1]! }),
+      ],
+    });
+  const compraVencida = () => compraPendiente().vencer();
+
+  describe("Entrada.cancelar", () => {
+    it("devuelve la entrada con su cambio CANCELADA por el comprador en `ahora`, sin tocar la original", () => {
+      const original = new Entrada({ codigo: "7K3MQ9TB" });
+      const cancelada = original.cancelar("usuario-martin", despues(10 * MINUTO));
+      expect(cancelada).not.toBe(original);
+      expect(cancelada.codigo).toBe("7K3MQ9TB");
+      expect(cancelada.cambios).toEqual([cancelacion]);
+      expect(cancelada.ultimoEstadoPropio).toBe(EstadoCompra.CANCELADA);
+      expect(original.cambios).toEqual([]);
+    });
+  });
+
+  describe("Entrada.estadoEn", () => {
+    const estados = (compra: Compra) => codigos.map((codigo) => compra.estadoDeEntrada(codigo));
+
+    it("si la compra nunca llegó a CONFIRMADA, el estado de la compra", () => {
+      expect(estados(compraPendiente())).toEqual([EstadoCompra.PENDIENTE, EstadoCompra.PENDIENTE]);
+      expect(estados(compraCancelada())).toEqual([EstadoCompra.CANCELADA, EstadoCompra.CANCELADA]);
+      expect(estados(compraVencida())).toEqual([EstadoCompra.CANCELADA, EstadoCompra.CANCELADA]);
+    });
+
+    it("en una CANCELADA o una REEMBOLSADA después de confirmada, CANCELADA (su cambio propio)", () => {
+      expect(estados(compraCanceladaDesdeConfirmada())).toEqual([
+        EstadoCompra.CANCELADA,
+        EstadoCompra.CANCELADA,
+      ]);
+      expect(estados(compraReembolsada())).toEqual([EstadoCompra.CANCELADA, EstadoCompra.CANCELADA]);
+    });
+
+    it("en una CONFIRMADA o UTILIZADA, como en la 008", () => {
+      expect(estados(compraConfirmada())).toEqual([EstadoCompra.CONFIRMADA, EstadoCompra.CONFIRMADA]);
+      expect(estados(compraUtilizada())).toEqual([EstadoCompra.UTILIZADA, EstadoCompra.CONFIRMADA]);
+    });
+  });
+
+  it("fueConfirmada: el historial tiene un CONFIRMADA", () => {
+    for (const compra of [
+      compraConfirmada(),
+      compraUtilizada(),
+      compraCanceladaDesdeConfirmada(),
+      compraReembolsada(),
+    ]) {
+      expect(compra.fueConfirmada).toBe(true);
+    }
+    for (const compra of [compraPendiente(), compraCancelada(), compraVencida()]) {
+      expect(compra.fueConfirmada).toBe(false);
+    }
+  });
+
+  describe("canceladaDesde", () => {
+    it("CONFIRMADA en CANCELADA y REEMBOLSADA que pasaron por CONFIRMADA (también una gratis)", () => {
+      expect(compraCanceladaDesdeConfirmada().canceladaDesde).toBe("CONFIRMADA");
+      expect(compraCanceladaDesdeConfirmada({ total: 0 }).canceladaDesde).toBe("CONFIRMADA");
+      expect(compraReembolsada().canceladaDesde).toBe("CONFIRMADA");
+    });
+
+    it("PENDIENTE en una CANCELADA sin confirmar: por el comprador o vencida (también al día)", () => {
+      expect(compraCancelada().canceladaDesde).toBe("PENDIENTE");
+      expect(compraVencida().canceladaDesde).toBe("PENDIENTE");
+      expect(compraPendiente().alDia(despues(PLAZO)).canceladaDesde).toBe("PENDIENTE");
+    });
+
+    it("null en PENDIENTE, CONFIRMADA y UTILIZADA", () => {
+      expect(compraPendiente().canceladaDesde).toBeNull();
+      expect(compraConfirmada().canceladaDesde).toBeNull();
+      expect(compraUtilizada().canceladaDesde).toBeNull();
+    });
+  });
+
+  describe("cambioDeCancelacion", () => {
+    it("el cambio a CANCELADA del historial, también en una REEMBOLSADA", () => {
+      expect(compraCanceladaDesdeConfirmada().cambioDeCancelacion).toEqual(cancelacion);
+      expect(compraReembolsada().cambioDeCancelacion).toEqual(cancelacion);
+      expect(compraVencida().cambioDeCancelacion).toMatchObject({
+        estado: EstadoCompra.CANCELADA,
+        autor: { tipo: "sistema" },
+      });
+    });
+
+    it("null si no hay", () => {
+      expect(compraPendiente().cambioDeCancelacion).toBeNull();
+      expect(compraConfirmada().cambioDeCancelacion).toBeNull();
+      expect(compraUtilizada().cambioDeCancelacion).toBeNull();
+    });
+  });
+
+  describe("tieneReembolsoPendiente", () => {
+    it("true en una paga CANCELADA después de confirmada", () => {
+      expect(compraCanceladaDesdeConfirmada().tieneReembolsoPendiente()).toBe(true);
+    });
+
+    it("false en la gratis, la pendiente cancelada, la vencida, la REEMBOLSADA y los demás estados", () => {
+      for (const compra of [
+        compraCanceladaDesdeConfirmada({ total: 0 }),
+        compraCancelada(),
+        compraVencida(),
+        compraReembolsada(),
+        compraPendiente(),
+        compraConfirmada(),
+        compraUtilizada(),
+      ]) {
+        expect(compra.tieneReembolsoPendiente()).toBe(false);
+      }
+    });
+  });
+
+  describe("motivoNoCancelable (tabla de R6)", () => {
+    it("PENDIENTE → null, también con el evento empezado", () => {
+      const inicioCercano = despues(5 * MINUTO);
+      expect(compraPendiente().motivoNoCancelable(INICIO, despues(MINUTO))).toBeNull();
+      expect(compraPendiente().motivoNoCancelable(inicioCercano, despues(10 * MINUTO))).toBeNull();
+    });
+
+    it("CONFIRMADA 1 minuto antes del inicio → null", () => {
+      expect(compraConfirmada().motivoNoCancelable(INICIO, antesDelInicio)).toBeNull();
+    });
+
+    it("CONFIRMADA exactamente en el inicio y después → evento-empezado", () => {
+      expect(compraConfirmada().motivoNoCancelable(INICIO, INICIO)).toBe("evento-empezado");
+      const unaHoraDespues = new Date(INICIO.getTime() + 60 * MINUTO);
+      expect(compraConfirmada().motivoNoCancelable(INICIO, unaHoraDespues)).toBe("evento-empezado");
+    });
+
+    it("UTILIZADA → entrada-usada, con el evento empezado y sin empezar", () => {
+      expect(compraUtilizada().motivoNoCancelable(INICIO, antesDelInicio)).toBe("entrada-usada");
+      expect(compraUtilizada().motivoNoCancelable(INICIO, INICIO)).toBe("entrada-usada");
+    });
+
+    it("CANCELADA → cancelada (desde confirmada, pendiente cancelada o vencida)", () => {
+      for (const compra of [compraCanceladaDesdeConfirmada(), compraCancelada(), compraVencida()]) {
+        expect(compra.motivoNoCancelable(INICIO, antesDelInicio)).toBe("cancelada");
+        expect(compra.motivoNoCancelable(INICIO, INICIO)).toBe("cancelada");
+      }
+    });
+
+    it("REEMBOLSADA → reembolsada", () => {
+      expect(compraReembolsada().motivoNoCancelable(INICIO, antesDelInicio)).toBe("reembolsada");
+      expect(compraReembolsada().motivoNoCancelable(INICIO, INICIO)).toBe("reembolsada");
+    });
+  });
+
+  describe("invariantes del historial: REEMBOLSADA", () => {
+    const campos = (cambios: Partial<PropiedadesCompra>) =>
+      camposInvalidos({ entradas: entradasCanceladas(), ...cambios });
+
+    it("una REEMBOLSADA válida se crea", () => {
+      expect(() => compraReembolsada()).not.toThrow();
+    });
+
+    it("rechaza un REEMBOLSADA que no es el último cambio", () => {
+      const otraCancelacion = { ...cancelacion, fechaHora: despues(30 * MINUTO) };
+      expect(campos({ historial: [pendiente, confirmada, cancelacion, reembolso, otraCancelacion] })).toEqual(
+        ["historial"],
+      );
+    });
+
+    it("rechaza un REEMBOLSADA que no sigue inmediatamente a un CANCELADA", () => {
+      expect(campos({ historial: [pendiente, confirmada, reembolso] })).toEqual(["historial"]);
+    });
+
+    it("rechaza un REEMBOLSADA de una compra que no pasó por CONFIRMADA", () => {
+      expect(
+        camposInvalidos({
+          historial: [pendiente, { ...cancelacion, fechaHora: despues(MINUTO) }, reembolso],
+        }),
+      ).toEqual(["historial"]);
+    });
+
+    it("rechaza un REEMBOLSADA con total 0", () => {
+      expect(campos({ total: 0, historial: [pendiente, confirmada, cancelacion, reembolso] })).toEqual([
+        "historial",
+      ]);
+    });
+  });
+
+  describe("invariantes de las entradas (entradasCoherentes)", () => {
+    const [codigoA, codigoB] = codigos as [string, string];
+    const cancelada = (codigo: string) => new Entrada({ codigo, cambios: [cancelacion] });
+    const usada = (codigo: string) => new Entrada({ codigo, cambios: [usoDeA] });
+    const sinCambios = (codigo: string) => new Entrada({ codigo });
+
+    it("si la compra no pasó por CONFIRMADA, ninguna entrada con cambios", () => {
+      expect(
+        camposInvalidos({
+          historial: [pendiente, { ...cancelacion, fechaHora: despues(MINUTO) }],
+          entradas: [cancelada(codigoA), cancelada(codigoB)],
+        }),
+      ).toEqual(["entradas"]);
+    });
+
+    it("CONFIRMADA: ninguna cancelada", () => {
+      expect(
+        camposInvalidos({
+          historial: [pendiente, confirmada],
+          entradas: [cancelada(codigoA), sinCambios(codigoB)],
+        }),
+      ).toEqual(["entradas"]);
+    });
+
+    it("UTILIZADA: alguna usada y ninguna cancelada", () => {
+      expect(
+        camposInvalidos({
+          historial: [pendiente, confirmada, usoDeA],
+          entradas: [usada(codigoA), cancelada(codigoB)],
+        }),
+      ).toEqual(["entradas"]);
+    });
+
+    it.each([
+      ["CANCELADA", [pendiente, confirmada, cancelacion]],
+      ["REEMBOLSADA", [pendiente, confirmada, cancelacion, reembolso]],
+    ])(
+      "%s después de confirmada: cada entrada con un único cambio propio CANCELADA",
+      (_estado, historial) => {
+        const dosCancelaciones = [cancelacion, { ...cancelacion, fechaHora: despues(11 * MINUTO) }];
+        expect(
+          () => new Compra(con({ historial, entradas: [cancelada(codigoA), cancelada(codigoB)] })),
+        ).not.toThrow();
+        expect(camposInvalidos({ historial, entradas: [cancelada(codigoA), sinCambios(codigoB)] })).toEqual([
+          "entradas",
+        ]);
+        expect(camposInvalidos({ historial, entradas: [cancelada(codigoA), usada(codigoB)] })).toEqual([
+          "entradas",
+        ]);
+        expect(
+          camposInvalidos({
+            historial,
+            entradas: [cancelada(codigoA), new Entrada({ codigo: codigoB, cambios: dosCancelaciones })],
+          }),
+        ).toEqual(["entradas"]);
+      },
+    );
+  });
+
+  it("esVigente es false en una CANCELADA desde confirmada y en una REEMBOLSADA (FR-004)", () => {
+    expect(compraCanceladaDesdeConfirmada().esVigente(despues(MINUTO))).toBe(false);
+    expect(compraReembolsada().esVigente(despues(MINUTO))).toBe(false);
   });
 });
