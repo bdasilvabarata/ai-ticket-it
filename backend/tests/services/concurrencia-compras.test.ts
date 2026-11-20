@@ -277,7 +277,7 @@ describe("Concurrencia: uso de entradas (feature 008, SC-006)", () => {
       });
     }
     const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
-    expect(guardada.entradas[0]!.cambios).toHaveLength(1);
+    expect(guardada.entradas[0]!.uso).toMatchObject({ usuarioId: "usuario-lucia" });
     expect(guardada.historial.filter((c) => c.estado === EstadoCompra.UTILIZADA)).toHaveLength(1);
   });
 
@@ -396,8 +396,8 @@ describe("Concurrencia: cancelación y reembolso (feature 009, US4, SC-005)", ()
 
       expect([uso.status, cancelacion.status].toSorted()).toEqual(["fulfilled", "rejected"]);
       const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
-      const usadas = guardada.entradas.filter((e) => e.tieneCambioA(EstadoCompra.UTILIZADA));
-      const canceladas = guardada.entradas.filter((e) => e.tieneCambioA(EstadoCompra.CANCELADA));
+      const usadas = guardada.entradas.filter((e) => e.usada);
+      const canceladas = guardada.entradas.filter((e) => e.cancelada);
       expect(usadas.length === 0 || canceladas.length === 0).toBe(true);
 
       if (uso.status === "fulfilled") {

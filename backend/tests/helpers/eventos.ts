@@ -1,7 +1,7 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
 import { ALFABETO_DE_CODIGO, LARGO_DE_CODIGO } from "../../src/domain/codigo-de-entrada";
-import { Compra, Entrada, type CambioEstadoCompra } from "../../src/domain/compra";
+import { Compra, Entrada, type CambioEstadoCompra, type RegistroDeEntrada } from "../../src/domain/compra";
 import { Evento, TipoEntrada, type PropiedadesTipoEntrada } from "../../src/domain/evento";
 import type { Reloj } from "../../src/domain/reloj";
 import { Resenia } from "../../src/domain/resenia";
@@ -130,19 +130,29 @@ export function codigosDePrueba(cantidad: number): string[] {
   });
 }
 
+/** El usuario y la fecha de un cambio del historial (un cambio de un usuario: el uso o la cancelación). */
+function registroDe(cambio: CambioEstadoCompra): RegistroDeEntrada {
+  const usuarioId = cambio.autor.tipo === "usuario" ? cambio.autor.usuarioId : "sistema";
+  return { usuarioId, fechaHora: cambio.fechaHora };
+}
+
 /**
- * `cantidad` entradas con códigos de `codigosDePrueba`, sin cambios propios; si el `historial` dado
- * termina en UTILIZADA, la primera entrada lleva ese cambio (la compra la exige usada).
+ * `cantidad` entradas con códigos de `codigosDePrueba`, sin uso ni cancelación, salvo que el
+ * `historial` dado lo exija: si pasó por CONFIRMADA y tiene un CANCELADA, todas canceladas por el
+ * autor y en la fecha de ese cambio; si termina en UTILIZADA, la primera usada por el autor y en la
+ * fecha de ese cambio.
  */
 export function entradasDePrueba(cantidad: number, historial: readonly CambioEstadoCompra[] = []): Entrada[] {
   const ultimo = historial[historial.length - 1];
   const fueConfirmada = historial.some((cambio) => cambio.estado === EstadoCompra.CONFIRMADA);
   const cancelacion = historial.find((cambio) => cambio.estado === EstadoCompra.CANCELADA);
   if (fueConfirmada && cancelacion) {
-    return codigosDePrueba(cantidad).map((codigo) => new Entrada({ codigo, cambios: [cancelacion] }));
+    return codigosDePrueba(cantidad).map(
+      (codigo) => new Entrada({ codigo, cancelacion: registroDe(cancelacion) }),
+    );
   }
-  const uso = ultimo?.estado === EstadoCompra.UTILIZADA ? [ultimo] : [];
-  return codigosDePrueba(cantidad).map((codigo, i) => new Entrada({ codigo, cambios: i === 0 ? uso : [] }));
+  const uso = ultimo?.estado === EstadoCompra.UTILIZADA ? registroDe(ultimo) : null;
+  return codigosDePrueba(cantidad).map((codigo, i) => new Entrada({ codigo, uso: i === 0 ? uso : null }));
 }
 
 export interface CambiosCompra {

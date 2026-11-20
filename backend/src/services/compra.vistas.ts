@@ -37,7 +37,7 @@ export function aEntradaVista(entrada: Entrada, compra: Compra): EntradaVista {
   const usadaEn = entrada.usadaEn;
   return {
     codigo: entrada.codigo,
-    estado: entrada.estadoEn(compra),
+    estado: compra.estadoDe(entrada),
     usadaEn: usadaEn ? usadaEn.toISOString() : null,
     usadaEnLocal: usadaEn ? horaDeBuenosAires(usadaEn) : null,
   };

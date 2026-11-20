@@ -3,6 +3,9 @@ import { ReglaDeNegocioError } from "./errores";
 import type { TipoEntrada } from "./evento";
 import { esCodigoValido } from "./codigo-de-entrada";
 import { esEnteroNoNegativo, Invariantes } from "./invariantes";
+import { Entrada, motivoNoUsable } from "./entrada";
+
+export { Entrada, type RegistroDeEntrada } from "./entrada";
 
 /** Quién hizo un cambio de estado: un usuario o el sistema (el vencimiento). */
 export type AutorDelCambio = { tipo: "usuario"; usuarioId: string } | { tipo: "sistema" };
@@ -40,75 +43,6 @@ export interface DatosDeAlta {
   ahora: Date;
 }
 
-export interface PropiedadesEntrada {
-  codigo: string;
-  /** Sus cambios propios, posteriores a la confirmación de la compra (por defecto, ninguno). */
-  cambios?: readonly CambioEstadoCompra[];
-}
-
-/**
- * Una entrada de una compra (feature 008, R1): vive dentro del agregado `Compra` y se guarda con
- * él. Su código es su identificador (único en el sistema). Su estado se deriva: igual al de la
- * compra hasta que esta se confirma; después, el de su último cambio propio o `CONFIRMADA` (su uso
- * en la 008 y, al cancelar una confirmada, su cancelación en la 009).
- */
-export class Entrada {
-  readonly codigo: string;
-  readonly cambios: readonly CambioEstadoCompra[];
-
-  constructor({ codigo, cambios = [] }: PropiedadesEntrada) {
-    this.codigo = codigo;
-    this.cambios = Object.freeze(cambios.map((cambio) => Object.freeze({ ...cambio })));
-  }
-
-  /**
-   * El estado de esta entrada en `compra` (FR-012a): si la compra nunca llegó a CONFIRMADA, el de
-   * la compra; si llegó, el de su último cambio propio o CONFIRMADA (009, R3: en una CANCELADA o
-   * REEMBOLSADA después de confirmada, su cambio CANCELADA).
-   */
-  estadoEn(compra: Compra): EstadoCompra {
-    if (!compra.fueConfirmada) return compra.estado;
-    return this.ultimoEstadoPropio ?? EstadoCompra.CONFIRMADA;
-  }
-
-  /** Esta entrada con su uso registrado por `organizadorId` en `ahora` (la compra decide si se puede). */
-  usar(organizadorId: string, ahora: Date): Entrada {
-    return this.#conCambio({
-      estado: EstadoCompra.UTILIZADA,
-      autor: { tipo: "usuario", usuarioId: organizadorId },
-      fechaHora: ahora,
-    });
-  }
-
-  /** Esta entrada cancelada por su comprador en `ahora` (feature 009; la compra decide si se puede). */
-  cancelar(compradorId: string, ahora: Date): Entrada {
-    return this.#conCambio({
-      estado: EstadoCompra.CANCELADA,
-      autor: { tipo: "usuario", usuarioId: compradorId },
-      fechaHora: ahora,
-    });
-  }
-
-  /** El estado de su último cambio propio, sin mirar la compra (para las invariantes). */
-  get ultimoEstadoPropio(): EstadoCompra | null {
-    return this.cambios[this.cambios.length - 1]?.estado ?? null;
-  }
-
-  /** Cuándo se registró su uso, o `null`. */
-  get usadaEn(): Date | null {
-    return this.cambios.find((cambio) => cambio.estado === EstadoCompra.UTILIZADA)?.fechaHora ?? null;
-  }
-
-  /** Si tiene algún cambio propio a `estado` (para las invariantes). */
-  tieneCambioA(estado: EstadoCompra): boolean {
-    return this.cambios.some((cambio) => cambio.estado === estado);
-  }
-
-  #conCambio(cambio: CambioEstadoCompra): Entrada {
-    return new Entrada({ codigo: this.codigo, cambios: [...this.cambios, cambio] });
-  }
-}
-
 /**
  * Tantas entradas como la cantidad (si la cantidad es válida; si no, ya lo informa ese campo),
  * códigos con formato y distintos, y entradas coherentes con el estado de la compra.
@@ -126,25 +60,21 @@ function sonEntradasValidas(propiedades: PropiedadesCompra): boolean {
 }
 
 /**
- * Los cambios propios de las entradas según el estado de la compra (008, R1; 009, R3): si la compra
- * no pasó por CONFIRMADA, ninguno; CONFIRMADA → ninguna usada ni cancelada; UTILIZADA → alguna
- * usada y ninguna cancelada; CANCELADA o REEMBOLSADA después de confirmada → cada una con un único
- * cambio propio, CANCELADA.
+ * El uso y la cancelación de las entradas según el estado de la compra (008, R1; 009, R3): si la
+ * compra no pasó por CONFIRMADA, ninguna usada ni cancelada; CONFIRMADA → ninguna usada ni
+ * cancelada; UTILIZADA → alguna usada y ninguna cancelada; CANCELADA o REEMBOLSADA después de
+ * confirmada → todas canceladas y ninguna usada.
  */
 function entradasCoherentes(historial: readonly CambioEstadoCompra[], entradas: readonly Entrada[]): boolean {
-  if (!pasoPorConfirmada(historial)) return entradas.every((entrada) => entrada.cambios.length === 0);
-  const usada = (entrada: Entrada) => entrada.tieneCambioA(EstadoCompra.UTILIZADA);
-  const cancelada = (entrada: Entrada) => entrada.tieneCambioA(EstadoCompra.CANCELADA);
+  if (!pasoPorConfirmada(historial)) return entradas.every((entrada) => !entrada.usada && !entrada.cancelada);
   switch (historial[historial.length - 1]?.estado) {
     case EstadoCompra.CONFIRMADA:
-      return !entradas.some((entrada) => usada(entrada) || cancelada(entrada));
+      return !entradas.some((entrada) => entrada.usada || entrada.cancelada);
     case EstadoCompra.UTILIZADA:
-      return entradas.some(usada) && !entradas.some(cancelada);
+      return entradas.some((entrada) => entrada.usada) && !entradas.some((entrada) => entrada.cancelada);
     case EstadoCompra.CANCELADA:
     case EstadoCompra.REEMBOLSADA:
-      return entradas.every(
-        (entrada) => entrada.cambios.length === 1 && entrada.ultimoEstadoPropio === EstadoCompra.CANCELADA,
-      );
+      return entradas.every((entrada) => entrada.cancelada && !entrada.usada);
     default:
       return true;
   }
@@ -265,14 +195,25 @@ export class Compra {
     });
   }
 
-  /** El estado derivado de la entrada con ese código, o `null` si no es de esta compra. */
-  estadoDeEntrada(codigo: string): EstadoCompra | null {
-    return this.entradas.find((entrada) => entrada.codigo === codigo)?.estadoEn(this) ?? null;
+  /**
+   * El estado visible de una de sus entradas (FR-012a): si la compra nunca llegó a CONFIRMADA, el de
+   * la compra; si llegó, el propio de la entrada (UTILIZADA si se usó, CANCELADA si se canceló —
+   * también en una REEMBOLSADA—, si no CONFIRMADA).
+   */
+  estadoDe(entrada: Entrada): EstadoCompra {
+    if (!this.fueConfirmada) return this.estado;
+    return entrada.estadoPropio;
   }
 
-  /** Cuántas de sus entradas están UTILIZADA. */
+  /** El estado visible de la entrada con ese código, o `null` si no es de esta compra. */
+  estadoDeEntrada(codigo: string): EstadoCompra | null {
+    const entrada = this.entradas.find((candidata) => candidata.codigo === codigo);
+    return entrada ? this.estadoDe(entrada) : null;
+  }
+
+  /** Cuántas de sus entradas se usaron. */
   get entradasUsadas(): number {
-    return this.entradas.filter((entrada) => entrada.estadoEn(this) === EstadoCompra.UTILIZADA).length;
+    return this.entradas.filter((entrada) => entrada.usada).length;
   }
 
   /**
@@ -424,7 +365,7 @@ export class Compra {
    * service antes). En orden (R1): vencida → `COMPRA_VENCIDA`; PENDIENTE → CANCELADA, también con
    * el evento empezado (006); si no, según `motivoNoCancelable`: el evento empezó →
    * `EVENTO_REALIZADO`; otro motivo → `TRANSICION_INVALIDA` con su mensaje; ninguno (una CONFIRMADA
-   * antes del inicio, feature 009) → CANCELADA y cada entrada con su cambio propio CANCELADA.
+   * antes del inicio, feature 009) → CANCELADA y cada entrada cancelada (quién y cuándo).
    */
   cancelar(usuarioId: string, ahora: Date, inicioDelEvento: Date): Compra {
     if (this.estaVencida(ahora) || this.fueVencida()) {
@@ -505,22 +446,6 @@ const MENSAJE_NO_CANCELABLE: Record<Exclude<MotivoNoCancelable, "evento-empezado
   cancelada: "La compra ya está cancelada.",
   reembolsada: "La compra ya fue reembolsada.",
 };
-
-/** Por qué no se puede usar una entrada en ese estado (R5): el mensaje del `TRANSICION_INVALIDA`. */
-function motivoNoUsable(estado: EstadoCompra | null): string {
-  switch (estado) {
-    case EstadoCompra.UTILIZADA:
-      return "Esta entrada ya se utilizó.";
-    case EstadoCompra.PENDIENTE:
-      return "La compra de esta entrada todavía no se pagó.";
-    case EstadoCompra.CANCELADA:
-      return "La compra de esta entrada está cancelada.";
-    case EstadoCompra.REEMBOLSADA:
-      return "La compra de esta entrada fue reembolsada.";
-    default:
-      return "La entrada no es de esta compra.";
-  }
-}
 
 /**
  * Las entradas que liberan las compras vencidas en `ahora` (PENDIENTE pasado el plazo), sumadas por

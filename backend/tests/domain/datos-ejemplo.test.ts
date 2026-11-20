@@ -308,7 +308,7 @@ describe("crearDatosEjemplo", () => {
         { estado: EstadoCompra.CANCELADA, autor: diego, fechaHora: haceDias(1) },
       ]);
       expect(compra?.tieneReembolsoPendiente()).toBe(true);
-      expect(compra?.entradas.map((e) => [e.codigo, e.estadoEn(compra)])).toEqual([
+      expect(compra?.entradas.map((e) => [e.codigo, compra.estadoDe(e)])).toEqual([
         ["MZDF1C01", EstadoCompra.CANCELADA],
       ]);
     });

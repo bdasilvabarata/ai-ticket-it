@@ -266,6 +266,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     autor: porLucia,
     fechaHora: new Date(ahora.getTime() - HORA_MS / 2),
   };
+  const usoPorLucia = { usuarioId: lucia, fechaHora: usoDeMartin.fechaHora };
   const haceSofia = new Date(ahora.getTime() - 3 * HORA_MS);
   compras.push(
     new Compra({
@@ -281,7 +282,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         usoDeMartin,
       ],
       entradas: [
-        new Entrada({ codigo: "PRGM3A01", cambios: [usoDeMartin] }),
+        new Entrada({ codigo: "PRGM3A01", uso: usoPorLucia }),
         new Entrada({ codigo: "PRGM3A02" }),
         new Entrada({ codigo: "PRGM3A03" }),
       ],
@@ -315,6 +316,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     autor: porValentina,
     fechaHora: dias(2),
   };
+  const porValentinaHaceDosDias = { usuarioId: valentina, fechaHora: dias(2) };
   compras.push(
     new Compra({
       id: "compra-diego-maraton-inscripcion",
@@ -328,7 +330,7 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { estado: EstadoCompra.CONFIRMADA, autor: porDiego, fechaHora: masMinutos(dias(3), 5) },
         cancelacionDeDiego,
       ],
-      entradas: [new Entrada({ codigo: "MZDF1C01", cambios: [cancelacionDeDiego] })],
+      entradas: [new Entrada({ codigo: "MZDF1C01", cancelacion: { usuarioId: diego, fechaHora: dias(1) } })],
     }),
     new Compra({
       id: "compra-valentina-maraton-inscripcion",
@@ -344,8 +346,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { estado: EstadoCompra.REEMBOLSADA, autor: porLucia, fechaHora: dias(1) },
       ],
       entradas: [
-        new Entrada({ codigo: "MZVG2R01", cambios: [cancelacionDeValentina] }),
-        new Entrada({ codigo: "MZVG2R02", cambios: [cancelacionDeValentina] }),
+        new Entrada({ codigo: "MZVG2R01", cancelacion: porValentinaHaceDosDias }),
+        new Entrada({ codigo: "MZVG2R02", cancelacion: porValentinaHaceDosDias }),
       ],
     }),
   );

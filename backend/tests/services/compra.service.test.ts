@@ -1640,8 +1640,11 @@ describe("CompraService.cancelar de una CONFIRMADA (feature 009, US1, R2)", () =
       fechaHora: new Date(AHORA.getTime() + 7 * MINUTO),
     };
     expect(guardada?.historial.at(-1)).toEqual(esperado);
-    expect(guardada?.entradas.every((entrada) => entrada.cambios.length === 1)).toBe(true);
-    expect(guardada?.entradas[0]?.cambios[0]).toEqual(esperado);
+    expect(guardada?.entradas.every((entrada) => entrada.cancelada && !entrada.usada)).toBe(true);
+    expect(guardada?.entradas[0]?.cancelacion).toEqual({
+      usuarioId: "usuario-sofia",
+      fechaHora: esperado.fechaHora,
+    });
   });
 
   it("el cupo sube exactamente la cantidad: un tipo agotado vuelve a tener disponibles para todos", async () => {
@@ -1911,7 +1914,7 @@ describe("CompraService.confirmarReembolso (feature 009, US2, R5)", () => {
       autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
       fechaHora: new Date(AHORA.getTime() + 9 * MINUTO),
     });
-    expect(guardada?.entradas.every((entrada) => entrada.cambios.length === 1)).toBe(true);
+    expect(guardada?.entradas.every((entrada) => entrada.cancelada && !entrada.usada)).toBe(true);
   });
 
   it("un solo guardar de compras, ninguno de eventos, el cupo no cambia y el cerrojo se toma una vez", async () => {
