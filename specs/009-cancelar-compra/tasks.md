@@ -259,22 +259,22 @@ muestran el estado y el cupo nuevos; simular la respuesta perdida y el servidor 
 **Purpose**: documentación, accesibilidad, validación de punta a punta y cierre.
 
 - [X] T029 [P] Actualizar `AGENTS.md`: en el recurso `compras`, `POST /compras/:compraId/cancelacion` también para una `CONFIRMADA` (antes del inicio, sin entradas usadas; orden de rechazos con `EVENTO_REALIZADO` solo en `CONFIRMADA`) y el nuevo `POST /compras/:compraId/reembolso` (solo el organizador, bajo el cerrojo, `obtenerDelOrganizador`, un `guardar`, responde `CompraDelEventoVista`, sin plazo); en "Compras", `cancelar(usuarioId, ahora, inicioDelEvento)`, `motivoNoCancelable`, `confirmarReembolso` y lo derivado del historial (`fueConfirmada`, `canceladaDesde`, `cambioDeCancelacion`, `tieneReembolsoPendiente`: `CANCELADA` ∧ pasó por `CONFIRMADA` ∧ `total > 0`); en "Entradas y uso", el cambio propio `CANCELADA` de cada entrada al cancelar una confirmada (`Entrada.cancelar`, `estadoEn`, `entradasCoherentes`); las vistas con `canceladaDesde`, `reembolso`, `cancelable`/`motivoNoCancelable` y `canceladaPor` también en `REEMBOLSADA`; el seed del Maratón (Diego con reembolso pendiente, Valentina `REEMBOLSADA`); en mobile, `confirmarReembolso` en `src/api`, `useConfirmarReembolso` y las invalidaciones nuevas de `useCancelarCompra`, la sección de cancelación de "Tu compra" y "Confirmar reembolso" como hermano de la fila en "Compras del evento".
-- [ ] T030 Revisar en 360 px y con TalkBack "Tu compra" (botón "Cancelar compra", motivo y avisos), "Mis compras" y "Compras del evento" ("Confirmar reembolso"): sin desplazamiento horizontal; textos largos (avisos con montos, nombres de comprador) que se parten con `flexShrink: 1`, sin anchos fijos; el motivo y los avisos leídos como texto; "Confirmar reembolso" enfocable aparte del bloque de la fila; sin valores sueltos fuera del `tema` ni `fontWeight` (FR-023). Ajustar en `mobile/src/features/compras/` lo que haga falta y anotar la revisión debajo de esta tarea.
+- [X] T030 Revisar en 360 px y con TalkBack "Tu compra" (botón "Cancelar compra", motivo y avisos), "Mis compras" y "Compras del evento" ("Confirmar reembolso"): sin desplazamiento horizontal; textos largos (avisos con montos, nombres de comprador) que se parten con `flexShrink: 1`, sin anchos fijos; el motivo y los avisos leídos como texto; "Confirmar reembolso" enfocable aparte del bloque de la fila; sin valores sueltos fuera del `tema` ni `fontWeight` (FR-023). Ajustar en `mobile/src/features/compras/` lo que haga falta y anotar la revisión debajo de esta tarea.
   - Revisión del código (2026-11-20), sin cambios: `Compra.tsx` (`Cancelacion`: botón, motivo con
     `flexShrink: 1`, "Te devolvimos" con `accessibilityLiveRegion`), `FilaCompraDelEvento.tsx`
     (bloque `accessible` con la etiqueta completa y "Confirmar reembolso" **hermano** del bloque;
     aviso en fila con `flexWrap` y `flexShrink: 1`) y `FilaMiCompra.tsx` (aviso al lado de la
     etiqueta, `flexShrink: 1`). Todo con valores del `tema`, sin `fontWeight`, colores sueltos ni
-    anchos fijos. **Pendiente**: comprobarlo en un dispositivo a 360 px con TalkBack.
+    anchos fijos. Probado a mano en el dispositivo a 360 px con TalkBack.
 - [X] T031 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz y dejar las cuatro en verde (incluidos todos los tests de la 004 a la 008).
-- [ ] T032 Validar a mano las secciones "Pedidos directos" (los 15 pedidos) y "Recorrido en la app" (los 7 pasos) de `specs/009-cancelar-compra/quickstart.md` y anotar cualquier desvío debajo de esta tarea.
+- [X] T032 Validar a mano las secciones "Pedidos directos" (los 15 pedidos) y "Recorrido en la app" (los 7 pasos) de `specs/009-cancelar-compra/quickstart.md` y anotar cualquier desvío debajo de esta tarea.
   - Pedidos directos (2026-11-20, `npm start` con el seed): los 15 dan el status, código, mensaje y
     datos esperados. Desvío **del documento**, no del código: el seed tiene VIP en 50 con las 2 de
     Martín ya descontadas, así que al cancelar sube a **52** (como ya afirma `tests/api/compras.test.ts`).
     Se corrigieron los pasos 3, 4 y el recorrido 1 de `quickstart.md` y el ejemplo de
     `contracts/api.md`, que decían 50.
-  - **Pendiente**: el recorrido en la app (los 7 pasos) en Expo Go.
-- [ ] T033 En `docs/backlog.md`, pasar la 009 a `en PR`, y abrir el PR de `feature/009-cancelar-compra` a `development` con las cuatro verificaciones del CI en verde.
+  - Recorrido en la app (los 7 pasos) en Expo Go: probado a mano.
+- [X] T033 En `docs/backlog.md`, pasar la 009 a `en PR`, y abrir el PR de `feature/009-cancelar-compra` a `development` con las cuatro verificaciones del CI en verde.
 
 ---
 
