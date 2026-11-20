@@ -860,6 +860,110 @@ describe("POST /api/compras/:compraId/cancelacion de una CONFIRMADA (feature 009
   });
 });
 
+describe("POST /api/compras/:compraId/cancelacion: rechazos (feature 009, US3)", () => {
+  const COMPRA_DE_MARTIN = "compra-martin-festival-vip";
+  const cancelarComo = (app: App, compraId: string, usuarioId?: string) => {
+    const pedido = request(app).post(`/api/compras/${compraId}/cancelacion`);
+    return usuarioId === undefined ? pedido : pedido.set("X-Usuario-Id", usuarioId);
+  };
+  const obtenerComo = (app: App, compraId: string, usuarioId: string) =>
+    request(app).get(`/api/compras/${compraId}`).set("X-Usuario-Id", usuarioId);
+  function esperarError(respuesta: request.Response, status: number, codigo: string, mensaje?: string): void {
+    expect(respuesta.status).toBe(status);
+    expect(respuesta.body.error.codigo).toBe(codigo);
+    if (mensaje !== undefined) expect(respuesta.body.error.mensaje).toBe(mensaje);
+  }
+
+  it("sin header → 401; id inválido → 400 en params.compraId; inexistente → 404", async () => {
+    const app = nuevaApp();
+    esperarError(await cancelarComo(app, COMPRA_DE_MARTIN), 401, "USUARIO_NO_IDENTIFICADO");
+    const invalido = await cancelarComo(app, "no válido!", "usuario-martin");
+    esperarError(invalido, 400, "ENTRADA_INVALIDA");
+    expect(invalido.body.error.detalles).toEqual([
+      { campo: "params.compraId", mensaje: "Debe ser un identificador válido." },
+    ]);
+    esperarError(
+      await cancelarComo(app, "no-existe", "usuario-martin"),
+      404,
+      "COMPRA_NO_ENCONTRADA",
+      "No existe la compra.",
+    );
+  });
+
+  it("la de Sofía en la Peña como Lucía (organizadora) → 403 SIN_PERMISO", async () => {
+    esperarError(
+      await cancelarComo(nuevaApp(), "compra-sofia-pena-con-cena", "usuario-lucia"),
+      403,
+      "SIN_PERMISO",
+      "Solo quien hizo la compra puede verla o pagarla.",
+    );
+  });
+
+  it("con el reloj a la hora de inicio del Festival → 409 EVENTO_REALIZADO y el cupo no cambia", async () => {
+    const relojDeLaApp = relojMovible(new Date("2026-11-10T15:00:00.000Z"));
+    const app = crearApp({ reloj: relojDeLaApp });
+    const { body: festival } = await request(app).get(FESTIVAL);
+    const antes = await cupoDe(app, VIP);
+    relojDeLaApp.avanzar(new Date(festival.fechaHora).getTime() - relojDeLaApp.ahora().getTime());
+
+    esperarError(
+      await cancelarComo(app, COMPRA_DE_MARTIN, "usuario-martin"),
+      409,
+      "EVENTO_REALIZADO",
+      "El evento ya empezó: ya no se puede cancelar la compra.",
+    );
+    expect(await cupoDe(app, VIP)).toBe(antes);
+    expect((await obtenerComo(app, COMPRA_DE_MARTIN, "usuario-martin")).body).toMatchObject({
+      estado: EstadoCompra.CONFIRMADA,
+      cancelable: false,
+      motivoNoCancelable: "evento-empezado",
+    });
+  });
+
+  it("la UTILIZADA de Martín en la Peña → 409 «Ya se usó una entrada…»", async () => {
+    esperarError(
+      await cancelarComo(nuevaApp(), "compra-martin-pena-general", "usuario-martin"),
+      409,
+      "TRANSICION_INVALIDA",
+      "Ya se usó una entrada de esta compra: no se puede cancelar.",
+    );
+  });
+
+  it("cancelar dos veces la del Festival → el segundo 409 «ya está cancelada» y VIP sube una sola vez", async () => {
+    const app = nuevaApp();
+    const antes = await cupoDe(app, VIP);
+    expect((await cancelarComo(app, COMPRA_DE_MARTIN, "usuario-martin")).status).toBe(200);
+    esperarError(
+      await cancelarComo(app, COMPRA_DE_MARTIN, "usuario-martin"),
+      409,
+      "TRANSICION_INVALIDA",
+      "La compra ya está cancelada.",
+    );
+    expect(await cupoDe(app, VIP)).toBe(antes + 2);
+  });
+
+  it("la REEMBOLSADA de Valentina en el Maratón → 409 «ya fue reembolsada»", async () => {
+    esperarError(
+      await cancelarComo(nuevaApp(), "compra-valentina-maraton-inscripcion", "usuario-valentina"),
+      409,
+      "TRANSICION_INVALIDA",
+      "La compra ya fue reembolsada.",
+    );
+  });
+
+  it("GET /compras/:id informa si se puede cancelar: la UTILIZADA no, la del Festival sí", async () => {
+    const app = nuevaApp();
+    expect((await obtenerComo(app, "compra-martin-pena-general", "usuario-martin")).body).toMatchObject({
+      cancelable: false,
+      motivoNoCancelable: "entrada-usada",
+    });
+    expect((await obtenerComo(app, COMPRA_DE_MARTIN, "usuario-martin")).body).toMatchObject({
+      cancelable: true,
+      motivoNoCancelable: null,
+    });
+  });
+});
+
 describe("POST /api/compras/:compraId/reembolso (feature 009, US2)", () => {
   const MARATON = "/api/eventos/evento-maraton-10k";
   const INSCRIPCION = "tipo-maraton-10k-inscripcion";

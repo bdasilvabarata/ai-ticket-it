@@ -600,6 +600,14 @@
           }
         },
         {
+          "name": "Cancelar compra utilizada (Martín, Peña) → 409",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-martin-pena-general/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        },
+        {
           "name": "Confirmar reembolso (Lucía, Maratón, Diego)",
           "request": {
             "method": "POST",

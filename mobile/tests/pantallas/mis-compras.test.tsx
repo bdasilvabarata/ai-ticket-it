@@ -563,3 +563,18 @@ describe("Mis compras: canceladas y reembolsadas (feature 009, US2, FR-019)", ()
     }
   });
 });
+
+describe("Mis compras: no se cancela desde la lista (feature 009, US3, FR-017)", () => {
+  it("ninguna fila tiene Cancelar: ni la pendiente, ni la confirmada, ni la utilizada", async () => {
+    await abrirMisCompras([
+      {
+        status: 200,
+        json: [maratonPendiente, festivalVip, miCompra(compraUtilizada, { id: "utilizada" })],
+      },
+    ]);
+
+    expect(await filas()).toHaveLength(3);
+    expect(screen.getByRole("button", { name: /^Pagar/ })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /Cancelar/ })).toBeNull();
+  });
+});

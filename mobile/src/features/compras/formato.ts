@@ -6,6 +6,7 @@ import {
   type CompraVista,
   type EntradaDelEventoVista,
   type MiCompraVista,
+  type MotivoNoCancelable,
   type ResumenTipoEntradaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
@@ -202,6 +203,21 @@ export function textoMotivoNoUsable(entrada: EntradaDelEventoVista): string | nu
       return "La compra de esta entrada está cancelada.";
     case EstadoCompra.REEMBOLSADA:
       return "La compra de esta entrada fue reembolsada.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Por qué el comprador ya no puede cancelar la compra, para mostrar en lugar del botón, o `null` si
+ * no hay nada que decir: una cancelada o reembolsada ya lo dice su aviso (contracts/app.md).
+ */
+export function textoMotivoNoCancelable(motivo: MotivoNoCancelable | null): string | null {
+  switch (motivo) {
+    case "evento-empezado":
+      return "El evento ya empezó";
+    case "entrada-usada":
+      return "Ya usaste una entrada";
     default:
       return null;
   }

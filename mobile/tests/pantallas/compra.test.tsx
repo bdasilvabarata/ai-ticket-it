@@ -559,3 +559,74 @@ describe("Tu compra de una REEMBOLSADA (feature 009, US2)", () => {
     expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
   });
 });
+
+describe("Tu compra: por qué ya no se puede cancelar (feature 009, US3, FR-017, SC-007)", () => {
+  const TITULO = "¿Cancelar la compra de 2 entradas Inscripción?";
+  const empezada: typeof compraConfirmada = {
+    ...compraConfirmada,
+    cancelable: false,
+    motivoNoCancelable: "evento-empezado",
+  };
+
+  it("CONFIRMADA de un evento empezado: «El evento ya empezó» en lugar de Cancelar compra", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: empezada }] });
+
+    expect(await screen.findByText("El evento ya empezó")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
+    expect(screen.getByRole("header", { name: "Tus entradas" })).toBeOnTheScreen();
+  });
+
+  it("UTILIZADA: «Ya usaste una entrada», con Tus entradas y cuántas se usaron", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraUtilizada }] });
+
+    expect(await screen.findByText("Ya usaste una entrada")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Tus entradas" })).toBeOnTheScreen();
+    expect(screen.getByText("1 de 2 entradas usadas")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
+  });
+
+  it("la app no mira la fecha: una CONFIRMADA cancelable de un evento pasado sigue con el botón", async () => {
+    const pasada: typeof compraConfirmada = {
+      ...compraConfirmada,
+      evento: {
+        ...compraConfirmada.evento,
+        fechaHora: "2020-01-01T12:00:00.000Z",
+        fechaHoraLocal: "2020-01-01T09:00",
+        realizado: true,
+      },
+    };
+    await abrirCompra({ compra: [{ status: 200, json: pasada }] });
+
+    expect(await screen.findByRole("button", { name: "Cancelar compra" })).toBeOnTheScreen();
+    expect(screen.queryByText("El evento ya empezó")).toBeNull();
+  });
+
+  it("tras un 409 EVENTO_REALIZADO, la compra releída muestra el motivo en lugar del botón", async () => {
+    const alertas = espiarAlertas();
+    const mensaje = "El evento ya empezó: ya no se puede cancelar la compra.";
+    await abrirCompra({
+      compra: [
+        { status: 200, json: compraConfirmada },
+        { status: 200, json: empezada },
+      ],
+      cancelacion: [{ status: 409, json: errorApi("EVENTO_REALIZADO", mensaje) }],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText("El evento ya empezó")).toBeOnTheScreen();
+    expect(screen.getByText(mensaje)).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
+  });
+
+  it.each([
+    ["CANCELADA", compraCanceladaDesdeConfirmada],
+    ["REEMBOLSADA", compraReembolsada],
+  ])("%s: sin motivo aparte (lo dice su aviso)", async (_estado, compra) => {
+    await abrirCompra({ compra: [{ status: 200, json: compra }] });
+    await screen.findByText("Total: $ 60.000");
+    expect(screen.queryByText("El evento ya empezó")).toBeNull();
+    expect(screen.queryByText("Ya usaste una entrada")).toBeNull();
+  });
+});

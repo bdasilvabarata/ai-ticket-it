@@ -23,6 +23,7 @@ import {
   textoCantidad,
   textoConfirmarCancelacion,
   textoEntradasUsadas,
+  textoMotivoNoCancelable,
   textoReembolsada,
   textoVencimiento,
 } from "../formato";
@@ -185,7 +186,9 @@ function Cancelacion({ usuarioId, compra }: { usuarioId: string; compra: CompraV
       ],
     );
 
-  if (!compra.cancelable && !error) return null;
+  // El motivo lo decide el servidor (`motivoNoCancelable`) y va en lugar del botón (US3, SC-007).
+  const motivo = compra.cancelable ? null : textoMotivoNoCancelable(compra.motivoNoCancelable);
+  if (!compra.cancelable && !motivo && !error) return null;
   return (
     <View style={estilos.acciones}>
       <AvisoDeFormulario mensaje={error} />
@@ -198,6 +201,7 @@ function Cancelacion({ usuarioId, compra }: { usuarioId: string; compra: CompraV
           alPresionar={confirmar}
         />
       ) : null}
+      {motivo ? <Text style={estilos.motivo}>{motivo}</Text> : null}
     </View>
   );
 }
@@ -281,6 +285,7 @@ const estilos = StyleSheet.create({
   textoAviso: { ...tema.tipografia.mensaje, color: tema.colores.texto, textAlign: "center" },
   mensaje: { ...tema.tipografia.mensaje, color: tema.colores.texto },
   dato: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
+  motivo: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario, flexShrink: 1 },
   entradas: { gap: tema.espacio.chico },
   seccion: { ...tema.tipografia.subtitulo, color: tema.colores.texto },
   acciones: { alignItems: "flex-start", gap: tema.espacio.chico },

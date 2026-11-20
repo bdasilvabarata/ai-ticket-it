@@ -15,6 +15,7 @@ import {
   textoDiasRestantes,
   textoEntradasConfirmadas,
   textoEntradasUsadas,
+  textoMotivoNoCancelable,
   textoMotivoNoUsable,
   textoReembolsada,
   textoResumenDeTipo,
@@ -421,5 +422,18 @@ describe("reembolso (feature 009, US2)", () => {
         compraDelEvento({ estado: EstadoCompra.CANCELADA, canceladaPor: "sistema" }),
       ),
     ).toBe("Venció sin pagarse");
+  });
+});
+
+describe("textoMotivoNoCancelable (feature 009, US3)", () => {
+  it("el evento empezado y la entrada usada se explican", () => {
+    expect(textoMotivoNoCancelable("evento-empezado")).toBe("El evento ya empezó");
+    expect(textoMotivoNoCancelable("entrada-usada")).toBe("Ya usaste una entrada");
+  });
+
+  it("cancelada, reembolsada y sin motivo → null (lo dice el aviso, o se muestra el botón)", () => {
+    expect(textoMotivoNoCancelable("cancelada")).toBeNull();
+    expect(textoMotivoNoCancelable("reembolsada")).toBeNull();
+    expect(textoMotivoNoCancelable(null)).toBeNull();
   });
 });

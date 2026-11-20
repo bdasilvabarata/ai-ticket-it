@@ -1014,6 +1014,84 @@ describe("Compra.cancelar de una CONFIRMADA (feature 009, R1)", () => {
   });
 });
 
+describe("Compra.cancelar: rechazos (feature 009, US3, FR-007, FR-008, FR-010)", () => {
+  const INICIO = despues(DIA);
+  const antesDelInicio = new Date(INICIO.getTime() - MINUTO);
+  const unaHoraDespues = new Date(INICIO.getTime() + 60 * MINUTO);
+  const usoDeUna: CambioEstadoCompra = {
+    estado: EstadoCompra.UTILIZADA,
+    autor: porLucia,
+    fechaHora: despues(60 * MINUTO),
+  };
+  /** Una UTILIZADA con 1 de sus 3 entradas usada. */
+  const utilizadaUnaDeTres = () => {
+    const [primera, ...resto] = entradasDePrueba(3);
+    return new Compra(
+      con({
+        cantidad: 3,
+        total: 360000,
+        historial: [pendiente, confirmada, usoDeUna],
+        entradas: [new Entrada({ codigo: primera!.codigo, cambios: [usoDeUna] }), ...resto],
+      }),
+    );
+  };
+  const vencidaMaterializada = () => compraPendiente().vencer();
+
+  /** Que `cancelar` rechace con ese código y mensaje sin cambiar la instancia, sus entradas ni su historial. */
+  function rechaza(compra: Compra, ahora: Date, codigo: string, mensaje: string) {
+    const historial = [...compra.historial];
+    const entradas = compra.entradas.map((entrada) => [entrada.codigo, [...entrada.cambios]]);
+    expect(() => compra.cancelar("usuario-martin", ahora, INICIO)).toThrow(
+      expect.objectContaining({ codigo, message: mensaje }),
+    );
+    expect(() => compra.cancelar("usuario-martin", ahora, INICIO)).toThrow(ReglaDeNegocioError);
+    expect(compra.historial).toEqual(historial);
+    expect(compra.entradas.map((entrada) => [entrada.codigo, [...entrada.cambios]])).toEqual(entradas);
+  }
+
+  it("CONFIRMADA exactamente en el inicio y 1 hora después → EVENTO_REALIZADO", () => {
+    for (const ahora of [INICIO, unaHoraDespues]) {
+      rechaza(
+        compraConfirmada(),
+        ahora,
+        "EVENTO_REALIZADO",
+        "El evento ya empezó: ya no se puede cancelar la compra.",
+      );
+    }
+  });
+
+  it("UTILIZADA (1 de 3 usada), con el evento sin empezar y empezado → TRANSICION_INVALIDA, nunca EVENTO_REALIZADO", () => {
+    for (const ahora of [antesDelInicio, INICIO, unaHoraDespues]) {
+      rechaza(
+        utilizadaUnaDeTres(),
+        ahora,
+        "TRANSICION_INVALIDA",
+        "Ya se usó una entrada de esta compra: no se puede cancelar.",
+      );
+    }
+  });
+
+  it("CANCELADA desde confirmada o pendiente cancelada → «La compra ya está cancelada.»", () => {
+    for (const compra of [compraCanceladaDesdeConfirmada(), compraCancelada()]) {
+      for (const ahora of [antesDelInicio, INICIO]) {
+        rechaza(compra, ahora, "TRANSICION_INVALIDA", "La compra ya está cancelada.");
+      }
+    }
+  });
+
+  it("una pendiente vencida, materializada o no, sigue dando COMPRA_VENCIDA (006, R1)", () => {
+    const mensaje = "La compra venció: pasaron 15 minutos sin pagarla.";
+    rechaza(compraPendiente(), despues(PLAZO), "COMPRA_VENCIDA", mensaje);
+    rechaza(vencidaMaterializada(), antesDelInicio, "COMPRA_VENCIDA", mensaje);
+  });
+
+  it("REEMBOLSADA, con el evento empezado o no → «La compra ya fue reembolsada.»", () => {
+    for (const ahora of [antesDelInicio, INICIO, unaHoraDespues]) {
+      rechaza(compraReembolsada(), ahora, "TRANSICION_INVALIDA", "La compra ya fue reembolsada.");
+    }
+  });
+});
+
 describe("Compra.confirmarReembolso (feature 009, R5)", () => {
   const AHORA = despues(30 * MINUTO);
   const SIN_PENDIENTE = "Esta compra no tiene un reembolso pendiente.";
