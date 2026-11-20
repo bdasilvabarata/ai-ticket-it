@@ -1159,12 +1159,12 @@
       "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
       "post": {
         "tags": ["Compras"],
-        "summary": "Cancelar una compra pendiente",
-        "description": "Sin cuerpo (si viene uno, se ignora). El comprador cancela su compra PENDIENTE sin esperar a que venza: bajo el cerrojo del evento de la compra vence las pendientes vencidas del evento, verifica que el usuario sea el comprador, pasa la compra a CANCELADA (con un cambio de estado del comprador) y devuelve sus entradas al cupo. También con el evento empezado. Una compra CONFIRMADA no se cancela acá (eso es de la feature 009, con reembolso): 409 TRANSICION_INVALIDA.",
+        "summary": "Cancelar una compra (pendiente o confirmada)",
+        "description": "Sin cuerpo (si viene uno, se ignora). Bajo el cerrojo del evento de la compra (con el reloj leído adentro) vence las pendientes vencidas del evento, verifica que el usuario sea el comprador y cancela la compra entera. Una PENDIENTE pasa a CANCELADA como en la 006, también con el evento empezado. Una CONFIRMADA sin entradas usadas, antes del inicio del evento (feature 009), pasa a CANCELADA por su comprador, cada entrada queda CANCELADA y, si es paga, queda con el reembolso pendiente hasta que lo confirme el organizador. En los dos casos las entradas vuelven al cupo (se guarda primero la compra y después el evento). Orden de los rechazos: 401 → 400 → 404 → 403 → 409 COMPRA_VENCIDA → 409 EVENTO_REALIZADO (solo CONFIRMADA) → 409 TRANSICION_INVALIDA.",
         "security": [{ "usuarioSimulado": [] }],
         "responses": {
           "200": {
-            "description": "La compra CANCELADA, con `venceEn: null` y el historial [PENDIENTE, CANCELADA del comprador]",
+            "description": "La compra CANCELADA (con `canceladaDesde`, `reembolso`, `entradas: []` y `cancelable: false`) y el historial terminado en el CANCELADA del comprador",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
           },
           "400": {
@@ -1229,7 +1229,7 @@
             }
           },
           "409": {
-            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "description": "La compra venció (`COMPRA_VENCIDA`), el evento ya empezó (`EVENTO_REALIZADO`, solo una CONFIRMADA) o no se puede cancelar en su estado (`TRANSICION_INVALIDA`)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },
@@ -1243,12 +1243,39 @@
                       }
                     }
                   },
-                  "yaPagada": {
-                    "summary": "Ya está CONFIRMADA o ya se canceló",
+                  "eventoEmpezado": {
+                    "summary": "CONFIRMADA y el evento ya empezó (a la hora exacta, inclusive)",
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya empezó: ya no se puede cancelar la compra."
+                      }
+                    }
+                  },
+                  "entradaUsada": {
+                    "summary": "UTILIZADA (empiece o no el evento)",
                     "value": {
                       "error": {
                         "codigo": "TRANSICION_INVALIDA",
-                        "mensaje": "La compra no está pendiente de pago."
+                        "mensaje": "Ya se usó una entrada de esta compra: no se puede cancelar."
+                      }
+                    }
+                  },
+                  "yaCancelada": {
+                    "summary": "Ya está CANCELADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra ya está cancelada."
+                      }
+                    }
+                  },
+                  "yaReembolsada": {
+                    "summary": "Ya está REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra ya fue reembolsada."
                       }
                     }
                   }
@@ -1738,6 +1765,29 @@
           }
         }
       },
+      "MotivoNoCancelable": {
+        "type": "string",
+        "enum": ["evento-empezado", "entrada-usada", "cancelada", "reembolsada"],
+        "description": "Por qué una compra no se puede cancelar (lo decide el servidor al consultar; feature 009)."
+      },
+      "ReembolsoVista": {
+        "type": "object",
+        "description": "El reembolso de una compra cancelada después de confirmada y paga (feature 009).",
+        "required": ["estado", "monto"],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": ["pendiente", "confirmado"],
+            "description": "`pendiente` hasta que el organizador lo confirma; `confirmado` en una REEMBOLSADA."
+          },
+          "monto": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 240000,
+            "description": "Pesos enteros: el total fijado al comprar."
+          }
+        }
+      },
       "CompraVista": {
         "type": "object",
         "required": [
@@ -1753,7 +1803,11 @@
           "venceEnLocal",
           "historial",
           "entradas",
-          "entradasUsadas"
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso",
+          "cancelable",
+          "motivoNoCancelable"
         ],
         "properties": {
           "id": { "type": "string", "format": "uuid" },
@@ -1818,6 +1872,26 @@
             "minimum": 0,
             "example": 0,
             "description": "Cuántas de sus entradas se usaron (feature 008)"
+          },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          },
+          "cancelable": {
+            "type": "boolean",
+            "description": "Si su comprador la puede cancelar ahora (al día con el reloj del servidor; feature 009)."
+          },
+          "motivoNoCancelable": {
+            "allOf": [{ "$ref": "#/components/schemas/MotivoNoCancelable" }],
+            "nullable": true,
+            "description": "Por qué no se puede cancelar, o null si se puede (al día con el reloj del servidor; feature 009)."
           }
         }
       },
@@ -1864,7 +1938,9 @@
           "venceEnLocal",
           "diasRestantes",
           "canceladaPor",
-          "entradasUsadas"
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso"
         ],
         "properties": {
           "id": { "type": "string", "example": "compra-martin-festival-vip" },
@@ -1924,13 +2000,24 @@
             "type": "string",
             "enum": ["sistema", "usuario"],
             "nullable": true,
-            "description": "Solo en CANCELADA: \"sistema\" si venció sin pagarse y \"usuario\" si la canceló su comprador; si no, null."
+            "description": "Solo en CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA (\"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador); si no, null."
           },
           "entradasUsadas": {
             "type": "integer",
             "minimum": 0,
             "example": 0,
             "description": "Cuántas de sus entradas se usaron (feature 008)"
+          },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
           }
         }
       },
@@ -2069,7 +2156,9 @@
           "venceEn",
           "venceEnLocal",
           "canceladaPor",
-          "entradasUsadas"
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso"
         ],
         "properties": {
           "id": { "type": "string", "example": "compra-martin-festival-vip" },
@@ -2112,9 +2201,20 @@
             "type": "string",
             "enum": ["sistema", "usuario"],
             "nullable": true,
-            "description": "Solo en CANCELADA: el sistema si venció sin pagarse, si no, su comprador; si no, null"
+            "description": "Solo en CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA (\"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador); si no, null."
           },
-          "entradasUsadas": { "type": "integer", "minimum": 0, "example": 0 }
+          "entradasUsadas": { "type": "integer", "minimum": 0, "example": 0 },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          }
         }
       },
       "ComprasDelEventoVista": {

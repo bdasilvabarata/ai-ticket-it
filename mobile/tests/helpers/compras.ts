@@ -163,6 +163,44 @@ export const compraGratis: CompraVista = {
   total: 0,
 };
 
+/** La confirmada de la Maratón, cancelada por Martín antes del inicio: reembolso pendiente (feature 009). */
+export const compraCanceladaDesdeConfirmada: CompraVista = {
+  ...compraConfirmada,
+  estado: EstadoCompra.CANCELADA,
+  entradas: [],
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 60000 },
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
+  historial: [
+    ...compraConfirmada.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-13T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-13T09:00",
+    },
+  ],
+};
+
+/** Una CONFIRMADA de 1 entrada gratis ("Carrera kids" de la Maratón), cancelable (feature 009). */
+export const compraConfirmadaGratis: CompraVista = {
+  ...compraConfirmada,
+  tipoEntrada: { id: "tipo-maraton-kids", nombre: "Carrera kids" },
+  cantidad: 1,
+  total: 0,
+  entradas: [compraConfirmada.entradas[0]!],
+};
+
+/** La gratis confirmada, cancelada por Martín: sin reembolso (feature 009). */
+export const compraGratisCanceladaDesdeConfirmada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  tipoEntrada: compraConfirmadaGratis.tipoEntrada,
+  cantidad: 1,
+  total: 0,
+  reembolso: null,
+};
+
 /**
  * Una fila de "Mis compras" (feature 007) armada con una `CompraVista` (por defecto, la pendiente de
  * la Maratón): sin `compradorId`, `historial`, `entradas`, `cancelable` ni `motivoNoCancelable`, con

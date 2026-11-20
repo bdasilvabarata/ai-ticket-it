@@ -28,14 +28,30 @@ export function textoVencimiento(venceEnLocal: string): string {
 }
 
 /**
- * El aviso de una compra CANCELADA según quién la canceló (el último cambio de su historial): el
- * sistema, al vencer, o su comprador, antes de pagarla.
+ * El aviso de una compra CANCELADA. Si se canceló después de confirmada (feature 009), con el
+ * reembolso pendiente si es paga; si no, según quién la canceló (el último cambio de su historial):
+ * el sistema, al vencer, o su comprador, antes de pagarla.
  */
 export function textoCancelada(compra: CompraVista): string {
+  if (compra.reembolso?.estado === "pendiente") {
+    return `Cancelaste esta compra. El organizador tiene que confirmar el reembolso de ${textoTotal(compra.reembolso.monto)}`;
+  }
+  if (compra.canceladaDesde === "CONFIRMADA") return "Cancelaste esta compra";
   const ultimo = compra.historial[compra.historial.length - 1];
   return ultimo?.autor.tipo === "usuario"
     ? "Cancelaste esta compra: sus entradas volvieron a estar disponibles."
     : "Esta compra venció: sus entradas volvieron a estar disponibles.";
+}
+
+/** El mensaje del `Alert` que confirma la cancelación de una compra confirmada (feature 009). */
+export function textoConfirmarCancelacion(compra: CompraVista): string {
+  const cuales =
+    compra.cantidad === 1 ? "Se cancela tu entrada" : `Se cancelan tus ${compra.cantidad} entradas`;
+  if (compra.total > 0) {
+    return `${cuales}. El organizador tiene que confirmar el reembolso de ${textoTotal(compra.total)}. No se puede deshacer.`;
+  }
+  const vuelven = compra.cantidad === 1 ? "vuelve a estar disponible" : "vuelven a estar disponibles";
+  return `${cuales} y ${vuelven}. No se puede deshacer.`;
 }
 
 /** 1 → "Tenés 1 entrada confirmada para este evento"; 3 → "Tenés 3 entradas confirmadas…". */

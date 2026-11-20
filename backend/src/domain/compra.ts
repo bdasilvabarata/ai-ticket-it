@@ -419,21 +419,34 @@ export class Compra {
   }
 
   /**
-   * PENDIENTE → CANCELADA por su comprador en `ahora`, antes de pagarla (sus entradas vuelven al
-   * cupo). Mismo orden que `pagar`: vencida → `COMPRA_VENCIDA`; no PENDIENTE → `TRANSICION_INVALIDA`
-   * (cancelar una confirmada, con reembolso, es de la 009). También con el evento empezado.
+   * La cancela su comprador en `ahora` (sus entradas vuelven al cupo; el permiso lo verifica el
+   * service antes). En orden (R1): vencida → `COMPRA_VENCIDA`; PENDIENTE → CANCELADA, también con
+   * el evento empezado (006); si no, según `motivoNoCancelable`: el evento empezó →
+   * `EVENTO_REALIZADO`; otro motivo → `TRANSICION_INVALIDA` con su mensaje; ninguno (una CONFIRMADA
+   * antes del inicio, feature 009) → CANCELADA y cada entrada con su cambio propio CANCELADA.
    */
-  cancelar(usuarioId: string, ahora: Date): Compra {
+  cancelar(usuarioId: string, ahora: Date, inicioDelEvento: Date): Compra {
     if (this.estaVencida(ahora) || this.fueVencida()) {
       throw new ReglaDeNegocioError("COMPRA_VENCIDA", "La compra venció: pasaron 15 minutos sin pagarla.");
     }
-    if (this.estado !== EstadoCompra.PENDIENTE) {
-      throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "La compra no está pendiente de pago.");
-    }
-    return this.#conCambio({
+    const cambio: CambioEstadoCompra = {
       estado: EstadoCompra.CANCELADA,
       autor: { tipo: "usuario", usuarioId },
       fechaHora: ahora,
+    };
+    if (this.estado === EstadoCompra.PENDIENTE) return this.#conCambio(cambio);
+    const motivo = this.motivoNoCancelable(inicioDelEvento, ahora);
+    if (motivo === "evento-empezado") {
+      throw new ReglaDeNegocioError(
+        "EVENTO_REALIZADO",
+        "El evento ya empezó: ya no se puede cancelar la compra.",
+      );
+    }
+    if (motivo !== null) throw new ReglaDeNegocioError("TRANSICION_INVALIDA", MENSAJE_NO_CANCELABLE[motivo]);
+    return new Compra({
+      ...this.#propiedades(),
+      historial: [...this.historial, cambio],
+      entradas: this.entradas.map((entrada) => entrada.cancelar(usuarioId, ahora)),
     });
   }
 
@@ -464,6 +477,13 @@ export class Compra {
     };
   }
 }
+
+/** El mensaje del `TRANSICION_INVALIDA` al cancelar, por motivo (feature 009, data-model). */
+const MENSAJE_NO_CANCELABLE: Record<Exclude<MotivoNoCancelable, "evento-empezado">, string> = {
+  "entrada-usada": "Ya se usó una entrada de esta compra: no se puede cancelar.",
+  cancelada: "La compra ya está cancelada.",
+  reembolsada: "La compra ya fue reembolsada.",
+};
 
 /** Por qué no se puede usar una entrada en ese estado (R5): el mensaje del `TRANSICION_INVALIDA`. */
 function motivoNoUsable(estado: EstadoCompra | null): string {

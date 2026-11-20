@@ -150,3 +150,25 @@ describe("POST /api/eventos/:eventoId/entradas/:codigo/uso (feature 008)", () =>
     expect((await buscar(app, DE_SOFIA[0])).body.estado).toBe(EstadoCompra.CONFIRMADA);
   });
 });
+
+describe("Una entrada de una compra cancelada no sirve (feature 009, US1, SC-006)", () => {
+  it("Sofía cancela la de la Peña: su código queda CANCELADA y registrar el uso → 409", async () => {
+    const app = nuevaApp();
+    const cancelacion = await request(app)
+      .post("/api/compras/compra-sofia-pena-con-cena/cancelacion")
+      .set("X-Usuario-Id", "usuario-sofia");
+    expect(cancelacion.status).toBe(200);
+    expect(cancelacion.body.reembolso).toEqual({ estado: "pendiente", monto: 30000 });
+
+    const entrada = await buscar(app, DE_SOFIA[0]);
+    expect(entrada.status).toBe(200);
+    expect(entrada.body.estado).toBe(EstadoCompra.CANCELADA);
+
+    const uso = await usar(app, DE_SOFIA[0]);
+    expect(uso.status).toBe(409);
+    expect(uso.body.error).toEqual({
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "La compra de esta entrada está cancelada.",
+    });
+  });
+});

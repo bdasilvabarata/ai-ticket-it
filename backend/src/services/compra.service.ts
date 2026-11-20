@@ -158,7 +158,7 @@ export class CompraService {
       const evento = await this.#eventoService.obtenerAlDia(eventoId, ahora);
       const compra = await this.obtenerOFallar(compraId);
       exigirQueEsSuya(compra, usuarioId);
-      const cancelada = compra.cancelar(usuarioId, ahora);
+      const cancelada = compra.cancelar(usuarioId, ahora, evento.fechaHora);
       await this.#compras.guardar(cancelada);
       const devuelto = await this.#tipoEntradaService.devolverCupo(
         evento,

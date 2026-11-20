@@ -5,6 +5,7 @@ import {
   textoAccionDePago,
   textoAvisoDeMiCompra,
   textoCancelada,
+  textoConfirmarCancelacion,
   textoAvisoDeCompraDelEvento,
   textoCantidad,
   textoCodigo,
@@ -21,7 +22,10 @@ import {
 } from "../../../src/features/compras/formato";
 import {
   compraCancelada,
+  compraCanceladaDesdeConfirmada,
   compraCanceladaPorElComprador,
+  compraConfirmadaGratis,
+  compraGratisCanceladaDesdeConfirmada,
   compraConfirmada,
   compraDelEvento,
   compraPendiente,
@@ -295,5 +299,52 @@ describe("textoAvisoDeMiCompra con UTILIZADA (feature 008)", () => {
     expect(
       textoAvisoDeMiCompra(miCompra(compraConfirmada, { estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 })),
     ).toBe("1 de 2 entradas usadas");
+  });
+});
+
+describe("textoConfirmarCancelacion (feature 009)", () => {
+  it("paga: cuántas se cancelan y el reembolso que tiene que confirmar el organizador", () => {
+    expect(textoConfirmarCancelacion(compraConfirmada)).toBe(
+      "Se cancelan tus 2 entradas. El organizador tiene que confirmar el reembolso de $ 60.000. No se puede deshacer.",
+    );
+    expect(textoConfirmarCancelacion({ ...compraConfirmada, total: 240000 })).toBe(
+      "Se cancelan tus 2 entradas. El organizador tiene que confirmar el reembolso de $ 240.000. No se puede deshacer.",
+    );
+  });
+
+  it("gratis de 1 y de 3: sin monto, vuelven a estar disponibles", () => {
+    expect(textoConfirmarCancelacion(compraConfirmadaGratis)).toBe(
+      "Se cancela tu entrada y vuelve a estar disponible. No se puede deshacer.",
+    );
+    expect(textoConfirmarCancelacion({ ...compraConfirmadaGratis, cantidad: 3 })).toBe(
+      "Se cancelan tus 3 entradas y vuelven a estar disponibles. No se puede deshacer.",
+    );
+  });
+});
+
+describe("textoCancelada de una confirmada (feature 009)", () => {
+  it("con el reembolso pendiente, su monto", () => {
+    expect(textoCancelada(compraCanceladaDesdeConfirmada)).toBe(
+      "Cancelaste esta compra. El organizador tiene que confirmar el reembolso de $ 60.000",
+    );
+    expect(
+      textoCancelada({
+        ...compraCanceladaDesdeConfirmada,
+        reembolso: { estado: "pendiente", monto: 240000 },
+      }),
+    ).toBe("Cancelaste esta compra. El organizador tiene que confirmar el reembolso de $ 240.000");
+  });
+
+  it("gratis cancelada desde confirmada: Cancelaste esta compra", () => {
+    expect(textoCancelada(compraGratisCanceladaDesdeConfirmada)).toBe("Cancelaste esta compra");
+  });
+
+  it("pendiente cancelada y vencida: los textos de la 006", () => {
+    expect(textoCancelada(compraCanceladaPorElComprador)).toBe(
+      "Cancelaste esta compra: sus entradas volvieron a estar disponibles.",
+    );
+    expect(textoCancelada(compraCancelada)).toBe(
+      "Esta compra venció: sus entradas volvieron a estar disponibles.",
+    );
   });
 });

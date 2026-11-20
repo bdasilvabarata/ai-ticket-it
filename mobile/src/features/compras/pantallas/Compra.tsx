@@ -21,6 +21,7 @@ import {
   textoAccionDePago,
   textoCancelada,
   textoCantidad,
+  textoConfirmarCancelacion,
   textoEntradasUsadas,
   textoVencimiento,
 } from "../formato";
@@ -104,6 +105,7 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
       ) : null}
       <ResumenCompra compra={compra} />
       {conEntradas(compra) ? <TusEntradas compra={compra} /> : null}
+      {conEntradas(compra) ? <Cancelacion usuarioId={usuarioId} compra={compra} /> : null}
       {compra.estado === EstadoCompra.PENDIENTE ? (
         <Pago usuarioId={usuarioId} compra={compra} />
       ) : (
@@ -144,6 +146,61 @@ function mensajeDelError(error: unknown, sinServidor: string): string | null {
   if (!error) return null;
   if (error instanceof ServidorNoDisponibleError) return sinServidor;
   if (error instanceof ErrorDeApi) return error.status === 409 ? null : error.mensaje;
+  return "Ocurrió un error inesperado.";
+}
+
+/**
+ * Cancelar una compra pagada (feature 009, contracts/app.md): el botón solo si el servidor dice que
+ * es `cancelable` (la app no calcula la regla). A diferencia del pago, un 409 sí avisa con el mensaje
+ * del servidor; la compra se vuelve a pedir igual y su estado real redibuja la pantalla.
+ */
+function Cancelacion({ usuarioId, compra }: { usuarioId: string; compra: CompraVista }) {
+  const cancelar = useCancelarCompra(usuarioId, compra.id, compra.evento.id);
+  // Marca sincrónica: una segunda confirmación antes de que se vuelva a dibujar no manda otro pedido.
+  const enviando = useRef(false);
+  const error = mensajeDeCancelacion(cancelar.error);
+
+  const enviar = () => {
+    if (enviando.current) return;
+    enviando.current = true;
+    cancelar.mutate(undefined, {
+      onSettled: () => {
+        enviando.current = false;
+      },
+    });
+  };
+  const confirmar = () =>
+    Alert.alert(
+      `¿Cancelar la compra de ${textoCantidad(compra.cantidad)} ${compra.tipoEntrada.nombre}?`,
+      textoConfirmarCancelacion(compra),
+      [
+        { text: "Volver", style: "cancel" },
+        { text: "Cancelar compra", style: "destructive", onPress: enviar },
+      ],
+    );
+
+  if (!compra.cancelable && !error) return null;
+  return (
+    <View style={estilos.acciones}>
+      <AvisoDeFormulario mensaje={error} />
+      {compra.cancelable ? (
+        <Boton
+          variante="texto"
+          texto="Cancelar compra"
+          textoEnCurso="Cancelando…"
+          enCurso={cancelar.isPending}
+          alPresionar={confirmar}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** El aviso de una cancelación fallida de una compra pagada: también el mensaje de un 409. */
+function mensajeDeCancelacion(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof ServidorNoDisponibleError) return "No se pudo cancelar. Probá de nuevo.";
+  if (error instanceof ErrorDeApi) return error.mensaje;
   return "Ocurrió un error inesperado.";
 }
 

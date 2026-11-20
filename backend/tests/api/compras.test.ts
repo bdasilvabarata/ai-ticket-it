@@ -466,16 +466,21 @@ describe("POST /api/compras/:compraId/cancelacion (corrección de la 006)", () =
     expect((await misCompras(app, "usuario-sofia")).body.pendientes).toEqual([]);
   });
 
-  it("Diego → 403; inexistente → 404; sin usuario → 401; ya pagada → 409 TRANSICION_INVALIDA", async () => {
+  it("Diego → 403; inexistente → 404; sin usuario → 401; pagada y cancelada → 409 TRANSICION_INVALIDA", async () => {
     const app = nuevaApp();
     const { body: compra } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
     expect((await cancelar(app, compra.id, "usuario-diego")).status).toBe(403);
     expect((await cancelar(app, "compra-inexistente")).body.error.codigo).toBe("COMPRA_NO_ENCONTRADA");
     expect((await request(app).post(`/api/compras/${compra.id}/cancelacion`)).status).toBe(401);
     await pagar(app, compra.id);
+    // Desde la 009, una pagada se cancela antes del inicio; la segunda vez ya está cancelada.
+    expect((await cancelar(app, compra.id)).status).toBe(200);
     const otra = await cancelar(app, compra.id);
     expect(otra.status).toBe(409);
-    expect(otra.body.error.codigo).toBe("TRANSICION_INVALIDA");
+    expect(otra.body.error).toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "La compra ya está cancelada.",
+    });
   });
 
   it("la compra vencida del seed → 409 COMPRA_VENCIDA", async () => {
@@ -782,5 +787,67 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
       .send({ cualquiera: 1 });
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.compras).toHaveLength(2);
+  });
+});
+
+describe("POST /api/compras/:compraId/cancelacion de una CONFIRMADA (feature 009, US1)", () => {
+  const COMPRA_DE_MARTIN = "compra-martin-festival-vip";
+  const cancelarComo = (app: App, compraId: string, usuarioId: string) =>
+    request(app).post(`/api/compras/${compraId}/cancelacion`).set("X-Usuario-Id", usuarioId);
+
+  it("Martín cancela la del Festival → 200 con la forma del contrato", async () => {
+    const app = nuevaApp();
+    const respuesta = await cancelarComo(app, COMPRA_DE_MARTIN, "usuario-martin").send({ ignorado: true });
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      id: COMPRA_DE_MARTIN,
+      compradorId: "usuario-martin",
+      evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur", realizado: false },
+      tipoEntrada: { id: VIP, nombre: "VIP" },
+      cantidad: 2,
+      total: 240000,
+      estado: EstadoCompra.CANCELADA,
+      venceEn: null,
+      venceEnLocal: null,
+      entradas: [],
+      entradasUsadas: 0,
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 240000 },
+      cancelable: false,
+      motivoNoCancelable: "cancelada",
+    });
+    expect(respuesta.body.historial.map((cambio: { estado: string }) => cambio.estado)).toEqual([
+      EstadoCompra.PENDIENTE,
+      EstadoCompra.CONFIRMADA,
+      EstadoCompra.CANCELADA,
+    ]);
+    expect(respuesta.body.historial.at(-1)).toMatchObject({
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-10T15:00:00.000Z",
+    });
+  });
+
+  // El seed tiene VIP en 50 con las 2 de Martín ya vendidas: al cancelar sube 2 (a 52).
+  it("después, el cupo de VIP sube 2 para cualquiera, el Festival sigue en el catálogo y el tope de Martín se libera", async () => {
+    const app = nuevaApp();
+    const antes = await cupoDe(app, VIP);
+    await cancelarComo(app, COMPRA_DE_MARTIN, "usuario-martin");
+
+    expect(await cupoDe(app, VIP)).toBe(antes + 2);
+    const comoDiego = await request(app).get(FESTIVAL).set("X-Usuario-Id", "usuario-diego");
+    expect(
+      (comoDiego.body.tiposEntrada as { id: string; cupo: number }[]).find((t) => t.id === VIP)?.cupo,
+    ).toBe(antes + 2);
+    const catalogo = await request(app).get("/api/eventos");
+    expect(catalogo.body.eventos).toContainEqual(
+      expect.objectContaining({ id: "evento-festival-sonidos-del-sur", agotado: false }),
+    );
+
+    const { body } = await misCompras(app, "usuario-martin");
+    for (const tipoEntradaId of [GENERAL, VIP, BACKSTAGE]) {
+      expect(body.restantesPorTipo).toContainEqual({ tipoEntradaId, restantes: 4 });
+    }
+    expect(body.confirmadas.map((c: { id: string }) => c.id)).not.toContain(COMPRA_DE_MARTIN);
   });
 });

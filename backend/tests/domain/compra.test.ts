@@ -16,6 +16,8 @@ const MINUTO = 60 * 1000;
 const DIA = 24 * 60 * MINUTO;
 const PLAZO = LIMITES_COMPRA.minutosParaPagar * MINUTO;
 const despues = (ms: number) => new Date(CREADA.getTime() + ms);
+/** Un inicio del evento muy posterior a todo lo de estos casos (para cancelar sin que haya empezado). */
+const LEJOS = new Date(CREADA.getTime() + 365 * DIA);
 
 const porMartin = { tipo: "usuario", usuarioId: "usuario-martin" } as const;
 const pendiente: CambioEstadoCompra = { estado: EstadoCompra.PENDIENTE, autor: porMartin, fechaHora: CREADA };
@@ -408,7 +410,7 @@ describe("Compra.cancelar (corrección de la 006)", () => {
 
   it("PENDIENTE → CANCELADA por su comprador en `ahora`; la original no cambia", () => {
     const original = compraPendiente();
-    const cancelada = original.cancelar("usuario-martin", despues(PLAZO - 1));
+    const cancelada = original.cancelar("usuario-martin", despues(PLAZO - 1), LEJOS);
     expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
     expect(cancelada.historial).toEqual([pendiente, porMartinAhora(PLAZO - 1)]);
     expect(cancelada.fueVencida()).toBe(false);
@@ -417,7 +419,7 @@ describe("Compra.cancelar (corrección de la 006)", () => {
   });
 
   it("una cancelada por el comprador no libera cupo como vencida ni se puede pagar", () => {
-    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO));
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO), LEJOS);
     expect(cupoLiberadoPorTipo([cancelada], despues(PLAZO * 2)).size).toBe(0);
     expect(() => cancelada.pagar("usuario-martin", despues(2 * MINUTO))).toThrow(
       expect.objectContaining({ codigo: "TRANSICION_INVALIDA" }),
@@ -426,18 +428,23 @@ describe("Compra.cancelar (corrección de la 006)", () => {
 
   it("vencida (a los 15 minutos o ya CANCELADA por el sistema) → COMPRA_VENCIDA", () => {
     const vencida = expect.objectContaining({ codigo: "COMPRA_VENCIDA" });
-    expect(() => compraPendiente().cancelar("usuario-martin", despues(PLAZO))).toThrow(vencida);
-    expect(() => compraPendiente().vencer().cancelar("usuario-martin", despues(MINUTO))).toThrow(vencida);
+    expect(() => compraPendiente().cancelar("usuario-martin", despues(PLAZO), LEJOS)).toThrow(vencida);
+    expect(() => compraPendiente().vencer().cancelar("usuario-martin", despues(MINUTO), LEJOS)).toThrow(
+      vencida,
+    );
   });
 
-  it("CONFIRMADA o ya cancelada por el comprador → TRANSICION_INVALIDA", () => {
-    const invalida = expect.objectContaining({
-      codigo: "TRANSICION_INVALIDA",
-      message: "La compra no está pendiente de pago.",
-    });
-    expect(() => compraConfirmada().cancelar("usuario-martin", despues(10 * MINUTO))).toThrow(invalida);
-    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO));
-    expect(() => cancelada.cancelar("usuario-martin", despues(2 * MINUTO))).toThrow(invalida);
+  it("ya cancelada por el comprador → TRANSICION_INVALIDA (desde la 009, con el mensaje por motivo)", () => {
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO), LEJOS);
+    expect(() => cancelada.cancelar("usuario-martin", despues(2 * MINUTO), LEJOS)).toThrow(
+      expect.objectContaining({ codigo: "TRANSICION_INVALIDA", message: "La compra ya está cancelada." }),
+    );
+  });
+
+  it("una PENDIENTE se cancela también con el evento empezado (006)", () => {
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO), CREADA);
+    expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(cancelada.entradas.every((entrada) => entrada.cambios.length === 0)).toBe(true);
   });
 });
 
@@ -520,7 +527,7 @@ describe("Entrada dentro de la Compra (feature 008, R1)", () => {
     });
 
     it("tras cancelar o vencer, todas CANCELADA", () => {
-      const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO));
+      const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO), LEJOS);
       expect(estados(cancelada)).toEqual([EstadoCompra.CANCELADA, EstadoCompra.CANCELADA]);
       expect(estados(compraPendiente().vencer())).toEqual([EstadoCompra.CANCELADA, EstadoCompra.CANCELADA]);
     });
@@ -553,7 +560,7 @@ describe("Entrada dentro de la Compra (feature 008, R1)", () => {
   it("pagar, cancelar, vencer y alDia conservan las entradas", () => {
     const codigosDe = (compra: Compra) => compra.entradas.map((entrada) => entrada.codigo);
     expect(codigosDe(compraPendiente().pagar("usuario-martin", despues(MINUTO)))).toEqual(codigos);
-    expect(codigosDe(compraPendiente().cancelar("usuario-martin", despues(MINUTO)))).toEqual(codigos);
+    expect(codigosDe(compraPendiente().cancelar("usuario-martin", despues(MINUTO), LEJOS))).toEqual(codigos);
     expect(codigosDe(compraPendiente().vencer())).toEqual(codigos);
     expect(codigosDe(compraPendiente().alDia(despues(PLAZO)))).toEqual(codigos);
   });
@@ -654,7 +661,7 @@ describe("Compra.registrarUso (feature 008, R9)", () => {
 
   it("una UTILIZADA no se cancela (FR-020) y es vigente", () => {
     const usada = compraConfirmada().registrarUso(codigoA, "usuario-lucia", USO);
-    expect(errorDe(() => usada.cancelar("usuario-martin", USO)).codigo).toBe("TRANSICION_INVALIDA");
+    expect(errorDe(() => usada.cancelar("usuario-martin", USO, LEJOS)).codigo).toBe("TRANSICION_INVALIDA");
     expect(usada.esVigente(despues(PLAZO * 10))).toBe(true);
   });
 
@@ -920,5 +927,89 @@ describe("Cancelación y reembolso derivados del historial (feature 009, R3, R4,
   it("esVigente es false en una CANCELADA desde confirmada y en una REEMBOLSADA (FR-004)", () => {
     expect(compraCanceladaDesdeConfirmada().esVigente(despues(MINUTO))).toBe(false);
     expect(compraReembolsada().esVigente(despues(MINUTO))).toBe(false);
+  });
+});
+
+describe("Compra.cancelar de una CONFIRMADA (feature 009, R1)", () => {
+  const INICIO = despues(DIA);
+  const antesDelInicio = new Date(INICIO.getTime() - MINUTO);
+  const codigos = datos.entradas.map((entrada) => entrada.codigo);
+  const cambioDeCancelacion = (fechaHora: Date): CambioEstadoCompra => ({
+    estado: EstadoCompra.CANCELADA,
+    autor: porMartin,
+    fechaHora,
+  });
+
+  it("1 minuto antes del inicio → CANCELADA por el comprador, cada entrada cancelada; la original no cambia", () => {
+    const original = compraConfirmada();
+    const cancelada = original.cancelar("usuario-martin", antesDelInicio, INICIO);
+    expect(cancelada).not.toBe(original);
+    expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(cancelada.historial).toEqual([pendiente, confirmada, cambioDeCancelacion(antesDelInicio)]);
+    for (const entrada of cancelada.entradas) {
+      expect(entrada.cambios).toEqual([cambioDeCancelacion(antesDelInicio)]);
+    }
+    expect(codigos.map((codigo) => cancelada.estadoDeEntrada(codigo))).toEqual([
+      EstadoCompra.CANCELADA,
+      EstadoCompra.CANCELADA,
+    ]);
+    expect(cancelada.entradas.map((entrada) => entrada.codigo)).toEqual(codigos);
+    expect(cancelada.canceladaDesde).toBe("CONFIRMADA");
+    expect(cancelada.cambioDeCancelacion).toEqual(cambioDeCancelacion(antesDelInicio));
+    expect(cancelada.tieneReembolsoPendiente()).toBe(true);
+    expect(cancelada.esVigente(antesDelInicio)).toBe(false);
+    expect(original.estado).toBe(EstadoCompra.CONFIRMADA);
+    expect(original.entradas.every((entrada) => entrada.cambios.length === 0)).toBe(true);
+  });
+
+  it("una CONFIRMADA gratis → CANCELADA con sus entradas canceladas y sin reembolso pendiente", () => {
+    const cancelada = compraConfirmada({ total: 0 }).cancelar("usuario-martin", antesDelInicio, INICIO);
+    expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(cancelada.entradas.every((e) => e.ultimoEstadoPropio === EstadoCompra.CANCELADA)).toBe(true);
+    expect(cancelada.tieneReembolsoPendiente()).toBe(false);
+  });
+
+  it("la PENDIENTE sigue como en la 006: CANCELADA sin cambios en sus entradas; vencida → COMPRA_VENCIDA", () => {
+    const cancelada = compraPendiente().cancelar("usuario-martin", despues(MINUTO), INICIO);
+    expect(cancelada.canceladaDesde).toBe("PENDIENTE");
+    expect(cancelada.entradas.every((entrada) => entrada.cambios.length === 0)).toBe(true);
+    expect(() => compraPendiente().cancelar("usuario-martin", despues(PLAZO), INICIO)).toThrow(
+      expect.objectContaining({ codigo: "COMPRA_VENCIDA" }),
+    );
+  });
+
+  it("registrarUso sobre una entrada de la compra cancelada → TRANSICION_INVALIDA", () => {
+    const cancelada = compraConfirmada().cancelar("usuario-martin", antesDelInicio, INICIO);
+    for (const compra of [cancelada, compraReembolsada()]) {
+      expect(() => compra.registrarUso(codigos[0]!, "usuario-lucia", INICIO)).toThrow(
+        expect.objectContaining({
+          codigo: "TRANSICION_INVALIDA",
+          message: "La compra de esta entrada está cancelada.",
+        }),
+      );
+    }
+  });
+
+  it("exactamente en el inicio → EVENTO_REALIZADO", () => {
+    expect(() => compraConfirmada().cancelar("usuario-martin", INICIO, INICIO)).toThrow(
+      expect.objectContaining({
+        codigo: "EVENTO_REALIZADO",
+        message: "El evento ya empezó: ya no se puede cancelar la compra.",
+      }),
+    );
+  });
+
+  it.each([
+    [
+      "UTILIZADA",
+      () => compraConfirmada().registrarUso(codigos[0]!, "usuario-lucia", despues(MINUTO * 30)),
+      "Ya se usó una entrada de esta compra: no se puede cancelar.",
+    ],
+    ["CANCELADA desde confirmada", () => compraCanceladaDesdeConfirmada(), "La compra ya está cancelada."],
+    ["REEMBOLSADA", () => compraReembolsada(), "La compra ya fue reembolsada."],
+  ])("%s → TRANSICION_INVALIDA con su mensaje", (_estado, crear, mensaje) => {
+    expect(() => crear().cancelar("usuario-martin", antesDelInicio, INICIO)).toThrow(
+      expect.objectContaining({ codigo: "TRANSICION_INVALIDA", message: mensaje }),
+    );
   });
 });

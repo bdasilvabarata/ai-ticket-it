@@ -3,8 +3,11 @@ import { router } from "expo-router";
 
 import {
   compraCancelada,
+  compraCanceladaDesdeConfirmada,
   compraCanceladaPorElComprador,
   compraConfirmada,
+  compraConfirmadaGratis,
+  compraGratisCanceladaDesdeConfirmada,
   compraGratis,
   compraPendiente,
   compraUtilizada,
@@ -294,13 +297,6 @@ describe("Cancelar desde Tu compra", () => {
     expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
   });
-
-  it("CONFIRMADA: no ofrece Cancelar compra", async () => {
-    await abrirCompra({ compra: [{ status: 200, json: compraConfirmada }] });
-
-    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
-    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
-  });
 });
 
 const SIN_SERVIDOR = "No se pudo pagar. Probá de nuevo.";
@@ -422,5 +418,131 @@ describe("Tu compra: tus entradas (feature 008, FR-012b, R14)", () => {
     expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
     expect(screen.getByRole("button", { name: "Ir a Explorar" })).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: /Pagar|Cancelar/ })).toBeNull();
+  });
+});
+
+describe("Cancelar una compra confirmada desde Tu compra (feature 009, US1)", () => {
+  const TITULO = "¿Cancelar la compra de 2 entradas Inscripción?";
+  const MENSAJE =
+    "Se cancelan tus 2 entradas. El organizador tiene que confirmar el reembolso de $ 60.000. No se puede deshacer.";
+  const AVISO = "Cancelaste esta compra. El organizador tiene que confirmar el reembolso de $ 60.000";
+  const confirmadaYDespues = (despues = compraCanceladaDesdeConfirmada): Opciones => ({
+    compra: [
+      { status: 200, json: compraConfirmada },
+      { status: 200, json: despues },
+    ],
+    cancelacion: [{ status: 200, json: despues }],
+  });
+
+  it("CONFIRMADA cancelable: la confirmación, Tus entradas y Cancelar compra, junto a Volver al evento e Ir a Explorar", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraConfirmada }] });
+
+    expect(await screen.findByText("¡Listo! Tu compra está confirmada.")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Tus entradas" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Cancelar compra" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Ir a Explorar" })).toBeOnTheScreen();
+  });
+
+  it("Cancelar compra pide confirmación con el monto; Volver no manda nada", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra(confirmadaYDespues());
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+
+    const [llamada] = alertas.mock.calls.filter(([titulo]) => titulo === TITULO);
+    expect(llamada?.[1]).toBe(MENSAJE);
+    expect(llamada?.[2]).toEqual([
+      expect.objectContaining({ text: "Volver", style: "cancel" }),
+      expect.objectContaining({ text: "Cancelar compra", style: "destructive" }),
+    ]);
+    await tocarEnAlerta(alertas, TITULO, "Volver");
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(0);
+    expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("al confirmar, un POST sin cuerpo en nombre de Martín y se ve Cancelada con el reembolso pendiente, sin entradas", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra(confirmadaYDespues());
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText(AVISO)).toBeOnTheScreen();
+    expect(screen.getByText(AVISO).props.accessibilityLiveRegion).toBe("polite");
+    expect(screen.getByLabelText("Estado: Cancelada")).toBeOnTheScreen();
+    expect(screen.queryByRole("header", { name: "Tus entradas" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull();
+    const pedidos = resultado.falso.pedidosA(CANCELACION);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]?.metodo).toBe("POST");
+    expect(pedidos[0]?.cuerpo).toBeUndefined();
+    expect(pedidos[0]?.encabezados["X-Usuario-Id"]).toBe(martin.id);
+  });
+
+  it("una gratis: la confirmación sin monto", async () => {
+    const alertas = espiarAlertas();
+    await abrirCompra({
+      compra: [{ status: 200, json: compraConfirmadaGratis }],
+      cancelacion: [{ status: 200, json: compraGratisCanceladaDesdeConfirmada }],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+
+    const [llamada] = alertas.mock.calls.filter(
+      ([titulo]) => titulo === "¿Cancelar la compra de 1 entrada Carrera kids?",
+    );
+    expect(llamada?.[1]).toBe("Se cancela tu entrada y vuelve a estar disponible. No se puede deshacer.");
+  });
+
+  it("mientras va el pedido dice Cancelando… y otra confirmación no manda otro pedido", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCompra({
+      compra: [{ status: 200, json: compraConfirmada }],
+      cancelacion: ["colgar"],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    const cancelando = await screen.findByRole("button", { name: "Cancelando…" });
+    expect(cancelando).toBeBusy();
+    await fireEvent.press(cancelando);
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(1);
+  });
+
+  it("un 409 muestra el mensaje del servidor y vuelve a pedir la compra", async () => {
+    const alertas = espiarAlertas();
+    const mensaje = "El evento ya empezó: ya no se puede cancelar la compra.";
+    const resultado = await abrirCompra({
+      compra: [
+        { status: 200, json: compraConfirmada },
+        {
+          status: 200,
+          json: { ...compraConfirmada, cancelable: false, motivoNoCancelable: "evento-empezado" },
+        },
+      ],
+      cancelacion: [{ status: 409, json: errorApi("EVENTO_REALIZADO", mensaje) }],
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Cancelar compra" })).toBeNull());
+    expect(resultado.falso.pedidosA(COMPRA).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("sin servidor: No se pudo cancelar. Probá de nuevo. y sigue Confirmada", async () => {
+    const alertas = espiarAlertas();
+    await abrirCompra({ compra: [{ status: 200, json: compraConfirmada }], cancelacion: ["rechazar"] });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
   });
 });

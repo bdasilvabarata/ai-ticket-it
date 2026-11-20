@@ -587,6 +587,19 @@
           }
         }
       ]
+    },
+    {
+      "name": "Cancelar compra (009)",
+      "item": [
+        {
+          "name": "Cancelar compra confirmada (Martín, Festival)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        }
+      ]
     }
   ]
 }

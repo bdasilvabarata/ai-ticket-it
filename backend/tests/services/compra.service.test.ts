@@ -618,11 +618,16 @@ describe("CompraService.cancelar (corrección de la 006)", () => {
     expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(52);
   });
 
-  it("una CONFIRMADA → TRANSICION_INVALIDA (cancelarla con reembolso es de la 009)", async () => {
+  it("una CONFIRMADA antes del inicio se cancela (desde la 009); una segunda vez → TRANSICION_INVALIDA", async () => {
     const { compraService } = armar({ compras: [deSofia()] });
     await compraService.pagar("compra-sofia", "usuario-sofia");
+    expect(await compraService.cancelar("compra-sofia", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaDesde: "CONFIRMADA",
+    });
     await expect(compraService.cancelar("compra-sofia", "usuario-sofia")).rejects.toMatchObject({
       codigo: "TRANSICION_INVALIDA",
+      message: "La compra ya está cancelada.",
     });
   });
 
@@ -1590,5 +1595,141 @@ describe("Cancelación y reembolso en las vistas (feature 009, R6, R7)", () => {
     }
     expect(guardarCompra).not.toHaveBeenCalled();
     expect(guardarEvento).not.toHaveBeenCalled();
+  });
+});
+
+describe("CompraService.cancelar de una CONFIRMADA (feature 009, US1, R2)", () => {
+  // El Festival (evento-a) empieza 5 días después de AHORA; el cupo de cada tipo no incluye las
+  // compras armadas por constructor: cancelarlas lo sube en su cantidad.
+  const confirmadaDeSofia = (tipoEntradaId = "tipo-a-vip", { cantidad = 2, total = 240000 } = {}) =>
+    compra("evento-a", tipoEntradaId, EstadoCompra.CONFIRMADA, {
+      id: "compra-sofia",
+      compradorId: "usuario-sofia",
+      cantidad,
+      total,
+    });
+
+  it("responde la CANCELADA con el reembolso pendiente, sin entradas y ya no cancelable", async () => {
+    const { compraService } = armar({ compras: [confirmadaDeSofia()] });
+    expect(await compraService.cancelar("compra-sofia", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 240000 },
+      entradas: [],
+      entradasUsadas: 0,
+      cancelable: false,
+      motivoNoCancelable: "cancelada",
+    });
+  });
+
+  it("guarda el CANCELADA del comprador con la hora del reloj leída dentro del cerrojo", async () => {
+    const reloj = relojMovible();
+    const { compraService, cerrojo, repositorioCompras } = armar({ reloj, compras: [confirmadaDeSofia()] });
+    const ejecutar = cerrojo.ejecutar.bind(cerrojo);
+    vi.spyOn(cerrojo, "ejecutar").mockImplementation((clave, operacion) => {
+      reloj.avanzar(7 * MINUTO);
+      return ejecutar(clave, operacion);
+    });
+
+    await compraService.cancelar("compra-sofia", "usuario-sofia");
+
+    const guardada = await repositorioCompras.buscarPorId("compra-sofia");
+    const esperado = {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-sofia" },
+      fechaHora: new Date(AHORA.getTime() + 7 * MINUTO),
+    };
+    expect(guardada?.historial.at(-1)).toEqual(esperado);
+    expect(guardada?.entradas.every((entrada) => entrada.cambios.length === 1)).toBe(true);
+    expect(guardada?.entradas[0]?.cambios[0]).toEqual(esperado);
+  });
+
+  it("el cupo sube exactamente la cantidad: un tipo agotado vuelve a tener disponibles para todos", async () => {
+    const { compraService, eventoService, repositorioEventos } = armar();
+    const { id } = await compraService.crear("evento-a", "usuario-sofia", {
+      tipoEntradaId: "tipo-a-backstage",
+      cantidad: 3,
+    });
+    await compraService.pagar(id, "usuario-sofia");
+    expect(await cupoDe(repositorioEventos, "tipo-a-backstage")).toBe(0);
+
+    await compraService.cancelar(id, "usuario-sofia");
+
+    expect(await cupoDe(repositorioEventos, "tipo-a-backstage")).toBe(3);
+    const detalle = await eventoService.obtener("evento-a");
+    expect(detalle.tiposEntrada.find((t) => t.id === "tipo-a-backstage")?.cupo).toBe(3);
+  });
+
+  it("guarda la compra primero y después el evento, una vez cada uno, bajo un cerrojo del evento", async () => {
+    const { compraService, cerrojo, repositorioCompras, repositorioEventos } = armar({
+      compras: [confirmadaDeSofia()],
+    });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+
+    await compraService.cancelar("compra-sofia", "usuario-sofia");
+
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar).toHaveBeenCalledWith("evento-a", expect.any(Function));
+    expect(guardarCompra).toHaveBeenCalledTimes(1);
+    expect(guardarEvento).toHaveBeenCalledTimes(1);
+    expect(guardarCompra.mock.invocationCallOrder[0]!).toBeLessThan(
+      guardarEvento.mock.invocationCallOrder[0]!,
+    );
+    expect(cerrojo.clavesActivas).toBe(0);
+    expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(52);
+  });
+
+  it("libera el tope: con 4 pagas confirmadas, después de cancelar vuelve a poder comprar 4", async () => {
+    const { compraService } = armar({
+      compras: [confirmadaDeSofia("tipo-a-vip", { cantidad: 4, total: 480000 })],
+    });
+    const restantes = async () =>
+      (await compraService.misComprasDelEvento("evento-a", "usuario-sofia")).restantesPorTipo;
+    expect((await restantes()).find((r) => r.tipoEntradaId === "tipo-a-general")?.restantes).toBe(0);
+
+    await compraService.cancelar("compra-sofia", "usuario-sofia");
+
+    for (const id of ["tipo-a-general", "tipo-a-vip", "tipo-a-backstage"]) {
+      expect((await restantes()).find((r) => r.tipoEntradaId === id)?.restantes).toBe(4);
+    }
+    const { confirmadas } = await compraService.misComprasDelEvento("evento-a", "usuario-sofia");
+    expect(confirmadas).toEqual([]);
+    await expect(
+      compraService.crear("evento-a", "usuario-sofia", { tipoEntradaId: "tipo-a-vip", cantidad: 4 }),
+    ).resolves.toMatchObject({ estado: EstadoCompra.PENDIENTE });
+  });
+
+  it("una gratis: sin reembolso, y su cupo vuelve igual", async () => {
+    const { compraService, repositorioEventos } = armar({
+      compras: [confirmadaDeSofia("tipo-a-kids", { cantidad: 1, total: 0 })],
+    });
+    expect(await compraService.cancelar("compra-sofia", "usuario-sofia")).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaDesde: "CONFIRMADA",
+      reembolso: null,
+    });
+    expect(await cupoDe(repositorioEventos, "tipo-a-kids")).toBe(21);
+  });
+
+  it("comprasDelEvento la muestra CANCELADA, fuera de vendidas y con disponibles sumado", async () => {
+    const { compraService } = armar({ compras: [confirmadaDeSofia()] });
+    const vipDe = async () =>
+      (await compraService.comprasDelEvento("evento-a", "usuario-lucia")).resumenPorTipo.find(
+        (r) => r.tipoEntrada.id === "tipo-a-vip",
+      );
+    expect(await vipDe()).toMatchObject({ disponibles: 50, vendidas: 2 });
+
+    await compraService.cancelar("compra-sofia", "usuario-sofia");
+
+    expect(await vipDe()).toMatchObject({ disponibles: 52, vendidas: 0 });
+    const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
+    expect(vista.compras[0]).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaPor: "usuario",
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 240000 },
+    });
   });
 });
