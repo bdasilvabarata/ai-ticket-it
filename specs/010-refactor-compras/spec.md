@@ -20,6 +20,33 @@ del que dependen UC-05 y UC-06 (chat, 011) y UC-09 y UC-10 (reseñas, 012).
 > hace, qué es opcional y qué se descarta, con sus motivos) es `docs/backlog.md`, sección
 > "Alcance de la 010".
 
+## Clarifications
+
+### Session 2026-11-20
+
+- Q: Al registrar un ingreso, ¿quién toma el cerrojo del evento y hace los chequeos 404 evento /
+  403 organizador? → A: el responsable de las compras entero (`CompraService.registrarUso`:
+  cerrojo, `ahora`, 404/403, compra por código, ventana y un solo guardado);
+  `EntradaService.registrarUso` solo delega y el controller no cambia.
+- Q: ¿Hay que aclarar en la 010 la redacción de la constitución sobre la entrada ("un estado y sus
+  cambios de estado propios")? → A: sí, con una aclaración PATCH en el mismo PR: la entrada
+  registra su uso y su cancelación (quién y cuándo); las reglas no cambian.
+- Q: ¿Los opcionales (doble envío y días restantes) entran en `tasks.md`? → A: sí, como última
+  fase marcada como opcional; el PR puede cerrarse sin ella y el backlog registra cuáles se
+  hicieron.
+- Q: ¿Qué largo máximo debe tener `domain/compra.ts` al terminar (hoy 536 líneas)? → A: ≤ 300
+  líneas, sin contar los módulos nuevos de la entrada y de las reglas.
+- Q (plan): el test "registrar con éxito…" de `mobile/tests/pantallas/registrar-ingreso.test.tsx`
+  verifica hoy que registrar un ingreso invalida el catálogo y el evento (lo que quita el punto 2).
+  ¿Cómo se concilia con no tocar los tests de pantallas? → A: excepción acotada: en ese test solo
+  cambian esas aserciones (pasan a verificar que el catálogo y el evento **no** se invalidan); el
+  resto de `mobile/tests/pantallas/` no se modifica.
+- Q (plan): `VencimientoService.vencerPendientes` también guarda compras (las vencidas, como
+  `CANCELADA` del sistema). ¿Entra en "un solo responsable"? → A: no; queda como excepción
+  documentada: es la pieza de abajo del mismo agregado que materializa vencimientos y existe para
+  evitar el ciclo con `EventoService`. El responsable único es el de los **casos de uso** sobre
+  compras.
+
 ## Alcance
 
 **Incluye** (en orden de retorno, como en el backlog):
@@ -38,7 +65,8 @@ del que dependen UC-05 y UC-06 (chat, 011) y UC-09 y UC-10 (reseñas, 012).
 7. "Registrar ingreso" dividida en piezas propias (buscador y resultado), legibles sin ternarios
    anidados.
 8. La guía para agentes (`AGENTS.md`) y, si cambia algo de lo que cubren, las skills
-   `nuevo-endpoint` y `nueva-pantalla`; el estado de la 010 en el backlog.
+   `nuevo-endpoint` y `nueva-pantalla`; el estado de la 010 en el backlog; y una aclaración PATCH
+   de la constitución sobre cómo se describe la entrada (sin cambiar reglas).
 
 **Opcional** (solo si sobra tiempo al cerrar lo anterior, prioridad más baja): una pieza común
 para evitar el doble envío en "Tu compra" y "Compras del evento"; el cálculo de los días
@@ -199,7 +227,9 @@ días restantes deja de partir un texto de fecha, apoyándose en una conversión
 de Buenos Aires que vive en el mismo y único lugar que hoy concentra la zona horaria.
 
 **Why this priority**: beneficio bajo con esfuerzo bajo; no lo necesita ninguna feature
-siguiente. Se puede omitir sin afectar a las demás historias.
+siguiente. Se puede omitir sin afectar a las demás historias. Va como **última fase de
+`tasks.md`, marcada como opcional**: la feature y su PR se cierran sin ella si no hay tiempo, y
+el backlog registra cuáles se hicieron (FR-023).
 
 **Independent Test**: los tests de pantalla de "Tu compra" y "Compras del evento" (incluido el
 doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que verifican.
@@ -250,7 +280,9 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
 - **FR-002**: La app DEBE conservar el comportamiento, los textos, la accesibilidad y el aspecto
   definidos en la 007, la 008 y la 009.
 - **FR-003**: Los tests de `backend/tests/api/` y de `mobile/tests/pantallas/` DEBEN seguir
-  pasando **sin modificarse**. Los de `backend/tests/domain/`, `backend/tests/services/`,
+  pasando **sin modificarse**, con una única excepción: en el test "registrar con éxito…" de
+  `mobile/tests/pantallas/registrar-ingreso.test.tsx` cambian solo las aserciones de las
+  invalidaciones del catálogo y del evento, que pasan a verificar que no ocurren (FR-018). Los de `backend/tests/domain/`, `backend/tests/services/`,
   `backend/tests/repositories/` y los ayudantes de tests compartidos PUEDEN adaptarse a las formas
   internas nuevas sin perder ningún caso cubierto (cada caso que hoy se verifica sigue
   verificándose, aunque cambie cómo se arma).
@@ -298,10 +330,15 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
 
 **Un solo responsable de las compras (US2)**
 
-- **FR-014**: El responsable de las compras DEBE ser el único que guarda compras. Registrar el
-  ingreso de una entrada DEBE delegarse en una operación de ese responsable; la pieza que atiende
-  las entradas puede seguir resolviendo la consulta de una entrada y el permiso del organizador,
-  pero NO DEBE guardar compras.
+- **FR-014**: El responsable de las compras DEBE ser el único service de casos de uso que guarda
+  compras (la excepción es el vencimiento perezoso, que materializa las pendientes vencidas desde
+  abajo del dueño del evento y no cambia). Registrar el
+  ingreso de una entrada DEBE delegarse entero en una operación de ese responsable, que toma el
+  cerrojo del evento y hace todos los chequeos del uso (404 evento, 403, código, ventana y
+  transición) y el guardado, igual que ya hace con la cancelación y la confirmación del reembolso.
+  La pieza que atiende las entradas conserva la consulta de una entrada (solo lectura) y, para el
+  uso, solo delega (el controller y la ruta no cambian); NO DEBE guardar compras ni tomar el
+  cerrojo.
 - **FR-015**: Registrar el ingreso DEBE seguir ocurriendo entero bajo el cerrojo del evento, con un
   único "ahora" leído adentro, volviendo a leer el evento (al día, con los vencimientos
   materializados) y la compra por su código, con el mismo orden de chequeos (401 → 400 → 404
@@ -348,6 +385,10 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
   de lo que cubren.
 - **FR-023**: Al cerrar la feature, el backlog DEBE marcar el estado de la 010 y, si se hizo,
   registrar qué opcionales quedaron hechos y cuáles no.
+- **FR-024**: La constitución DEBE recibir una aclaración PATCH (en el mismo PR) que describa la
+  entrada con su uso y su cancelación, cada uno con quién y cuándo, en lugar de "un estado y sus
+  cambios de estado propios"; ninguna regla de dominio cambia (FR-005) y la versión sube en un
+  PATCH con su informe de sincronización.
 
 ### Key Entities
 
@@ -368,19 +409,20 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
 ### Measurable Outcomes
 
 - **SC-001**: El 100 % de los tests de `backend/tests/api/` y `mobile/tests/pantallas/` pasan sin
-  que se modifique ninguno de sus archivos (verificable comparando esos archivos con
-  `development`), y `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` pasan
+  que se modifique ninguno de sus archivos, salvo las aserciones de invalidación de
+  `registrar-ingreso.test.tsx` (FR-003) (verificable comparando esos archivos con `development`), y `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` pasan
   en local y en el CI.
 - **SC-002**: Ningún archivo de `shared/` ni la especificación OpenAPI cambia respecto de
   `development`.
 - **SC-003**: Ningún caso cubierto por los tests de dominio y de services anteriores se pierde:
   cada escenario que verificaban sigue verificado, y cada regla de la compra tiene al menos un
   caso que la cumple y uno que la viola.
-- **SC-004**: Hay exactamente una pieza del servidor que guarda compras, y exactamente una
-  definición de "entrada usada".
+- **SC-004**: Hay exactamente un service de casos de uso que guarda compras (además del
+  vencimiento perezoso, FR-014), y exactamente una definición de "entrada usada".
 - **SC-005**: El modelo de la compra no tiene ninguna función que reúna la coherencia de las
-  entradas para todos los estados ni guardas combinadas entre reglas, y el archivo de la compra
-  queda claramente más corto que sus 536 líneas actuales (el plan fija la meta).
+  entradas para todos los estados ni guardas combinadas entre reglas, y `domain/compra.ts` pasa
+  de 536 líneas a **300 o menos** (sin contar los módulos nuevos de la entrada y de las reglas,
+  que se miden aparte y se justifican en el plan).
 - **SC-006**: Sumar un dato de la compra que ven el comprador y el organizador requiere tocar una
   sola pieza de las vistas del servidor (además del contrato, si el dato es nuevo).
 - **SC-007**: Registrar un ingreso dispara, en la app, cero pedidos nuevos del detalle del evento
@@ -397,9 +439,9 @@ doble toque en el diálogo) y los de días restantes pasan sin cambiar lo que ve
   cuentan como código de tests adaptable: se adaptan a la forma nueva de la entrada conservando
   sus firmas, porque los tests de la API los usan y no se modifican.
 - La forma nueva de la entrada (uso y cancelación con quién y cuándo) sigue cumpliendo la
-  constitución ("un estado y sus cambios de estado propios", con quién y cuándo, y el estado igual
-  al de la compra hasta que se confirma): no hace falta enmendarla. Si el plan detecta que la
-  redacción de la constitución queda desalineada, propone una aclaración (PATCH) por separado.
+  constitución en lo sustancial (cambios propios con quién y cuándo, y el estado igual al de la
+  compra hasta que se confirma); su redacción se alinea con una aclaración PATCH dentro de esta
+  feature (FR-024), sin cambiar ninguna regla.
 - El reembolso sigue derivado del historial, sin campo guardado (decisión del backlog).
 - Los textos de "no se puede usar" del servidor y de la app siguen duplicados (descartado en el
   backlog: no son idénticos y unificarlos tocaría el contrato).
