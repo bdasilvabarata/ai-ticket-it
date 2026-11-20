@@ -23,6 +23,7 @@ import {
   textoCantidad,
   textoConfirmarCancelacion,
   textoEntradasUsadas,
+  textoReembolsada,
   textoVencimiento,
 } from "../formato";
 import { useCancelarCompra, usePagarCompra } from "../mutaciones";
@@ -101,6 +102,11 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
       {compra.estado === EstadoCompra.CANCELADA ? (
         <Text style={estilos.mensaje} accessibilityLiveRegion="polite">
           {textoCancelada(compra)}
+        </Text>
+      ) : null}
+      {compra.estado === EstadoCompra.REEMBOLSADA ? (
+        <Text style={estilos.mensaje} accessibilityLiveRegion="polite">
+          {textoReembolsada(compra)}
         </Text>
       ) : null}
       <ResumenCompra compra={compra} />

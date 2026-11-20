@@ -8,6 +8,7 @@ import {
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
   cancelarCompra,
+  confirmarReembolso,
   pagarCompra,
   registrarUsoDeEntrada,
 } from "../../src/api";
@@ -232,6 +233,40 @@ describe("registrarUsoDeEntrada (feature 008)", () => {
       status: 409,
       codigo: "TRANSICION_INVALIDA",
       mensaje: "Esta entrada ya se utilizó.",
+    });
+  });
+});
+
+describe("confirmarReembolso (feature 009)", () => {
+  it("envía POST /compras/:id/reembolso sin cuerpo, en nombre del usuario dado, y devuelve la vista", async () => {
+    const vista = { id: "compra-1", estado: "REEMBOLSADA" };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+    await expect(confirmarReembolso(cliente, "compra a/b", { usuarioId: "usuario-lucia" })).resolves.toEqual(
+      vista,
+    );
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/compras/compra%20a%2Fb/reembolso`,
+      metodo: "POST",
+    });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
+  });
+
+  it("un 409 llega como ErrorDeApi con su mensaje", async () => {
+    const { cliente } = armar({
+      status: 409,
+      json: {
+        error: { codigo: "TRANSICION_INVALIDA", mensaje: "El reembolso de esta compra ya se confirmó." },
+      },
+    });
+    const error = await confirmarReembolso(cliente, "compra-1", { usuarioId: "usuario-lucia" }).catch(
+      (e: unknown) => e,
+    );
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({
+      status: 409,
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "El reembolso de esta compra ya se confirmó.",
     });
   });
 });

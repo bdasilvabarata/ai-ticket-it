@@ -1,5 +1,6 @@
 import {
   EstadoCompra,
+  type CompraDelEventoVista,
   type ComprasDelEventoVista,
   type CompraVista,
   type DatosCompra,
@@ -166,6 +167,31 @@ export class CompraService {
         cancelada.cantidad,
       );
       return aCompraVista(cancelada, devuelto, ahora);
+    });
+  }
+
+  /**
+   * El organizador confirma que devolvió el dinero de una compra cancelada después de confirmada
+   * (feature 009, R5): CANCELADA → REEMBOLSADA, sin plazo y sin tocar el cupo. La compra se lee una
+   * vez afuera para saber qué cerrojo tomar. Bajo el cerrojo de su evento, con un único `ahora`:
+   * 403 si no organiza el evento (también el comprador) y materializa sus vencimientos
+   * (`obtenerDelOrganizador`), relee la compra y `compra.confirmarReembolso` decide el 409. Un solo
+   * `guardar`, el de la compra.
+   */
+  async confirmarReembolso(compraId: string, usuarioId: string): Promise<CompraDelEventoVista> {
+    const { eventoId } = await this.obtenerOFallar(compraId);
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId, ahora);
+      const compra = await this.obtenerOFallar(compraId);
+      const reembolsada = compra.confirmarReembolso(usuarioId, ahora);
+      await this.#compras.guardar(reembolsada);
+      const comprador = await this.#usuarioService.obtenerOFallar(reembolsada.compradorId);
+      return aCompraDelEventoVista(
+        reembolsada,
+        comprador,
+        evento.buscarTipoEntrada(reembolsada.tipoEntradaId),
+      );
     });
   }
 

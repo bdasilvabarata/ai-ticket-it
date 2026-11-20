@@ -1733,3 +1733,151 @@ describe("CompraService.cancelar de una CONFIRMADA (feature 009, US1, R2)", () =
     });
   });
 });
+
+describe("CompraService.confirmarReembolso (feature 009, US2, R5)", () => {
+  const porSofia = { tipo: "usuario", usuarioId: "usuario-sofia" } as const;
+  const enAhora = (
+    estado: EstadoCompra,
+    autor: CambioEstadoCompra["autor"] = porSofia,
+  ): CambioEstadoCompra => ({
+    estado,
+    autor,
+    fechaHora: AHORA,
+  });
+  const desdeConfirmada = [
+    enAhora(EstadoCompra.PENDIENTE),
+    enAhora(EstadoCompra.CONFIRMADA),
+    enAhora(EstadoCompra.CANCELADA),
+  ];
+  const canceladaDeSofia = (eventoId = "evento-a", tipoEntradaId = "tipo-a-vip") =>
+    compra(eventoId, tipoEntradaId, EstadoCompra.CANCELADA, {
+      id: "compra-sofia",
+      compradorId: "usuario-sofia",
+      cantidad: 2,
+      total: 240000,
+      historial: desdeConfirmada,
+    });
+  const reembolsadaDeSofia = () =>
+    compra("evento-a", "tipo-a-vip", EstadoCompra.REEMBOLSADA, {
+      id: "compra-reembolsada",
+      compradorId: "usuario-sofia",
+      cantidad: 2,
+      total: 240000,
+      historial: [
+        ...desdeConfirmada,
+        enAhora(EstadoCompra.REEMBOLSADA, { tipo: "usuario", usuarioId: "usuario-lucia" }),
+      ],
+    });
+
+  it("el organizador → la CompraDelEventoVista REEMBOLSADA con su comprador y sin códigos", async () => {
+    const { compraService } = armar({ compras: [canceladaDeSofia()] });
+    const vista = await compraService.confirmarReembolso("compra-sofia", "usuario-lucia");
+    expect(vista).toMatchObject({
+      id: "compra-sofia",
+      comprador: { id: "usuario-sofia" },
+      estado: EstadoCompra.REEMBOLSADA,
+      canceladaPor: "usuario",
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "confirmado", monto: 240000 },
+    });
+    expect(vista).not.toHaveProperty("entradas");
+    expect(JSON.stringify(vista)).not.toContain("codigo");
+  });
+
+  it("guarda el REEMBOLSADA del organizador con la hora del reloj leída dentro del cerrojo", async () => {
+    const reloj = relojMovible();
+    const { compraService, cerrojo, repositorioCompras } = armar({ reloj, compras: [canceladaDeSofia()] });
+    const ejecutar = cerrojo.ejecutar.bind(cerrojo);
+    vi.spyOn(cerrojo, "ejecutar").mockImplementation((clave, operacion) => {
+      reloj.avanzar(9 * MINUTO);
+      return ejecutar(clave, operacion);
+    });
+
+    await compraService.confirmarReembolso("compra-sofia", "usuario-lucia");
+
+    const guardada = await repositorioCompras.buscarPorId("compra-sofia");
+    expect(guardada?.historial.at(-1)).toEqual({
+      estado: EstadoCompra.REEMBOLSADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: new Date(AHORA.getTime() + 9 * MINUTO),
+    });
+    expect(guardada?.entradas.every((entrada) => entrada.cambios.length === 1)).toBe(true);
+  });
+
+  it("un solo guardar de compras, ninguno de eventos, el cupo no cambia y el cerrojo se toma una vez", async () => {
+    const { compraService, cerrojo, repositorioCompras, repositorioEventos } = armar({
+      compras: [canceladaDeSofia()],
+    });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+
+    await compraService.confirmarReembolso("compra-sofia", "usuario-lucia");
+
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar).toHaveBeenCalledWith("evento-a", expect.any(Function));
+    expect(guardarCompra).toHaveBeenCalledTimes(1);
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(50);
+    expect(cerrojo.clavesActivas).toBe(0);
+  });
+
+  it("con el evento ya realizado también se acepta (sin plazo)", async () => {
+    const { compraService } = armar({ compras: [canceladaDeSofia("evento-pasado", "tipo-pasado-general")] });
+    await expect(compraService.confirmarReembolso("compra-sofia", "usuario-lucia")).resolves.toMatchObject({
+      estado: EstadoCompra.REEMBOLSADA,
+    });
+  });
+
+  it("materializa los vencimientos pendientes del evento", async () => {
+    const vencida = compra("evento-a", "tipo-a-general", EstadoCompra.PENDIENTE, {
+      id: "compra-vencida",
+      creadaEn: new Date(AHORA.getTime() - 20 * MINUTO),
+    });
+    const { compraService, repositorioCompras } = armar({ compras: [canceladaDeSofia(), vencida] });
+
+    await compraService.confirmarReembolso("compra-sofia", "usuario-lucia");
+
+    const guardada = await repositorioCompras.buscarPorId("compra-vencida");
+    expect(guardada?.estado).toBe(EstadoCompra.CANCELADA);
+    expect(guardada?.fueVencida()).toBe(true);
+  });
+
+  describe("orden de los rechazos: 404 → 403 → 409", () => {
+    it("una compra inexistente → CompraNoEncontradaError", async () => {
+      const { compraService } = armar();
+      await expect(compraService.confirmarReembolso("no-existe", "usuario-lucia")).rejects.toBeInstanceOf(
+        CompraNoEncontradaError,
+      );
+    });
+
+    it.each(["usuario-sofia", "usuario-martin"])(
+      "%s (no organiza el evento, también el comprador) → SinPermisoError, aunque ya esté reembolsada",
+      async (usuarioId) => {
+        const { compraService, repositorioCompras } = armar({
+          compras: [canceladaDeSofia(), reembolsadaDeSofia()],
+        });
+        const guardar = vi.spyOn(repositorioCompras, "guardar");
+        for (const id of ["compra-sofia", "compra-reembolsada"]) {
+          await expect(compraService.confirmarReembolso(id, usuarioId)).rejects.toThrow(
+            new SinPermisoError("Solo el organizador puede modificar este evento."),
+          );
+        }
+        expect(guardar).not.toHaveBeenCalled();
+      },
+    );
+
+    it("el organizador sobre una ya reembolsada → TRANSICION_INVALIDA y libera el cerrojo", async () => {
+      const { compraService, cerrojo, repositorioCompras } = armar({ compras: [reembolsadaDeSofia()] });
+      const guardar = vi.spyOn(repositorioCompras, "guardar");
+      await expect(
+        compraService.confirmarReembolso("compra-reembolsada", "usuario-lucia"),
+      ).rejects.toMatchObject({
+        codigo: "TRANSICION_INVALIDA",
+        message: "El reembolso de esta compra ya se confirmó.",
+      });
+      expect(guardar).not.toHaveBeenCalled();
+      expect(cerrojo.clavesActivas).toBe(0);
+    });
+  });
+});

@@ -598,6 +598,30 @@
             "url": { "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/cancelacion" },
             "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
           }
+        },
+        {
+          "name": "Confirmar reembolso (Lucía, Maratón, Diego)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-diego-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Confirmar reembolso ya confirmado (Valentina) → 409",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-valentina-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Confirmar reembolso como comprador (Diego) → 403",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-diego-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }]
+          }
         }
       ]
     }

@@ -301,6 +301,55 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     }),
   );
 
+  // Compras canceladas sobre el Maratón (feature 009, R11), de Lucía y lejano: Diego canceló la suya
+  // después de pagarla y espera el reembolso; la de Valentina ya está reembolsada. Las dos liberaron
+  // su cupo al cancelarse, así que Inscripción sigue en 1000.
+  const maraton = "maraton-10k";
+  const valentina = "usuario-valentina";
+  const porDiego = { tipo: "usuario", usuarioId: diego } as const;
+  const porValentina = { tipo: "usuario", usuarioId: valentina } as const;
+  const dias = (cantidad: number) => new Date(ahora.getTime() - cantidad * 24 * HORA_MS);
+  const cancelacionDeDiego = { estado: EstadoCompra.CANCELADA, autor: porDiego, fechaHora: dias(1) };
+  const cancelacionDeValentina = {
+    estado: EstadoCompra.CANCELADA,
+    autor: porValentina,
+    fechaHora: dias(2),
+  };
+  compras.push(
+    new Compra({
+      id: "compra-diego-maraton-inscripcion",
+      compradorId: diego,
+      eventoId: `evento-${maraton}`,
+      tipoEntradaId: `tipo-${maraton}-inscripcion`,
+      cantidad: 1,
+      total: 30000,
+      historial: [
+        { estado: EstadoCompra.PENDIENTE, autor: porDiego, fechaHora: dias(3) },
+        { estado: EstadoCompra.CONFIRMADA, autor: porDiego, fechaHora: masMinutos(dias(3), 5) },
+        cancelacionDeDiego,
+      ],
+      entradas: [new Entrada({ codigo: "MZDF1C01", cambios: [cancelacionDeDiego] })],
+    }),
+    new Compra({
+      id: "compra-valentina-maraton-inscripcion",
+      compradorId: valentina,
+      eventoId: `evento-${maraton}`,
+      tipoEntradaId: `tipo-${maraton}-inscripcion`,
+      cantidad: 2,
+      total: 60000,
+      historial: [
+        { estado: EstadoCompra.PENDIENTE, autor: porValentina, fechaHora: dias(4) },
+        { estado: EstadoCompra.CONFIRMADA, autor: porValentina, fechaHora: masMinutos(dias(4), 5) },
+        cancelacionDeValentina,
+        { estado: EstadoCompra.REEMBOLSADA, autor: porLucia, fechaHora: dias(1) },
+      ],
+      entradas: [
+        new Entrada({ codigo: "MZVG2R01", cambios: [cancelacionDeValentina] }),
+        new Entrada({ codigo: "MZVG2R02", cambios: [cancelacionDeValentina] }),
+      ],
+    }),
+  );
+
   return {
     categorias: datosCategorias.map((datos) => new Categoria(datos)),
     usuarios: datosUsuarios.map((datos) => new Usuario(datos)),

@@ -25,6 +25,11 @@ describe("crearRepositoriosDeEjemplo", () => {
     expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-general")).toBe(true);
     expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-backstage")).toBe(false);
     expect(await compras.existePorEvento("evento-noche-de-rock")).toBe(false);
+    // Feature 009 (R11): la cancelada de Diego y la reembolsada de Valentina sobre el Maratón.
+    expect((await compras.listarPorEvento("evento-maraton-10k")).map((c) => c.id).toSorted()).toEqual([
+      "compra-diego-maraton-inscripcion",
+      "compra-valentina-maraton-inscripcion",
+    ]);
   });
 
   it("no carga reseñas: todos los organizadores salen sin puntaje", async () => {

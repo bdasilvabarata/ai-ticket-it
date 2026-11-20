@@ -283,6 +283,57 @@ describe("crearDatosEjemplo", () => {
     expect(festival?.buscarTipoEntrada("tipo-festival-sonidos-del-sur-backstage")?.cupo).toBe(3);
   });
 
+  describe("compras canceladas sobre el Maratón (feature 009, R11)", () => {
+    const delMaraton = compras.filter((c) => c.eventoId === "evento-maraton-10k");
+    const porId = new Map(delMaraton.map((c) => [c.id, c]));
+    const diego = { tipo: "usuario", usuarioId: "usuario-diego" };
+    const valentina = { tipo: "usuario", usuarioId: "usuario-valentina" };
+    const lucia = { tipo: "usuario", usuarioId: "usuario-lucia" };
+    const haceDias = (dias: number, minutos = 0) =>
+      new Date(ahora.getTime() - dias * DIA + minutos * 60 * 1000);
+
+    it("Diego canceló la suya después de pagarla y espera el reembolso", () => {
+      const compra = porId.get("compra-diego-maraton-inscripcion");
+      expect(compra).toMatchObject({
+        compradorId: "usuario-diego",
+        tipoEntradaId: "tipo-maraton-10k-inscripcion",
+        cantidad: 1,
+        total: 30000,
+        estado: EstadoCompra.CANCELADA,
+        canceladaDesde: "CONFIRMADA",
+      });
+      expect(compra?.historial).toEqual([
+        { estado: EstadoCompra.PENDIENTE, autor: diego, fechaHora: haceDias(3) },
+        { estado: EstadoCompra.CONFIRMADA, autor: diego, fechaHora: haceDias(3, 5) },
+        { estado: EstadoCompra.CANCELADA, autor: diego, fechaHora: haceDias(1) },
+      ]);
+      expect(compra?.tieneReembolsoPendiente()).toBe(true);
+      expect(compra?.entradas.map((e) => [e.codigo, e.estadoEn(compra)])).toEqual([
+        ["MZDF1C01", EstadoCompra.CANCELADA],
+      ]);
+    });
+
+    it("la de Valentina ya está reembolsada por Lucía", () => {
+      const compra = porId.get("compra-valentina-maraton-inscripcion");
+      expect(compra).toMatchObject({ compradorId: "usuario-valentina", cantidad: 2, total: 60000 });
+      expect(compra?.estado).toBe(EstadoCompra.REEMBOLSADA);
+      expect(compra?.historial).toEqual([
+        { estado: EstadoCompra.PENDIENTE, autor: valentina, fechaHora: haceDias(4) },
+        { estado: EstadoCompra.CONFIRMADA, autor: valentina, fechaHora: haceDias(4, 5) },
+        { estado: EstadoCompra.CANCELADA, autor: valentina, fechaHora: haceDias(2) },
+        { estado: EstadoCompra.REEMBOLSADA, autor: lucia, fechaHora: haceDias(1) },
+      ]);
+      expect(compra?.tieneReembolsoPendiente()).toBe(false);
+      expect(compra?.entradas.map((e) => e.codigo)).toEqual(["MZVG2R01", "MZVG2R02"]);
+    });
+
+    it("el cupo de Inscripción sigue en 1000", () => {
+      const maraton = eventos.find((e) => e.id === "evento-maraton-10k");
+      expect(maraton?.buscarTipoEntrada("tipo-maraton-10k-inscripcion")?.cupo).toBe(1000);
+      expect(delMaraton).toHaveLength(2);
+    });
+  });
+
   it("deja los favoritos vacíos", () => {
     for (const usuario of usuarios) expect(usuario.favoritos).toEqual([]);
   });

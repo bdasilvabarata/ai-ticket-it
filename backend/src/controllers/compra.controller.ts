@@ -1,4 +1,5 @@
 import type {
+  CompraDelEventoVista,
   ComprasDelEventoVista,
   CompraVista,
   MiCompraVista,
@@ -48,5 +49,10 @@ export class CompraController {
   cancelar = async (req: Request, res: Response<CompraVista>): Promise<void> => {
     const { compraId } = compraPorId.leer(req, "params");
     res.json(await this.compraService.cancelar(compraId, usuarioActual(req).id));
+  };
+
+  confirmarReembolso = async (req: Request, res: Response<CompraDelEventoVista>): Promise<void> => {
+    const { compraId } = compraPorId.leer(req, "params");
+    res.json(await this.compraService.confirmarReembolso(compraId, usuarioActual(req).id));
   };
 }

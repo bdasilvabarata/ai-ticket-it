@@ -183,6 +183,23 @@ export const compraCanceladaDesdeConfirmada: CompraVista = {
   ],
 };
 
+/** La cancelada de la Maratón, con el reembolso ya confirmado por su organizadora (feature 009). */
+export const compraReembolsada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 60000 },
+  motivoNoCancelable: "reembolsada",
+  historial: [
+    ...compraCanceladaDesdeConfirmada.historial,
+    {
+      estado: EstadoCompra.REEMBOLSADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: "2026-11-14T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-14T09:00",
+    },
+  ],
+};
+
 /** Una CONFIRMADA de 1 entrada gratis ("Carrera kids" de la Maratón), cancelable (feature 009). */
 export const compraConfirmadaGratis: CompraVista = {
   ...compraConfirmada,
@@ -272,6 +289,37 @@ export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): Co
     ...cambios,
   };
 }
+
+/** Diego canceló sus 2 VIP después de pagarlas: el reembolso de $ 240.000 está pendiente (feature 009). */
+export const diegoConReembolsoPendiente = compraDelEvento({
+  id: "compra-diego-vip",
+  comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 2,
+  total: 240000,
+  estado: EstadoCompra.CANCELADA,
+  canceladaPor: "usuario",
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 240000 },
+});
+
+/** La de Diego, ya reembolsada por Lucía (la respuesta del `POST …/reembolso` y la relectura). */
+export const diegoReembolsada = compraDelEvento({
+  ...diegoConReembolsoPendiente,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 240000 },
+});
+
+/** Valentina, 1 VIP cancelada y ya reembolsada (feature 009). */
+export const valentinaReembolsada = compraDelEvento({
+  id: "compra-valentina-vip",
+  comprador: { id: "usuario-valentina", nombre: "Valentina", apellido: "Gómez" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 1,
+  total: 120000,
+  estado: EstadoCompra.REEMBOLSADA,
+  canceladaPor: "usuario",
+});
 
 /** La ventana de uso del Festival: de las 10:00 del 10/12 a las 02:00 del 11/12 (hora de Buenos Aires). */
 export function ventanaDelFestival(estado: VentanaDeUsoVista["estado"] = "antes"): VentanaDeUsoVista {

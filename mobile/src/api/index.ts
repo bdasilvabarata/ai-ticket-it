@@ -16,6 +16,7 @@ export {
   obtenerEntradaDelEvento,
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
+  confirmarReembolso,
   pagarCompra,
   registrarUsoDeEntrada,
 } from "./compras";

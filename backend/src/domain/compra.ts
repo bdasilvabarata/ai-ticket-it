@@ -193,7 +193,8 @@ function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
  * nueva. El alta es `Compra.registrar` (PENDIENTE). Transiciones de esta feature:
  * `PENDIENTE → CONFIRMADA` (el pago del comprador), `PENDIENTE → CANCELADA` por el sistema
  * (vencimiento a los 15 minutos) y `PENDIENTE → CANCELADA` por el comprador (la cancela antes de
- * pagarla); la 008 suma `CONFIRMADA → UTILIZADA` (la primera entrada usada) y la 009, las suyas. Desde la 008 lleva sus `entradas`, una por unidad
+ * pagarla); la 008 suma `CONFIRMADA → UTILIZADA` (la primera entrada usada) y la 009, `CONFIRMADA → CANCELADA`
+ * por el comprador y `CANCELADA → REEMBOLSADA` por el organizador. Desde la 008 lleva sus `entradas`, una por unidad
  * con su código; sus transiciones las conservan.
  */
 export class Compra {
@@ -447,6 +448,26 @@ export class Compra {
       ...this.#propiedades(),
       historial: [...this.historial, cambio],
       entradas: this.entradas.map((entrada) => entrada.cancelar(usuarioId, ahora)),
+    });
+  }
+
+  /**
+   * CANCELADA (paga, desde confirmada) → REEMBOLSADA por su organizador en `ahora` (feature 009, R5).
+   * Sin plazo: no mira la fecha del evento. Las entradas no cambian y el cupo tampoco. El permiso lo
+   * verifica el service antes. Ya REEMBOLSADA → `TRANSICION_INVALIDA` «ya se confirmó»; sin reembolso
+   * pendiente → `TRANSICION_INVALIDA` «no tiene un reembolso pendiente».
+   */
+  confirmarReembolso(organizadorId: string, ahora: Date): Compra {
+    if (this.estado === EstadoCompra.REEMBOLSADA) {
+      throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "El reembolso de esta compra ya se confirmó.");
+    }
+    if (!this.tieneReembolsoPendiente()) {
+      throw new ReglaDeNegocioError("TRANSICION_INVALIDA", "Esta compra no tiene un reembolso pendiente.");
+    }
+    return this.#conCambio({
+      estado: EstadoCompra.REEMBOLSADA,
+      autor: { tipo: "usuario", usuarioId: organizadorId },
+      fechaHora: ahora,
     });
   }
 

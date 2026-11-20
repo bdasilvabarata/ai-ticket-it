@@ -54,6 +54,16 @@ export function textoConfirmarCancelacion(compra: CompraVista): string {
   return `${cuales} y ${vuelven}. No se puede deshacer.`;
 }
 
+/** Una REEMBOLSADA, para su comprador (feature 009): "Te devolvimos $ 240.000". */
+export function textoReembolsada(compra: Pick<CompraVista, "total" | "reembolso">): string {
+  return `Te devolvimos ${textoTotal(compra.reembolso?.monto ?? compra.total)}`;
+}
+
+/** El mensaje del `Alert` con el que el organizador confirma un reembolso (feature 009). */
+export function textoConfirmarReembolso(compra: CompraDelEventoVista): string {
+  return `Confirmás que le devolviste ${textoTotal(compra.reembolso?.monto ?? compra.total)}. No se puede deshacer.`;
+}
+
 /** 1 → "Tenés 1 entrada confirmada para este evento"; 3 → "Tenés 3 entradas confirmadas…". */
 export function textoEntradasConfirmadas(cantidad: number): string {
   return cantidad === 1
@@ -84,12 +94,16 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
     case EstadoCompra.PENDIENTE:
       return compra.venceEnLocal === null ? null : textoVencimiento(compra.venceEnLocal);
     case EstadoCompra.CANCELADA:
+      if (compra.reembolso?.estado === "pendiente") {
+        return `El organizador tiene que confirmar el reembolso de ${textoTotal(compra.reembolso.monto)}`;
+      }
+      if (compra.canceladaDesde === "CONFIRMADA") return "Cancelaste esta compra";
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
     case EstadoCompra.UTILIZADA:
       return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
-    default:
-      return null;
+    case EstadoCompra.REEMBOLSADA:
+      return textoReembolsada(compra);
   }
 }
 
@@ -130,10 +144,15 @@ export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): strin
         ? null
         : `Puede pagarla hasta las ${compra.venceEnLocal.slice(11, 16)}`;
     case EstadoCompra.CANCELADA:
+      if (compra.reembolso?.estado === "pendiente") {
+        return `La canceló el comprador · Reembolso pendiente de ${textoTotal(compra.reembolso.monto)}`;
+      }
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La canceló el comprador" : null;
     case EstadoCompra.UTILIZADA:
       return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
+    case EstadoCompra.REEMBOLSADA:
+      return "Reembolso confirmado";
     default:
       return null;
   }

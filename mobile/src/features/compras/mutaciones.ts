@@ -1,7 +1,14 @@
-import type { DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
+import type { CompraDelEventoVista, DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query, type UseMutationResult } from "@tanstack/react-query";
 
-import { cancelarCompra, comprarEntradas, ErrorDeApi, pagarCompra, registrarUsoDeEntrada } from "../../api";
+import {
+  cancelarCompra,
+  comprarEntradas,
+  confirmarReembolso,
+  ErrorDeApi,
+  pagarCompra,
+  registrarUsoDeEntrada,
+} from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
@@ -112,6 +119,32 @@ export function useRegistrarUso(
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
         // El comprador es otro usuario y puede estar en la caché de este dispositivo (R13).
+        queryClient.invalidateQueries({ queryKey: ["compra"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+      ]),
+  });
+}
+
+/**
+ * El organizador confirma el reembolso de una compra cancelada (feature 009), en su nombre; la
+ * variable es el id de la compra. Sin reintentos. Al terminar, con éxito o error, invalida "Compras
+ * del evento" y, por prefijo, las vistas del comprador de cualquier usuario (`entrada-del-evento`,
+ * `compra`, `mis-compras`, `mis-compras-del-evento`). No el evento ni el catálogo: el cupo no
+ * cambia (R10).
+ */
+export function useConfirmarReembolso(
+  usuarioId: string,
+  eventoId: string,
+): UseMutationResult<CompraDelEventoVista, Error, string> {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (compraId: string) => confirmarReembolso(cliente, compraId, { usuarioId }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: claves.comprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),

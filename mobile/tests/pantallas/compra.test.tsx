@@ -10,6 +10,7 @@ import {
   compraGratisCanceladaDesdeConfirmada,
   compraGratis,
   compraPendiente,
+  compraReembolsada,
   compraUtilizada,
   conRestantes,
 } from "../helpers/compras";
@@ -544,5 +545,17 @@ describe("Cancelar una compra confirmada desde Tu compra (feature 009, US1)", ()
 
     expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+});
+
+describe("Tu compra de una REEMBOLSADA (feature 009, US2)", () => {
+  it("la etiqueta Reembolsada con «Te devolvimos $ 60.000», sin entradas ni botones de pago o cancelación", async () => {
+    await abrirCompra({ compra: [{ status: 200, json: compraReembolsada }] });
+
+    expect(await screen.findByLabelText("Estado: Reembolsada")).toBeOnTheScreen();
+    expect(screen.getByText("Te devolvimos $ 60.000")).toBeOnTheScreen();
+    expect(screen.queryByRole("header", { name: "Tus entradas" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Pagar|^Confirmar|^Cancelar/ })).toBeNull();
+    expect(screen.getByRole("button", { name: "Volver al evento" })).toBeOnTheScreen();
   });
 });

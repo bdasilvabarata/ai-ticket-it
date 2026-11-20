@@ -1013,3 +1013,70 @@ describe("Compra.cancelar de una CONFIRMADA (feature 009, R1)", () => {
     );
   });
 });
+
+describe("Compra.confirmarReembolso (feature 009, R5)", () => {
+  const AHORA = despues(30 * MINUTO);
+  const SIN_PENDIENTE = "Esta compra no tiene un reembolso pendiente.";
+  const vencida = () =>
+    new Compra(
+      con({
+        historial: [
+          pendiente,
+          { estado: EstadoCompra.CANCELADA, autor: { tipo: "sistema" }, fechaHora: despues(PLAZO) },
+        ],
+      }),
+    );
+
+  it("una CANCELADA paga desde confirmada → REEMBOLSADA por el organizador; las entradas no cambian", () => {
+    const original = compraCanceladaDesdeConfirmada();
+    const reembolsada = original.confirmarReembolso("usuario-lucia", AHORA);
+    expect(reembolsada).not.toBe(original);
+    expect(reembolsada.estado).toBe(EstadoCompra.REEMBOLSADA);
+    expect(reembolsada.historial).toEqual([
+      pendiente,
+      confirmada,
+      cancelacion,
+      { estado: EstadoCompra.REEMBOLSADA, autor: porLucia, fechaHora: AHORA },
+    ]);
+    for (const entrada of reembolsada.entradas) expect(entrada.cambios).toEqual([cancelacion]);
+    expect(reembolsada.canceladaDesde).toBe("CONFIRMADA");
+    expect(reembolsada.cambioDeCancelacion).toEqual(cancelacion);
+    expect(reembolsada.tieneReembolsoPendiente()).toBe(false);
+    expect(original.estado).toBe(EstadoCompra.CANCELADA);
+  });
+
+  it("sin plazo: se confirma mucho después (no recibe la fecha del evento)", () => {
+    const reembolsada = compraCanceladaDesdeConfirmada().confirmarReembolso("usuario-lucia", LEJOS);
+    expect(reembolsada.estado).toBe(EstadoCompra.REEMBOLSADA);
+  });
+
+  it("una REEMBOLSADA → TRANSICION_INVALIDA «ya se confirmó» y no cambia", () => {
+    const compra = compraReembolsada();
+    expect(() => compra.confirmarReembolso("usuario-lucia", AHORA)).toThrow(
+      expect.objectContaining({
+        codigo: "TRANSICION_INVALIDA",
+        message: "El reembolso de esta compra ya se confirmó.",
+      }),
+    );
+    expect(compra.historial).toHaveLength(4);
+  });
+
+  it.each([
+    ["PENDIENTE", () => compraPendiente()],
+    ["CONFIRMADA", () => compraConfirmada()],
+    ["UTILIZADA", () => compraConfirmada().registrarUso("7K3MQ9TB", "usuario-lucia", despues(10 * MINUTO))],
+    ["pendiente cancelada", () => compraCancelada()],
+    ["vencida", vencida],
+    ["gratis cancelada desde confirmada", () => compraCanceladaDesdeConfirmada({ total: 0 })],
+  ])("%s → TRANSICION_INVALIDA «no tiene un reembolso pendiente» y no cambia", (_caso, crear) => {
+    const compra = crear();
+    const estado = compra.estado;
+    const largo = compra.historial.length;
+    expect(() => compra.confirmarReembolso("usuario-lucia", AHORA)).toThrow(
+      expect.objectContaining({ codigo: "TRANSICION_INVALIDA", message: SIN_PENDIENTE }),
+    );
+    expect(() => compra.confirmarReembolso("usuario-lucia", AHORA)).toThrow(ReglaDeNegocioError);
+    expect(compra.estado).toBe(estado);
+    expect(compra.historial).toHaveLength(largo);
+  });
+});

@@ -3,9 +3,14 @@ import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-lib
 import { router } from "expo-router";
 
 import {
+  compraCanceladaDesdeConfirmada,
+  compraCancelada,
+  compraCanceladaPorElComprador,
   compraConfirmada,
   compraGratis,
+  compraGratisCanceladaDesdeConfirmada,
   compraPendiente,
+  compraReembolsada,
   compraUtilizada,
   conRestantes,
   miCompra,
@@ -525,5 +530,36 @@ describe("Mis compras: una UTILIZADA (feature 008, FR-012e)", () => {
     await abrirMisCompras([{ status: 200, json: [miCompra(compraUtilizada)] }]);
     expect(await screen.findByText("1 de 2 entradas usadas")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Utilizada")).toBeOnTheScreen();
+  });
+});
+
+describe("Mis compras: canceladas y reembolsadas (feature 009, US2, FR-019)", () => {
+  it("cada fila dice su reembolso junto a la etiqueta, distinto de «Venció sin pagarse» y «La cancelaste»", async () => {
+    const porUsuario = { canceladaPor: "usuario" as const };
+    await abrirMisCompras([
+      {
+        status: 200,
+        json: [
+          miCompra(compraCanceladaDesdeConfirmada, { ...porUsuario, id: "con-reembolso" }),
+          miCompra(compraGratisCanceladaDesdeConfirmada, { ...porUsuario, id: "gratis" }),
+          miCompra(compraReembolsada, { ...porUsuario, id: "reembolsada" }),
+          miCompra(compraCanceladaPorElComprador, { ...porUsuario, id: "pendiente-cancelada" }),
+          miCompra(compraCancelada, { canceladaPor: "sistema", id: "vencida" }),
+        ],
+      },
+    ]);
+
+    const [conReembolso, gratis, reembolsada, pendienteCancelada, vencida] = await filas();
+    const esperado: [typeof conReembolso, string, string][] = [
+      [conReembolso, "Cancelada", "El organizador tiene que confirmar el reembolso de $ 60.000"],
+      [gratis, "Cancelada", "Cancelaste esta compra"],
+      [reembolsada, "Reembolsada", "Te devolvimos $ 60.000"],
+      [pendienteCancelada, "Cancelada", "La cancelaste"],
+      [vencida, "Cancelada", "Venció sin pagarse"],
+    ];
+    for (const [fila, estado, aviso] of esperado) {
+      expect(within(fila!).getByLabelText(`Estado: ${estado}`)).toBeOnTheScreen();
+      expect(within(fila!).getByText(aviso)).toBeOnTheScreen();
+    }
   });
 });

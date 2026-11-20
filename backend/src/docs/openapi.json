@@ -1286,6 +1286,140 @@
         }
       }
     },
+    "/compras/{compraId}/reembolso": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Confirmar el reembolso de una compra cancelada (organizador)",
+        "description": "Sin cuerpo (si viene uno, se ignora). El organizador del evento confirma que devolvió la plata de una compra CANCELADA después de confirmada y paga (feature 009): pasa a REEMBOLSADA (autor el organizador, hora del servidor). No cambia el cupo ni las entradas, y no tiene plazo (también con el evento realizado). Bajo el cerrojo del evento de la compra (con el reloj leído adentro): verifica que el usuario organice el evento, vence las pendientes vencidas del evento, relee la compra y la guarda una vez. Orden de los rechazos: 401 → 400 → 404 → 403 → 409 TRANSICION_INVALIDA.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La compra REEMBOLSADA como la ve el organizador (`reembolso.estado: \"confirmado\"`, sin códigos de entrada)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompraDelEventoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No organiza el evento de la compra, también su comprador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador puede modificar este evento."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra no tiene un reembolso pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "yaConfirmado": {
+                    "summary": "Ya está REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "El reembolso de esta compra ya se confirmó."
+                      }
+                    }
+                  },
+                  "sinReembolsoPendiente": {
+                    "summary": "Pendiente, confirmada, utilizada, cancelada sin pagar o vencida, o gratis",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "Esta compra no tiene un reembolso pendiente."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/eventos/{eventoId}/tipos-entrada": {
       "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
       "post": {

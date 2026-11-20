@@ -576,15 +576,23 @@ describe("GET /api/compras (feature 007)", () => {
     ]);
   });
 
-  it("Diego → 200 con su compra CANCELADA por el sistema", async () => {
+  it("Diego → 200 con su compra CANCELADA por el sistema y la del Maratón, cancelada por él (009)", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-diego");
     expect(respuesta.status).toBe(200);
+    // El Festival (+30 días) antes que el Maratón (+45 días): no realizados, por fecha ascendente.
     expect(respuesta.body).toEqual([
       expect.objectContaining({
         id: "compra-diego-festival-general",
         estado: EstadoCompra.CANCELADA,
         canceladaPor: "sistema",
         venceEn: null,
+      }),
+      expect.objectContaining({
+        id: "compra-diego-maraton-inscripcion",
+        estado: EstadoCompra.CANCELADA,
+        canceladaPor: "usuario",
+        canceladaDesde: "CONFIRMADA",
+        reembolso: { estado: "pendiente", monto: 30000 },
       }),
     ]);
   });
@@ -849,5 +857,120 @@ describe("POST /api/compras/:compraId/cancelacion de una CONFIRMADA (feature 009
       expect(body.restantesPorTipo).toContainEqual({ tipoEntradaId, restantes: 4 });
     }
     expect(body.confirmadas.map((c: { id: string }) => c.id)).not.toContain(COMPRA_DE_MARTIN);
+  });
+});
+
+describe("POST /api/compras/:compraId/reembolso (feature 009, US2)", () => {
+  const MARATON = "/api/eventos/evento-maraton-10k";
+  const INSCRIPCION = "tipo-maraton-10k-inscripcion";
+  const DIEGO = "compra-diego-maraton-inscripcion";
+  const VALENTINA = "compra-valentina-maraton-inscripcion";
+  const reembolsar = (app: App, compraId: string, usuarioId = "usuario-lucia") =>
+    request(app).post(`/api/compras/${compraId}/reembolso`).set("X-Usuario-Id", usuarioId);
+  const comprasDelMaraton = (app: App) =>
+    request(app).get(`${MARATON}/compras`).set("X-Usuario-Id", "usuario-lucia");
+  const inscripcion = async (app: App) => {
+    const { body } = await request(app).get(MARATON);
+    return (body.tiposEntrada as { id: string; cupo: number }[]).find((t) => t.id === INSCRIPCION)!.cupo;
+  };
+  const ya = { codigo: "TRANSICION_INVALIDA", mensaje: "El reembolso de esta compra ya se confirmó." };
+
+  it("sin X-Usuario-Id → 401 USUARIO_NO_IDENTIFICADO", async () => {
+    const respuesta = await request(nuevaApp()).post(`/api/compras/${DIEGO}/reembolso`);
+    expect(respuesta.status).toBe(401);
+    expect(respuesta.body.error.codigo).toBe("USUARIO_NO_IDENTIFICADO");
+  });
+
+  it("compraId inválido → 400 ENTRADA_INVALIDA en params.compraId", async () => {
+    const respuesta = await reembolsar(nuevaApp(), "Compra%201");
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.error).toMatchObject({ codigo: "ENTRADA_INVALIDA" });
+    expect(respuesta.body.error.detalles).toEqual([
+      { campo: "params.compraId", mensaje: "Debe ser un identificador válido." },
+    ]);
+  });
+
+  it("una compra inexistente → 404 COMPRA_NO_ENCONTRADA", async () => {
+    const respuesta = await reembolsar(nuevaApp(), "no-existe");
+    expect(respuesta.status).toBe(404);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "COMPRA_NO_ENCONTRADA",
+      mensaje: "No existe la compra.",
+    });
+  });
+
+  it("Diego sobre la suya → 403 SIN_PERMISO", async () => {
+    const respuesta = await reembolsar(nuevaApp(), DIEGO, "usuario-diego");
+    expect(respuesta.status).toBe(403);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "SIN_PERMISO",
+      mensaje: "Solo el organizador puede modificar este evento.",
+    });
+  });
+
+  it("antes del reembolso, Compras del evento trae a Diego pendiente y a Valentina confirmada, con 1000 disponibles", async () => {
+    const { status, body } = await comprasDelMaraton(nuevaApp());
+    expect(status).toBe(200);
+    const porId = new Map((body.compras as { id: string }[]).map((c) => [c.id, c]));
+    expect(porId.get(DIEGO)).toMatchObject({
+      estado: EstadoCompra.CANCELADA,
+      canceladaPor: "usuario",
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "pendiente", monto: 30000 },
+    });
+    expect(porId.get(VALENTINA)).toMatchObject({
+      estado: EstadoCompra.REEMBOLSADA,
+      canceladaPor: "usuario",
+      reembolso: { estado: "confirmado", monto: 60000 },
+    });
+    expect(
+      body.resumenPorTipo.find((r: { tipoEntrada: { id: string } }) => r.tipoEntrada.id === INSCRIPCION),
+    ).toMatchObject({
+      disponibles: 1000,
+      vendidas: 0,
+    });
+  });
+
+  it("Lucía confirma el de Diego → 200 REEMBOLSADA; Compras del evento lo muestra y el cupo sigue en 1000", async () => {
+    const app = nuevaApp();
+    const respuesta = await reembolsar(app, DIEGO).send({ ignorado: true });
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toMatchObject({
+      id: DIEGO,
+      comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
+      tipoEntrada: { id: INSCRIPCION, nombre: "Inscripción" },
+      cantidad: 1,
+      total: 30000,
+      estado: EstadoCompra.REEMBOLSADA,
+      venceEn: null,
+      canceladaPor: "usuario",
+      canceladaDesde: "CONFIRMADA",
+      reembolso: { estado: "confirmado", monto: 30000 },
+    });
+    expect(JSON.stringify(respuesta.body)).not.toContain("MZDF1C01");
+    const { body } = await comprasDelMaraton(app);
+    expect((body.compras as { id: string; estado: string }[]).find((c) => c.id === DIEGO)?.estado).toBe(
+      EstadoCompra.REEMBOLSADA,
+    );
+    expect(await inscripcion(app)).toBe(1000);
+
+    const repetido = await reembolsar(app, DIEGO);
+    expect(repetido.status).toBe(409);
+    expect(repetido.body.error).toMatchObject(ya);
+  });
+
+  it("Valentina (ya reembolsada) → 409 «ya se confirmó»", async () => {
+    const respuesta = await reembolsar(nuevaApp(), VALENTINA);
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject(ya);
+  });
+
+  it("la vencida de Diego en el Festival → 409 «no tiene un reembolso pendiente»", async () => {
+    const respuesta = await reembolsar(nuevaApp(), "compra-diego-festival-general");
+    expect(respuesta.status).toBe(409);
+    expect(respuesta.body.error).toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+      mensaje: "Esta compra no tiene un reembolso pendiente.",
+    });
   });
 });

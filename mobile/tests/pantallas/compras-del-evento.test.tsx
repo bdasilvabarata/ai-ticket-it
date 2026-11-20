@@ -5,6 +5,9 @@ import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-lib
 import {
   compraDelEvento,
   comprasDelFestival,
+  diegoConReembolsoPendiente,
+  diegoReembolsada,
+  valentinaReembolsada,
   entradaDelEvento,
   ventanaDelFestival,
 } from "../helpers/compras";
@@ -184,7 +187,9 @@ describe("Compras del evento (feature 008, US1)", () => {
       },
     ]);
 
-    const pendiente = await screen.findByLabelText("Sofía Castro, VIP, 1 entrada, $ 120.000, Pendiente");
+    const pendiente = await screen.findByLabelText(
+      "Sofía Castro, VIP, 1 entrada, $ 120.000, Pendiente, Puede pagarla hasta las 15:35",
+    );
     expect(within(pendiente).getByText("Sofía Castro")).toBeOnTheScreen();
     expect(within(pendiente).getByText("VIP · 1 entrada · $ 120.000")).toBeOnTheScreen();
     expect(within(pendiente).getByText("Comprada el 18/11 15:20")).toBeOnTheScreen();
@@ -195,14 +200,20 @@ describe("Compras del evento (feature 008, US1)", () => {
     expect(within(confirmada).getByText("General · 3 entradas · $ 18.000")).toBeOnTheScreen();
     expect(within(confirmada).getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
 
-    const vencida = screen.getByLabelText("Diego Fernández, General, 1 entrada, $ 45.000, Cancelada");
+    const vencida = screen.getByLabelText(
+      "Diego Fernández, General, 1 entrada, $ 45.000, Cancelada, Venció sin pagarse",
+    );
     expect(within(vencida).getByText("Venció sin pagarse")).toBeOnTheScreen();
 
-    const cancelada = screen.getByLabelText("Diego Fernández, Backstage, 2 entradas, Gratis, Cancelada");
+    const cancelada = screen.getByLabelText(
+      "Diego Fernández, Backstage, 2 entradas, Gratis, Cancelada, La canceló el comprador",
+    );
     expect(within(cancelada).getByText("Backstage · 2 entradas · Gratis")).toBeOnTheScreen();
     expect(within(cancelada).getByText("La canceló el comprador")).toBeOnTheScreen();
 
-    const utilizada = screen.getByLabelText("Martín Benítez, General, 3 entradas, $ 18.000, Utilizada");
+    const utilizada = screen.getByLabelText(
+      "Martín Benítez, General, 3 entradas, $ 18.000, Utilizada, 1 de 3 entradas usadas",
+    );
     expect(within(utilizada).getByText("Comprada el 17/11 10:05")).toBeOnTheScreen();
     expect(within(utilizada).getByText("1 de 3 entradas usadas")).toBeOnTheScreen();
   });
@@ -374,7 +385,7 @@ describe("Compras del evento: al día y ante fallas (feature 008, US4)", () => {
     await act(() => router.back());
 
     const utilizada = await screen.findByLabelText(
-      "Martín Benítez, General, 3 entradas, $ 18.000, Utilizada",
+      "Martín Benítez, General, 3 entradas, $ 18.000, Utilizada, 1 de 3 entradas usadas",
     );
     expect(within(utilizada).getByText("1 de 3 entradas usadas")).toBeOnTheScreen();
     expect(
@@ -446,5 +457,149 @@ describe("Compras del evento: al día y ante fallas (feature 008, US4)", () => {
     expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
     expect(screen.queryByText("Martín Benítez")).toBeNull();
     expect(pedidosDeLaLista(resultado).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
+  });
+});
+
+describe("Compras del evento: confirmar el reembolso (feature 009, US2)", () => {
+  const REEMBOLSO = "/compras/compra-diego-vip/reembolso";
+  const TITULO = "¿Confirmar el reembolso a Diego Fernández?";
+  const FILA_DIEGO =
+    "Diego Fernández, VIP, 2 entradas, $ 240.000, Cancelada, La canceló el comprador · Reembolso pendiente de $ 240.000";
+  const gratisDesdeConfirmada = compraDelEvento({
+    id: "compra-martin-kids",
+    tipoEntrada: { id: "tipo-festival-kids", nombre: "Kids" },
+    cantidad: 1,
+    total: 0,
+    estado: EstadoCompra.CANCELADA,
+    canceladaPor: "usuario",
+    canceladaDesde: "CONFIRMADA",
+    reembolso: null,
+  });
+  const conPendiente = {
+    status: 200,
+    json: comprasDelFestival([diegoConReembolsoPendiente, valentinaReembolsada]),
+  };
+  const releida = { status: 200, json: comprasDelFestival([diegoReembolsada, valentinaReembolsada]) };
+  const postsDeReembolso = (resultado: Awaited<ReturnType<typeof abrirComprasDelFestival>>) =>
+    resultado.falso.pedidos.filter((p) => p.metodo === "POST" && p.url.endsWith(REEMBOLSO));
+
+  it("«Confirmar reembolso» solo en las filas con reembolso pendiente, fuera del bloque de la fila", async () => {
+    await abrirComprasDelFestival([
+      {
+        status: 200,
+        json: comprasDelFestival([
+          diegoConReembolsoPendiente,
+          valentinaReembolsada,
+          diegoVencida,
+          diegoCancelada,
+          gratisDesdeConfirmada,
+        ]),
+      },
+    ]);
+
+    const fila = await screen.findByLabelText(FILA_DIEGO);
+    expect(
+      within(fila).getByText("La canceló el comprador · Reembolso pendiente de $ 240.000"),
+    ).toBeOnTheScreen();
+    expect(within(fila).queryByRole("button")).toBeNull();
+    expect(screen.getAllByRole("button", { name: "Confirmar reembolso" })).toHaveLength(1);
+
+    const valentina = screen.getByLabelText(
+      "Valentina Gómez, VIP, 1 entrada, $ 120.000, Reembolsada, Reembolso confirmado",
+    );
+    expect(within(valentina).getByLabelText("Estado: Reembolsada")).toBeOnTheScreen();
+    expect(
+      screen.getByLabelText("Martín Benítez, Kids, 1 entrada, Gratis, Cancelada, La canceló el comprador"),
+    ).toBeOnTheScreen();
+  });
+
+  it("el Alert nombra al comprador y el monto; «Volver» no manda nada", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([conPendiente]);
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+
+    const [llamada] = alertasCon(alertas, TITULO);
+    expect(llamada?.[1]).toBe("Confirmás que le devolviste $ 240.000. No se puede deshacer.");
+    expect((llamada?.[2] as { text: string }[]).map((b) => b.text)).toEqual([
+      "Volver",
+      "Confirmar reembolso",
+    ]);
+    await tocarEnAlerta(alertas, TITULO, "Volver");
+    expect(postsDeReembolso(resultado)).toHaveLength(0);
+  });
+
+  it("confirmar: un POST sin cuerpo, la fila releída dice «Reembolso confirmado» sin botón, e invalida las vistas", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([conPendiente, releida], {
+      [REEMBOLSO]: [{ status: 200, json: diegoReembolsada }],
+    });
+    await screen.findByLabelText(FILA_DIEGO);
+    const invalidar = jest.spyOn(resultado.deps.queryClient, "invalidateQueries");
+
+    await fireEvent.press(screen.getByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+
+    expect(
+      await screen.findByLabelText(
+        "Diego Fernández, VIP, 2 entradas, $ 240.000, Reembolsada, Reembolso confirmado",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Confirmar reembolso" })).toBeNull();
+    const [post] = postsDeReembolso(resultado);
+    expect(postsDeReembolso(resultado)).toHaveLength(1);
+    expect(post?.cuerpo).toBeUndefined();
+    expect(post?.encabezados["X-Usuario-Id"]).toBe(lucia.id);
+    expect(pedidosDeLaLista(resultado).length).toBeGreaterThanOrEqual(2);
+
+    const claves = invalidar.mock.calls.map(([filtro]) => filtro?.queryKey).filter(Boolean);
+    expect(claves).toEqual(
+      expect.arrayContaining([
+        ["compras-del-evento", lucia.id, "evento-festival"],
+        ["entrada-del-evento"],
+        ["compra"],
+        ["mis-compras"],
+        ["mis-compras-del-evento"],
+      ]),
+    );
+    // El cupo no cambia: ni el evento ni el catálogo (R10).
+    expect(claves).not.toContainEqual(["catalogo"]);
+    expect(invalidar.mock.calls.some(([filtro]) => typeof filtro?.predicate === "function")).toBe(false);
+  });
+
+  it("mientras va el pedido la fila queda en curso y otra confirmación no manda otro pedido", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirComprasDelFestival([conPendiente], { [REEMBOLSO]: ["colgar"] });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+
+    const enCurso = await screen.findByRole("button", { name: "Confirmando…" });
+    expect(enCurso).toBeBusy();
+    await fireEvent.press(enCurso);
+    expect(postsDeReembolso(resultado)).toHaveLength(1);
+  });
+
+  it.each([
+    [409, "TRANSICION_INVALIDA", "El reembolso de esta compra ya se confirmó."],
+    [403, "SIN_PERMISO", "Solo el organizador puede modificar este evento."],
+  ])("un %i muestra el mensaje del servidor en esa fila", async (status, codigo, mensaje) => {
+    const alertas = espiarAlertas();
+    await abrirComprasDelFestival([conPendiente], {
+      [REEMBOLSO]: [{ status, json: errorApi(codigo, mensaje) }],
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+  });
+
+  it("sin servidor: «No se pudo confirmar el reembolso. Probá de nuevo.»", async () => {
+    const alertas = espiarAlertas();
+    await abrirComprasDelFestival([conPendiente], { [REEMBOLSO]: ["rechazar"] });
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, TITULO, "Confirmar reembolso");
+    expect(await screen.findByText("No se pudo confirmar el reembolso. Probá de nuevo.")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Confirmar reembolso" })).toBeOnTheScreen();
   });
 });
