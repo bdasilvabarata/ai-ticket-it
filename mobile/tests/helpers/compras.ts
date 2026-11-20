@@ -56,6 +56,10 @@ export const compraPendiente: CompraVista = {
   ],
   entradas: [],
   entradasUsadas: 0,
+  canceladaDesde: null,
+  reembolso: null,
+  cancelable: true,
+  motivoNoCancelable: null,
 };
 
 /** Los códigos de las 2 entradas de la compra de la Maratón, una vez pagada. */
@@ -89,6 +93,8 @@ export const compraUtilizada: CompraVista = {
   ...compraConfirmada,
   estado: EstadoCompra.UTILIZADA,
   entradasUsadas: 1,
+  cancelable: false,
+  motivoNoCancelable: "entrada-usada",
   entradas: [
     {
       codigo: CODIGOS_DE_LA_MARATON[0],
@@ -115,6 +121,9 @@ export const compraCancelada: CompraVista = {
   estado: EstadoCompra.CANCELADA,
   venceEn: null,
   venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
   historial: [
     ...compraPendiente.historial,
     {
@@ -132,6 +141,9 @@ export const compraCanceladaPorElComprador: CompraVista = {
   estado: EstadoCompra.CANCELADA,
   venceEn: null,
   venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
   historial: [
     ...compraPendiente.historial,
     {
@@ -151,10 +163,65 @@ export const compraGratis: CompraVista = {
   total: 0,
 };
 
+/** La confirmada de la Maratón, cancelada por Martín antes del inicio: reembolso pendiente (feature 009). */
+export const compraCanceladaDesdeConfirmada: CompraVista = {
+  ...compraConfirmada,
+  estado: EstadoCompra.CANCELADA,
+  entradas: [],
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 60000 },
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
+  historial: [
+    ...compraConfirmada.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-13T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-13T09:00",
+    },
+  ],
+};
+
+/** La cancelada de la Maratón, con el reembolso ya confirmado por su organizadora (feature 009). */
+export const compraReembolsada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 60000 },
+  motivoNoCancelable: "reembolsada",
+  historial: [
+    ...compraCanceladaDesdeConfirmada.historial,
+    {
+      estado: EstadoCompra.REEMBOLSADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: "2026-11-14T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-14T09:00",
+    },
+  ],
+};
+
+/** Una CONFIRMADA de 1 entrada gratis ("Carrera kids" de la Maratón), cancelable (feature 009). */
+export const compraConfirmadaGratis: CompraVista = {
+  ...compraConfirmada,
+  tipoEntrada: { id: "tipo-maraton-kids", nombre: "Carrera kids" },
+  cantidad: 1,
+  total: 0,
+  entradas: [compraConfirmada.entradas[0]!],
+};
+
+/** La gratis confirmada, cancelada por Martín: sin reembolso (feature 009). */
+export const compraGratisCanceladaDesdeConfirmada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  tipoEntrada: compraConfirmadaGratis.tipoEntrada,
+  cantidad: 1,
+  total: 0,
+  reembolso: null,
+};
+
 /**
  * Una fila de "Mis compras" (feature 007) armada con una `CompraVista` (por defecto, la pendiente de
- * la Maratón): sin `compradorId` ni `historial`, con `diasRestantes` y `canceladaPor` en `null` salvo
- * que se cambien.
+ * la Maratón): sin `compradorId`, `historial`, `entradas`, `cancelable` ni `motivoNoCancelable`, con
+ * `diasRestantes` y `canceladaPor` en `null` salvo que se cambien.
  */
 export function miCompra(
   base: CompraVista = compraPendiente,
@@ -171,6 +238,8 @@ export function miCompra(
     venceEn,
     venceEnLocal,
     entradasUsadas,
+    canceladaDesde,
+    reembolso,
   } = base;
   return {
     id,
@@ -183,6 +252,8 @@ export function miCompra(
     venceEn,
     venceEnLocal,
     entradasUsadas,
+    canceladaDesde,
+    reembolso,
     diasRestantes: null,
     canceladaPor: null,
     ...cambios,
@@ -191,8 +262,15 @@ export function miCompra(
 
 // Datos de "Compras del evento" (feature 008): el Festival de Lucía (10/12 14:00).
 
-/** Una fila de "Compras del evento": Martín, 3 General del Festival, CONFIRMADA, salvo que se cambie. */
+/**
+ * Una fila de "Compras del evento": Martín, 3 General del Festival, CONFIRMADA, salvo que se cambie.
+ * Si no se dan, `canceladaDesde` y `reembolso` siguen al estado (feature 009): una CANCELADA, desde
+ * PENDIENTE y sin reembolso; una REEMBOLSADA, desde CONFIRMADA con el reembolso confirmado.
+ */
 export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): CompraDelEventoVista {
+  const estado = cambios.estado ?? EstadoCompra.CONFIRMADA;
+  const total = cambios.total ?? 18000;
+  const reembolsada = estado === EstadoCompra.REEMBOLSADA;
   return {
     id: "compra-martin-general",
     comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
@@ -206,9 +284,42 @@ export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): Co
     venceEnLocal: null,
     canceladaPor: null,
     entradasUsadas: 0,
+    canceladaDesde: reembolsada ? "CONFIRMADA" : estado === EstadoCompra.CANCELADA ? "PENDIENTE" : null,
+    reembolso: reembolsada ? { estado: "confirmado", monto: total } : null,
     ...cambios,
   };
 }
+
+/** Diego canceló sus 2 VIP después de pagarlas: el reembolso de $ 240.000 está pendiente (feature 009). */
+export const diegoConReembolsoPendiente = compraDelEvento({
+  id: "compra-diego-vip",
+  comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 2,
+  total: 240000,
+  estado: EstadoCompra.CANCELADA,
+  canceladaPor: "usuario",
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 240000 },
+});
+
+/** La de Diego, ya reembolsada por Lucía (la respuesta del `POST …/reembolso` y la relectura). */
+export const diegoReembolsada = compraDelEvento({
+  ...diegoConReembolsoPendiente,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 240000 },
+});
+
+/** Valentina, 1 VIP cancelada y ya reembolsada (feature 009). */
+export const valentinaReembolsada = compraDelEvento({
+  id: "compra-valentina-vip",
+  comprador: { id: "usuario-valentina", nombre: "Valentina", apellido: "Gómez" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 1,
+  total: 120000,
+  estado: EstadoCompra.REEMBOLSADA,
+  canceladaPor: "usuario",
+});
 
 /** La ventana de uso del Festival: de las 10:00 del 10/12 a las 02:00 del 11/12 (hora de Buenos Aires). */
 export function ventanaDelFestival(estado: VentanaDeUsoVista["estado"] = "antes"): VentanaDeUsoVista {

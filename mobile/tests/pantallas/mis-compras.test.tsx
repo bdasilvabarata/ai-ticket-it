@@ -3,9 +3,14 @@ import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-lib
 import { router } from "expo-router";
 
 import {
+  compraCanceladaDesdeConfirmada,
+  compraCancelada,
+  compraCanceladaPorElComprador,
   compraConfirmada,
   compraGratis,
+  compraGratisCanceladaDesdeConfirmada,
   compraPendiente,
+  compraReembolsada,
   compraUtilizada,
   conRestantes,
   miCompra,
@@ -525,5 +530,110 @@ describe("Mis compras: una UTILIZADA (feature 008, FR-012e)", () => {
     await abrirMisCompras([{ status: 200, json: [miCompra(compraUtilizada)] }]);
     expect(await screen.findByText("1 de 2 entradas usadas")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Utilizada")).toBeOnTheScreen();
+  });
+});
+
+describe("Mis compras: canceladas y reembolsadas (feature 009, US2, FR-019)", () => {
+  it("cada fila dice su reembolso junto a la etiqueta, distinto de «Venció sin pagarse» y «La cancelaste»", async () => {
+    const porUsuario = { canceladaPor: "usuario" as const };
+    await abrirMisCompras([
+      {
+        status: 200,
+        json: [
+          miCompra(compraCanceladaDesdeConfirmada, { ...porUsuario, id: "con-reembolso" }),
+          miCompra(compraGratisCanceladaDesdeConfirmada, { ...porUsuario, id: "gratis" }),
+          miCompra(compraReembolsada, { ...porUsuario, id: "reembolsada" }),
+          miCompra(compraCanceladaPorElComprador, { ...porUsuario, id: "pendiente-cancelada" }),
+          miCompra(compraCancelada, { canceladaPor: "sistema", id: "vencida" }),
+        ],
+      },
+    ]);
+
+    const [conReembolso, gratis, reembolsada, pendienteCancelada, vencida] = await filas();
+    const esperado: [typeof conReembolso, string, string][] = [
+      [conReembolso, "Cancelada", "El organizador tiene que confirmar el reembolso de $ 60.000"],
+      [gratis, "Cancelada", "Cancelaste esta compra"],
+      [reembolsada, "Reembolsada", "Te devolvimos $ 60.000"],
+      [pendienteCancelada, "Cancelada", "La cancelaste"],
+      [vencida, "Cancelada", "Venció sin pagarse"],
+    ];
+    for (const [fila, estado, aviso] of esperado) {
+      expect(within(fila!).getByLabelText(`Estado: ${estado}`)).toBeOnTheScreen();
+      expect(within(fila!).getByText(aviso)).toBeOnTheScreen();
+    }
+  });
+});
+
+describe("Mis compras: al volver de cancelar una confirmada (feature 009, US5-2)", () => {
+  const COMPRA = "/compras/compra-nueva";
+  const FILA_MARATON = "Ver la compra de 2 Inscripción para Maratón Ciudad 10K";
+
+  it("al volver de Tu compra la lista se vuelve a pedir y la fila dice Cancelada con el reembolso pendiente", async () => {
+    const alertas = espiarAlertas();
+    const cancelada = miCompra(compraCanceladaDesdeConfirmada, { canceladaPor: "usuario" });
+    let cancelo = false;
+    const { falso } = await abrirMisCompras(
+      [
+        () => ({
+          status: 200,
+          json: [cancelo ? cancelada : miCompra(compraConfirmada, { diasRestantes: 10 })],
+        }),
+      ],
+      {
+        [`${COMPRA}/cancelacion`]: [
+          porMetodo({
+            POST: [
+              () => {
+                cancelo = true;
+                return { status: 200, json: compraCanceladaDesdeConfirmada };
+              },
+            ],
+          }),
+        ],
+        [COMPRA]: [
+          () => ({ status: 200, json: cancelo ? compraCanceladaDesdeConfirmada : compraConfirmada }),
+        ],
+      },
+    );
+    await fireEvent.press(await screen.findByRole("button", { name: FILA_MARATON }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Cancelar compra" }));
+    await tocarEnAlerta(alertas, "¿Cancelar la compra de 2 entradas Inscripción?", "Cancelar compra");
+    expect(
+      await screen.findByText(
+        "Cancelaste esta compra. El organizador tiene que confirmar el reembolso de $ 60.000",
+      ),
+    ).toBeOnTheScreen();
+    const pedidosAntes = falso.pedidos.filter(
+      (p) => p.metodo === "GET" && p.url.endsWith("/api/compras"),
+    ).length;
+
+    await act(() => router.back());
+
+    const fila = await screen.findByRole("button", { name: FILA_MARATON });
+    await waitFor(() => expect(within(fila).getByLabelText("Estado: Cancelada")).toBeOnTheScreen());
+    expect(
+      within(fila).getByText("El organizador tiene que confirmar el reembolso de $ 60.000"),
+    ).toBeOnTheScreen();
+    expect(within(fila).queryByText("Faltan 10 días")).toBeNull();
+    await waitFor(() =>
+      expect(
+        falso.pedidos.filter((p) => p.metodo === "GET" && p.url.endsWith("/api/compras")).length,
+      ).toBeGreaterThan(pedidosAntes),
+    );
+  });
+});
+
+describe("Mis compras: no se cancela desde la lista (feature 009, US3, FR-017)", () => {
+  it("ninguna fila tiene Cancelar: ni la pendiente, ni la confirmada, ni la utilizada", async () => {
+    await abrirMisCompras([
+      {
+        status: 200,
+        json: [maratonPendiente, festivalVip, miCompra(compraUtilizada, { id: "utilizada" })],
+      },
+    ]);
+
+    expect(await filas()).toHaveLength(3);
+    expect(screen.getByRole("button", { name: /^Pagar/ })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /Cancelar/ })).toBeNull();
   });
 });

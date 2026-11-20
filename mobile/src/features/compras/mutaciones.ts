@@ -1,7 +1,14 @@
-import type { DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
+import type { CompraDelEventoVista, DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query, type UseMutationResult } from "@tanstack/react-query";
 
-import { cancelarCompra, comprarEntradas, ErrorDeApi, pagarCompra, registrarUsoDeEntrada } from "../../api";
+import {
+  cancelarCompra,
+  comprarEntradas,
+  confirmarReembolso,
+  ErrorDeApi,
+  pagarCompra,
+  registrarUsoDeEntrada,
+} from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
@@ -65,9 +72,11 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
 }
 
 /**
- * Cancela una compra pendiente (sin esperar a que venza). Al terminar, con éxito o error, invalida lo
- * mismo que el pago: la compra, las compras del usuario en el evento y en "Mis compras", el evento
- * (todos los usuarios: su cupo volvió) y el catálogo.
+ * Cancela una compra pendiente (sin esperar a que venza) o, desde la 009, una confirmada. Al terminar,
+ * con éxito o error, invalida lo mismo que el pago: la compra, las compras del usuario en el evento y
+ * en "Mis compras", el evento (todos los usuarios: su cupo volvió) y el catálogo; y, por prefijo, lo
+ * que ve el organizador ("Compras del evento" y la entrada buscada en "Registrar ingreso"), que es
+ * otro usuario y puede estar en la caché de este dispositivo (R10).
  */
 export function useCancelarCompra(usuarioId: string, compraId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -84,6 +93,8 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
         queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+        queryClient.invalidateQueries({ queryKey: ["compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
       ]),
   });
 }
@@ -112,6 +123,32 @@ export function useRegistrarUso(
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
         // El comprador es otro usuario y puede estar en la caché de este dispositivo (R13).
+        queryClient.invalidateQueries({ queryKey: ["compra"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
+        queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+      ]),
+  });
+}
+
+/**
+ * El organizador confirma el reembolso de una compra cancelada (feature 009), en su nombre; la
+ * variable es el id de la compra. Sin reintentos. Al terminar, con éxito o error, invalida "Compras
+ * del evento" y, por prefijo, las vistas del comprador de cualquier usuario (`entrada-del-evento`,
+ * `compra`, `mis-compras`, `mis-compras-del-evento`). No el evento ni el catálogo: el cupo no
+ * cambia (R10).
+ */
+export function useConfirmarReembolso(
+  usuarioId: string,
+  eventoId: string,
+): UseMutationResult<CompraDelEventoVista, Error, string> {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (compraId: string) => confirmarReembolso(cliente, compraId, { usuarioId }),
+    onSettled: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: claves.comprasDelEvento(usuarioId, eventoId) }),
+        queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),

@@ -1,4 +1,5 @@
 import type {
+  CompraDelEventoVista,
   ComprasDelEventoVista,
   CompraVista,
   DatosCompra,
@@ -120,4 +121,18 @@ export function cancelarCompra(
   { usuarioId }: { usuarioId: string },
 ): Promise<CompraVista> {
   return cliente.post<CompraVista>(`${rutaDeLaCompra(compraId)}/cancelacion`, undefined, { usuarioId });
+}
+
+/**
+ * `POST /compras/:compraId/reembolso` (feature 009), sin cuerpo: el organizador confirma que devolvió
+ * la plata de una compra cancelada. No se reintenta solo.
+ */
+export function confirmarReembolso(
+  cliente: ClienteApi,
+  compraId: string,
+  { usuarioId }: { usuarioId: string },
+): Promise<CompraDelEventoVista> {
+  return cliente.post<CompraDelEventoVista>(`${rutaDeLaCompra(compraId)}/reembolso`, undefined, {
+    usuarioId,
+  });
 }

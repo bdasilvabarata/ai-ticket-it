@@ -29,6 +29,17 @@ export interface CambioEstadoCompraVista {
   fechaHoraLocal: string;
 }
 
+/** Por qué una compra no se puede cancelar (lo decide el servidor al consultar; feature 009). */
+export type MotivoNoCancelable = "evento-empezado" | "entrada-usada" | "cancelada" | "reembolsada";
+
+/** El reembolso de una compra paga cancelada después de confirmada (feature 009). */
+export interface ReembolsoVista {
+  /** "pendiente" hasta que el organizador lo confirma; "confirmado" en una REEMBOLSADA. */
+  estado: "pendiente" | "confirmado";
+  /** Pesos enteros: el total fijado al comprar. */
+  monto: number;
+}
+
 /** Una compra, con su estado al día (una pendiente vencida ya se ve CANCELADA). */
 export interface CompraVista {
   id: string;
@@ -57,16 +68,31 @@ export interface CompraVista {
   entradas: EntradaVista[];
   /** Cuántas de sus entradas se usaron (feature 008). */
   entradasUsadas: number;
+  /** Desde qué estado se canceló (feature 009). Solo en CANCELADA o REEMBOLSADA; si no, `null`. */
+  canceladaDesde: "PENDIENTE" | "CONFIRMADA" | null;
+  /** El reembolso de una paga cancelada después de confirmada (feature 009); si no, `null`. */
+  reembolso: ReembolsoVista | null;
+  /** Si su comprador la puede cancelar ahora (feature 009): `motivoNoCancelable === null`. Al día con el reloj del servidor. */
+  cancelable: boolean;
+  /** Por qué no se puede cancelar (feature 009); `null` si se puede. Al día con el reloj del servidor. */
+  motivoNoCancelable: MotivoNoCancelable | null;
 }
 
 /**
  * Una fila de "Mis compras" (feature 007): la compra al día con su evento y su tipo actuales, sin
- * historial ni entradas (conserva `entradasUsadas`, feature 008).
+ * historial ni entradas (conserva `entradasUsadas`, feature 008) y sin si se puede cancelar (en
+ * "Mis compras" no se cancela; feature 009).
  */
-export type MiCompraVista = Omit<CompraVista, "compradorId" | "historial" | "entradas"> & {
+export type MiCompraVista = Omit<
+  CompraVista,
+  "compradorId" | "historial" | "entradas" | "cancelable" | "motivoNoCancelable"
+> & {
   /** Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null. */
   diasRestantes: number | null;
-  /** Solo en CANCELADA: "sistema" si venció sin pagarse, "usuario" si la canceló su comprador; si no, null. */
+  /**
+   * Solo CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA ("sistema" si venció sin pagarse,
+   * "usuario" si la canceló su comprador); si no, null.
+   */
   canceladaPor: "sistema" | "usuario" | null;
 };
 
@@ -142,10 +168,17 @@ export interface CompraDelEventoVista {
   venceEn: string | null;
   /** `venceEn` en hora de Buenos Aires; solo en PENDIENTE, si no, `null`. */
   venceEnLocal: string | null;
-  /** Solo en CANCELADA: "sistema" si venció sin pagarse, "usuario" si la canceló su comprador; si no, `null`. */
+  /**
+   * Solo CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA ("sistema" si venció sin pagarse,
+   * "usuario" si la canceló su comprador); si no, `null`.
+   */
   canceladaPor: "sistema" | "usuario" | null;
   /** Cuántas de sus entradas ya se usaron. */
   entradasUsadas: number;
+  /** Desde qué estado se canceló (feature 009). Solo en CANCELADA o REEMBOLSADA; si no, `null`. */
+  canceladaDesde: "PENDIENTE" | "CONFIRMADA" | null;
+  /** El reembolso de una paga cancelada después de confirmada (feature 009); si no, `null`. */
+  reembolso: ReembolsoVista | null;
 }
 
 /** Respuesta de `GET /eventos/:eventoId/compras` (solo el organizador). */

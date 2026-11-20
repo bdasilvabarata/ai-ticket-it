@@ -137,3 +137,22 @@ describe("Tope por persona con compras UTILIZADA (feature 008, R9)", () => {
     expect(entradasRestantes(general, vigentes)).toBe(1);
   });
 });
+
+describe("Tope por persona al cancelar una confirmada (feature 009, FR-004)", () => {
+  const INICIO = new Date(AHORA.getTime() + 24 * 60 * 60 * 1000);
+  const vigentesDe = (compras: readonly Compra[]) => compras.filter((compra) => compra.esVigente(AHORA));
+
+  it("con el tope de pagos lleno, cancelar una confirmada devuelve las restantes", () => {
+    const vip = vigente("vip", 3, 360000);
+    const otra = vigente("general", 1, 45000);
+    expect(entradasRestantes(general, vigentesDe([vip, otra]))).toBe(0);
+    const cancelada = vip.cancelar("usuario-martin", AHORA, INICIO);
+    expect(entradasRestantes(general, vigentesDe([cancelada, otra]))).toBe(3);
+  });
+
+  it("con la gratis de un tipo confirmada, cancelarla devuelve el tope a 1", () => {
+    const gratis = vigente("kids", 1, 0);
+    expect(entradasRestantes(kids, vigentesDe([gratis]))).toBe(0);
+    expect(entradasRestantes(kids, vigentesDe([gratis.cancelar("usuario-martin", AHORA, INICIO)]))).toBe(1);
+  });
+});

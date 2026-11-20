@@ -6,6 +6,7 @@ import {
   type CompraVista,
   type EntradaDelEventoVista,
   type MiCompraVista,
+  type MotivoNoCancelable,
   type ResumenTipoEntradaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
@@ -28,14 +29,40 @@ export function textoVencimiento(venceEnLocal: string): string {
 }
 
 /**
- * El aviso de una compra CANCELADA según quién la canceló (el último cambio de su historial): el
- * sistema, al vencer, o su comprador, antes de pagarla.
+ * El aviso de una compra CANCELADA. Si se canceló después de confirmada (feature 009), con el
+ * reembolso pendiente si es paga; si no, según quién la canceló (el último cambio de su historial):
+ * el sistema, al vencer, o su comprador, antes de pagarla.
  */
 export function textoCancelada(compra: CompraVista): string {
+  if (compra.reembolso?.estado === "pendiente") {
+    return `Cancelaste esta compra. El organizador tiene que confirmar el reembolso de ${textoTotal(compra.reembolso.monto)}`;
+  }
+  if (compra.canceladaDesde === "CONFIRMADA") return "Cancelaste esta compra";
   const ultimo = compra.historial[compra.historial.length - 1];
   return ultimo?.autor.tipo === "usuario"
     ? "Cancelaste esta compra: sus entradas volvieron a estar disponibles."
     : "Esta compra venció: sus entradas volvieron a estar disponibles.";
+}
+
+/** El mensaje del `Alert` que confirma la cancelación de una compra confirmada (feature 009). */
+export function textoConfirmarCancelacion(compra: CompraVista): string {
+  const cuales =
+    compra.cantidad === 1 ? "Se cancela tu entrada" : `Se cancelan tus ${compra.cantidad} entradas`;
+  if (compra.total > 0) {
+    return `${cuales}. El organizador tiene que confirmar el reembolso de ${textoTotal(compra.total)}. No se puede deshacer.`;
+  }
+  const vuelven = compra.cantidad === 1 ? "vuelve a estar disponible" : "vuelven a estar disponibles";
+  return `${cuales} y ${vuelven}. No se puede deshacer.`;
+}
+
+/** Una REEMBOLSADA, para su comprador (feature 009): "Te devolvimos $ 240.000". */
+export function textoReembolsada(compra: Pick<CompraVista, "total" | "reembolso">): string {
+  return `Te devolvimos ${textoTotal(compra.reembolso?.monto ?? compra.total)}`;
+}
+
+/** El mensaje del `Alert` con el que el organizador confirma un reembolso (feature 009). */
+export function textoConfirmarReembolso(compra: CompraDelEventoVista): string {
+  return `Confirmás que le devolviste ${textoTotal(compra.reembolso?.monto ?? compra.total)}. No se puede deshacer.`;
 }
 
 /** 1 → "Tenés 1 entrada confirmada para este evento"; 3 → "Tenés 3 entradas confirmadas…". */
@@ -68,12 +95,16 @@ export function textoAvisoDeMiCompra(compra: MiCompraVista): string | null {
     case EstadoCompra.PENDIENTE:
       return compra.venceEnLocal === null ? null : textoVencimiento(compra.venceEnLocal);
     case EstadoCompra.CANCELADA:
+      if (compra.reembolso?.estado === "pendiente") {
+        return `El organizador tiene que confirmar el reembolso de ${textoTotal(compra.reembolso.monto)}`;
+      }
+      if (compra.canceladaDesde === "CONFIRMADA") return "Cancelaste esta compra";
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La cancelaste" : null;
     case EstadoCompra.UTILIZADA:
       return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
-    default:
-      return null;
+    case EstadoCompra.REEMBOLSADA:
+      return textoReembolsada(compra);
   }
 }
 
@@ -114,10 +145,15 @@ export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): strin
         ? null
         : `Puede pagarla hasta las ${compra.venceEnLocal.slice(11, 16)}`;
     case EstadoCompra.CANCELADA:
+      if (compra.reembolso?.estado === "pendiente") {
+        return `La canceló el comprador · Reembolso pendiente de ${textoTotal(compra.reembolso.monto)}`;
+      }
       if (compra.canceladaPor === "sistema") return "Venció sin pagarse";
       return compra.canceladaPor === "usuario" ? "La canceló el comprador" : null;
     case EstadoCompra.UTILIZADA:
       return textoEntradasUsadas(compra.entradasUsadas, compra.cantidad);
+    case EstadoCompra.REEMBOLSADA:
+      return "Reembolso confirmado";
     default:
       return null;
   }
@@ -167,6 +203,21 @@ export function textoMotivoNoUsable(entrada: EntradaDelEventoVista): string | nu
       return "La compra de esta entrada está cancelada.";
     case EstadoCompra.REEMBOLSADA:
       return "La compra de esta entrada fue reembolsada.";
+    default:
+      return null;
+  }
+}
+
+/**
+ * Por qué el comprador ya no puede cancelar la compra, para mostrar en lugar del botón, o `null` si
+ * no hay nada que decir: una cancelada o reembolsada ya lo dice su aviso (contracts/app.md).
+ */
+export function textoMotivoNoCancelable(motivo: MotivoNoCancelable | null): string | null {
+  switch (motivo) {
+    case "evento-empezado":
+      return "El evento ya empezó";
+    case "entrada-usada":
+      return "Ya usaste una entrada";
     default:
       return null;
   }
