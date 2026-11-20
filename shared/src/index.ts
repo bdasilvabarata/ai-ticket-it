@@ -12,6 +12,8 @@ export type {
   EntradaVista,
   MiCompraVista,
   MisComprasDelEventoVista,
+  MotivoNoCancelable,
+  ReembolsoVista,
   ResumenTipoEntradaVista,
   VentanaDeUsoVista,
 } from "./compra";

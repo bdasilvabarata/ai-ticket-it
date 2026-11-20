@@ -29,6 +29,17 @@ export interface CambioEstadoCompraVista {
   fechaHoraLocal: string;
 }
 
+/** Por qué una compra no se puede cancelar (lo decide el servidor al consultar; feature 009). */
+export type MotivoNoCancelable = "evento-empezado" | "entrada-usada" | "cancelada" | "reembolsada";
+
+/** El reembolso de una compra paga cancelada después de confirmada (feature 009). */
+export interface ReembolsoVista {
+  /** "pendiente" hasta que el organizador lo confirma; "confirmado" en una REEMBOLSADA. */
+  estado: "pendiente" | "confirmado";
+  /** Pesos enteros: el total fijado al comprar. */
+  monto: number;
+}
+
 /** Una compra, con su estado al día (una pendiente vencida ya se ve CANCELADA). */
 export interface CompraVista {
   id: string;
