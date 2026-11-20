@@ -1,9 +1,9 @@
 import { EstadoCompra, LIMITES_COMPRA, type MotivoNoCancelable } from "@ai-ticket-it/shared";
 import { ReglaDeNegocioError } from "./errores";
 import type { TipoEntrada } from "./evento";
-import { esCodigoValido } from "./codigo-de-entrada";
-import { esEnteroNoNegativo, Invariantes } from "./invariantes";
+import { Invariantes } from "./invariantes";
 import { Entrada, motivoNoUsable } from "./entrada";
+import { pasoPorConfirmada, REGLAS_DE_COMPRA } from "./reglas-de-compra";
 
 export { Entrada, type RegistroDeEntrada } from "./entrada";
 
@@ -43,79 +43,7 @@ export interface DatosDeAlta {
   ahora: Date;
 }
 
-/**
- * Tantas entradas como la cantidad (si la cantidad es válida; si no, ya lo informa ese campo),
- * códigos con formato y distintos, y entradas coherentes con el estado de la compra.
- */
-function sonEntradasValidas(propiedades: PropiedadesCompra): boolean {
-  const { entradas, cantidad, historial } = propiedades;
-  const cantidadValida = Number.isInteger(cantidad) && cantidad >= 1;
-  const codigos = entradas.map((entrada) => entrada.codigo);
-  return (
-    (!cantidadValida || entradas.length === cantidad) &&
-    codigos.every(esCodigoValido) &&
-    new Set(codigos).size === codigos.length &&
-    entradasCoherentes(historial, entradas)
-  );
-}
-
-/**
- * El uso y la cancelación de las entradas según el estado de la compra (008, R1; 009, R3): si la
- * compra no pasó por CONFIRMADA, ninguna usada ni cancelada; CONFIRMADA → ninguna usada ni
- * cancelada; UTILIZADA → alguna usada y ninguna cancelada; CANCELADA o REEMBOLSADA después de
- * confirmada → todas canceladas y ninguna usada.
- */
-function entradasCoherentes(historial: readonly CambioEstadoCompra[], entradas: readonly Entrada[]): boolean {
-  if (!pasoPorConfirmada(historial)) return entradas.every((entrada) => !entrada.usada && !entrada.cancelada);
-  switch (historial[historial.length - 1]?.estado) {
-    case EstadoCompra.CONFIRMADA:
-      return !entradas.some((entrada) => entrada.usada || entrada.cancelada);
-    case EstadoCompra.UTILIZADA:
-      return entradas.some((entrada) => entrada.usada) && !entradas.some((entrada) => entrada.cancelada);
-    case EstadoCompra.CANCELADA:
-    case EstadoCompra.REEMBOLSADA:
-      return entradas.every((entrada) => entrada.cancelada && !entrada.usada);
-    default:
-      return true;
-  }
-}
-
-function pasoPorConfirmada(historial: readonly CambioEstadoCompra[]): boolean {
-  return historial.some((cambio) => cambio.estado === EstadoCompra.CONFIRMADA);
-}
-
-/**
- * Un REEMBOLSADA (feature 009, R4) es el último cambio, sigue inmediatamente a un CANCELADA, de una
- * compra que pasó por CONFIRMADA y es paga.
- */
-function esReembolsoValido(historial: readonly CambioEstadoCompra[], total: number): boolean {
-  return historial.every(
-    (cambio, i) =>
-      cambio.estado !== EstadoCompra.REEMBOLSADA ||
-      (i === historial.length - 1 &&
-        historial[i - 1]?.estado === EstadoCompra.CANCELADA &&
-        pasoPorConfirmada(historial) &&
-        total > 0),
-  );
-}
-
-const ESTADOS = new Set<string>(Object.values(EstadoCompra));
 const PLAZO_PARA_PAGAR_MS = LIMITES_COMPRA.minutosParaPagar * 60 * 1000;
-
-/** No vacío, empieza en PENDIENTE, estados y fechas válidos y fechas no decrecientes. */
-function esHistorialValido(historial: readonly CambioEstadoCompra[]): boolean {
-  return (
-    historial.length > 0 &&
-    historial[0]?.estado === EstadoCompra.PENDIENTE &&
-    historial.every(
-      (cambio, i) =>
-        ESTADOS.has(cambio.estado) &&
-        cambio.fechaHora instanceof Date &&
-        !Number.isNaN(cambio.fechaHora.getTime()) &&
-        (i === 0 || cambio.fechaHora.getTime() >= historial[i - 1]!.fechaHora.getTime()),
-    )
-  );
-}
 
 /**
  * Una compra de entradas de un tipo, con su historial de estados (feature 006). El estado, el alta
@@ -137,30 +65,15 @@ export class Compra {
   readonly historial: readonly CambioEstadoCompra[];
   readonly entradas: readonly Entrada[];
 
+  /**
+   * Verifica cada regla de `REGLAS_DE_COMPRA` (feature 010, R2) y, si alguna falla, lanza
+   * `DatosInvalidosError` con un detalle por regla violada.
+   */
   constructor(propiedades: PropiedadesCompra) {
-    new Invariantes()
-      .exigir(
-        Number.isInteger(propiedades.cantidad) && propiedades.cantidad >= 1,
-        "cantidad",
-        "Debe ser un entero mayor o igual a 1.",
-      )
-      .exigir(esEnteroNoNegativo(propiedades.total), "total", "Debe ser un entero mayor o igual a 0.")
-      .exigir(
-        esHistorialValido(propiedades.historial),
-        "historial",
-        "Debe empezar en PENDIENTE, con estados válidos y fechas válidas no decrecientes.",
-      )
-      .exigir(
-        esReembolsoValido(propiedades.historial, propiedades.total),
-        "historial",
-        "Un REEMBOLSADA es el último cambio, sigue a un CANCELADA y solo en una compra paga que se confirmó.",
-      )
-      .exigir(
-        sonEntradasValidas(propiedades),
-        "entradas",
-        "Debe haber una por unidad, con códigos válidos y distintos, y cambios propios coherentes con el estado de la compra.",
-      )
-      .verificar();
+    const invariantes = new Invariantes();
+    for (const regla of REGLAS_DE_COMPRA)
+      invariantes.exigir(regla.cumple(propiedades), regla.campo, regla.mensaje);
+    invariantes.verificar();
     this.id = propiedades.id;
     this.compradorId = propiedades.compradorId;
     this.eventoId = propiedades.eventoId;

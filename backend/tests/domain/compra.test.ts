@@ -92,14 +92,23 @@ const compraReembolsada = (cambios: Partial<PropiedadesCompra> = {}) =>
     }),
   );
 
-function camposInvalidos(cambios: Partial<Record<keyof PropiedadesCompra, unknown>>): string[] {
+function detallesInvalidos(cambios: Partial<Record<keyof PropiedadesCompra, unknown>>) {
   try {
     new Compra({ ...datos, ...cambios } as PropiedadesCompra);
   } catch (error) {
     expect(error).toBeInstanceOf(DatosInvalidosError);
-    return (error as DatosInvalidosError).detalles.map((detalle) => detalle.campo);
+    return (error as DatosInvalidosError).detalles;
   }
   throw new Error("Debía lanzar DatosInvalidosError.");
+}
+
+/**
+ * Los campos con algún detalle, sin repetir: desde la 010 cada regla informa el suyo, y varias
+ * reglas de `entradas` (o de `historial`) pueden fallar a la vez. Qué reglas fallan lo prueba
+ * `reglas-de-compra.test.ts`; acá, que la compra se rechaza por ese campo.
+ */
+function camposInvalidos(cambios: Partial<Record<keyof PropiedadesCompra, unknown>>): string[] {
+  return [...new Set(detallesInvalidos(cambios).map((detalle) => detalle.campo))];
 }
 
 describe("Compra", () => {
@@ -147,6 +156,29 @@ describe("Compra", () => {
       expect(() =>
         compraConfirmada({ historial: [pendiente, { ...confirmada, fechaHora: CREADA }] }),
       ).not.toThrow();
+    });
+
+    it("con varias reglas violadas a la vez informa un detalle por regla (feature 010)", () => {
+      const entradas = [
+        new Entrada({ codigo: "7K3MQ9TB", uso: { usuarioId: "usuario-lucia", fechaHora: despues(MINUTO) } }),
+        new Entrada({ codigo: "7K3MQ9TC" }),
+      ];
+      expect(detallesInvalidos({ entradas })).toEqual([
+        {
+          campo: "entradas",
+          mensaje: "Una compra que no se confirmó no tiene entradas usadas ni canceladas.",
+        },
+        {
+          campo: "entradas",
+          mensaje: "La compra está UTILIZADA si y solo si alguna de sus entradas se usó.",
+        },
+      ]);
+    });
+
+    it("cantidad 0 con 1 entrada informa solo la cantidad, no una entrada por unidad (feature 010)", () => {
+      expect(detallesInvalidos({ cantidad: 0, entradas: [new Entrada({ codigo: "7K3MQ9TB" })] })).toEqual([
+        { campo: "cantidad", mensaje: "Debe ser un entero mayor o igual a 1." },
+      ]);
     });
 
     it("copia el historial: cambiar el arreglo original no cambia la compra", () => {
