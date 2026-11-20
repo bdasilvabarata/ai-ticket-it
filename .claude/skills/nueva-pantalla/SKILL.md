@@ -149,7 +149,7 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
     Siempre con la etiqueta del estado escrita (ver Accesibilidad), como badge (ver `MarcaRealizado`).
   - El logo es el componente `Logo` (ya tiene su `accessibilityLabel`); no importes el `.png` suelto.
 - Animaciones, transiciones y demás pulido visual **no** se agregan pantalla por pantalla: van en
-  la feature 013 (pulido estético), de forma global en `tema.ts` y en los componentes base.
+  la feature 014 (pulido estético), de forma global en `tema.ts` y en los componentes base.
 
 ## Accesibilidad y 360 px
 - Títulos con `accessibilityRole="header"`. `Boton` ya es `button` con su texto y anuncia

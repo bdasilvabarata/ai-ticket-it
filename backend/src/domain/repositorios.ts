@@ -62,7 +62,7 @@ export interface RepositorioCompras {
   guardar(compra: Compra): Promise<void>;
 }
 
-/** Reseñas (mínimo de la 005): lo justo para el puntaje del organizador. La 011 lo amplía. */
+/** Reseñas (mínimo de la 005): lo justo para el puntaje del organizador. La 012 lo amplía. */
 export interface RepositorioResenias {
   /** Las reseñas de esos eventos (posiblemente ninguna). */
   listarPorEventos(eventoIds: readonly string[]): Promise<Resenia[]>;

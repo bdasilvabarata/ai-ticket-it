@@ -12,7 +12,7 @@ export interface PropiedadesResenia {
 const esPuntuacion = (valor: number): boolean => Number.isInteger(valor) && valor >= 1 && valor <= 5;
 
 /**
- * Reseña mínima (feature 005): lo justo para el puntaje del organizador. La 011 le suma el
+ * Reseña mínima (feature 005): lo justo para el puntaje del organizador. La 012 le suma el
  * `detalle`, el alta y la regla "solo con una compra `UTILIZADA`, una vez por evento".
  */
 export class Resenia {

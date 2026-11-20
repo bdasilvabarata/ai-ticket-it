@@ -68,7 +68,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     (`EntradaNoEncontradaError`, también para un código de otro evento o con formato inválido) →
     409 `FUERA_DE_HORARIO_DE_USO` → 409 `TRANSICION_INVALIDA`) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
     `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
-    `puntajeDe`, sin endpoints; lo amplía la 011; vacío en el seed).
+    `puntajeDe`, sin endpoints; lo amplía la 012; vacío en el seed).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
     los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden` y `sentido`, más
     `hayEventosProximos`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae

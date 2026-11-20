@@ -31,7 +31,7 @@ export function crearRepositoriosDeEjemplo(ahora: Date = new Date()): Repositori
     categorias: new CategoriaRepository(categorias),
     eventos: new EventoRepository(eventos),
     compras: new CompraRepository(compras),
-    // Sin reseñas: todos los organizadores salen "sin puntaje" hasta la 011 (FR-010).
+    // Sin reseñas: todos los organizadores salen "sin puntaje" hasta la 012 (FR-010).
     resenias: new ReseniaRepository([]),
   };
 }
