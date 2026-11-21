@@ -2,12 +2,18 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 import { router } from "expo-router";
 
-import { chatDeEjemplo, compraConfirmada, MENSAJES_DEL_SEED, mensajeDeEjemplo } from "../helpers/compras";
+import {
+  chatDeEjemplo,
+  chatVistoPorLucia,
+  compraConfirmada,
+  MENSAJES_DEL_SEED,
+  mensajeDeEjemplo,
+} from "../helpers/compras";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { escribir, tituloDelHeader } from "../helpers/formulario";
 import { esperarPestanas } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { martin, todos } from "../helpers/usuarios";
+import { lucia, martin, todos } from "../helpers/usuarios";
 
 type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 
@@ -116,5 +122,45 @@ describe("Chat de la compra: el comprador (feature 011, US1)", () => {
     // El nuevo es el último de la conversación.
     const mensajes = screen.getAllByLabelText(/^Vos, comprador, |^Lucía Álvarez, organizador, /);
     expect(within(mensajes.at(-1)!).getByText("¿A qué hora abren las puertas?")).toBeOnTheScreen();
+  });
+});
+
+describe("Chat de la compra: la organizadora (feature 011, US2)", () => {
+  const respuesta = mensajeDeEjemplo({
+    numero: 4,
+    autor: chatDeEjemplo().otraParte,
+    texto: "Las puertas abren a las 18.",
+    enviadoEn: "2026-11-20T17:35:00.000Z",
+    enviadoEnLocal: "2026-11-20T14:35",
+  });
+
+  it("ve a Martín como la otra parte, sus mensajes como del comprador y el suyo como «Vos»", async () => {
+    await abrirChat({ usuario: lucia, chat: [{ status: 200, json: chatVistoPorLucia() }] });
+
+    expect(await screen.findByText("Con Martín Benítez · Comprador")).toBeOnTheScreen();
+    expect(screen.getAllByText("Martín Benítez · Comprador")).toHaveLength(2);
+    expect(screen.getAllByText("Vos")).toHaveLength(1);
+    const deLucia = screen.getByLabelText(/^Vos, organizador, /);
+    expect(within(deLucia).getByText(MENSAJES_DEL_SEED[1]!.texto)).toBeOnTheScreen();
+  });
+
+  it("enviar manda el mensaje en nombre de Lucía", async () => {
+    const resultado = await abrirChat({
+      usuario: lucia,
+      chat: [
+        { status: 200, json: chatVistoPorLucia() },
+        { status: 200, json: chatVistoPorLucia({ mensajes: [...MENSAJES_DEL_SEED, respuesta] }) },
+      ],
+      envio: [{ status: 201, json: respuesta }],
+    });
+    await screen.findByText("¡Genial, gracias!");
+
+    await escribir("Mensaje", "Las puertas abren a las 18.");
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(await screen.findByText("Las puertas abren a las 18.")).toBeOnTheScreen();
+    const [envio] = pedidosPost(resultado);
+    expect(envio?.encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
+    expect(screen.getAllByText("Vos")).toHaveLength(2);
   });
 });

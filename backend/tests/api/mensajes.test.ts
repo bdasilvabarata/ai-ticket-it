@@ -119,3 +119,28 @@ describe("POST /api/compras/:compraId/mensajes (US1)", () => {
     expect(body.estado).toBe(EstadoCompra.CANCELADA);
   });
 });
+
+describe("Chat de la compra: el organizador (US2)", () => {
+  it("Lucía ve la conversación con Martín como la otra parte", async () => {
+    const respuesta = await chat(nuevaApp(), "usuario-lucia");
+
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.otraParte).toEqual(martin);
+    expect((respuesta.body.mensajes as { autor: { rol: string } }[]).map((m) => m.autor.rol)).toEqual([
+      "comprador",
+      "organizador",
+      "comprador",
+    ]);
+  });
+
+  it("Lucía responde y Martín lo ve en su GET como de la organizadora", async () => {
+    const app = nuevaApp();
+
+    const respuesta = await enviar(app, "usuario-lucia", { texto: "Las puertas abren a las 18." });
+
+    expect(respuesta.status).toBe(201);
+    expect(respuesta.body).toMatchObject({ numero: 4, autor: lucia, texto: "Las puertas abren a las 18." });
+    const { body } = await chat(app, "usuario-martin");
+    expect(body.mensajes.at(-1)).toEqual(respuesta.body);
+  });
+});

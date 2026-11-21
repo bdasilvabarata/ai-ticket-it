@@ -6,6 +6,7 @@ import {
   compraDelEvento,
   comprasDelFestival,
   diegoConReembolsoPendiente,
+  chatVistoPorLucia,
   diegoReembolsada,
   valentinaReembolsada,
   entradaDelEvento,
@@ -224,7 +225,8 @@ describe("Compras del evento (feature 008, US1)", () => {
     ]);
     await screen.findByText("Martín Benítez");
 
-    expect(screen.queryByRole("button", { name: /Martín Benítez|Sofía Castro/ })).toBeNull();
+    // "Abrir el chat con …" (feature 011) va aparte del bloque de la fila: la fila en sí no es tocable.
+    expect(screen.queryByRole("button", { name: /^(Martín Benítez|Sofía Castro)/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /^Pagar|^Confirmar|^Usar|^Cancelar/ })).toBeNull();
   });
 
@@ -691,5 +693,59 @@ describe("Compras del evento después de una cancelación (feature 009, US5)", (
     expect(screen.queryByLabelText(FILA_DIEGO)).toBeNull();
     expect(screen.queryByRole("button", { name: "Confirmar reembolso" })).toBeNull();
     expect(pedidosDeLaLista(resultado).at(-1)?.encabezados["X-Usuario-Id"]).toBe(diego.id);
+  });
+});
+
+describe("Compras del evento: abrir el chat (feature 011, US2)", () => {
+  const filas = [
+    sofiaPendiente,
+    martinConfirmada,
+    diegoVencida,
+    diegoCancelada,
+    martinUtilizada,
+    diegoReembolsada,
+  ];
+  const comprador = (compra: (typeof filas)[number]) =>
+    `${compra.comprador.nombre} ${compra.comprador.apellido}`;
+
+  it.each([
+    ["con el evento por venir", {}],
+    [
+      "con el evento realizado",
+      {
+        evento: { ...comprasDelFestival().evento, realizado: true },
+        ventanaDeUso: ventanaDelFestival("despues"),
+      },
+    ],
+  ])(
+    "cada fila, en cada estado, tiene «Abrir chat» fuera de su bloque accesible (%s)",
+    async (_caso, cambios) => {
+      await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival(filas, cambios) }]);
+      await screen.findByText("Sofía Castro");
+
+      const botones = screen.getAllByRole("button", { name: /^Abrir el chat con / });
+      expect(botones.map((boton) => boton.props.accessibilityLabel)).toEqual(
+        filas.map((compra) => `Abrir el chat con ${comprador(compra)}`),
+      );
+      for (const boton of botones) expect(within(boton).getByText("Abrir chat")).toBeOnTheScreen();
+      const confirmada = screen.getByLabelText("Martín Benítez, General, 3 entradas, $ 18.000, Confirmada");
+      expect(within(confirmada).queryByRole("button")).toBeNull();
+    },
+  );
+
+  it("tocarlo abre «Chat de la compra» de esa compra, en nombre de Lucía", async () => {
+    const chat = `/compras/${martinConfirmada.id}/mensajes`;
+    const resultado = await abrirComprasDelFestival(
+      [{ status: 200, json: comprasDelFestival([martinConfirmada]) }],
+      { [chat]: [{ status: 200, json: chatVistoPorLucia() }] },
+    );
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Abrir el chat con Martín Benítez" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe(`/compras/${martinConfirmada.id}/chat`));
+    expect(await screen.findByText("Con Martín Benítez · Comprador")).toBeOnTheScreen();
+    expect(tituloDelHeader()).toBe("Chat de la compra");
+    const [pedido] = resultado.falso.pedidosA(chat);
+    expect(pedido?.encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
   });
 });

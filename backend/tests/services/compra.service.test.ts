@@ -2183,7 +2183,7 @@ describe("CompraService.registrarUso (feature 010)", () => {
   });
 });
 
-describe("Chat de la compra (feature 011, US1): el comprador", () => {
+describe("Chat de la compra (feature 011): el comprador (US1) y el organizador (US2)", () => {
   // Martín compró 2 VIP del Festival de Lucía en AHORA; el reloj, una hora después (una PENDIENTE
   // ya está vencida; las demás no cambian).
   const UNA_HORA_DESPUES = new Date(AHORA.getTime() + HORA);
@@ -2441,6 +2441,91 @@ describe("Chat de la compra (feature 011, US1): el comprador", () => {
       const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
       expect(guardada.estado).toBe(EstadoCompra.CONFIRMADA);
       expect(guardada.historial).toEqual(antes.historial);
+      expect(guardada.mensajes).toHaveLength(1);
+    });
+  });
+
+  describe("el organizador (US2)", () => {
+    it("chat: los mismos mensajes, con el comprador como la otra parte y cada autor con su rol", async () => {
+      const { compraService } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() }),
+      ]);
+
+      const chat = await compraService.chat("compra-martin", "usuario-lucia");
+
+      expect(chat.otraParte).toEqual({
+        id: "usuario-martin",
+        nombre: "Martín",
+        apellido: "Benítez",
+        rol: "comprador",
+      });
+      expect(chat.mensajes.map((m) => [m.numero, m.autor.id, m.autor.rol, m.texto])).toEqual([
+        [1, "usuario-martin", "comprador", "Hola"],
+        [2, "usuario-lucia", "organizador", "Hola, Martín"],
+        [3, "usuario-martin", "comprador", "Gracias"],
+      ]);
+      expect(chat.compra.estado).toBe(EstadoCompra.CONFIRMADA);
+    });
+
+    it("enviarMensaje: guarda el mensaje con su autorId y responde rol organizador", async () => {
+      const { compraService, repositorioCompras, guardarCompra } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() }),
+      ]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "Abrimos a las 18",
+      });
+
+      expect(vista).toEqual({
+        numero: 4,
+        autor: { id: "usuario-lucia", nombre: "Lucía", apellido: "Álvarez", rol: "organizador" },
+        texto: "Abrimos a las 18",
+        enviadoEn: "2026-11-10T16:00:00.000Z",
+        enviadoEnLocal: "2026-11-10T13:00",
+      });
+      expect(guardarCompra).toHaveBeenCalledTimes(1);
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.mensajes.at(-1)).toMatchObject({
+        autorId: "usuario-lucia",
+        texto: "Abrimos a las 18",
+        enviadoEn: UNA_HORA_DESPUES,
+      });
+    });
+
+    it("enviarMensaje: se acepta con el evento realizado", async () => {
+      const realizada = deMartin(EstadoCompra.CONFIRMADA, {
+        eventoId: "evento-pasado",
+        tipoEntradaId: "tipo-pasado-general",
+        creadaEn: new Date(AHORA.getTime() - 2 * DIA),
+      });
+      const { compraService, repositorioCompras } = armarChat([realizada]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "¡Gracias por venir!",
+      });
+
+      expect(vista).toMatchObject({ numero: 1, autor: { rol: "organizador" } });
+      expect((await repositorioCompras.buscarPorId("compra-martin"))?.mensajes).toHaveLength(1);
+    });
+
+    it("enviarMensaje: se acepta en una REEMBOLSADA, que no cambia de estado", async () => {
+      const reembolsada = deMartin(EstadoCompra.REEMBOLSADA, {
+        historial: [
+          enAhora(EstadoCompra.PENDIENTE),
+          enAhora(EstadoCompra.CONFIRMADA),
+          enAhora(EstadoCompra.CANCELADA),
+          enAhora(EstadoCompra.REEMBOLSADA, porLucia),
+        ],
+      });
+      const { compraService, repositorioCompras } = armarChat([reembolsada]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "Ya te devolvimos la plata",
+      });
+
+      expect(vista).toMatchObject({ numero: 1, autor: { rol: "organizador" } });
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.REEMBOLSADA);
       expect(guardada.mensajes).toHaveLength(1);
     });
   });
