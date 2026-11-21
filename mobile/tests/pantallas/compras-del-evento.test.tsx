@@ -749,3 +749,113 @@ describe("Compras del evento: abrir el chat (feature 011, US2)", () => {
     expect(pedido?.encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
   });
 });
+
+describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 3)", () => {
+  const FILA_SOFIA = "Sofía Castro, VIP, 1 entrada, $ 120.000, Pendiente, Puede pagarla hasta las 15:35";
+  const FILA_MARTIN = "Martín Benítez, General, 3 entradas, $ 18.000, Confirmada";
+  const FILA_MARTIN_UTILIZADA =
+    "Martín Benítez, General, 3 entradas, $ 18.000, Utilizada, 1 de 3 entradas usadas";
+  const FILA_DIEGO_VENCIDA = "Diego Fernández, General, 1 entrada, $ 45.000, Cancelada, Venció sin pagarse";
+  const FILA_DIEGO_CANCELADA =
+    "Diego Fernández, Backstage, 2 entradas, Gratis, Cancelada, La canceló el comprador";
+  const resumen = [
+    {
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      disponibles: 117,
+      pendientes: 0,
+      vendidas: 3,
+      usadas: 1,
+    },
+  ];
+  const todasLasCompras = comprasDelFestival(
+    [sofiaPendiente, martinConfirmada, diegoVencida, diegoCancelada, martinUtilizada],
+    { resumenPorTipo: resumen },
+  );
+  const chip = (nombre: string) => screen.getByRole("radio", { name: nombre });
+
+  it("un grupo de chips con Todas elegido y los cinco estados, en orden", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    const grupo = await screen.findByLabelText("Filtrar por estado");
+    expect(grupo.props.accessibilityRole).toBe("radiogroup");
+    const nombres = within(grupo)
+      .getAllByRole("radio")
+      .map((r) => r.props.accessibilityLabel);
+    expect(nombres).toEqual(["Todas", "Pendiente", "Confirmada", "Utilizada", "Cancelada", "Reembolsada"]);
+    expect(chip("Todas")).toBeChecked();
+    expect(chip("Cancelada")).not.toBeChecked();
+    expect(screen.getByLabelText(FILA_SOFIA)).toBeOnTheScreen();
+    expect(screen.getByLabelText(FILA_MARTIN_UTILIZADA)).toBeOnTheScreen();
+  });
+
+  it("elegir un estado deja solo sus compras y no toca la disponibilidad por tipo", async () => {
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    await screen.findByLabelText(FILA_SOFIA);
+
+    await fireEvent.press(chip("Cancelada"));
+
+    expect(chip("Cancelada")).toBeChecked();
+    expect(chip("Todas")).not.toBeChecked();
+    expect(screen.getByLabelText(FILA_DIEGO_VENCIDA)).toBeOnTheScreen();
+    expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
+    expect(screen.queryByLabelText(FILA_MARTIN)).toBeNull();
+    expect(screen.queryByLabelText(FILA_MARTIN_UTILIZADA)).toBeNull();
+    expect(
+      screen.getByLabelText("General: 117 disponibles · 0 pendientes · 3 vendidas · 1 usada"),
+    ).toBeOnTheScreen();
+    // Filtra en la app: no vuelve a pedir la lista.
+    expect(pedidosDeLaLista(resultado)).toHaveLength(1);
+  });
+
+  it("Utilizada tiene su chip: Confirmada no muestra las utilizadas", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    await screen.findByLabelText(FILA_SOFIA);
+
+    await fireEvent.press(chip("Confirmada"));
+    expect(screen.getByLabelText(FILA_MARTIN)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_MARTIN_UTILIZADA)).toBeNull();
+
+    await fireEvent.press(chip("Utilizada"));
+    expect(screen.getByLabelText(FILA_MARTIN_UTILIZADA)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_MARTIN)).toBeNull();
+  });
+
+  it("sin compras del estado elegido, su propio vacío; Todas vuelve a mostrarlas", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    await screen.findByLabelText(FILA_SOFIA);
+
+    await fireEvent.press(chip("Reembolsada"));
+    expect(screen.getByText("No hay compras reembolsadas")).toBeOnTheScreen();
+    expect(screen.queryByText("Todavía nadie compró entradas")).toBeNull();
+    expect(screen.getByLabelText("Filtrar por estado")).toBeOnTheScreen();
+
+    await fireEvent.press(chip("Todas"));
+    expect(screen.queryByText("No hay compras reembolsadas")).toBeNull();
+    expect(screen.getByLabelText(FILA_SOFIA)).toBeOnTheScreen();
+    expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
+  });
+
+  it("sin ninguna compra no hay chips: solo «Todavía nadie compró entradas»", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([]) }]);
+    expect(await screen.findByText("Todavía nadie compró entradas")).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Filtrar por estado")).toBeNull();
+  });
+
+  it("el filtro elegido se mantiene al releer la lista al volver a la pantalla", async () => {
+    const resultado = await abrirComprasDelFestival([
+      { status: 200, json: todasLasCompras },
+      { status: 200, json: todasLasCompras },
+    ]);
+    await screen.findByLabelText(FILA_SOFIA);
+    await fireEvent.press(chip("Cancelada"));
+
+    await fireEvent.press(screen.getByRole("button", { name: "Registrar ingreso" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-festival/ingreso"));
+    await act(() => router.back());
+    await waitFor(() => expect(pedidosDeLaLista(resultado)).toHaveLength(2));
+
+    expect(chip("Cancelada")).toBeChecked();
+    expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
+    expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
+  });
+});

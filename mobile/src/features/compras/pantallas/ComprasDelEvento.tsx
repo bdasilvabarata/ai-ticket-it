@@ -1,5 +1,6 @@
 import type { CompraDelEventoVista, ComprasDelEventoVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
+import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
@@ -7,8 +8,15 @@ import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../compon
 import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
+import { FiltroPorEstado } from "../componentes/FiltroPorEstado";
 import { ResumenPorTipo } from "../componentes/ResumenPorTipo";
 import { useSalirSiNoExisteElEvento } from "../evento-inexistente";
+import {
+  filtrarCompras,
+  SIN_COMPRAS,
+  textoSinComprasDelFiltro,
+  type FiltroDeCompras,
+} from "../filtro-de-compras";
 import { textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
 import { useConfirmarReembolso } from "../mutaciones";
 import { useComprasDelEvento } from "../useComprasDelEvento";
@@ -27,13 +35,13 @@ export function ComprasDelEvento() {
   return <ListaDeComprasDelEvento usuarioId={estado.usuarioId} eventoId={eventoId} />;
 }
 
-const SIN_COMPRAS = "Todavía nadie compró entradas";
-
 function ListaDeComprasDelEvento({ usuarioId, eventoId }: { usuarioId: string; eventoId: string }) {
   const consulta = useComprasDelEvento(usuarioId, eventoId);
   // Al volver (de "Registrar ingreso" u otra pantalla) refleja compras, usos y vencimientos (FR-023).
   useRefrescarAlFocalizar(consulta.refetch);
   useSalirSiNoExisteElEvento(consulta.error);
+  // Acá y no en `Contenido`: el filtro elegido sobrevive a las relecturas de la lista.
+  const [filtro, setFiltro] = useState<FiltroDeCompras>("todas");
   return (
     <View style={estilos.pantalla}>
       {/*
@@ -41,13 +49,22 @@ function ListaDeComprasDelEvento({ usuarioId, eventoId }: { usuarioId: string; e
         el evento y la ventana, y la lista dice el vacío (FR-022).
       */}
       <SegunConsulta consulta={consulta} mensajeVacio={SIN_COMPRAS}>
-        {(vista) => <Contenido usuarioId={usuarioId} vista={vista} />}
+        {(vista) => (
+          <Contenido usuarioId={usuarioId} vista={vista} filtro={filtro} alCambiarFiltro={setFiltro} />
+        )}
       </SegunConsulta>
     </View>
   );
 }
 
-function Contenido({ usuarioId, vista }: { usuarioId: string; vista: ComprasDelEventoVista }) {
+interface PropsContenido {
+  usuarioId: string;
+  vista: ComprasDelEventoVista;
+  filtro: FiltroDeCompras;
+  alCambiarFiltro: (filtro: FiltroDeCompras) => void;
+}
+
+function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido) {
   // Una sola mutation para todas las filas (feature 009): la fila en curso y su error salen de ella.
   const reembolso = useConfirmarReembolso(usuarioId, vista.evento.id);
   // Marca sincrónica: una segunda confirmación antes de que se vuelva a dibujar no manda otro pedido.
@@ -66,6 +83,8 @@ function Contenido({ usuarioId, vista }: { usuarioId: string; vista: ComprasDelE
       ],
     );
   const deEstaFila = (compra: CompraDelEventoVista) => reembolso.variables === compra.id;
+  // El filtro solo toca la lista: el resumen por tipo sigue contando todas las compras.
+  const compras = filtrarCompras(vista.compras, filtro);
 
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
@@ -88,19 +107,24 @@ function Contenido({ usuarioId, vista }: { usuarioId: string; vista: ComprasDelE
         <Text style={estilos.titulo} accessibilityRole="header">
           Compras
         </Text>
+        {/* Sin ninguna compra no hay nada que filtrar. */}
         {vista.compras.length === 0 ? (
           <Text style={estilos.dato}>{SIN_COMPRAS}</Text>
         ) : (
-          vista.compras.map((compra) => (
-            <FilaCompraDelEvento
-              key={compra.id}
-              compra={compra}
-              alConfirmarReembolso={confirmar}
-              enCurso={reembolso.isPending && deEstaFila(compra)}
-              error={deEstaFila(compra) ? error : null}
-            />
-          ))
+          <FiltroPorEstado filtro={filtro} alCambiar={alCambiarFiltro} />
         )}
+        {vista.compras.length > 0 && compras.length === 0 && (
+          <Text style={estilos.dato}>{textoSinComprasDelFiltro(filtro)}</Text>
+        )}
+        {compras.map((compra) => (
+          <FilaCompraDelEvento
+            key={compra.id}
+            compra={compra}
+            alConfirmarReembolso={confirmar}
+            enCurso={reembolso.isPending && deEstaFila(compra)}
+            error={deEstaFila(compra) ? error : null}
+          />
+        ))}
       </View>
     </PantallaDesplazable>
   );

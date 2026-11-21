@@ -330,7 +330,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       vencer la próxima pendiente (`useRefrescarAlVencer` con `vencimientos.ts`). La 008 suma, para
       el organizador, `ComprasDelEvento` (ventana de uso, `ResumenPorTipo` con "Agotado" y una
       `FilaCompraDelEvento` no tocable por compra; vacío "Todavía nadie compró entradas" sin tapar
-      el resumen) y `RegistrarIngreso` (desde la 010, en dos piezas internas: `BuscadorDeCodigo`
+      el resumen; desde las mejoras del organizador, `FiltroPorEstado`: chips radio "Todas" y los cinco
+      estados que filtran `vista.compras` en la app con `filtro-de-compras.ts`, sin tocar el resumen ni
+      el endpoint, con el vacío propio de cada filtro y sin chips si no hay compras) y `RegistrarIngreso` (desde la 010, en dos piezas internas: `BuscadorDeCodigo`
       —el campo y "Buscar"— y `ResultadoDeIngreso` —`TarjetaEntrada`, el motivo de
       `textoMotivoNoUsable` en lugar del botón o "No hay ninguna entrada…"—; la pantalla busca con
       `useEntradaDelEvento` y confirma con `Alert`); la mutation `useRegistrarUso` (sin reintentos)
