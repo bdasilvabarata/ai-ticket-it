@@ -144,3 +144,145 @@ describe("Chat de la compra: el organizador (US2)", () => {
     expect(body.mensajes.at(-1)).toEqual(respuesta.body);
   });
 });
+
+describe("Chat de la compra: nadie más lee ni escribe (US3)", () => {
+  const MENSAJE_403 =
+    "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.";
+  const sinUsuario = {
+    GET: (app: App) => request(app).get(`/api/compras/${COMPRA_VIP}/mensajes`),
+    POST: (app: App) => request(app).post(`/api/compras/${COMPRA_VIP}/mensajes`).send({ texto: "Hola" }),
+  };
+  const comoUsuario = {
+    GET: (app: App, usuarioId: string, compraId?: string) => chat(app, usuarioId, compraId),
+    POST: (app: App, usuarioId: string, compraId?: string) =>
+      enviar(app, usuarioId, { texto: "Hola" }, compraId),
+  };
+
+  function esperarError(respuesta: request.Response, status: number, codigo: string, mensaje?: string): void {
+    expect(respuesta.status).toBe(status);
+    expect(respuesta.body.error.codigo).toBe(codigo);
+    if (mensaje !== undefined) expect(respuesta.body.error.mensaje).toBe(mensaje);
+  }
+
+  /** La conversación del seed sigue con sus tres mensajes. */
+  async function sinCambios(app: App): Promise<void> {
+    const { body } = await chat(app, "usuario-martin");
+    expect(body.mensajes).toHaveLength(3);
+  }
+
+  describe.each(["GET", "POST"] as const)("%s", (metodo) => {
+    it("sin X-Usuario-Id o con un usuario inexistente → 401 USUARIO_NO_IDENTIFICADO", async () => {
+      const app = nuevaApp();
+      esperarError(await sinUsuario[metodo](app), 401, "USUARIO_NO_IDENTIFICADO");
+      esperarError(await comoUsuario[metodo](app, "usuario-nadie"), 401, "USUARIO_NO_IDENTIFICADO");
+      await sinCambios(app);
+    });
+
+    it("compraId con formato inválido → 400 ENTRADA_INVALIDA en params.compraId", async () => {
+      const app = nuevaApp();
+      const respuesta = await comoUsuario[metodo](app, "usuario-martin", "Compra%201");
+      esperarError(respuesta, 400, "ENTRADA_INVALIDA");
+      expect(respuesta.body.error.detalles).toEqual([
+        { campo: "params.compraId", mensaje: "Debe ser un identificador válido." },
+      ]);
+      await sinCambios(app);
+    });
+
+    it("compra inexistente → 404 COMPRA_NO_ENCONTRADA", async () => {
+      const app = nuevaApp();
+      esperarError(
+        await comoUsuario[metodo](app, "usuario-martin", "compra-no-existe"),
+        404,
+        "COMPRA_NO_ENCONTRADA",
+        "No existe la compra.",
+      );
+      await sinCambios(app);
+    });
+
+    it("Sofía, que no es parte → 403 SIN_PERMISO", async () => {
+      const app = nuevaApp();
+      esperarError(await comoUsuario[metodo](app, "usuario-sofia"), 403, "SIN_PERMISO", MENSAJE_403);
+      await sinCambios(app);
+    });
+
+    it("una compra inexistente pedida por Sofía → 404 (el 404 va antes del 403)", async () => {
+      const app = nuevaApp();
+      esperarError(
+        await comoUsuario[metodo](app, "usuario-sofia", "compra-no-existe"),
+        404,
+        "COMPRA_NO_ENCONTRADA",
+      );
+    });
+  });
+
+  describe("el texto del POST", () => {
+    it.each([
+      ["faltante", {}],
+      ["null", { texto: null }],
+      ["un número", { texto: 42 }],
+      ["vacío", { texto: "" }],
+      ["solo espacios y saltos de línea", { texto: "   \n " }],
+    ])("%s → 400 en body.texto con «Es obligatorio.»", async (_caso, cuerpo) => {
+      const app = nuevaApp();
+      const respuesta = await enviar(app, "usuario-martin", cuerpo);
+      esperarError(respuesta, 400, "ENTRADA_INVALIDA");
+      expect(respuesta.body.error.detalles).toEqual([{ campo: "body.texto", mensaje: "Es obligatorio." }]);
+      await sinCambios(app);
+    });
+
+    it("500 caracteres, con espacios alrededor que se recortan → 201", async () => {
+      const texto = "a".repeat(500);
+      const respuesta = await enviar(nuevaApp(), "usuario-martin", { texto: `  ${texto}\n` });
+      expect(respuesta.status).toBe(201);
+      expect(respuesta.body.texto).toBe(texto);
+    });
+
+    it("501 caracteres → 400 «Debe tener como máximo 500 caracteres.»", async () => {
+      const app = nuevaApp();
+      const respuesta = await enviar(app, "usuario-martin", { texto: "a".repeat(501) });
+      esperarError(respuesta, 400, "ENTRADA_INVALIDA");
+      expect(respuesta.body.error.detalles).toEqual([
+        { campo: "body.texto", mensaje: "Debe tener como máximo 500 caracteres." },
+      ]);
+      await sinCambios(app);
+    });
+  });
+
+  it("combinaciones: sin usuario + texto vacío → 401; texto vacío + compra inexistente → 400; inexistente como Sofía → 404", async () => {
+    const app = nuevaApp();
+    esperarError(
+      await request(app).post(`/api/compras/${COMPRA_VIP}/mensajes`).send({ texto: "" }),
+      401,
+      "USUARIO_NO_IDENTIFICADO",
+    );
+    esperarError(
+      await enviar(app, "usuario-martin", { texto: "" }, "compra-no-existe"),
+      400,
+      "ENTRADA_INVALIDA",
+    );
+    esperarError(
+      await enviar(app, "usuario-sofia", { texto: "Hola" }, "compra-no-existe"),
+      404,
+      "COMPRA_NO_ENCONTRADA",
+    );
+    await sinCambios(app);
+  });
+
+  it.each([
+    ["put", `/api/compras/${COMPRA_VIP}/mensajes`],
+    ["patch", `/api/compras/${COMPRA_VIP}/mensajes`],
+    ["delete", `/api/compras/${COMPRA_VIP}/mensajes`],
+    ["delete", `/api/compras/${COMPRA_VIP}/mensajes/1`],
+  ] as const)(
+    "los mensajes no se editan ni se borran (FR-004): %s %s → 404 RUTA_NO_ENCONTRADA",
+    async (metodo, ruta) => {
+      const app = nuevaApp();
+      const agente = request(app);
+      const respuesta = await agente[metodo](ruta)
+        .set("X-Usuario-Id", "usuario-martin")
+        .send({ texto: "Otro" });
+      esperarError(respuesta, 404, "RUTA_NO_ENCONTRADA");
+      await sinCambios(app);
+    },
+  );
+});

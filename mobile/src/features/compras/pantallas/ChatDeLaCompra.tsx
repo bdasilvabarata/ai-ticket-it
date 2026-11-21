@@ -7,6 +7,7 @@ import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
 import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { AvisoDeFormulario, CampoDeTexto } from "../../eventos";
 import { useSesion } from "../../sesion";
+import { AvisoDeLaCompra, CompraNoEncontrada } from "../componentes/AvisoDeLaCompra";
 import { EncabezadoDelChat } from "../componentes/EncabezadoDelChat";
 import { MensajeDelChat } from "../componentes/MensajeDelChat";
 import { SIN_MENSAJES } from "../formato";
@@ -28,6 +29,12 @@ export function ChatDeLaCompra() {
 
 function SegunElChat({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
   const consulta = useChatDeLaCompra(usuarioId, compraId);
+  const { error } = consulta;
+
+  if (error instanceof ErrorDeApi && error.status === 403) {
+    return <AvisoDeLaCompra icono="lock-closed-outline" mensaje="No tenés permiso para ver este chat." />;
+  }
+  if (error instanceof ErrorDeApi && error.status === 404) return <CompraNoEncontrada />;
   return (
     <SegunConsulta consulta={consulta} mensajeVacio="No encontramos esta compra.">
       {(chat) => <Conversacion usuarioId={usuarioId} chat={chat} />}

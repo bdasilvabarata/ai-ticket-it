@@ -10,6 +10,7 @@ import {
   mensajeDeEjemplo,
 } from "../helpers/compras";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
+import { errorApi } from "../helpers/eventos";
 import { escribir, tituloDelHeader } from "../helpers/formulario";
 import { esperarPestanas } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
@@ -162,5 +163,44 @@ describe("Chat de la compra: la organizadora (feature 011, US2)", () => {
     const [envio] = pedidosPost(resultado);
     expect(envio?.encabezados["X-Usuario-Id"]).toBe("usuario-lucia");
     expect(screen.getAllByText("Vos")).toHaveLength(2);
+  });
+});
+
+describe("Chat de la compra: nadie más lo lee ni escribe (feature 011, US3)", () => {
+  const MENSAJE_403 =
+    "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.";
+
+  it("403 al pedir el chat: «No tenés permiso para ver este chat.», sin conversación ni campo", async () => {
+    await abrirChat({ chat: [{ status: 403, json: errorApi("SIN_PERMISO", MENSAJE_403) }] });
+
+    expect(await screen.findByText("No tenés permiso para ver este chat.")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
+    expect(screen.queryByLabelText("Mensaje")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Enviar" })).toBeNull();
+  });
+
+  it("404 al pedir el chat: «No encontramos esta compra.» e «Ir a Explorar»", async () => {
+    const resultado = await abrirChat({
+      chat: [{ status: 404, json: errorApi("COMPRA_NO_ENCONTRADA", "No existe la compra.") }],
+    });
+
+    expect(await screen.findByText("No encontramos esta compra.")).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Mensaje")).toBeNull();
+    await fireEvent.press(screen.getByRole("button", { name: "Ir a Explorar" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/"));
+  });
+
+  it.each([
+    [403, errorApi("SIN_PERMISO", MENSAJE_403)],
+    [404, errorApi("COMPRA_NO_ENCONTRADA", "No existe la compra.")],
+  ])("un %i al enviar muestra el mensaje del servidor y conserva el texto", async (status, json) => {
+    await abrirChat({ envio: [{ status, json }] });
+    await screen.findByText("¡Genial, gracias!");
+
+    await escribir("Mensaje", "¿Me leen?");
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(await screen.findByText(json.error.mensaje)).toBeOnTheScreen();
+    expect(screen.getByLabelText("Mensaje")).toHaveDisplayValue("¿Me leen?");
   });
 });

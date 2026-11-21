@@ -1,20 +1,12 @@
 import { EstadoCompra, type CompraVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import type { ReactNode } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import {
-  Boton,
-  EtiquetaEstadoCompra,
-  Ilustracion,
-  PantallaDesplazable,
-  SegunConsulta,
-  tema,
-  type PropsIlustracion,
-} from "../../../componentes";
+import { Boton, EtiquetaEstadoCompra, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
+import { AvisoDeLaCompra, CompraNoEncontrada } from "../componentes/AvisoDeLaCompra";
 import { ListaDeEntradas } from "../componentes/ListaDeEntradas";
 import { ResumenCompra } from "../componentes/ResumenCompra";
 import {
@@ -60,39 +52,15 @@ function SegunLaCompra({ usuarioId, compraId }: { usuarioId: string; compraId: s
   const { error } = consulta;
 
   if (error instanceof ErrorDeApi && error.status === 403) {
-    return <Aviso icono="lock-closed-outline" mensaje="No tenés permiso para ver esta compra." />;
+    return <AvisoDeLaCompra icono="lock-closed-outline" mensaje="No tenés permiso para ver esta compra." />;
   }
   if (error instanceof ErrorDeApi && error.status === 404) {
-    return (
-      <Aviso icono="search-outline" mensaje="No encontramos esta compra.">
-        <Boton texto="Ir a Explorar" alPresionar={irAExplorar} />
-      </Aviso>
-    );
+    return <CompraNoEncontrada />;
   }
   return (
     <SegunConsulta consulta={consulta} mensajeVacio="No encontramos esta compra.">
       {(compra) => <ContenidoDeLaCompra usuarioId={usuarioId} compra={compra} />}
     </SegunConsulta>
-  );
-}
-
-function Aviso({
-  icono,
-  mensaje,
-  children,
-}: {
-  icono: PropsIlustracion["icono"];
-  mensaje: string;
-  children?: ReactNode;
-}) {
-  return (
-    <View style={estilos.aviso}>
-      <Ilustracion icono={icono} />
-      <Text style={estilos.textoAviso} accessibilityLiveRegion="polite">
-        {mensaje}
-      </Text>
-      {children}
-    </View>
   );
 }
 
@@ -268,15 +236,6 @@ function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista })
 }
 
 const estilos = StyleSheet.create({
-  aviso: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: tema.espacio.normal,
-    padding: tema.espacio.amplio,
-    backgroundColor: tema.colores.fondo,
-  },
-  textoAviso: { ...tema.tipografia.mensaje, color: tema.colores.texto, textAlign: "center" },
   mensaje: { ...tema.tipografia.mensaje, color: tema.colores.texto },
   dato: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
   motivo: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario, flexShrink: 1 },

@@ -2529,4 +2529,74 @@ describe("Chat de la compra (feature 011): el comprador (US1) y el organizador (
       expect(guardada.mensajes).toHaveLength(1);
     });
   });
+
+  describe("nadie más lee ni escribe (US3)", () => {
+    const MENSAJE_403 =
+      "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.";
+    // Sofía también compró en el Festival de Lucía; Martín organiza evento-b, no el Festival.
+    const deSofia = (estado: EstadoCompra) =>
+      compra("evento-a", "tipo-a-general", estado, {
+        id: "compra-sofia",
+        compradorId: "usuario-sofia",
+        cantidad: 1,
+      });
+    const llamar = {
+      chat: (servicios: ReturnType<typeof armarChat>, compraId: string, usuarioId: string) =>
+        servicios.compraService.chat(compraId, usuarioId),
+      enviarMensaje: (servicios: ReturnType<typeof armarChat>, compraId: string, usuarioId: string) =>
+        servicios.compraService.enviarMensaje(compraId, usuarioId, { texto: "¿Me ven?" }),
+    };
+
+    describe.each(Object.entries(llamar))("%s", (_nombre, operacion) => {
+      it("con una compra inexistente: CompraNoEncontradaError (404)", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA)]);
+
+        await expect(operacion(servicios, "compra-x", "usuario-martin")).rejects.toBeInstanceOf(
+          CompraNoEncontradaError,
+        );
+      });
+
+      it("el 404 va antes del 403: una compra inexistente pedida por alguien ajeno", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA)]);
+
+        await expect(operacion(servicios, "compra-x", "usuario-sofia")).rejects.toBeInstanceOf(
+          CompraNoEncontradaError,
+        );
+      });
+
+      it("otro comprador del mismo evento: SinPermisoError con el mensaje del contrato", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA), deSofia(EstadoCompra.CONFIRMADA)]);
+
+        const rechazo = operacion(servicios, "compra-martin", "usuario-sofia");
+
+        await expect(rechazo).rejects.toBeInstanceOf(SinPermisoError);
+        await expect(rechazo).rejects.toThrow(MENSAJE_403);
+      });
+
+      it("el organizador de otro evento: SinPermisoError con el mensaje del contrato", async () => {
+        const servicios = armarChat([deSofia(EstadoCompra.CONFIRMADA)]);
+
+        const rechazo = operacion(servicios, "compra-sofia", "usuario-martin");
+
+        await expect(rechazo).rejects.toBeInstanceOf(SinPermisoError);
+        await expect(rechazo).rejects.toThrow(MENSAJE_403);
+      });
+    });
+
+    it("un 403 al enviar no guarda nada ni materializa el vencimiento de una PENDIENTE vencida", async () => {
+      const { compraService, repositorioCompras, repositorioEventos, guardarCompra, guardarEvento } =
+        armarChat([deMartin(EstadoCompra.PENDIENTE, { mensajes: mensajesDePrueba() })]);
+
+      await expect(
+        compraService.enviarMensaje("compra-martin", "usuario-sofia", { texto: "Hola" }),
+      ).rejects.toBeInstanceOf(SinPermisoError);
+
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.PENDIENTE);
+      expect(guardada.mensajes).toHaveLength(3);
+      expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(50);
+    });
+  });
 });
