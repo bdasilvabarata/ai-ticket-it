@@ -6,7 +6,7 @@ import { calcularPuntaje, puntajesPorOrganizador, type Puntaje } from "../domain
  * Casos de uso de reseñas (mínimo de la 005): el puntaje de los organizadores. Las reseñas son
  * otro agregado, así que `EventoService` le pide los puntajes acá (constitución 2.2.0, principio
  * III). Recibe los eventos por parámetro y depende solo de su repositorio: no conoce a
- * `EventoService` (sin ciclo). La 011 le suma el alta.
+ * `EventoService` (sin ciclo). La 012 le suma el alta.
  */
 export class ReseniaService {
   readonly #resenias: RepositorioResenias;

@@ -1,7 +1,7 @@
 import type { RepositorioResenias } from "../domain/repositorios";
 import type { Resenia } from "../domain/resenia";
 
-/** Reseñas en memoria (constitución, principio IV). Mínimo de la feature 005; lo amplía la 011. */
+/** Reseñas en memoria (constitución, principio IV). Mínimo de la feature 005; lo amplía la 012. */
 export class ReseniaRepository implements RepositorioResenias {
   readonly #resenias: Map<string, Resenia>;
 

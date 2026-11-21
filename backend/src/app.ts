@@ -75,9 +75,8 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
     cerrojo,
     reloj,
   });
-  // Las entradas viven dentro de las compras: escribe con su repositorio, bajo el cerrojo del evento
-  // (feature 008, R4). No depende de CompraService.
-  const entradaService = new EntradaService({ compras, eventoService, usuarioService, cerrojo, reloj });
+  // Las entradas viven dentro de las compras: el uso lo guarda su dueño, CompraService (feature 010, R3).
+  const entradaService = new EntradaService({ compraService, eventoService, usuarioService, reloj });
 
   const controllers = {
     salud: new SaludController(),

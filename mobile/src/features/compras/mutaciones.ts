@@ -102,8 +102,9 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
 /**
  * Registra el ingreso con una entrada (feature 008), en nombre del organizador de la pantalla. Sin
  * reintentos. Con éxito escribe la entrada en su consulta; al terminar, con éxito o error, invalida
- * "Compras del evento", la entrada, el evento (todos los usuarios), el catálogo y, por prefijo, las
- * vistas del comprador de cualquier usuario (`compra`, `mis-compras`, `mis-compras-del-evento`).
+ * "Compras del evento", la entrada y, por prefijo, las vistas del comprador de cualquier usuario
+ * (`compra`, `mis-compras`, `mis-compras-del-evento`). No el evento ni el catálogo: usar una
+ * entrada no cambia el cupo (feature 010, R8).
  */
 export function useRegistrarUso(
   usuarioId: string,
@@ -120,8 +121,6 @@ export function useRegistrarUso(
       Promise.all([
         queryClient.invalidateQueries({ queryKey: claves.comprasDelEvento(usuarioId, eventoId) }),
         queryClient.invalidateQueries({ queryKey: claves.entradaDelEvento(usuarioId, eventoId, codigo) }),
-        queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
-        queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
         // El comprador es otro usuario y puede estar en la caché de este dispositivo (R13).
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),

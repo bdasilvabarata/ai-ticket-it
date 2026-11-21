@@ -13,7 +13,7 @@ import {
 import type { CambioEstadoCompra, Compra, Entrada } from "../domain/compra";
 import type { ResumenDeTipo } from "../domain/compras-del-evento";
 import { diasRestantes } from "../domain/dias-restantes";
-import type { Evento, TipoEntrada } from "../domain/evento";
+import type { Evento } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import type { Usuario } from "../domain/usuario";
 import { estadoDeVentana, ventanaDeUso } from "../domain/ventana-de-uso";
@@ -37,20 +37,18 @@ export function aEntradaVista(entrada: Entrada, compra: Compra): EntradaVista {
   const usadaEn = entrada.usadaEn;
   return {
     codigo: entrada.codigo,
-    estado: entrada.estadoEn(compra),
+    estado: compra.estadoDe(entrada),
     usadaEn: usadaEn ? usadaEn.toISOString() : null,
     usadaEnLocal: usadaEn ? horaDeBuenosAires(usadaEn) : null,
   };
 }
 
 /**
- * El reembolso de la compra (feature 009, R7): `pendiente` si falta que el organizador lo confirme,
- * `confirmado` en una REEMBOLSADA y, si no (también en una gratis), `null`. El monto es el total.
+ * El reembolso de la compra (feature 009, R7), tal como lo da `compra.reembolso` (feature 010): el
+ * monto es el total; sin reembolso (también en una gratis), `null`.
  */
 export function aReembolsoVista(compra: Compra): ReembolsoVista | null {
-  if (compra.tieneReembolsoPendiente()) return { estado: "pendiente", monto: compra.total };
-  if (compra.estado === EstadoCompra.REEMBOLSADA) return { estado: "confirmado", monto: compra.total };
-  return null;
+  return compra.reembolso ? { estado: compra.reembolso, monto: compra.total } : null;
 }
 
 /** Quién la canceló, según el cambio a CANCELADA (también en una REEMBOLSADA, 009); si no hay, `null`. */
@@ -60,6 +58,47 @@ function canceladaPor(compra: Compra): "sistema" | "usuario" | null {
   return cambio.autor.tipo === "sistema" ? "sistema" : "usuario";
 }
 
+/** El tipo de la compra con su nombre actual, que sale del evento: un tipo con compras no se puede quitar. */
+function aTipoDeLaCompra(compra: Compra, evento: Evento): { id: string; nombre: string } {
+  return {
+    id: compra.tipoEntradaId,
+    nombre: evento.buscarTipoEntrada(compra.tipoEntradaId)?.nombre ?? "",
+  };
+}
+
+/** El comprador como lo ve el organizador: id, nombre y apellido. */
+function aCompradorVista(usuario: Usuario): { id: string; nombre: string; apellido: string } {
+  return { id: usuario.id, nombre: usuario.nombre, apellido: usuario.apellido };
+}
+
+/** Hasta cuándo se puede pagar: solo en una PENDIENTE; si no, `null`. */
+function vencimiento(compra: Compra): { venceEn: string | null; venceEnLocal: string | null } {
+  const pendiente = compra.estado === EstadoCompra.PENDIENTE;
+  return {
+    venceEn: pendiente ? compra.venceEn.toISOString() : null,
+    venceEnLocal: pendiente ? horaDeBuenosAires(compra.venceEn) : null,
+  };
+}
+
+/**
+ * El estado de la compra tal como llega (quien llama decide si va al día): su estado, cuántas
+ * entradas se usaron, desde dónde se canceló y el reembolso (feature 009). Lo ven el comprador y el
+ * organizador: un dato de la compra que vean los dos se suma acá (feature 010, SC-006).
+ */
+function estadoDeLaCompra(compra: Compra): {
+  estado: EstadoCompra;
+  entradasUsadas: number;
+  canceladaDesde: CompraVista["canceladaDesde"];
+  reembolso: ReembolsoVista | null;
+} {
+  return {
+    estado: compra.estado,
+    entradasUsadas: compra.entradasUsadas,
+    canceladaDesde: compra.canceladaDesde,
+    reembolso: aReembolsoVista(compra),
+  };
+}
+
 type DatosComunes = Omit<
   CompraVista,
   "compradorId" | "historial" | "entradas" | "cancelable" | "motivoNoCancelable"
@@ -67,12 +106,10 @@ type DatosComunes = Omit<
 
 /**
  * Lo que comparten `CompraVista` y `MiCompraVista`: la compra tal como llega (quien llama decide si
- * va al día, con `alDia(ahora)`) con su evento y su tipo actuales. El nombre del tipo sale del
- * evento: un tipo con compras no se puede quitar. `venceEn` solo si está PENDIENTE; desde dónde se
- * canceló y el reembolso, derivados del historial (feature 009).
+ * va al día, con `alDia(ahora)`) con su evento y su tipo actuales.
  */
 function datosComunes(compra: Compra, evento: Evento, ahora: Date): DatosComunes {
-  const pendiente = compra.estado === EstadoCompra.PENDIENTE;
+  const { estado, ...restoDelEstado } = estadoDeLaCompra(compra);
   return {
     id: compra.id,
     evento: {
@@ -82,19 +119,13 @@ function datosComunes(compra: Compra, evento: Evento, ahora: Date): DatosComunes
       fechaHoraLocal: horaDeBuenosAires(evento.fechaHora),
       realizado: evento.estaRealizado(ahora),
     },
-    tipoEntrada: {
-      id: compra.tipoEntradaId,
-      nombre: evento.buscarTipoEntrada(compra.tipoEntradaId)?.nombre ?? "",
-    },
+    tipoEntrada: aTipoDeLaCompra(compra, evento),
     cantidad: compra.cantidad,
     total: compra.total,
-    estado: compra.estado,
+    estado,
     creadaEn: compra.creadaEn.toISOString(),
-    venceEn: pendiente ? compra.venceEn.toISOString() : null,
-    venceEnLocal: pendiente ? horaDeBuenosAires(compra.venceEn) : null,
-    entradasUsadas: compra.entradasUsadas,
-    canceladaDesde: compra.canceladaDesde,
-    reembolso: aReembolsoVista(compra),
+    ...vencimiento(compra),
+    ...restoDelEstado,
   };
 }
 
@@ -134,30 +165,27 @@ export function aMiCompraVista(compra: Compra, evento: Evento, ahora: Date): MiC
 
 /**
  * Una fila de "Compras del evento" (feature 008): la compra tal como llega (al día), su comprador y
- * su tipo actual, **sin códigos** de entrada ni historial (FR-012b). `venceEn` solo si está
- * PENDIENTE; `canceladaPor`, `canceladaDesde` y `reembolso` en CANCELADA o REEMBOLSADA (009).
+ * su tipo actual (del `evento`), **sin códigos** de entrada ni historial (FR-012b). Se arma con las
+ * mismas piezas que las vistas del comprador (feature 010).
  */
 export function aCompraDelEventoVista(
   compra: Compra,
   comprador: Usuario,
-  tipo: TipoEntrada | null,
+  evento: Evento,
 ): CompraDelEventoVista {
-  const pendiente = compra.estado === EstadoCompra.PENDIENTE;
+  const { estado, ...restoDelEstado } = estadoDeLaCompra(compra);
   return {
     id: compra.id,
-    comprador: { id: comprador.id, nombre: comprador.nombre, apellido: comprador.apellido },
-    tipoEntrada: { id: compra.tipoEntradaId, nombre: tipo?.nombre ?? "" },
+    comprador: aCompradorVista(comprador),
+    tipoEntrada: aTipoDeLaCompra(compra, evento),
     cantidad: compra.cantidad,
     total: compra.total,
-    estado: compra.estado,
+    estado,
     creadaEn: compra.creadaEn.toISOString(),
     creadaEnLocal: horaDeBuenosAires(compra.creadaEn),
-    venceEn: pendiente ? compra.venceEn.toISOString() : null,
-    venceEnLocal: pendiente ? horaDeBuenosAires(compra.venceEn) : null,
+    ...vencimiento(compra),
     canceladaPor: canceladaPor(compra),
-    entradasUsadas: compra.entradasUsadas,
-    canceladaDesde: compra.canceladaDesde,
-    reembolso: aReembolsoVista(compra),
+    ...restoDelEstado,
   };
 }
 
@@ -198,18 +226,17 @@ export function aEntradaDelEventoVista(
 ): EntradaDelEventoVista {
   // El service ya encontró la compra por ese código.
   const entrada = compra.entradas.find((e) => e.codigo === codigo)!;
+  // Su tipo de `shared/` no lleva `canceladaDesde` ni `reembolso`.
+  const { estado, entradasUsadas } = estadoDeLaCompra(compra);
   return {
     ...aEntradaVista(entrada, compra),
     compra: {
       id: compra.id,
-      comprador: { id: comprador.id, nombre: comprador.nombre, apellido: comprador.apellido },
-      tipoEntrada: {
-        id: compra.tipoEntradaId,
-        nombre: evento.buscarTipoEntrada(compra.tipoEntradaId)?.nombre ?? "",
-      },
+      comprador: aCompradorVista(comprador),
+      tipoEntrada: aTipoDeLaCompra(compra, evento),
       cantidad: compra.cantidad,
-      estado: compra.estado,
-      entradasUsadas: compra.entradasUsadas,
+      estado,
+      entradasUsadas,
     },
     ventanaDeUso: aVentanaDeUsoVista(evento.fechaHora, ahora),
   };

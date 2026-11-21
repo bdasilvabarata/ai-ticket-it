@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../../src/domain/hora-buenos-aires";
+import {
+  diaDeCalendarioDeBuenosAires,
+  horaDeBuenosAires,
+  instanteDesdeHoraDeBuenosAires,
+} from "../../src/domain/hora-buenos-aires";
 
 const zonaOriginal = process.env.TZ;
 
@@ -34,6 +38,27 @@ describe("hora de Buenos Aires (UTC−3 fijo)", () => {
         "2026-12-01T23:00:00.000Z",
       );
       expect(horaDeBuenosAires(new Date("2026-12-01T23:00:00.000Z"))).toBe("2026-12-01T20:00");
+    }
+  });
+});
+
+describe("diaDeCalendarioDeBuenosAires", () => {
+  it("a las 23:59 de Buenos Aires sigue siendo ese día", () => {
+    expect(diaDeCalendarioDeBuenosAires(new Date("2026-11-20T02:59:00.000Z"))).toBe(Date.UTC(2026, 10, 19));
+  });
+
+  it("a las 00:00 de Buenos Aires ya es el día siguiente", () => {
+    expect(diaDeCalendarioDeBuenosAires(new Date("2026-11-20T03:00:00.000Z"))).toBe(Date.UTC(2026, 10, 20));
+  });
+
+  it("el 31 de diciembre a las 23:59 de Buenos Aires es ese día, no el 1 de enero", () => {
+    expect(diaDeCalendarioDeBuenosAires(new Date("2027-01-01T02:59:00.000Z"))).toBe(Date.UTC(2026, 11, 31));
+  });
+
+  it("no depende de la zona del proceso", () => {
+    for (const zona of ["Asia/Tokyo", "America/New_York", "UTC"]) {
+      process.env.TZ = zona;
+      expect(diaDeCalendarioDeBuenosAires(new Date("2026-11-20T02:59:00.000Z"))).toBe(Date.UTC(2026, 10, 19));
     }
   });
 });

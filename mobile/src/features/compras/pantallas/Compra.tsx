@@ -1,6 +1,6 @@
 import { EstadoCompra, type CompraVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
@@ -29,6 +29,7 @@ import {
 } from "../formato";
 import { useCancelarCompra, usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
+import { useEnvioUnico } from "../useEnvioUnico";
 
 /**
  * "Tu compra" (contracts/app.md, "Tu compra"). Se dibuja **siempre** desde la compra que devuelve el
@@ -164,18 +165,10 @@ function mensajeDelError(error: unknown, sinServidor: string): string | null {
 function Cancelacion({ usuarioId, compra }: { usuarioId: string; compra: CompraVista }) {
   const cancelar = useCancelarCompra(usuarioId, compra.id, compra.evento.id);
   // Marca sincrónica: una segunda confirmación antes de que se vuelva a dibujar no manda otro pedido.
-  const enviando = useRef(false);
+  const enviarUnaVez = useEnvioUnico();
   const error = mensajeDeCancelacion(cancelar.error);
 
-  const enviar = () => {
-    if (enviando.current) return;
-    enviando.current = true;
-    cancelar.mutate(undefined, {
-      onSettled: () => {
-        enviando.current = false;
-      },
-    });
-  };
+  const enviar = () => enviarUnaVez((terminar) => cancelar.mutate(undefined, { onSettled: terminar }));
   const confirmar = () =>
     Alert.alert(
       `¿Cancelar la compra de ${textoCantidad(compra.cantidad)} ${compra.tipoEntrada.nombre}?`,
@@ -224,22 +217,15 @@ function Pago({ usuarioId, compra }: { usuarioId: string; compra: CompraVista })
   const cancelar = useCancelarCompra(usuarioId, compra.id, compra.evento.id);
   // Marca sincrónica: un segundo toque antes de que se vuelva a dibujar no manda otro pedido (ni
   // pagar y cancelar a la vez).
-  const enviando = useRef(false);
+  const enviarUnaVez = useEnvioUnico();
   const gratis = compra.total === 0;
   const error =
     mensajeDelError(pagar.error, "No se pudo pagar. Probá de nuevo.") ??
     mensajeDelError(cancelar.error, "No se pudo cancelar. Probá de nuevo.");
   const descripcion = `${textoCantidad(compra.cantidad)} ${compra.tipoEntrada.nombre}`;
 
-  const enviar = (mutacion: typeof pagar | typeof cancelar) => {
-    if (enviando.current) return;
-    enviando.current = true;
-    mutacion.mutate(undefined, {
-      onSettled: () => {
-        enviando.current = false;
-      },
-    });
-  };
+  const enviar = (mutacion: typeof pagar | typeof cancelar) =>
+    enviarUnaVez((terminar) => mutacion.mutate(undefined, { onSettled: terminar }));
   const alPagar = () => enviar(pagar);
 
   const confirmarCancelar = () =>

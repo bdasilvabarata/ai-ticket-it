@@ -65,7 +65,8 @@ describe("resumenPorTipo", () => {
       total: 1000 * cantidad,
       historial: [...historialHasta(EstadoCompra.CONFIRMADA, "usuario-martin"), uso],
       entradas: codigosDePrueba(cantidad).map(
-        (codigo, i) => new Entrada({ codigo, cambios: i < usadas ? [uso] : [] }),
+        (codigo, i) =>
+          new Entrada({ codigo, uso: i < usadas ? { usuarioId: "usuario-lucia", fechaHora: AHORA } : null }),
       ),
     });
   }

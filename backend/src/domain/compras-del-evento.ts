@@ -52,9 +52,7 @@ export function resumenPorTipo(
       if (compra.estado === EstadoCompra.PENDIENTE) resumen.pendientes += compra.cantidad;
       if (compra.estado === EstadoCompra.CONFIRMADA || compra.estado === EstadoCompra.UTILIZADA) {
         resumen.vendidas += compra.cantidad;
-        resumen.usadas += compra.entradas.filter(
-          (entrada) => entrada.estadoEn(compra) === EstadoCompra.UTILIZADA,
-        ).length;
+        resumen.usadas += compra.entradasUsadas;
       }
     }
     return resumen;

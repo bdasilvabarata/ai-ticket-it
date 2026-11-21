@@ -22,3 +22,12 @@ export function horaDeBuenosAires(instante: Date): string {
     `T${dos(local.getUTCHours())}:${dos(local.getUTCMinutes())}`
   );
 }
+
+/**
+ * Medianoche UTC de la fecha de pared de Buenos Aires de un instante (en milisegundos): sirve para
+ * restar días de calendario.
+ */
+export function diaDeCalendarioDeBuenosAires(instante: Date): number {
+  const local = new Date(instante.getTime() - DESFASE_UTC_HORAS * 60 * 60 * 1000);
+  return Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate());
+}

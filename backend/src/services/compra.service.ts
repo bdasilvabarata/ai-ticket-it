@@ -4,9 +4,11 @@ import {
   type ComprasDelEventoVista,
   type CompraVista,
   type DatosCompra,
+  type EntradaDelEventoVista,
   type MiCompraVista,
   type MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
+import { esCodigoValido, normalizarCodigo } from "../domain/codigo-de-entrada";
 import { Compra } from "../domain/compra";
 import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
@@ -15,11 +17,13 @@ import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
 import type { Usuario } from "../domain/usuario";
 import { entradasRestantes, exigirTopePorPersona } from "../domain/tope-por-persona";
-import { CompraNoEncontradaError, SinPermisoError } from "../errors/index";
+import { exigirVentanaAbierta } from "../domain/ventana-de-uso";
+import { CompraNoEncontradaError, EntradaNoEncontradaError, SinPermisoError } from "../errors/index";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import {
   aCompraDelEventoVista,
   aCompraVista,
+  aEntradaDelEventoVista,
   aMiCompraVista,
   aResumenTipoEntradaVista,
   aVentanaDeUsoVista,
@@ -78,6 +82,19 @@ export class CompraService {
   async obtenerOFallar(id: string): Promise<Compra> {
     const compra = await this.#compras.buscarPorId(id);
     if (!compra) throw new CompraNoEncontradaError();
+    return compra;
+  }
+
+  /**
+   * Único lugar que busca una compra por el código (canónico) de una de sus entradas (feature 010,
+   * R3): si el formato no es válido, no hay compra con ese código o es de otro evento, 404
+   * `ENTRADA_NO_ENCONTRADA` (sin revelar nada del otro evento).
+   */
+  async obtenerPorCodigoOFallar(eventoId: string, codigoCanonico: string): Promise<Compra> {
+    const compra = esCodigoValido(codigoCanonico)
+      ? await this.#compras.buscarPorCodigoDeEntrada(codigoCanonico)
+      : null;
+    if (!compra || compra.eventoId !== eventoId) throw new EntradaNoEncontradaError();
     return compra;
   }
 
@@ -187,11 +204,29 @@ export class CompraService {
       const reembolsada = compra.confirmarReembolso(usuarioId, ahora);
       await this.#compras.guardar(reembolsada);
       const comprador = await this.#usuarioService.obtenerOFallar(reembolsada.compradorId);
-      return aCompraDelEventoVista(
-        reembolsada,
-        comprador,
-        evento.buscarTipoEntrada(reembolsada.tipoEntradaId),
-      );
+      return aCompraDelEventoVista(reembolsada, comprador, evento);
+    });
+  }
+
+  /**
+   * El organizador registra el uso de una entrada en "Registrar ingreso" (feature 008, R10; desde la
+   * 010, acá: `CompraService` es el dueño de `Compra`, R3/R4). Bajo el cerrojo del evento, con un
+   * único `ahora` leído adentro: 404 evento → 403 si no lo organiza (también el comprador) y
+   * materializa sus vencimientos (`obtenerDelOrganizador`) → relee la compra por código (404) → 409
+   * fuera de la ventana de uso → `compra.registrarUso` decide el 409 de transición inválida. Un solo
+   * `guardar`, el de la compra: el cupo no cambia.
+   */
+  async registrarUso(eventoId: string, codigo: string, usuarioId: string): Promise<EntradaDelEventoVista> {
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerDelOrganizador(eventoId, usuarioId, ahora);
+      const canonico = normalizarCodigo(codigo);
+      const compra = await this.obtenerPorCodigoOFallar(eventoId, canonico);
+      exigirVentanaAbierta(evento.fechaHora, ahora);
+      const usada = compra.alDia(ahora).registrarUso(canonico, usuarioId, ahora);
+      await this.#compras.guardar(usada);
+      const comprador = await this.#usuarioService.obtenerOFallar(usada.compradorId);
+      return aEntradaDelEventoVista(usada, canonico, comprador, evento, ahora);
     });
   }
 
@@ -282,11 +317,7 @@ export class CompraService {
       resumenPorTipo: resumenPorTipo(evento.tiposEntrada, compras).map(aResumenTipoEntradaVista),
       // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
       compras: compras.map((compra) =>
-        aCompraDelEventoVista(
-          compra,
-          compradores.get(compra.compradorId)!,
-          evento.buscarTipoEntrada(compra.tipoEntradaId),
-        ),
+        aCompraDelEventoVista(compra, compradores.get(compra.compradorId)!, evento),
       ),
     };
   }

@@ -1,4 +1,5 @@
-import { cupoLiberadoPorTipo, type Compra } from "../domain/compra";
+import type { Compra } from "../domain/compra";
+import { cupoLiberadoPorTipo } from "../domain/vencimiento";
 import type { RepositorioCompras } from "../domain/repositorios";
 
 export interface DependenciasVencimientoService {

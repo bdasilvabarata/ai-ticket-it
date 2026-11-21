@@ -2,7 +2,7 @@ import { StyleSheet, View } from "react-native";
 
 import { tema } from "../../../componentes";
 
-/** Relleno con la forma de una `TarjetaEvento` mientras carga el catálogo (sin animación: la 013). */
+/** Relleno con la forma de una `TarjetaEvento` mientras carga el catálogo (sin animación: la 014). */
 export function TarjetaSkeleton() {
   return (
     <View style={estilos.tarjeta}>
