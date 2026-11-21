@@ -59,7 +59,7 @@ function canceladaPor(compra: Compra): "sistema" | "usuario" | null {
 }
 
 /** El tipo de la compra con su nombre actual, que sale del evento: un tipo con compras no se puede quitar. */
-function aTipoDeLaCompra(compra: Compra, evento: Evento): { id: string; nombre: string } {
+export function aTipoDeLaCompra(compra: Compra, evento: Evento): { id: string; nombre: string } {
   return {
     id: compra.tipoEntradaId,
     nombre: evento.buscarTipoEntrada(compra.tipoEntradaId)?.nombre ?? "",

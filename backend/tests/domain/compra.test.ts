@@ -1,6 +1,12 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
-import { Compra, Entrada, type CambioEstadoCompra, type PropiedadesCompra } from "../../src/domain/compra";
+import {
+  Compra,
+  Entrada,
+  Mensaje,
+  type CambioEstadoCompra,
+  type PropiedadesCompra,
+} from "../../src/domain/compra";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
 import { TipoEntrada } from "../../src/domain/evento";
 import { cupoLiberadoPorTipo } from "../../src/domain/vencimiento";
@@ -1191,5 +1197,189 @@ describe("Compra.confirmarReembolso (feature 009, R5)", () => {
     expect(() => compra.confirmarReembolso("usuario-lucia", AHORA)).toThrow(ReglaDeNegocioError);
     expect(compra.estado).toBe(estado);
     expect(compra.historial).toHaveLength(largo);
+  });
+});
+
+describe("Mensajes de la compra (feature 011)", () => {
+  const mensaje = (autorId: string, texto: string, minutos: number) =>
+    new Mensaje({ autorId, texto, enviadoEn: despues(minutos * MINUTO) });
+  const conversacion = () => [
+    mensaje("usuario-martin", "Hola", 1),
+    mensaje("usuario-lucia", "¡Hola, Martín!", 2),
+  ];
+  const AHORA = despues(30 * MINUTO);
+
+  it("sin mensajes en las propiedades la compra tiene [], y Compra.registrar arranca con []", () => {
+    expect(compraPendiente().mensajes).toEqual([]);
+    const tipo = new TipoEntrada({
+      id: "tipo-festival-vip",
+      nombre: "VIP",
+      descripcion: "",
+      precio: 1,
+      cupo: 5,
+    });
+    const alta = Compra.registrar({
+      id: "compra-nueva",
+      compradorId: "usuario-sofia",
+      eventoId: "evento-festival",
+      tipo,
+      cantidad: 1,
+      codigos: ["7K3MQ9TB"],
+      ahora: CREADA,
+    });
+    expect(alta.mensajes).toEqual([]);
+  });
+
+  it("conserva los mensajes recibidos, congelados (como las entradas)", () => {
+    const mensajes = conversacion();
+    const compra = compraConfirmada({ mensajes });
+
+    expect(compra.mensajes).toEqual(mensajes);
+    expect(Object.isFrozen(compra.mensajes)).toBe(true);
+    mensajes.pop();
+    expect(compra.mensajes).toHaveLength(2);
+  });
+
+  it("enviarMensaje agrega al final un mensaje con autor, texto y ahora, en una compra nueva", () => {
+    const original = compraConfirmada({ mensajes: conversacion() });
+
+    const conMensaje = original.enviarMensaje("usuario-martin", "¡Genial, gracias!", AHORA);
+
+    expect(conMensaje).not.toBe(original);
+    expect(conMensaje.mensajes).toHaveLength(3);
+    expect(conMensaje.mensajes[2]).toBeInstanceOf(Mensaje);
+    expect(conMensaje.mensajes[2]).toMatchObject({
+      autorId: "usuario-martin",
+      texto: "¡Genial, gracias!",
+      enviadoEn: AHORA,
+    });
+    expect(conMensaje.mensajes.slice(0, 2)).toEqual(original.mensajes);
+    expect(original.mensajes).toHaveLength(2);
+  });
+
+  it("enviarMensaje no cambia estado, historial, entradas, total, cantidad ni reembolso", () => {
+    const original = compraCanceladaDesdeConfirmada();
+
+    const conMensaje = original.enviarMensaje("usuario-lucia", "Ya te reembolso.", AHORA);
+
+    expect(conMensaje.estado).toBe(original.estado);
+    expect(conMensaje.historial).toEqual(original.historial);
+    expect(conMensaje.entradas).toEqual(original.entradas);
+    expect(conMensaje.total).toBe(original.total);
+    expect(conMensaje.cantidad).toBe(original.cantidad);
+    expect(conMensaje.reembolso).toBe(original.reembolso);
+  });
+
+  it.each([
+    ["PENDIENTE", () => compraPendiente(), EstadoCompra.PENDIENTE, despues(MINUTO)],
+    ["PENDIENTE vencida sin materializar", () => compraPendiente(), EstadoCompra.PENDIENTE, AHORA],
+    ["CONFIRMADA", () => compraConfirmada(), EstadoCompra.CONFIRMADA, AHORA],
+    [
+      "UTILIZADA",
+      () => compraConfirmada().registrarUso("7K3MQ9TB", "usuario-lucia", despues(10 * MINUTO)),
+      EstadoCompra.UTILIZADA,
+      AHORA,
+    ],
+    ["CANCELADA por el comprador", () => compraCancelada(), EstadoCompra.CANCELADA, AHORA],
+    ["CANCELADA por vencimiento", () => compraPendiente().vencer(), EstadoCompra.CANCELADA, AHORA],
+    ["REEMBOLSADA", () => compraReembolsada(), EstadoCompra.REEMBOLSADA, AHORA],
+  ])("enviarMensaje funciona en una %s", (_caso, crear, estado, ahora) => {
+    const conMensaje = crear().enviarMensaje("usuario-martin", "Hola", ahora);
+
+    expect(conMensaje.estado).toBe(estado);
+    expect(conMensaje.mensajes.map((m) => m.texto)).toEqual(["Hola"]);
+  });
+
+  it("enviarMensaje no recibe la fecha del evento", () => {
+    expect(Compra.prototype.enviarMensaje.length).toBe(3);
+  });
+
+  it("dos mensajes seguidos quedan en orden", () => {
+    const compra = compraConfirmada()
+      .enviarMensaje("usuario-martin", "Primero", AHORA)
+      .enviarMensaje("usuario-lucia", "Segundo", AHORA);
+
+    expect(compra.mensajes.map((m) => [m.autorId, m.texto])).toEqual([
+      ["usuario-martin", "Primero"],
+      ["usuario-lucia", "Segundo"],
+    ]);
+  });
+
+  describe("cada transición conserva los mensajes", () => {
+    const esperados = () => conversacion().map((m) => [m.autorId, m.texto, m.enviadoEn]);
+    const resumen = (compra: Compra) => compra.mensajes.map((m) => [m.autorId, m.texto, m.enviadoEn]);
+
+    it("pagar", () => {
+      const pagada = compraPendiente({ mensajes: conversacion() }).pagar(
+        "usuario-martin",
+        despues(5 * MINUTO),
+      );
+      expect(pagada.estado).toBe(EstadoCompra.CONFIRMADA);
+      expect(resumen(pagada)).toEqual(esperados());
+    });
+
+    it("cancelar una pendiente", () => {
+      const cancelada = compraPendiente({ mensajes: conversacion() }).cancelar(
+        "usuario-martin",
+        despues(5 * MINUTO),
+        LEJOS,
+      );
+      expect(cancelada.estado).toBe(EstadoCompra.CANCELADA);
+      expect(resumen(cancelada)).toEqual(esperados());
+    });
+
+    it("cancelar una confirmada", () => {
+      const cancelada = compraConfirmada({ mensajes: conversacion() }).cancelar(
+        "usuario-martin",
+        despues(10 * MINUTO),
+        LEJOS,
+      );
+      expect(cancelada.canceladaDesde).toBe(EstadoCompra.CONFIRMADA);
+      expect(resumen(cancelada)).toEqual(esperados());
+    });
+
+    it("vencer", () => {
+      const vencida = compraPendiente({ mensajes: conversacion() }).vencer();
+      expect(vencida.fueVencida()).toBe(true);
+      expect(resumen(vencida)).toEqual(esperados());
+    });
+
+    it("alDia de una vencida", () => {
+      const alDia = compraPendiente({ mensajes: conversacion() }).alDia(despues(PLAZO));
+      expect(alDia.estado).toBe(EstadoCompra.CANCELADA);
+      expect(resumen(alDia)).toEqual(esperados());
+    });
+
+    it("registrarUso", () => {
+      const usada = compraConfirmada({ mensajes: conversacion() }).registrarUso(
+        "7K3MQ9TB",
+        "usuario-lucia",
+        despues(10 * MINUTO),
+      );
+      expect(usada.estado).toBe(EstadoCompra.UTILIZADA);
+      expect(resumen(usada)).toEqual(esperados());
+    });
+
+    it("confirmarReembolso", () => {
+      const reembolsada = compraCanceladaDesdeConfirmada({ mensajes: conversacion() }).confirmarReembolso(
+        "usuario-lucia",
+        despues(20 * MINUTO),
+      );
+      expect(reembolsada.estado).toBe(EstadoCompra.REEMBOLSADA);
+      expect(resumen(reembolsada)).toEqual(esperados());
+    });
+  });
+
+  describe("rolDe", () => {
+    const compra = compraConfirmada();
+    it("comprador con el compradorId", () => {
+      expect(compra.rolDe("usuario-martin", "usuario-lucia")).toBe("comprador");
+    });
+    it("organizador con el organizadorId recibido", () => {
+      expect(compra.rolDe("usuario-lucia", "usuario-lucia")).toBe("organizador");
+    });
+    it("null con otro usuario (no lanza)", () => {
+      expect(compra.rolDe("usuario-sofia", "usuario-lucia")).toBeNull();
+    });
   });
 });

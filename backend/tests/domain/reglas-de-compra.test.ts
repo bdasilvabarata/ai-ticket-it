@@ -1,7 +1,10 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
 import type { AutorDelCambio, CambioEstadoCompra, PropiedadesCompra } from "../../src/domain/compra";
+import { Compra } from "../../src/domain/compra";
 import { Entrada } from "../../src/domain/entrada";
+import { DatosInvalidosError } from "../../src/domain/errores";
+import { Mensaje } from "../../src/domain/mensaje";
 import { pasoPorConfirmada, REGLAS_DE_COMPRA, type ReglaDeCompra } from "../../src/domain/reglas-de-compra";
 
 const T0 = new Date("2026-11-10T15:00:00.000Z");
@@ -69,7 +72,7 @@ function reglaLlamada(nombre: string): ReglaDeCompra {
 }
 
 describe("REGLAS_DE_COMPRA (feature 010, R2)", () => {
-  it("son once, con nombres distintos y en el orden de data-model", () => {
+  it("son doce, con nombres distintos y en el orden de data-model", () => {
     expect(REGLAS_DE_COMPRA.map((regla) => [regla.nombre, regla.campo])).toEqual([
       ["cantidad-valida", "cantidad"],
       ["total-valido", "total"],
@@ -82,8 +85,9 @@ describe("REGLAS_DE_COMPRA (feature 010, R2)", () => {
       ["usada-o-cancelada", "entradas"],
       ["utilizada-si-alguna-usada", "entradas"],
       ["canceladas-con-la-compra", "entradas"],
+      ["mensajes-en-orden", "mensajes"],
     ]);
-    expect(new Set(REGLAS_DE_COMPRA.map((regla) => regla.nombre)).size).toBe(11);
+    expect(new Set(REGLAS_DE_COMPRA.map((regla) => regla.nombre)).size).toBe(12);
   });
 
   describe("cantidad-valida", () => {
@@ -242,6 +246,50 @@ describe("REGLAS_DE_COMPRA (feature 010, R2)", () => {
     });
     it("en una cancelada sin confirmar, ninguna cancelada (esa la cubre también sin-cambios-antes-de-confirmar)", () => {
       expect(regla.cumple(props({ historial: HIST_CANCELADA_SIN_CONFIRMAR }))).toBe(true);
+    });
+  });
+
+  describe("mensajes-en-orden (feature 011)", () => {
+    const regla = reglaLlamada("mensajes-en-orden");
+    const mensaje = (minutos: number) =>
+      new Mensaje({ autorId: "usuario-martin", texto: "Hola", enviadoEn: despues(minutos) });
+
+    it("se cumple sin mensajes (con y sin la propiedad)", () => {
+      expect(regla.cumple(props())).toBe(true);
+      expect(regla.cumple(props({ mensajes: [] }))).toBe(true);
+    });
+    it("se cumple con fechas crecientes y con fechas iguales", () => {
+      expect(regla.cumple(props({ mensajes: [mensaje(1), mensaje(2), mensaje(30)] }))).toBe(true);
+      expect(regla.cumple(props({ mensajes: [mensaje(3), mensaje(3)] }))).toBe(true);
+    });
+    it("se cumple con un mensaje a la misma hora que el alta", () => {
+      expect(regla.cumple(props({ mensajes: [mensaje(0)] }))).toBe(true);
+    });
+    it("se viola con fechas que decrecen", () => {
+      expect(regla.cumple(props({ mensajes: [mensaje(2), mensaje(1)] }))).toBe(false);
+    });
+    it("se viola con un mensaje anterior al alta", () => {
+      expect(regla.cumple(props({ mensajes: [mensaje(-1)] }))).toBe(false);
+    });
+    it("con un historial vacío no compara contra el alta (lo informa historial-valido)", () => {
+      expect(regla.cumple(props({ historial: [], mensajes: [mensaje(-1), mensaje(5)] }))).toBe(true);
+      expect(regla.cumple(props({ historial: [], mensajes: [mensaje(5), mensaje(1)] }))).toBe(false);
+    });
+    it("el constructor de Compra lo informa en mensajes junto con las otras reglas violadas", () => {
+      try {
+        new Compra(props({ total: -1, mensajes: [mensaje(2), mensaje(1)] }));
+      } catch (error) {
+        expect(error).toBeInstanceOf(DatosInvalidosError);
+        expect((error as DatosInvalidosError).detalles).toEqual([
+          { campo: "total", mensaje: "Debe ser un entero mayor o igual a 0." },
+          {
+            campo: "mensajes",
+            mensaje: "Los mensajes van en orden de envío y no son anteriores al alta de la compra.",
+          },
+        ]);
+        return;
+      }
+      throw new Error("Debía lanzar DatosInvalidosError.");
     });
   });
 });

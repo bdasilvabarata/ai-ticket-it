@@ -1,11 +1,18 @@
-import { EstadoCompra, LIMITES_COMPRA, type MotivoNoCancelable } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  LIMITES_COMPRA,
+  type MotivoNoCancelable,
+  type RolEnLaCompra,
+} from "@ai-ticket-it/shared";
 import { ReglaDeNegocioError } from "./errores";
 import type { TipoEntrada } from "./evento";
 import { Invariantes } from "./invariantes";
 import { Entrada, motivoNoUsable } from "./entrada";
+import { Mensaje } from "./mensaje";
 import { pasoPorConfirmada, REGLAS_DE_COMPRA } from "./reglas-de-compra";
 
 export { Entrada, type RegistroDeEntrada } from "./entrada";
+export { Mensaje, type PropiedadesMensaje } from "./mensaje";
 
 /** El reembolso de una compra cancelada después de confirmada y paga (feature 010, R5). */
 export type EstadoDeReembolso = "pendiente" | "confirmado";
@@ -32,6 +39,8 @@ export interface PropiedadesCompra {
   historial: CambioEstadoCompra[];
   /** Una por unidad (`entradas.length === cantidad`), cada una con su código (feature 008, R1). */
   entradas: readonly Entrada[];
+  /** El chat de la compra, en orden de envío (feature 011); si falta, `[]`. */
+  mensajes?: readonly Mensaje[];
 }
 
 /** Lo que necesita `Compra.registrar`: el tipo comprado (con su precio vigente) y el instante del alta. */
@@ -72,6 +81,7 @@ export class Compra {
   readonly total: number;
   readonly historial: readonly CambioEstadoCompra[];
   readonly entradas: readonly Entrada[];
+  readonly mensajes: readonly Mensaje[];
 
   /**
    * Verifica cada regla de `REGLAS_DE_COMPRA` (feature 010, R2) y, si alguna falla, lanza
@@ -90,6 +100,7 @@ export class Compra {
     this.total = propiedades.total;
     this.historial = Object.freeze(propiedades.historial.map((cambio) => Object.freeze({ ...cambio })));
     this.entradas = Object.freeze([...propiedades.entradas]);
+    this.mensajes = Object.freeze([...(propiedades.mensajes ?? [])]);
   }
 
   /**
@@ -314,6 +325,28 @@ export class Compra {
     return this.#conCambio(cambioPorUsuario(EstadoCompra.REEMBOLSADA, organizadorId, ahora));
   }
 
+  /**
+   * La compra con un mensaje nuevo de `autorId` al final, enviado en `ahora` (feature 011, R1). Vale
+   * en cualquier estado y no mira la fecha del evento; no cambia el historial, las entradas, el total
+   * ni el estado. Que el autor sea una de las dos partes lo verifica el service antes (`rolDe`).
+   */
+  enviarMensaje(autorId: string, texto: string, ahora: Date): Compra {
+    return new Compra({
+      ...this.#propiedades(),
+      mensajes: [...this.mensajes, new Mensaje({ autorId, texto, enviadoEn: ahora })],
+    });
+  }
+
+  /**
+   * El rol de `usuarioId` en esta compra (feature 011, R2): su comprador, el organizador del evento
+   * (`organizadorId`, que la compra no conoce) o ninguno (`null`; el 403 lo decide el service).
+   */
+  rolDe(usuarioId: string, organizadorId: string): RolEnLaCompra | null {
+    if (usuarioId === this.compradorId) return "comprador";
+    if (usuarioId === organizadorId) return "organizador";
+    return null;
+  }
+
   /** La compra como se ve en `ahora`, sin guardarla: vencida si correspondía, si no, esta misma. */
   alDia(ahora: Date): Compra {
     return this.estaVencida(ahora) ? this.vencer() : this;
@@ -338,6 +371,7 @@ export class Compra {
       total: this.total,
       historial: [...this.historial],
       entradas: this.entradas,
+      mensajes: this.mensajes,
     };
   }
 }

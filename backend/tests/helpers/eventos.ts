@@ -1,7 +1,13 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { Categoria } from "../../src/domain/categoria";
 import { ALFABETO_DE_CODIGO, LARGO_DE_CODIGO } from "../../src/domain/codigo-de-entrada";
-import { Compra, Entrada, type CambioEstadoCompra, type RegistroDeEntrada } from "../../src/domain/compra";
+import {
+  Compra,
+  Entrada,
+  type CambioEstadoCompra,
+  type Mensaje,
+  type RegistroDeEntrada,
+} from "../../src/domain/compra";
 import { Evento, TipoEntrada, type PropiedadesTipoEntrada } from "../../src/domain/evento";
 import type { Reloj } from "../../src/domain/reloj";
 import { Resenia } from "../../src/domain/resenia";
@@ -166,6 +172,8 @@ export interface CambiosCompra {
   historial?: CambioEstadoCompra[];
   /** Por defecto, `cantidad` entradas de `entradasDePrueba` (en una UTILIZADA, la primera usada). */
   entradas?: Entrada[];
+  /** El chat de la compra (feature 011); por defecto, ninguno. */
+  mensajes?: Mensaje[];
 }
 
 /** Una compra de Martín de 1 entrada por $ 1000 en `estado` (atajo) o con el historial dado. */
