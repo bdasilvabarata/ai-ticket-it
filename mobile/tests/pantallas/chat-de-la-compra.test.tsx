@@ -1,4 +1,4 @@
-import type { UsuarioVista } from "@ai-ticket-it/shared";
+import { EstadoCompra, type UsuarioVista } from "@ai-ticket-it/shared";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 import { router } from "expo-router";
 
@@ -6,6 +6,7 @@ import {
   chatDeEjemplo,
   chatVistoPorLucia,
   compraConfirmada,
+  compraPendiente,
   MENSAJES_DEL_SEED,
   mensajeDeEjemplo,
 } from "../helpers/compras";
@@ -35,14 +36,23 @@ interface Opciones {
   usuario?: UsuarioVista;
   chat?: Lista;
   envio?: Lista;
+  compra?: Lista;
+  pago?: Lista;
 }
 
-function respuestas({ usuario = martin, chat = [{ status: 200, json: chatDeEjemplo() }], envio }: Opciones) {
+function respuestas({
+  usuario = martin,
+  chat = [{ status: 200, json: chatDeEjemplo() }],
+  envio,
+  compra = [{ status: 200, json: { ...compraConfirmada, id: COMPRA_ID } }],
+  pago = [{ status: 200, json: { ...compraConfirmada, id: COMPRA_ID } }],
+}: Opciones) {
   return porRuta({
     "/usuarios/actual": [{ status: 200, json: usuario }],
     "/usuarios": [{ status: 200, json: todos }],
     [MENSAJES]: [porMetodo({ GET: chat, POST: envio ?? [{ status: 201, json: mensajeNuevo }] })],
-    [COMPRA]: [{ status: 200, json: { ...compraConfirmada, id: COMPRA_ID } }],
+    [`${COMPRA}/pago`]: pago,
+    [COMPRA]: compra,
   });
 }
 
@@ -202,5 +212,128 @@ describe("Chat de la compra: nadie más lo lee ni escribe (feature 011, US3)", (
 
     expect(await screen.findByText(json.error.mensaje)).toBeOnTheScreen();
     expect(screen.getByLabelText("Mensaje")).toHaveDisplayValue("¿Me leen?");
+  });
+});
+
+describe("Chat de la compra: una conversación al día (feature 011, US4)", () => {
+  it("dos toques seguidos en «Enviar» mandan un solo pedido", async () => {
+    const resultado = await abrirChat({ envio: ["colgar"] });
+    await screen.findByText("¡Genial, gracias!");
+
+    await escribir("Mensaje", "Hola");
+    const enviar = screen.getByRole("button", { name: "Enviar" });
+    await fireEvent.press(enviar);
+    await fireEvent.press(enviar);
+
+    expect(await screen.findByRole("button", { name: "Enviando…" })).toBeDisabled();
+    expect(pedidosPost(resultado)).toHaveLength(1);
+  });
+
+  it("sin servidor: «No se pudo enviar. Probá de nuevo.», conserva el texto, no reintenta y vuelve a pedir el chat", async () => {
+    const resultado = await abrirChat({ envio: ["rechazar"] });
+    await screen.findByText("¡Genial, gracias!");
+
+    await escribir("Mensaje", "¿Me leen?");
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(await screen.findByText("No se pudo enviar. Probá de nuevo.")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Mensaje")).toHaveDisplayValue("¿Me leen?");
+    await waitFor(() => expect(pedidosGet(resultado)).toHaveLength(2));
+    expect(pedidosPost(resultado)).toHaveLength(1);
+  });
+
+  it("volver a la pantalla vuelve a pedir el chat; al abrirlo se pide una sola vez", async () => {
+    const resultado = await abrirChat();
+    await screen.findByText("¡Genial, gracias!");
+    expect(pedidosGet(resultado)).toHaveLength(1);
+
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: COMPRA_ID } }));
+    await screen.findByRole("button", { name: "Chat con el organizador" });
+    expect(pedidosGet(resultado)).toHaveLength(1);
+    await act(() => router.back());
+
+    await waitFor(() => expect(resultado.getPathname()).toBe(`${COMPRA}/chat`));
+    await waitFor(() => expect(pedidosGet(resultado)).toHaveLength(2));
+  });
+
+  it("con la pantalla a la vista no hay sondeo: 60 s después sigue habiendo un solo pedido", async () => {
+    const resultado = await abrirChat();
+    await screen.findByText("¡Genial, gracias!");
+
+    jest.useFakeTimers();
+    await act(() => jest.advanceTimersByTimeAsync(60_000));
+
+    expect(pedidosGet(resultado)).toHaveLength(1);
+  });
+
+  it("Martín envía y Lucía, en el mismo celular, abre el chat enseguida: se pide de nuevo y ve el mensaje", async () => {
+    const respuestaDeLucia = chatVistoPorLucia({ mensajes: [...MENSAJES_DEL_SEED, mensajeNuevo] });
+    const resultado = await abrirChat({
+      chat: [
+        (_url, init) =>
+          (init?.headers as Record<string, string> | undefined)?.["X-Usuario-Id"] === lucia.id
+            ? { status: 200, json: respuestaDeLucia }
+            : { status: 200, json: chatDeEjemplo() },
+      ],
+    });
+    await screen.findByText("¡Genial, gracias!");
+    await escribir("Mensaje", TEXTO_NUEVO);
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(screen.getByLabelText("Mensaje")).toHaveDisplayValue(""));
+
+    await act(() => router.push("/seleccionar-usuario"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Lucía Álvarez" }));
+    await act(() => router.push({ pathname: "/compras/[compraId]/chat", params: { compraId: COMPRA_ID } }));
+
+    expect(await screen.findByText("¿A qué hora abren las puertas?")).toBeOnTheScreen();
+    const deLucia = pedidosGet(resultado).filter((p) => p.encabezados["X-Usuario-Id"] === lucia.id);
+    expect(deLucia.length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText("Con Martín Benítez · Comprador")).toBeOnTheScreen();
+  });
+});
+
+describe("Chat de la compra: lo que invalida cada escritura (feature 011, US4, R10)", () => {
+  const pedidosDeLaCompra = (resultado: Awaited<ReturnType<typeof abrirChat>>) =>
+    resultado.falso.pedidosA(COMPRA).filter((pedido) => pedido.metodo === "GET");
+
+  it("después de pagar en Tu compra, el chat se vuelve a pedir y el encabezado dice «Confirmada»", async () => {
+    const pendiente = chatDeEjemplo({
+      compra: { ...chatDeEjemplo().compra, estado: EstadoCompra.PENDIENTE },
+    });
+    const resultado = await abrirChat({
+      chat: [
+        { status: 200, json: pendiente },
+        { status: 200, json: chatDeEjemplo() },
+      ],
+      compra: [{ status: 200, json: { ...compraPendiente, id: COMPRA_ID } }],
+    });
+    expect(await screen.findByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: COMPRA_ID } }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+    await waitFor(() => expect(resultado.falso.pedidosA(`${COMPRA}/pago`)).toHaveLength(1));
+    // Una pantalla de chat nueva arriba: con el chat fresco en caché no lo pediría si nadie lo invalidó.
+    await act(() => router.push({ pathname: "/compras/[compraId]/chat", params: { compraId: COMPRA_ID } }));
+
+    await waitFor(() => expect(pedidosGet(resultado)).toHaveLength(2));
+    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("enviar un mensaje no vuelve a pedir Tu compra", async () => {
+    const resultado = await renderConDependencias({
+      usuarioRecordado: martin.id,
+      respuestas: respuestas({}),
+    });
+    await esperarPestanas();
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: COMPRA_ID } }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Chat con el organizador" }));
+    await screen.findByText("¡Genial, gracias!");
+    const antes = pedidosDeLaCompra(resultado).length;
+
+    await escribir("Mensaje", "Hola");
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+    await waitFor(() => expect(pedidosGet(resultado)).toHaveLength(2));
+
+    expect(pedidosDeLaCompra(resultado)).toHaveLength(antes);
   });
 });

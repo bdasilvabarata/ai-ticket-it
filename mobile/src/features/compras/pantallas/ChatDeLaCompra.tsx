@@ -14,6 +14,7 @@ import { SIN_MENSAJES } from "../formato";
 import { useEnviarMensaje } from "../mutaciones";
 import { useChatDeLaCompra } from "../useChatDeLaCompra";
 import { useEnvioUnico } from "../useEnvioUnico";
+import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
  * "Chat de la compra" (feature 011, contracts/app.md): la conversación entre el comprador y el
@@ -29,6 +30,8 @@ export function ChatDeLaCompra() {
 
 function SegunElChat({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
   const consulta = useChatDeLaCompra(usuarioId, compraId);
+  // Sin sondeo: se pone al día al volver a la pantalla y cuando una escritura lo invalida (FR-019).
+  useRefrescarAlFocalizar(consulta.refetch);
   const { error } = consulta;
 
   if (error instanceof ErrorDeApi && error.status === 403) {

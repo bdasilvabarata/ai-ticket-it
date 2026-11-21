@@ -21,7 +21,8 @@ import { useClienteApi } from "../../consultas/cliente-api";
 
 // Las escrituras de compras van en nombre del usuario de la pantalla y no se reintentan solas
 // (`mutations.retry: false` del QueryClient). Con éxito o error invalidan lo que pudo cambiar: la
-// única fuente de verdad es el servidor (cupo, tope, estado).
+// única fuente de verdad es el servidor (cupo, tope, estado). Las que cambian el estado de una compra
+// invalidan también, por prefijo, `["chat-de-la-compra"]`: su encabezado lo muestra (feature 011, R10).
 
 /** `["evento", *, eventoId]`: el cupo cambió para todos los usuarios, no solo para el de la pantalla. */
 const delEvento =
@@ -74,6 +75,7 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
         queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -102,6 +104,7 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
         queryClient.invalidateQueries({ queryKey: ["compras-del-evento"] }),
         queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -132,6 +135,7 @@ export function useRegistrarUso(
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -158,6 +162,7 @@ export function useConfirmarReembolso(
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
