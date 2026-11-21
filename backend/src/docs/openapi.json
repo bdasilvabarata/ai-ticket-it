@@ -2536,7 +2536,8 @@
           "canceladaPor",
           "entradasUsadas",
           "canceladaDesde",
-          "reembolso"
+          "reembolso",
+          "mensajeSinResponder"
         ],
         "properties": {
           "id": { "type": "string", "example": "compra-martin-festival-vip" },
@@ -2592,13 +2593,17 @@
             "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
             "nullable": true,
             "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          },
+          "mensajeSinResponder": {
+            "type": "boolean",
+            "description": "El último mensaje del chat de la compra es de su comprador: el organizador todavía no le contestó. Sin mensajes, false."
           }
         }
       },
       "ComprasDelEventoVista": {
         "type": "object",
         "description": "Todas las compras de un evento, al día, para su organizador.",
-        "required": ["evento", "ventanaDeUso", "resumenPorTipo", "compras"],
+        "required": ["evento", "ventanaDeUso", "resumenPorTipo", "compras", "comprasConMensajesSinResponder"],
         "properties": {
           "evento": {
             "type": "object",
@@ -2624,6 +2629,12 @@
             "type": "array",
             "description": "De la más nueva a la más vieja (desempate por id).",
             "items": { "$ref": "#/components/schemas/CompraDelEventoVista" }
+          },
+          "comprasConMensajesSinResponder": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 1,
+            "description": "Cuántas de las compras tienen mensajeSinResponder."
           }
         }
       },

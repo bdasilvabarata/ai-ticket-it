@@ -1009,7 +1009,12 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     compradorId: string,
     tipoEntradaId: string,
     estado: EstadoCompra,
-    cambios: { creadaEn?: Date; cantidad?: number; historial?: CambioEstadoCompra[] } = {},
+    cambios: {
+      creadaEn?: Date;
+      cantidad?: number;
+      historial?: CambioEstadoCompra[];
+      mensajes?: Mensaje[];
+    } = {},
   ) => compra("evento-a", tipoEntradaId, estado, { id, compradorId, ...cambios });
 
   it("todas las compras del evento, de todos los compradores y estados, con la forma de CompraDelEventoVista", async () => {
@@ -1043,6 +1048,7 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
       entradasUsadas: 0,
       canceladaDesde: null,
       reembolso: null,
+      mensajeSinResponder: false,
     });
     expect(vista.compras[1]).toMatchObject({ estado: EstadoCompra.CANCELADA, canceladaPor: "usuario" });
     expect(vista.compras[0]).toMatchObject({
@@ -1249,6 +1255,30 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
         expect(resumenPorTipo.map((r) => r.disponibles)).toEqual(detalle.tiposEntrada.map((t) => t.cupo));
       }
     });
+  });
+
+  it("mensajeSinResponder por compra y comprasConMensajesSinResponder (docs/mejoras-organizador.md, grupo 4)", async () => {
+    const mensaje = (autorId: string, minutos: number) =>
+      new Mensaje({ autorId, texto: "Hola", enviadoEn: new Date(hace(30).getTime() + minutos * MINUTO) });
+    const { compraService } = armar({
+      compras: [
+        de("sin-responder", "usuario-martin", "tipo-a-vip", EstadoCompra.CONFIRMADA, {
+          creadaEn: hace(30),
+          mensajes: [mensaje("usuario-martin", 1)],
+        }),
+        de("respondida", "usuario-sofia", "tipo-a-general", EstadoCompra.CANCELADA, {
+          creadaEn: hace(30),
+          mensajes: [mensaje("usuario-sofia", 1), mensaje("usuario-lucia", 2)],
+        }),
+        de("sin-mensajes", "usuario-diego", "tipo-a-kids", EstadoCompra.CONFIRMADA, { creadaEn: hace(30) }),
+      ],
+    });
+
+    const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
+
+    const sinResponder = Object.fromEntries(vista.compras.map((c) => [c.id, c.mensajeSinResponder]));
+    expect(sinResponder).toEqual({ "sin-responder": true, respondida: false, "sin-mensajes": false });
+    expect(vista.comprasConMensajesSinResponder).toBe(1);
   });
 
   it("sin compras, no pide usuarios", async () => {

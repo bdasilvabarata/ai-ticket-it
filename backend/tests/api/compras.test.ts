@@ -706,6 +706,7 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
         estado: "antes",
       },
       resumenPorTipo: expect.any(Array),
+      comprasConMensajesSinResponder: 1,
       compras: [
         expect.objectContaining({
           id: "compra-diego-festival-general",
@@ -786,6 +787,27 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
     await comprar(app, { tipoEntradaId: VIP, cantidad: 2 });
     const despues = (await comprasDelEvento(app, "usuario-lucia")).body.resumenPorTipo[1];
     expect(despues).toMatchObject({ disponibles: antes.disponibles - 2, pendientes: 2, vendidas: 2 });
+  });
+
+  it("mensajes sin responder (docs/mejoras-organizador.md, grupo 4): el seed de Martín termina en él; se apaga cuando Lucía contesta", async () => {
+    const app = nuevaApp();
+    const fila = (body: { compras: { id: string; mensajeSinResponder: boolean }[] }, id: string) =>
+      body.compras.find((compra) => compra.id === id)?.mensajeSinResponder;
+
+    const antes = (await comprasDelEvento(app, "usuario-lucia")).body;
+    expect(fila(antes, "compra-martin-festival-vip")).toBe(true);
+    expect(fila(antes, "compra-diego-festival-general")).toBe(false);
+    expect(antes.comprasConMensajesSinResponder).toBe(1);
+
+    const respuesta = await request(app)
+      .post("/api/compras/compra-martin-festival-vip/mensajes")
+      .set("X-Usuario-Id", "usuario-lucia")
+      .send({ texto: "¡De nada!" });
+    expect(respuesta.status).toBe(201);
+
+    const despues = (await comprasDelEvento(app, "usuario-lucia")).body;
+    expect(fila(despues, "compra-martin-festival-vip")).toBe(false);
+    expect(despues.comprasConMensajesSinResponder).toBe(0);
   });
 
   it("query y cuerpo se ignoran", async () => {

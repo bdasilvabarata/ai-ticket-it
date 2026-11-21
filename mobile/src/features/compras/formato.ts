@@ -163,6 +163,20 @@ export function textoAvisoDeCompraDelEvento(compra: CompraDelEventoVista): strin
   }
 }
 
+/** La marca de una fila de "Compras del evento" cuyo último mensaje es del comprador (grupo 4). */
+export const MARCA_SIN_RESPONDER = "Mensaje sin responder";
+
+/**
+ * El contador de "Compras del evento": "1 compra con un mensaje sin responder", "3 compras con
+ * mensajes sin responder", o `null` si no hay ninguna.
+ */
+export function textoComprasSinResponder(cantidad: number): string | null {
+  if (cantidad === 0) return null;
+  return cantidad === 1
+    ? "1 compra con un mensaje sin responder"
+    : `${cantidad} compras con mensajes sin responder`;
+}
+
 /** Cómo viene la venta de un tipo: "117 disponibles · 0 pendientes · 3 vendidas · 1 usada". */
 export function textoResumenDeTipo(resumen: ResumenTipoEntradaVista): string {
   const contar = (n: number, singular: string) => `${n} ${n === 1 ? singular : `${singular}s`}`;

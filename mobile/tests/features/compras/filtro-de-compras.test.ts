@@ -14,7 +14,11 @@ const pendiente = compraDelEvento({ id: "c-pendiente", estado: EstadoCompra.PEND
 const confirmada = compraDelEvento({ id: "c-confirmada", estado: EstadoCompra.CONFIRMADA });
 const utilizada = compraDelEvento({ id: "c-utilizada", estado: EstadoCompra.UTILIZADA });
 const cancelada = compraDelEvento({ id: "c-cancelada", estado: EstadoCompra.CANCELADA });
-const otraCancelada = compraDelEvento({ id: "c-cancelada-2", estado: EstadoCompra.CANCELADA });
+const otraCancelada = compraDelEvento({
+  id: "c-cancelada-2",
+  estado: EstadoCompra.CANCELADA,
+  mensajeSinResponder: true,
+});
 const compras = [cancelada, pendiente, confirmada, utilizada, otraCancelada];
 
 describe("filtrarCompras", () => {
@@ -34,6 +38,11 @@ describe("filtrarCompras", () => {
     expect(filtrarCompras(compras, EstadoCompra.UTILIZADA).map((c) => c.id)).toEqual(["c-utilizada"]);
   });
 
+  it("«sin-responder» deja las que tienen mensajeSinResponder, de cualquier estado (grupo 4)", () => {
+    expect(filtrarCompras(compras, "sin-responder").map((c) => c.id)).toEqual(["c-cancelada-2"]);
+    expect(filtrarCompras([pendiente, confirmada], "sin-responder")).toEqual([]);
+  });
+
   it("sin compras del estado, vacío", () => {
     expect(filtrarCompras(compras, EstadoCompra.REEMBOLSADA)).toEqual([]);
   });
@@ -43,6 +52,7 @@ describe("textos del filtro", () => {
   it("los chips, en orden", () => {
     expect(FILTROS_DE_COMPRAS.map(textoDelFiltro)).toEqual([
       "Todas",
+      "Sin responder",
       "Pendiente",
       "Confirmada",
       "Utilizada",
@@ -54,6 +64,7 @@ describe("textos del filtro", () => {
   it("el vacío de cada filtro", () => {
     expect(FILTROS_DE_COMPRAS.map(textoSinComprasDelFiltro)).toEqual([
       "Todavía nadie compró entradas",
+      "No hay mensajes sin responder",
       "No hay compras pendientes",
       "No hay compras confirmadas",
       "No hay compras utilizadas",

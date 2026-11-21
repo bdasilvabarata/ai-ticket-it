@@ -16,6 +16,7 @@ import {
   textoCantidad,
   textoCodigo,
   textoCodigoAccesible,
+  textoComprasSinResponder,
   textoCompradaEl,
   textoDiasRestantes,
   textoEntradasConfirmadas,
@@ -484,5 +485,13 @@ describe("textos del chat de la compra (feature 011, R12)", () => {
 
   it("SIN_MENSAJES", () => {
     expect(SIN_MENSAJES).toBe("Todavía no hay mensajes");
+  });
+});
+
+describe("textoComprasSinResponder (grupo 4)", () => {
+  it("null sin ninguna, singular con una y plural con varias", () => {
+    expect(textoComprasSinResponder(0)).toBeNull();
+    expect(textoComprasSinResponder(1)).toBe("1 compra con un mensaje sin responder");
+    expect(textoComprasSinResponder(3)).toBe("3 compras con mensajes sin responder");
   });
 });

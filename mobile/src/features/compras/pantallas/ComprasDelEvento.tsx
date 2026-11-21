@@ -17,7 +17,7 @@ import {
   textoSinComprasDelFiltro,
   type FiltroDeCompras,
 } from "../filtro-de-compras";
-import { textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
+import { textoComprasSinResponder, textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
 import { useConfirmarReembolso } from "../mutaciones";
 import { useComprasDelEvento } from "../useComprasDelEvento";
 import { useEnvioUnico } from "../useEnvioUnico";
@@ -85,6 +85,8 @@ function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido
   const deEstaFila = (compra: CompraDelEventoVista) => reembolso.variables === compra.id;
   // El filtro solo toca la lista: el resumen por tipo sigue contando todas las compras.
   const compras = filtrarCompras(vista.compras, filtro);
+  // El contador va acá y no en el hub, que solo lee el evento (docs/mejoras-organizador.md, grupo 4).
+  const sinResponder = textoComprasSinResponder(vista.comprasConMensajesSinResponder);
 
   return (
     <PantallaDesplazable separacion={tema.espacio.normal}>
@@ -107,6 +109,7 @@ function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido
         <Text style={estilos.titulo} accessibilityRole="header">
           Compras
         </Text>
+        {sinResponder !== null && <Text style={estilos.ventana}>{sinResponder}</Text>}
         {/* Sin ninguna compra no hay nada que filtrar. */}
         {vista.compras.length === 0 ? (
           <Text style={estilos.dato}>{SIN_COMPRAS}</Text>

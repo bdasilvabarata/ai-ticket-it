@@ -289,6 +289,7 @@ export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): Co
     entradasUsadas: 0,
     canceladaDesde: reembolsada ? "CONFIRMADA" : estado === EstadoCompra.CANCELADA ? "PENDIENTE" : null,
     reembolso: reembolsada ? { estado: "confirmado", monto: total } : null,
+    mensajeSinResponder: false,
     ...cambios,
   };
 }
@@ -350,6 +351,7 @@ export function comprasDelFestival(
     ventanaDeUso: ventanaDelFestival(),
     resumenPorTipo: [],
     compras,
+    comprasConMensajesSinResponder: compras.filter((compra) => compra.mensajeSinResponder).length,
     ...cambios,
   };
 }

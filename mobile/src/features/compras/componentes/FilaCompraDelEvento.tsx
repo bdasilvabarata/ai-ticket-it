@@ -5,7 +5,13 @@ import { StyleSheet, Text, View } from "react-native";
 import { Boton, EtiquetaEstadoCompra, tema, textoEtiquetaEstado } from "../../../componentes";
 import { AvisoDeFormulario } from "../../eventos";
 import { nombreCompleto } from "../../usuarios";
-import { textoAvisoDeCompraDelEvento, textoCantidad, textoCompradaEl, textoTotal } from "../formato";
+import {
+  MARCA_SIN_RESPONDER,
+  textoAvisoDeCompraDelEvento,
+  textoCantidad,
+  textoCompradaEl,
+  textoTotal,
+} from "../formato";
 
 export interface PropsFilaCompraDelEvento {
   compra: CompraDelEventoVista;
@@ -23,7 +29,9 @@ export interface PropsFilaCompraDelEvento {
  * un solo elemento accesible que resume la fila. Con el reembolso pendiente (feature 009), debajo y
  * como hermano de ese bloque, "Confirmar reembolso" y el error de esa fila. Al pie (feature 011),
  * en todos los estados y también con el evento realizado, "Abrir chat": otro hermano del bloque, para
- * que TalkBack lo enfoque aparte, que abre "Chat de la compra" de esta compra.
+ * que TalkBack lo enfoque aparte, que abre "Chat de la compra" de esta compra. Si el último mensaje
+ * del chat es del comprador (docs/mejoras-organizador.md, grupo 4), la marca "Mensaje sin responder",
+ * que también lee el lector de pantalla.
  */
 export function FilaCompraDelEvento({
   compra,
@@ -36,7 +44,8 @@ export function FilaCompraDelEvento({
   const cantidad = textoCantidad(compra.cantidad);
   const total = textoTotal(compra.total);
   const aviso = textoAvisoDeCompraDelEvento(compra);
-  const etiqueta = [comprador, tipo, cantidad, total, textoEtiquetaEstado(compra.estado), aviso]
+  const sinResponder = compra.mensajeSinResponder ? MARCA_SIN_RESPONDER : null;
+  const etiqueta = [comprador, tipo, cantidad, total, textoEtiquetaEstado(compra.estado), aviso, sinResponder]
     .filter((parte) => parte !== null)
     .join(", ");
   return (
@@ -49,6 +58,11 @@ export function FilaCompraDelEvento({
           <EtiquetaEstadoCompra estado={compra.estado} />
           {aviso !== null && <Text style={estilos.aviso}>{aviso}</Text>}
         </View>
+        {sinResponder !== null && (
+          <View style={estilos.marca}>
+            <Text style={estilos.textoMarca}>{sinResponder}</Text>
+          </View>
+        )}
       </View>
       {compra.reembolso?.estado === "pendiente" && alConfirmarReembolso ? (
         <View style={estilos.bloque}>
@@ -91,4 +105,16 @@ const estilos = StyleSheet.create({
   // El aviso va al lado de la etiqueta (nunca la reemplaza) y baja de renglón si no entra.
   estado: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: tema.espacio.chico },
   aviso: { ...tema.tipografia.secundario, color: tema.colores.texto, flexShrink: 1 },
+  // Como un badge, pero sobre `avisoFondo`: no se confunde con el estado de la compra.
+  marca: {
+    alignSelf: "flex-start",
+    justifyContent: "center",
+    height: tema.tamano.badge,
+    paddingHorizontal: tema.espacio.chico,
+    borderRadius: tema.radio.pildora,
+    borderWidth: tema.grosor.fino,
+    borderColor: tema.colores.borde,
+    backgroundColor: tema.colores.avisoFondo,
+  },
+  textoMarca: { ...tema.tipografia.badge, color: tema.colores.avisoTexto },
 });

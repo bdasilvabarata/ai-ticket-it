@@ -347,6 +347,14 @@ export class Compra {
     return null;
   }
 
+  /**
+   * El último mensaje del chat es de su comprador (docs/mejoras-organizador.md, grupo 4): el
+   * organizador, la única otra parte, todavía no le contestó. Sin mensajes, `false`.
+   */
+  get mensajeSinResponder(): boolean {
+    return this.mensajes.at(-1)?.autorId === this.compradorId;
+  }
+
   /** La compra como se ve en `ahora`, sin guardarla: vencida si correspondía, si no, esta misma. */
   alDia(ahora: Date): Compra {
     return this.estaVencida(ahora) ? this.vencer() : this;

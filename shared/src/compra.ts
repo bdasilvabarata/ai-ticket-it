@@ -179,6 +179,11 @@ export interface CompraDelEventoVista {
   canceladaDesde: "PENDIENTE" | "CONFIRMADA" | null;
   /** El reembolso de una paga cancelada después de confirmada (feature 009); si no, `null`. */
   reembolso: ReembolsoVista | null;
+  /**
+   * El último mensaje del chat de la compra es de su comprador: el organizador todavía no le contestó
+   * (docs/mejoras-organizador.md, grupo 4). Derivado del chat, sin estado de lectura; sin mensajes, `false`.
+   */
+  mensajeSinResponder: boolean;
 }
 
 /** Respuesta de `GET /eventos/:eventoId/compras` (solo el organizador). */
@@ -189,6 +194,8 @@ export interface ComprasDelEventoVista {
   resumenPorTipo: ResumenTipoEntradaVista[];
   /** Todas, de la más nueva a la más vieja (desempate por id). */
   compras: CompraDelEventoVista[];
+  /** Cuántas de `compras` tienen `mensajeSinResponder`. */
+  comprasConMensajesSinResponder: number;
 }
 
 /** Respuesta de `GET /eventos/:eventoId/entradas/:codigo` y de `POST …/uso` (solo el organizador). */

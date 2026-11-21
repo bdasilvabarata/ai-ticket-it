@@ -773,14 +773,22 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
   );
   const chip = (nombre: string) => screen.getByRole("radio", { name: nombre });
 
-  it("un grupo de chips con Todas elegido y los cinco estados, en orden", async () => {
+  it("un grupo de chips con Todas elegido, Sin responder y los cinco estados, en orden", async () => {
     await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
-    const grupo = await screen.findByLabelText("Filtrar por estado");
+    const grupo = await screen.findByLabelText("Filtrar compras");
     expect(grupo.props.accessibilityRole).toBe("radiogroup");
     const nombres = within(grupo)
       .getAllByRole("radio")
       .map((r) => r.props.accessibilityLabel);
-    expect(nombres).toEqual(["Todas", "Pendiente", "Confirmada", "Utilizada", "Cancelada", "Reembolsada"]);
+    expect(nombres).toEqual([
+      "Todas",
+      "Sin responder",
+      "Pendiente",
+      "Confirmada",
+      "Utilizada",
+      "Cancelada",
+      "Reembolsada",
+    ]);
     expect(chip("Todas")).toBeChecked();
     expect(chip("Cancelada")).not.toBeChecked();
     expect(screen.getByLabelText(FILA_SOFIA)).toBeOnTheScreen();
@@ -827,7 +835,7 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
     await fireEvent.press(chip("Reembolsada"));
     expect(screen.getByText("No hay compras reembolsadas")).toBeOnTheScreen();
     expect(screen.queryByText("Todavía nadie compró entradas")).toBeNull();
-    expect(screen.getByLabelText("Filtrar por estado")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Filtrar compras")).toBeOnTheScreen();
 
     await fireEvent.press(chip("Todas"));
     expect(screen.queryByText("No hay compras reembolsadas")).toBeNull();
@@ -838,7 +846,7 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
   it("sin ninguna compra no hay chips: solo «Todavía nadie compró entradas»", async () => {
     await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([]) }]);
     expect(await screen.findByText("Todavía nadie compró entradas")).toBeOnTheScreen();
-    expect(screen.queryByLabelText("Filtrar por estado")).toBeNull();
+    expect(screen.queryByLabelText("Filtrar compras")).toBeNull();
   });
 
   it("el filtro elegido se mantiene al releer la lista al volver a la pantalla", async () => {
@@ -857,5 +865,54 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
     expect(chip("Cancelada")).toBeChecked();
     expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
     expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
+  });
+});
+
+describe("Compras del evento: mensajes sin responder (mejoras del organizador, grupo 4)", () => {
+  const FILA_MARTIN = "Martín Benítez, General, 3 entradas, $ 18.000, Confirmada";
+  const FILA_MARTIN_SIN_RESPONDER = `${FILA_MARTIN}, Mensaje sin responder`;
+  const FILA_SOFIA = "Sofía Castro, VIP, 1 entrada, $ 120.000, Pendiente, Puede pagarla hasta las 15:35";
+  const martinSinResponder = compraDelEvento({ mensajeSinResponder: true });
+  const chip = (nombre: string) => screen.getByRole("radio", { name: nombre });
+
+  it("la fila con el último mensaje del comprador lleva la marca, también para el lector de pantalla", async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([sofiaPendiente, martinSinResponder]) },
+    ]);
+    expect(await screen.findByLabelText(FILA_MARTIN_SIN_RESPONDER)).toBeOnTheScreen();
+    expect(screen.getAllByText("Mensaje sin responder")).toHaveLength(1);
+    expect(screen.getByLabelText(FILA_SOFIA)).toBeOnTheScreen();
+  });
+
+  it("el contador arriba de la lista, en plural con varias", async () => {
+    const otra = compraDelEvento({ id: "compra-martin-2", mensajeSinResponder: true });
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([martinSinResponder, otra]) }]);
+    expect(await screen.findByText("2 compras con mensajes sin responder")).toBeOnTheScreen();
+  });
+
+  it("sin mensajes sin responder no hay contador ni marca", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([martinConfirmada]) }]);
+    expect(await screen.findByLabelText(FILA_MARTIN)).toBeOnTheScreen();
+    expect(screen.queryByText(/sin responder$/)).toBeNull();
+  });
+
+  it("el chip Sin responder deja solo esas compras; sin ninguna, su propio vacío", async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([sofiaPendiente, martinSinResponder]) },
+    ]);
+    expect(await screen.findByText("1 compra con un mensaje sin responder")).toBeOnTheScreen();
+
+    await fireEvent.press(chip("Sin responder"));
+    expect(chip("Sin responder")).toBeChecked();
+    expect(screen.getByLabelText(FILA_MARTIN_SIN_RESPONDER)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
+  });
+
+  it("con compras pero ninguna sin responder, el chip muestra «No hay mensajes sin responder»", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([sofiaPendiente]) }]);
+    await screen.findByLabelText(FILA_SOFIA);
+    await fireEvent.press(chip("Sin responder"));
+    expect(screen.getByText("No hay mensajes sin responder")).toBeOnTheScreen();
+    expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
   });
 });

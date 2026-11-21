@@ -186,6 +186,7 @@ export function aCompraDelEventoVista(
     ...vencimiento(compra),
     canceladaPor: canceladaPor(compra),
     ...restoDelEstado,
+    mensajeSinResponder: compra.mensajeSinResponder,
   };
 }
 

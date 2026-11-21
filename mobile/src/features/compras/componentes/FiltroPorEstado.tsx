@@ -9,12 +9,12 @@ export interface PropsFiltroPorEstado {
 }
 
 /**
- * Los chips del filtro por estado de "Compras del evento": un grupo de radios ("Todas", "Pendiente"…)
- * con el elegido marcado por color y por `checked`, que lee el lector de pantalla.
+ * Los chips del filtro de "Compras del evento": un grupo de radios ("Todas", "Sin responder",
+ * "Pendiente"…) con el elegido marcado por color y por `checked`, que lee el lector de pantalla.
  */
 export function FiltroPorEstado({ filtro: elegido, alCambiar }: PropsFiltroPorEstado) {
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel="Filtrar por estado" style={estilos.opciones}>
+    <View accessibilityRole="radiogroup" accessibilityLabel="Filtrar compras" style={estilos.opciones}>
       {FILTROS_DE_COMPRAS.map((filtro) => {
         const esElegido = filtro === elegido;
         const texto = textoDelFiltro(filtro);

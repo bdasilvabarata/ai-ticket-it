@@ -332,7 +332,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `FilaCompraDelEvento` no tocable por compra; vacío "Todavía nadie compró entradas" sin tapar
       el resumen; desde las mejoras del organizador, `FiltroPorEstado`: chips radio "Todas" y los cinco
       estados que filtran `vista.compras` en la app con `filtro-de-compras.ts`, sin tocar el resumen ni
-      el endpoint, con el vacío propio de cada filtro y sin chips si no hay compras) y `RegistrarIngreso` (desde la 010, en dos piezas internas: `BuscadorDeCodigo`
+      el endpoint, con el vacío propio de cada filtro y sin chips si no hay compras; también el chip
+      "Sin responder", con la marca "Mensaje sin responder" en `FilaCompraDelEvento` y el contador
+      sobre la lista, de `CompraDelEventoVista.mensajeSinResponder` y
+      `ComprasDelEventoVista.comprasConMensajesSinResponder`, que el backend deriva con el getter
+      `Compra.mensajeSinResponder`: el último mensaje del chat es del comprador) y `RegistrarIngreso` (desde la 010, en dos piezas internas: `BuscadorDeCodigo`
       —el campo y "Buscar"— y `ResultadoDeIngreso` —`TarjetaEntrada`, el motivo de
       `textoMotivoNoUsable` en lugar del botón o "No hay ninguna entrada…"—; la pantalla busca con
       `useEntradaDelEvento` y confirma con `Alert`); la mutation `useRegistrarUso` (sin reintentos)

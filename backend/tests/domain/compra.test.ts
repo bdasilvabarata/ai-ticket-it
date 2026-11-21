@@ -1370,6 +1370,23 @@ describe("Mensajes de la compra (feature 011)", () => {
     });
   });
 
+  describe("mensajeSinResponder (docs/mejoras-organizador.md, grupo 4)", () => {
+    it("false sin mensajes", () => {
+      expect(compraConfirmada().mensajeSinResponder).toBe(false);
+    });
+    it("true si el último mensaje es del comprador", () => {
+      const compra = compraConfirmada({ mensajes: [...conversacion(), mensaje("usuario-martin", "¿Y?", 3)] });
+      expect(compra.mensajeSinResponder).toBe(true);
+    });
+    it("false si el último es del organizador (se apaga al contestar)", () => {
+      expect(compraConfirmada({ mensajes: conversacion() }).mensajeSinResponder).toBe(false);
+      const respondida = compraConfirmada()
+        .enviarMensaje("usuario-martin", "Hola", AHORA)
+        .enviarMensaje("usuario-lucia", "¡Hola!", AHORA);
+      expect(respondida.mensajeSinResponder).toBe(false);
+    });
+  });
+
   describe("rolDe", () => {
     const compra = compraConfirmada();
     it("comprador con el compradorId", () => {

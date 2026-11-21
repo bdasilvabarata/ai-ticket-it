@@ -336,6 +336,7 @@ export class CompraService {
       compras: compras.map((compra) =>
         aCompraDelEventoVista(compra, compradores.get(compra.compradorId)!, evento),
       ),
+      comprasConMensajesSinResponder: compras.filter((compra) => compra.mensajeSinResponder).length,
     };
   }
 
