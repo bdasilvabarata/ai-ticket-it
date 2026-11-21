@@ -190,7 +190,8 @@ en T019, al cerrar US1; el backlog y el PR van en la Fase 11).
   - Resultado: `git diff --stat development -- shared backend/src/docs backend/tests/api` vacío; `git diff development -- mobile/tests/pantallas` solo con las tres líneas de T015 en `registrar-ingreso.test.tsx`. `compra.ts`: **350** líneas (desviación de SC-005 ya aceptada en T011). Greps de §5: coherencia combinada, sin resultados; forma vieja de la entrada, solo variables `...cambios` de los ayudantes (ninguna `entrada.cambios`, `estadoEn(`, `ultimoEstadoPropio`, `tieneCambioA` ni `tieneReembolsoPendiente`); `compras.guardar`, solo en `compra.service.ts` (5) y `vencimiento.service.ts` (1); `entrada.service.ts`, sin `RepositorioCompras` ni uso del cerrojo (solo la palabra en el JSDoc de `obtener`: "Lectura: sin cerrojo y sin guardar"); `UTILIZADA` en `compras-del-evento.ts`, solo el estado de la **compra** para contar vendidas (línea 53, que T004 conserva) y dos comentarios: ningún filtro por entrada. Sin ternarios anidados en `RegistrarIngreso.tsx`, `BuscadorDeCodigo.tsx` ni `ResultadoDeIngreso.tsx`.
 - [X] T022 Correr `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` desde la raíz y dejar las cuatro en verde.
   - Resultado: backend 872 tests (47 archivos), mobile 560 tests (52 suites), lint, typecheck y format:check en verde.
-- [ ] T023 Validar a mano en el celular los 5 puntos de quickstart §6 (SC-008) y anotar cualquier desvío debajo de esta tarea.
+- [X] T023 Validar a mano en el celular los 5 puntos de quickstart §6 (SC-008) y anotar cualquier desvío debajo de esta tarea.
+  - Resultado: los 5 puntos validados a mano en el celular por el usuario (2026-11-20), sin desvíos.
 
 ---
 
@@ -215,7 +216,8 @@ toque en el diálogo) y `dias-restantes.test.ts` pasan sin cambiar lo que verifi
 
 **Purpose**: backlog y PR, con o sin la Fase 10.
 
-- [ ] T028 En `docs/backlog.md`, pasar la 010 a `en PR` y registrar en "Alcance de la 010 · Opcionales" cuáles se hicieron y cuáles no (FR-023). Abrir el PR de `feature/010-refactor-compras` a `development` con las verificaciones del CI en verde y, en la descripción, la excepción acotada de `registrar-ingreso.test.tsx` y la de `VencimientoService`.
+- [X] T028 En `docs/backlog.md`, pasar la 010 a `en PR` y registrar en "Alcance de la 010 · Opcionales" cuáles se hicieron y cuáles no (FR-023). Abrir el PR de `feature/010-refactor-compras` a `development` con las verificaciones del CI en verde y, en la descripción, la excepción acotada de `registrar-ingreso.test.tsx` y la de `VencimientoService`.
+  - Resultado: 010 en `en PR` en `docs/backlog.md`, con los opcionales hechos (`useEnvioUnico`, `diaDeCalendarioDeBuenosAires`) y los no hechos (índice `#codigosUsados`, textos sin duplicar); PR abierto a `development`.
 
 ---
 

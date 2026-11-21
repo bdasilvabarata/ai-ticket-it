@@ -20,7 +20,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 007 | **Mis compras**: listado con estado bien diferenciado y días restantes si está confirmada | UC-01 | P1 | 006 | integrada |
 | 008 | **Compras de un evento** (organizador): compras por estado, disponibles por tipo y registrar uso de entrada → `UTILIZADA` | UC-02 | P2 | 004, 006 | integrada |
 | 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | integrada |
-| 010 | **Refactor de 007, 008 y 009**: `Entrada` con estado explícito, invariantes de `Compra` legibles, un solo dueño de `RepositorioCompras`, vistas sin mapeos repetidos y "Registrar ingreso" en componentes; sin cambiar contratos de API ni comportamiento (ver "Alcance de la 010") | — | P2 | 007, 008, 009 | tasks |
+| 010 | **Refactor de 007, 008 y 009**: `Entrada` con estado explícito, invariantes de `Compra` legibles, un solo dueño de `RepositorioCompras`, vistas sin mapeos repetidos y "Registrar ingreso" en componentes; sin cambiar contratos de API ni comportamiento (ver "Alcance de la 010") | — | P2 | 007, 008, 009 | en PR |
 | 011 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 007, 008, 010 | pendiente |
 | 012 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008, 010 | pendiente |
 | 013 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 005 | pendiente |
@@ -105,6 +105,11 @@ API, la OpenAPI ni el comportamiento visible; la red de seguridad son los tests 
 | `diasRestantes` sin `split`: una función de fecha de pared en `hora-buenos-aires.ts` | 3.5 (4) | bajo | bajo | la zona horaria tiene que seguir viviendo solo en ese archivo |
 | Índice `#codigosUsados` en `CompraRepository` | 3.4 | bajo | muy bajo | con datos en memoria no se nota y agrega estado a mantener en `guardar` |
 | Textos de "no se puede usar" sin duplicar entre backend y app | 3.3 (2) | bajo-medio | bajo | no son idénticos (la app agrega la fecha de uso) y exigiría tocar el contrato |
+
+**Resultado (al cerrar la 010):** se hicieron `useEnvioUnico` (en `features/compras`, lo usan
+"Tu compra" y "Compras del evento") y `diaDeCalendarioDeBuenosAires` en `hora-buenos-aires.ts`
+(lo usa `diasRestantes`). **No** se hicieron el índice `#codigosUsados` ni la deduplicación de los
+textos de "no se puede usar", por los motivos de la tabla.
 
 ### Se descartan
 
