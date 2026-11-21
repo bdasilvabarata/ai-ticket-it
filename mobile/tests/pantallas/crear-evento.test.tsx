@@ -281,12 +281,18 @@ describe("Crear evento (US1): errores y descarte", () => {
     expect(screen.getByLabelText("Nombre del evento")).toHaveDisplayValue("Noche de Tango");
   });
 
-  it("atrás pregunta siempre (aunque no haya cambios): Seguir editando conserva lo cargado y Descartar sale", async () => {
+  it("atrás sin cambios sale sin preguntar", async () => {
     const alertas = espiarAlertas();
     const resultado = await abrirCrearEvento();
 
     await act(() => router.back());
-    expect(alertasCon(alertas, DESCARTAR)).toHaveLength(1);
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
+  });
+
+  it("atrás con cambios pregunta: Seguir editando conserva lo cargado y Descartar sale", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirCrearEvento();
 
     await escribir("Nombre del evento", "Noche de Tango");
     await act(() => router.back());

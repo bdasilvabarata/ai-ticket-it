@@ -13,7 +13,7 @@ import {
   SIN_ERRORES,
   type ErroresDeFormulario,
 } from "../errores-de-formulario";
-import { aCuerpoEvento, valoresDeEvento, type ValoresEvento } from "../formulario";
+import { aCuerpoEvento, mismosValores, valoresDeEvento, type ValoresEvento } from "../formulario";
 import { useActualizarEvento, useEliminarEvento, useQuitarTipoEntrada } from "../mutaciones";
 import { useConfirmarDescarte } from "../useConfirmarDescarte";
 
@@ -25,14 +25,16 @@ const AVISO_NO_EXISTE = "El evento ya no existe.";
  * el evento y `EventoDelOrganizador` pasa a solo lectura.
  */
 export function EditarEvento({ evento, usuarioId }: { evento: EventoVista; usuarioId: string }) {
-  const [valores, setValores] = useState<ValoresEvento>(() => valoresDeEvento(evento));
+  // Lo cargado al abrir: los cambios se miden contra esto (los tipos se guardan en su propia pantalla).
+  const [iniciales] = useState<ValoresEvento>(() => valoresDeEvento(evento));
+  const [valores, setValores] = useState<ValoresEvento>(iniciales);
   const [errores, setErrores] = useState<ErroresDeFormulario>(SIN_ERRORES);
   const [avisoTipos, setAvisoTipos] = useState<string | null>(null);
   const [avisoEliminar, setAvisoEliminar] = useState<string | null>(null);
   const actualizar = useActualizarEvento(usuarioId, evento.id);
   const quitar = useQuitarTipoEntrada(usuarioId, evento.id);
   const eliminar = useEliminarEvento(usuarioId, evento.id);
-  const { salirSinConfirmar } = useConfirmarDescarte();
+  const { salirSinConfirmar } = useConfirmarDescarte({ hayCambios: !mismosValores(valores, iniciales) });
 
   const volverAMisEventos = () => salirSinConfirmar(() => router.dismissTo("/mis-eventos"));
 

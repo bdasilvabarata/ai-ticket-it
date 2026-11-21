@@ -174,9 +174,18 @@ describe("Agregar tipo de entrada (US3)", () => {
     expect(screen.getByLabelText("Nombre")).toHaveDisplayValue("Platea");
   });
 
-  it("atrás pregunta ¿Descartar los cambios?", async () => {
+  it("atrás sin cambios sale sin preguntar", async () => {
     const alertas = espiarAlertas();
     const resultado = await abrirAgregar();
+    await act(() => router.back());
+    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
+  });
+
+  it("atrás con cambios pregunta ¿Descartar los cambios?", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirAgregar();
+    await escribir("Nombre", "Platea");
     await act(() => router.back());
     await tocarEnAlerta(alertas, DESCARTAR, "Descartar");
     await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));

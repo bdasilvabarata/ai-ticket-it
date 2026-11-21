@@ -302,7 +302,7 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       usuario **del formulario**, invalidan al terminar, también `["catalogo"]`), `fecha-de-pared.ts` (selector ⇄ `"YYYY-MM-DDTHH:mm"`,
       sin convertir zonas), `errores-de-formulario.ts` (la app no valida: muestra los detalles del
       400 junto a cada campo) y `useConfirmarDescarte` ("¿Descartar los cambios?" al salir de un
-      formulario, con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
+      formulario **solo si hay cambios** (`hayCambios`, con `mismosValores` de `formulario.ts`), con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
       `DetalleEvento` acepta `complementos` opcionales (`ComplementosDelDetalle`: `AccionDeTipo` al
       lado de cada tipo, vía la prop `accionDeTipo` de `ListaTiposEntrada`, y `SeccionPropia` antes
       de "Tipos de entrada"): así otra feature le suma cosas **sin que `eventos` la importe**;

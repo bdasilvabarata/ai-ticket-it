@@ -13,6 +13,7 @@ import {
   aCuerpoEvento,
   aCuerpoTipo,
   erroresDelTipo,
+  mismosValores,
   VALORES_EVENTO_VACIO,
   VALORES_TIPO_VACIO,
   type ValoresEvento,
@@ -39,7 +40,13 @@ function FormularioCrearEvento({ usuarioId }: { usuarioId: string }) {
   const [errores, setErrores] = useState<ErroresDeFormulario>(SIN_ERRORES);
   const siguienteClave = useRef(1);
   const crear = useCrearEvento(usuarioId);
-  const { salirSinConfirmar } = useConfirmarDescarte();
+  const hayCambios =
+    !mismosValores(valores, VALORES_EVENTO_VACIO) ||
+    !mismosValores(
+      tipos.map(({ nombre, descripcion, precio, cupo }) => ({ nombre, descripcion, precio, cupo })),
+      [VALORES_TIPO_VACIO],
+    );
+  const { salirSinConfirmar } = useConfirmarDescarte({ hayCambios });
 
   const cambiar = (cambios: Partial<ValoresEvento>) =>
     setValores((actuales) => ({ ...actuales, ...cambios }));

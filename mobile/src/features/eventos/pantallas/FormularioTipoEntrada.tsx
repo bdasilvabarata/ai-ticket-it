@@ -15,7 +15,7 @@ import {
   SIN_ERRORES,
   type ErroresDeFormulario,
 } from "../errores-de-formulario";
-import { aCuerpoTipo, type ValoresTipoEntrada } from "../formulario";
+import { aCuerpoTipo, mismosValores, type ValoresTipoEntrada } from "../formulario";
 import { useConfirmarDescarte } from "../useConfirmarDescarte";
 
 export interface PropsFormularioTipoEntrada {
@@ -40,7 +40,7 @@ export function FormularioTipoEntrada({
 }: PropsFormularioTipoEntrada) {
   const [valores, setValores] = useState(inicial);
   const [errores, setErrores] = useState<ErroresDeFormulario>(SIN_ERRORES);
-  const { salirSinConfirmar } = useConfirmarDescarte();
+  const { salirSinConfirmar } = useConfirmarDescarte({ hayCambios: !mismosValores(valores, inicial) });
 
   function guardar() {
     setErrores(SIN_ERRORES);

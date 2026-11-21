@@ -71,6 +71,14 @@ export function aCuerpoTipo(valores: ValoresTipoEntrada): CuerpoTipoEntrada {
   };
 }
 
+/**
+ * Si dos estados de un formulario son iguales (valores planos: textos, números, `null` y arreglos).
+ * Decide si salir pide confirmar el descarte: volver a escribir lo que había no cuenta como cambio.
+ */
+export function mismosValores<T>(a: T, b: T): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 /** Los errores de un tipo del formulario de creación, que el servidor informa con su índice. */
 export function erroresDelTipo(campos: Record<string, string>, indice: number) {
   const de = (campo: string) => campos[`tiposEntrada.${indice}.${campo}`];

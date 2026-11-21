@@ -206,10 +206,33 @@ describe("Editar evento (US3)", () => {
     expect(screen.getByLabelText("Nombre del evento")).toHaveDisplayValue("Festival del Sur");
   });
 
-  it("atrás pregunta ¿Descartar los cambios?", async () => {
+  it("atrás sin cambios sale sin preguntar", async () => {
     const alertas = espiarAlertas();
     const resultado = await abrirEditar();
     await screen.findByLabelText("Nombre del evento");
+
+    await act(() => router.back());
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
+  });
+
+  it("atrás con cambios pregunta ¿Descartar los cambios?; volver a lo original no cuenta como cambio", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirEditar();
+    await escribir("Nombre del evento", "Festival del Sur");
+
+    await act(() => router.back());
+    await tocarEnAlerta(alertas, DESCARTAR, "Seguir editando");
+    await escribir("Nombre del evento", "Festival Sonidos del Sur");
+    await act(() => router.back());
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    expect(alertasCon(alertas, DESCARTAR)).toHaveLength(1);
+  });
+
+  it("atrás con cambios y Descartar sale", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirEditar();
+    await escribir("Nombre del evento", "Festival del Sur");
 
     await act(() => router.back());
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(1);

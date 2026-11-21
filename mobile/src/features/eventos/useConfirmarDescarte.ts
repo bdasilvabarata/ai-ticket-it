@@ -7,7 +7,7 @@ import { useSesion } from "../sesion";
 /**
  * Confirmación al salir de un formulario (FR-026a, research R12). El atrás del header, el de
  * Android y el gesto de iOS remueven la pantalla: se retienen y se pregunta "¿Descartar los
- * cambios?", **siempre**, haya cambios o no.
+ * cambios?" **solo si hay cambios** sin guardar (`hayCambios`): sin cambios, sale directo.
  *
  * No pregunta:
  * - si la pantalla no es la que se está viendo: una salida que la saca de abajo del Stack (volver a
@@ -16,9 +16,9 @@ import { useSesion } from "../sesion";
  *   salida la provoca el guard de la sesión;
  * - después de `salirSinConfirmar(navegar)`, que se usa tras guardar o eliminar con éxito y ante un
  *   404: la navegación ocurre en un efecto, cuando el hook ya no retiene;
- * - si `habilitado` es `false`.
+ * - si `hayCambios` es `false`.
  */
-export function useConfirmarDescarte({ habilitado = true }: { habilitado?: boolean } = {}) {
+export function useConfirmarDescarte({ hayCambios }: { hayCambios: boolean }) {
   const { estado } = useSesion();
   const [usuarioDelFormulario] = useState(estado.fase === "con-usuario" ? estado.usuarioId : null);
   const [salida, setSalida] = useState<{ navegar: () => void } | null>(null);
@@ -27,7 +27,7 @@ export function useConfirmarDescarte({ habilitado = true }: { habilitado?: boole
   const enfocada = useIsFocused();
 
   const mismaSesion = estado.fase === "con-usuario" && estado.usuarioId === usuarioDelFormulario;
-  const retener = habilitado && enfocada && mismaSesion && salida === null && !descartado;
+  const retener = hayCambios && enfocada && mismaSesion && salida === null && !descartado;
 
   usePreventRemove(retener, ({ repeat }) => {
     Alert.alert("¿Descartar los cambios?", undefined, [
