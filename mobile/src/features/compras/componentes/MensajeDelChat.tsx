@@ -34,6 +34,7 @@ const estilos = StyleSheet.create({
     borderWidth: tema.grosor.normal,
     borderColor: tema.colores.borde,
     boxShadow: tema.sombra.nivel1,
+    maxWidth: tema.anchoMaximoMensaje,
     flexShrink: 1,
   },
   propio: { alignSelf: "flex-end", backgroundColor: tema.colores.resaltado },

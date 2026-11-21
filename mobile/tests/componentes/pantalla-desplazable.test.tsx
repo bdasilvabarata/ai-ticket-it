@@ -1,5 +1,5 @@
-import { render, screen } from "@testing-library/react-native";
-import { StyleSheet, Text } from "react-native";
+import { fireEvent, render, screen } from "@testing-library/react-native";
+import { ScrollView, StyleSheet, Text } from "react-native";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { PantallaDesplazable } from "../../src/componentes/PantallaDesplazable";
@@ -10,7 +10,17 @@ const metricas = {
   insets: { top: 24, left: 0, right: 0, bottom: 48 },
 };
 
+function scrollDe(texto: string) {
+  let scroll = screen.getByText(texto).parent;
+  while (scroll && scroll.type !== "RCTScrollView") scroll = scroll.parent;
+  if (!scroll) throw new Error("No se encontró el ScrollView");
+  return scroll;
+}
+
 describe("PantallaDesplazable", () => {
+  const scrollToEnd = jest.spyOn(ScrollView.prototype, "scrollToEnd");
+  beforeEach(() => scrollToEnd.mockClear());
+
   it("termina por encima de la barra de navegación del sistema", async () => {
     await render(
       <SafeAreaProvider initialMetrics={metricas}>
@@ -20,14 +30,46 @@ describe("PantallaDesplazable", () => {
       </SafeAreaProvider>,
     );
 
-    const texto = screen.getByText("Contenido");
-    expect(texto).toBeOnTheScreen();
-    let scroll = texto.parent;
-    while (scroll && scroll.type !== "RCTScrollView") scroll = scroll.parent;
-    expect(StyleSheet.flatten(scroll?.props.contentContainerStyle).paddingBottom).toBe(
+    expect(screen.getByText("Contenido")).toBeOnTheScreen();
+    const scroll = scrollDe("Contenido");
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingBottom).toBe(
       tema.espacio.normal + 48,
     );
     // Tocar un botón con el teclado abierto lo presiona en el primer toque.
-    expect(scroll?.props.keyboardShouldPersistTaps).toBe("handled");
+    expect(scroll.props.keyboardShouldPersistTaps).toBe("handled");
+  });
+
+  it("con «empezarAlFinal», al cambiar el tamaño del contenido desplaza hasta el final sin animación", async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={metricas}>
+        <PantallaDesplazable empezarAlFinal>
+          <Text>Conversación</Text>
+        </PantallaDesplazable>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent(scrollDe("Conversación"), "contentSizeChange", 360, 1200);
+
+    expect(scrollToEnd).toHaveBeenCalledWith({ animated: false });
+    // El margen inferior y el teclado no cambian con la prop.
+    const scroll = scrollDe("Conversación");
+    expect(StyleSheet.flatten(scroll.props.contentContainerStyle).paddingBottom).toBe(
+      tema.espacio.normal + 48,
+    );
+    expect(scroll.props.keyboardShouldPersistTaps).toBe("handled");
+  });
+
+  it("sin «empezarAlFinal», un cambio de tamaño del contenido no desplaza", async () => {
+    await render(
+      <SafeAreaProvider initialMetrics={metricas}>
+        <PantallaDesplazable>
+          <Text>Formulario</Text>
+        </PantallaDesplazable>
+      </SafeAreaProvider>,
+    );
+
+    await fireEvent(scrollDe("Formulario"), "contentSizeChange", 360, 1200);
+
+    expect(scrollToEnd).not.toHaveBeenCalled();
   });
 });

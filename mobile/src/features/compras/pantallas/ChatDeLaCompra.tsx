@@ -47,7 +47,7 @@ function SegunElChat({ usuarioId, compraId }: { usuarioId: string; compraId: str
 
 function Conversacion({ usuarioId, chat }: { usuarioId: string; chat: ChatDeLaCompraVista }) {
   return (
-    <PantallaDesplazable separacion={tema.espacio.normal}>
+    <PantallaDesplazable separacion={tema.espacio.normal} empezarAlFinal>
       <EncabezadoDelChat chat={chat} />
       {chat.mensajes.length === 0 ? (
         <Text style={estilos.vacio}>{SIN_MENSAJES}</Text>
@@ -78,10 +78,18 @@ function NuevoMensaje({ usuarioId, compraId }: { usuarioId: string; compraId: st
       enviarMensaje.mutate({ texto }, { onSuccess: () => setTexto(""), onSettled: terminar }),
     );
 
+  const errorDelTexto = errorDelCampoTexto(enviarMensaje.error);
+
   return (
     <View style={estilos.campo}>
-      <CampoDeTexto etiqueta="Mensaje" valor={texto} alCambiar={setTexto} multiline />
-      <AvisoDeFormulario mensaje={mensajeDelEnvio(enviarMensaje.error)} />
+      <CampoDeTexto
+        etiqueta="Mensaje"
+        valor={texto}
+        alCambiar={setTexto}
+        error={errorDelTexto ?? undefined}
+        multiline
+      />
+      <AvisoDeFormulario mensaje={errorDelTexto ? null : mensajeDelEnvio(enviarMensaje.error)} />
       <Boton
         texto="Enviar"
         textoEnCurso="Enviando…"
@@ -92,7 +100,13 @@ function NuevoMensaje({ usuarioId, compraId }: { usuarioId: string; compraId: st
   );
 }
 
-/** El aviso de un envío fallido; el texto escrito se conserva. */
+/** Ante un 400, el detalle de `body.texto`: se muestra como error del campo (la app no valida). */
+function errorDelCampoTexto(error: unknown): string | null {
+  if (!(error instanceof ErrorDeApi) || error.status !== 400) return null;
+  return error.detalles.find((detalle) => detalle.campo === "body.texto")?.mensaje ?? null;
+}
+
+/** El aviso de un envío fallido que no es de un campo; el texto escrito se conserva. */
 function mensajeDelEnvio(error: unknown): string | null {
   if (!error) return null;
   if (error instanceof ServidorNoDisponibleError) return "No se pudo enviar. Probá de nuevo.";
