@@ -187,11 +187,7 @@ export class CompraService {
       const reembolsada = compra.confirmarReembolso(usuarioId, ahora);
       await this.#compras.guardar(reembolsada);
       const comprador = await this.#usuarioService.obtenerOFallar(reembolsada.compradorId);
-      return aCompraDelEventoVista(
-        reembolsada,
-        comprador,
-        evento.buscarTipoEntrada(reembolsada.tipoEntradaId),
-      );
+      return aCompraDelEventoVista(reembolsada, comprador, evento);
     });
   }
 
@@ -282,11 +278,7 @@ export class CompraService {
       resumenPorTipo: resumenPorTipo(evento.tiposEntrada, compras).map(aResumenTipoEntradaVista),
       // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
       compras: compras.map((compra) =>
-        aCompraDelEventoVista(
-          compra,
-          compradores.get(compra.compradorId)!,
-          evento.buscarTipoEntrada(compra.tipoEntradaId),
-        ),
+        aCompraDelEventoVista(compra, compradores.get(compra.compradorId)!, evento),
       ),
     };
   }
