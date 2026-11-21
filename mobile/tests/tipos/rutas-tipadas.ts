@@ -46,3 +46,12 @@ export const tuCompra: Href = { pathname: "/compras/[compraId]", params: { compr
 
 // @ts-expect-error Tu compra necesita su parámetro compraId
 export const tuCompraSinParametro: Href = { pathname: "/compras/[compraId]" };
+
+// El chat de la compra (feature 011): necesita el parámetro compraId.
+export const chatDeLaCompra: Href = {
+  pathname: "/compras/[compraId]/chat",
+  params: { compraId: "compra-martin-festival-vip" },
+};
+
+// @ts-expect-error el chat de la compra necesita su parámetro compraId
+export const chatSinCompra: Href = { pathname: "/compras/[compraId]/chat" };

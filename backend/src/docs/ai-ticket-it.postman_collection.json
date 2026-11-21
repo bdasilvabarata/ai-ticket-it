@@ -589,6 +589,102 @@
       ]
     },
     {
+      "name": "Chat de la compra (011)",
+      "item": [
+        {
+          "name": "Chat de la compra (Martín, Festival)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Chat de la compra (Lucía, organizadora)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-lucia"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Enviar mensaje (Martín)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"¿A qué hora abren las puertas?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Enviar mensaje vacío → 400",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"   \"\n}"
+            }
+          }
+        },
+        {
+          "name": "Chat de la compra como Sofía → 403",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "Cancelar compra (009)",
       "item": [
         {

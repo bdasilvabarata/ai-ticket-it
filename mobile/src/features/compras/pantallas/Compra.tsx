@@ -51,6 +51,10 @@ const irAExplorar = () => router.dismissTo("/");
 const irAlEvento = (eventoId: string) =>
   router.dismissTo({ pathname: "/explorar/[eventoId]", params: { eventoId } });
 
+/** Al chat de la compra con el organizador (feature 011). */
+const irAlChat = (compraId: string) =>
+  router.push({ pathname: "/compras/[compraId]/chat", params: { compraId } });
+
 function SegunLaCompra({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
   const consulta = useCompra(usuarioId, compraId);
   const { error } = consulta;
@@ -112,6 +116,10 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
         </Text>
       ) : null}
       <ResumenCompra compra={compra} />
+      {/* El chat con el organizador, en cualquier estado (feature 011). */}
+      <View style={estilos.acciones}>
+        <Boton variante="aviso" texto="Chat con el organizador" alPresionar={() => irAlChat(compra.id)} />
+      </View>
       {conEntradas(compra) ? <TusEntradas compra={compra} /> : null}
       {conEntradas(compra) ? <Cancelacion usuarioId={usuarioId} compra={compra} /> : null}
       {compra.estado === EstadoCompra.PENDIENTE ? (

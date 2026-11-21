@@ -1,0 +1,97 @@
+import type { ChatDeLaCompraVista } from "@ai-ticket-it/shared";
+import { useLocalSearchParams } from "expo-router";
+import { useState } from "react";
+import { StyleSheet, Text, View } from "react-native";
+
+import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
+import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import { AvisoDeFormulario, CampoDeTexto } from "../../eventos";
+import { useSesion } from "../../sesion";
+import { EncabezadoDelChat } from "../componentes/EncabezadoDelChat";
+import { MensajeDelChat } from "../componentes/MensajeDelChat";
+import { SIN_MENSAJES } from "../formato";
+import { useEnviarMensaje } from "../mutaciones";
+import { useChatDeLaCompra } from "../useChatDeLaCompra";
+import { useEnvioUnico } from "../useEnvioUnico";
+
+/**
+ * "Chat de la compra" (feature 011, contracts/app.md): la conversación entre el comprador y el
+ * organizador del evento. Una sola pantalla para las dos partes: se dibuja solo con la respuesta del
+ * chat, y lo propio se distingue comparando el autor con el usuario actual.
+ */
+export function ChatDeLaCompra() {
+  const { compraId } = useLocalSearchParams<{ compraId: string }>();
+  const { estado } = useSesion();
+  if (estado.fase !== "con-usuario") return null; // el guard ya no muestra esta ruta
+  return <SegunElChat usuarioId={estado.usuarioId} compraId={compraId} />;
+}
+
+function SegunElChat({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
+  const consulta = useChatDeLaCompra(usuarioId, compraId);
+  return (
+    <SegunConsulta consulta={consulta} mensajeVacio="No encontramos esta compra.">
+      {(chat) => <Conversacion usuarioId={usuarioId} chat={chat} />}
+    </SegunConsulta>
+  );
+}
+
+function Conversacion({ usuarioId, chat }: { usuarioId: string; chat: ChatDeLaCompraVista }) {
+  return (
+    <PantallaDesplazable separacion={tema.espacio.normal}>
+      <EncabezadoDelChat chat={chat} />
+      {chat.mensajes.length === 0 ? (
+        <Text style={estilos.vacio}>{SIN_MENSAJES}</Text>
+      ) : (
+        <View style={estilos.mensajes}>
+          {chat.mensajes.map((mensaje) => (
+            <MensajeDelChat key={mensaje.numero} mensaje={mensaje} usuarioId={usuarioId} />
+          ))}
+        </View>
+      )}
+      <NuevoMensaje usuarioId={usuarioId} compraId={chat.compra.id} />
+    </PantallaDesplazable>
+  );
+}
+
+/**
+ * El campo y "Enviar". La app no valida (sin `maxLength` y sin deshabilitar "Enviar" con el campo
+ * vacío): lo decide el servidor. Un toque doble manda un solo pedido (`useEnvioUnico`); con éxito,
+ * el campo se vacía y el mensaje aparece cuando vuelve el chat pedido de nuevo.
+ */
+function NuevoMensaje({ usuarioId, compraId }: { usuarioId: string; compraId: string }) {
+  const [texto, setTexto] = useState("");
+  const enviarMensaje = useEnviarMensaje(usuarioId, compraId);
+  const enviarUnaVez = useEnvioUnico();
+
+  const alEnviar = () =>
+    enviarUnaVez((terminar) =>
+      enviarMensaje.mutate({ texto }, { onSuccess: () => setTexto(""), onSettled: terminar }),
+    );
+
+  return (
+    <View style={estilos.campo}>
+      <CampoDeTexto etiqueta="Mensaje" valor={texto} alCambiar={setTexto} multiline />
+      <AvisoDeFormulario mensaje={mensajeDelEnvio(enviarMensaje.error)} />
+      <Boton
+        texto="Enviar"
+        textoEnCurso="Enviando…"
+        enCurso={enviarMensaje.isPending}
+        alPresionar={alEnviar}
+      />
+    </View>
+  );
+}
+
+/** El aviso de un envío fallido; el texto escrito se conserva. */
+function mensajeDelEnvio(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof ServidorNoDisponibleError) return "No se pudo enviar. Probá de nuevo.";
+  if (error instanceof ErrorDeApi) return error.mensaje;
+  return "Ocurrió un error inesperado.";
+}
+
+const estilos = StyleSheet.create({
+  mensajes: { gap: tema.espacio.medio },
+  vacio: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
+  campo: { gap: tema.espacio.chico },
+});

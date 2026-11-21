@@ -5,13 +5,17 @@ import {
   type CompraDelEventoVista,
   type CompraVista,
   type EntradaDelEventoVista,
+  type MensajeVista,
   type MiCompraVista,
   type MotivoNoCancelable,
+  type ParteDeLaCompraVista,
   type ResumenTipoEntradaVista,
+  type RolEnLaCompra,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
-import { textoPrecio } from "../eventos";
+import { textoFechaHora, textoPrecio } from "../eventos";
+import { nombreCompleto } from "../usuarios";
 
 /** 0 → "Gratis"; 240000 → "$ 240.000". */
 export function textoTotal(total: number): string {
@@ -221,4 +225,39 @@ export function textoMotivoNoCancelable(motivo: MotivoNoCancelable | null): stri
     default:
       return null;
   }
+}
+
+// Chat de la compra (feature 011, R12).
+
+/** El chat sin mensajes: el encabezado y el campo siguen a la vista. */
+export const SIN_MENSAJES = "Todavía no hay mensajes";
+
+/** "comprador" → "Comprador"; "organizador" → "Organizador". */
+export function textoRolEnLaCompra(rol: RolEnLaCompra): string {
+  return rol === "comprador" ? "Comprador" : "Organizador";
+}
+
+/** "Lucía Álvarez · Organizador". */
+function textoParte(parte: ParteDeLaCompraVista): string {
+  return `${nombreCompleto(parte)} · ${textoRolEnLaCompra(parte.rol)}`;
+}
+
+/** "Con Lucía Álvarez · Organizador". */
+export function textoOtraParte(parte: ParteDeLaCompraVista): string {
+  return `Con ${textoParte(parte)}`;
+}
+
+/** "Vos" si lo escribió `usuarioId`; si no, "Lucía Álvarez · Organizador". */
+export function textoAutorDelMensaje(mensaje: MensajeVista, usuarioId: string): string {
+  return mensaje.autor.id === usuarioId ? "Vos" : textoParte(mensaje.autor);
+}
+
+/**
+ * La etiqueta accesible de un mensaje, que TalkBack lee como una unidad (FR-021): "Vos, comprador,
+ * vie 20 nov 2026 · 14:35: ¿A qué hora abren?" o "Lucía Álvarez, organizador, …: …". El rol propio
+ * solo se anuncia acá (en pantalla, el propio dice "Vos").
+ */
+export function etiquetaDelMensaje(mensaje: MensajeVista, usuarioId: string): string {
+  const autor = mensaje.autor.id === usuarioId ? "Vos" : nombreCompleto(mensaje.autor);
+  return `${autor}, ${mensaje.autor.rol}, ${textoFechaHora(mensaje.enviadoEnLocal)}: ${mensaje.texto}`;
 }

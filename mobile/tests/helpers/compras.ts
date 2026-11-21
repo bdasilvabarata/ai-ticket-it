@@ -1,11 +1,14 @@
 import {
   EstadoCompra,
+  type ChatDeLaCompraVista,
   type CompraDelEventoVista,
   type ComprasDelEventoVista,
   type CompraVista,
   type EntradaDelEventoVista,
+  type MensajeVista,
   type MiCompraVista,
   type MisComprasDelEventoVista,
+  type ParteDeLaCompraVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
@@ -378,4 +381,77 @@ export function entradaDelEvento(
       ...compra,
     },
   };
+}
+
+// Chat de la compra (feature 011): la conversación del seed (R8) entre Martín y Lucía.
+
+/** Martín, comprador de la compra VIP del Festival. */
+export const martinComprador: ParteDeLaCompraVista = {
+  id: "usuario-martin",
+  nombre: "Martín",
+  apellido: "Benítez",
+  rol: "comprador",
+};
+
+/** Lucía, organizadora del Festival. */
+export const luciaOrganizadora: ParteDeLaCompraVista = {
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  rol: "organizador",
+};
+
+/** Un mensaje de Martín a las 15:30 del 18/11, salvo que se cambie. */
+export function mensajeDeEjemplo(cambios: Partial<MensajeVista> = {}): MensajeVista {
+  return {
+    numero: 1,
+    autor: martinComprador,
+    texto: "Hola, ¿la entrada VIP incluye estacionamiento?",
+    enviadoEn: "2026-11-18T18:30:00.000Z",
+    enviadoEnLocal: "2026-11-18T15:30",
+    ...cambios,
+  };
+}
+
+/** Los tres mensajes del seed: Martín pregunta, Lucía responde y Martín agradece. */
+export const MENSAJES_DEL_SEED: MensajeVista[] = [
+  mensajeDeEjemplo(),
+  mensajeDeEjemplo({
+    numero: 2,
+    autor: luciaOrganizadora,
+    texto:
+      "¡Hola, Martín! Sí: con la entrada VIP tenés lugar en el estacionamiento del predio. Mostrá tu código en la barrera.",
+    enviadoEn: "2026-11-18T20:20:00.000Z",
+    enviadoEnLocal: "2026-11-18T17:20",
+  }),
+  mensajeDeEjemplo({
+    numero: 3,
+    texto: "¡Genial, gracias!",
+    enviadoEn: "2026-11-18T21:20:00.000Z",
+    enviadoEnLocal: "2026-11-18T18:20",
+  }),
+];
+
+/**
+ * El chat de la compra VIP del Festival visto por Martín (Festival, VIP, 2 entradas, CONFIRMADA, la
+ * otra parte es Lucía y los tres mensajes del seed), salvo que se cambie.
+ */
+export function chatDeEjemplo(cambios: Partial<ChatDeLaCompraVista> = {}): ChatDeLaCompraVista {
+  return {
+    compra: {
+      id: "compra-martin-festival-vip",
+      evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur" },
+      tipoEntrada: { id: "tipo-festival-sonidos-del-sur-vip", nombre: "VIP" },
+      cantidad: 2,
+      estado: EstadoCompra.CONFIRMADA,
+    },
+    otraParte: luciaOrganizadora,
+    mensajes: MENSAJES_DEL_SEED,
+    ...cambios,
+  };
+}
+
+/** El mismo chat visto por Lucía: la otra parte es Martín. */
+export function chatVistoPorLucia(cambios: Partial<ChatDeLaCompraVista> = {}): ChatDeLaCompraVista {
+  return chatDeEjemplo({ otraParte: martinComprador, ...cambios });
 }

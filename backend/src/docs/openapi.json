@@ -1286,6 +1286,250 @@
         }
       }
     },
+    "/compras/{compraId}/mensajes": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Chat de la compra (comprador u organizador)",
+        "description": "La conversación entre el comprador y el organizador del evento (feature 011), del mensaje más viejo al más nuevo, con el encabezado de la compra y su estado al día (una PENDIENTE vencida se ve CANCELADA). Vale en cualquier estado y con el evento realizado: no hay 409. Es una lectura: no toma el cerrojo ni guarda nada. Nunca trae códigos de entradas, historial, total ni `compradorId`. Orden de los rechazos: 401 → 400 → 404 → 403.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El chat visto por el usuario actual (`otraParte` es la otra de las dos partes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDeLaCompraVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es su comprador ni el organizador de su evento (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Enviar un mensaje en el chat de la compra (comprador u organizador)",
+        "description": "Suma un mensaje al final de la conversación (feature 011). El autor es el usuario de `X-Usuario-Id` y la fecha, la del reloj del servidor; las claves desconocidas del cuerpo se descartan. El texto se recorta y tiene que tener entre 1 y 500 caracteres. Vale en cualquier estado y con el evento realizado: no hay 409. Bajo el cerrojo del evento de la compra (con el reloj leído adentro): verifica que el usuario sea una de las dos partes, vence las pendientes vencidas del evento (con su cupo) y guarda la compra con el mensaje una vez. El mensaje no cambia el estado, el historial, las entradas, el total ni el cupo. Orden de los rechazos: 401 → 400 → 404 → 403.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosMensaje"
+              },
+              "example": {
+                "texto": "¿A qué hora abren las puertas?"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El mensaje creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "textoVacio": {
+                    "summary": "texto faltante, vacío o de solo espacios",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.texto",
+                            "mensaje": "Es obligatorio."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "textoLargo": {
+                    "summary": "texto de más de 500 caracteres",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.texto",
+                            "mensaje": "Debe tener como máximo 500 caracteres."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es su comprador ni el organizador de su evento (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/compras/{compraId}/reembolso": {
       "parameters": [
         {
@@ -2410,6 +2654,143 @@
             "example": "2026-11-18T20:15",
             "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
             "nullable": true
+          }
+        }
+      },
+      "DatosMensaje": {
+        "type": "object",
+        "description": "Cuerpo de `POST /compras/{compraId}/mensajes`: solo el texto (autor y fecha los pone el servidor).",
+        "required": ["texto"],
+        "properties": {
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Se recorta; ya recortado, de 1 a 500 caracteres. Los saltos de línea internos se conservan.",
+            "example": "¿A qué hora abren las puertas?"
+          }
+        }
+      },
+      "RolEnLaCompra": {
+        "type": "string",
+        "enum": ["comprador", "organizador"],
+        "description": "El rol de un usuario en una compra: su comprador o el organizador de su evento."
+      },
+      "ParteDeLaCompraVista": {
+        "type": "object",
+        "description": "Una de las dos partes del chat de una compra.",
+        "required": ["id", "nombre", "apellido", "rol"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usuario-lucia"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Lucía"
+          },
+          "apellido": {
+            "type": "string",
+            "example": "Álvarez"
+          },
+          "rol": {
+            "$ref": "#/components/schemas/RolEnLaCompra"
+          }
+        }
+      },
+      "MensajeVista": {
+        "type": "object",
+        "description": "Un mensaje del chat, en orden de envío.",
+        "required": ["numero", "autor", "texto", "enviadoEn", "enviadoEnLocal"],
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Su posición en la conversación, desde 1.",
+            "example": 4
+          },
+          "autor": {
+            "$ref": "#/components/schemas/ParteDeLaCompraVista"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "example": "¿A qué hora abren las puertas?"
+          },
+          "enviadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante UTC (reloj del servidor)."
+          },
+          "enviadoEnLocal": {
+            "type": "string",
+            "description": "`YYYY-MM-DDTHH:mm`, hora de Buenos Aires.",
+            "example": "2026-11-20T14:35"
+          }
+        }
+      },
+      "ChatDeLaCompraVista": {
+        "type": "object",
+        "description": "El chat de una compra: el encabezado (sin códigos de entrada, historial ni total), la otra parte y los mensajes.",
+        "required": ["compra", "otraParte", "mensajes"],
+        "properties": {
+          "compra": {
+            "type": "object",
+            "required": ["id", "evento", "tipoEntrada", "cantidad", "estado"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "compra-martin-festival-vip"
+              },
+              "evento": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "evento-festival-sonidos-del-sur"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Festival Sonidos del Sur"
+                  }
+                }
+              },
+              "tipoEntrada": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "tipo-festival-sonidos-del-sur-vip"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "VIP"
+                  }
+                }
+              },
+              "cantidad": {
+                "type": "integer",
+                "minimum": 1,
+                "example": 2
+              },
+              "estado": {
+                "type": "string",
+                "enum": ["PENDIENTE", "CONFIRMADA", "CANCELADA", "UTILIZADA", "REEMBOLSADA"],
+                "description": "Al día con el reloj del servidor."
+              }
+            }
+          },
+          "otraParte": {
+            "$ref": "#/components/schemas/ParteDeLaCompraVista"
+          },
+          "mensajes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MensajeVista"
+            }
           }
         }
       },

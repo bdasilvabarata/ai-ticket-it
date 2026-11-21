@@ -1,6 +1,6 @@
-import { LIMITES_COMPRA } from "@ai-ticket-it/shared";
+import { LIMITES_COMPRA, LIMITES_MENSAJE } from "@ai-ticket-it/shared";
 import { z } from "zod";
-import { idSchema, obligatorio } from "./comunes";
+import { idSchema, obligatorio, textoObligatorio } from "./comunes";
 import { crearValidacion } from "./validacion";
 
 // Forma de la entrada de las compras (contracts/api.md). Las reglas (tipo del evento, tope, cupo…)
@@ -29,5 +29,15 @@ export const compraNueva = crearValidacion({ params: paramsEvento, body: datosCo
 /** `GET /eventos/:eventoId/mis-compras` y `GET /eventos/:eventoId/compras` (feature 008): solo el id del evento. */
 export const comprasDelEvento = crearValidacion({ params: paramsEvento });
 
-/** `GET /compras/:compraId` y `POST /compras/:compraId/pago`. */
+/** `GET /compras/:compraId`, `POST /compras/:compraId/pago` y `GET /compras/:compraId/mensajes`. */
 export const compraPorId = crearValidacion({ params: z.object({ compraId: idSchema }) });
+
+/**
+ * `POST /compras/:compraId/mensajes` (feature 011, R3): el texto, recortado, de 1 a 500 caracteres.
+ * Las claves desconocidas (`autorId`, `enviadoEn`, `numero`…) se descartan: el autor es el usuario
+ * actual y la fecha, la del reloj del servidor.
+ */
+export const mensajeNuevo = crearValidacion({
+  params: z.object({ compraId: idSchema }),
+  body: z.object({ texto: textoObligatorio(LIMITES_MENSAJE.largoMaximo) }),
+});

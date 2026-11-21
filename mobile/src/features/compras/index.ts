@@ -1,3 +1,4 @@
+export { ChatDeLaCompra } from "./pantallas/ChatDeLaCompra";
 export { Compra } from "./pantallas/Compra";
 export { ComprarEntradas } from "./pantallas/ComprarEntradas";
 export { ComprasDelEvento } from "./pantallas/ComprasDelEvento";

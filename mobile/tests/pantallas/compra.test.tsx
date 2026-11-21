@@ -729,3 +729,24 @@ describe("Tu compra: por qué ya no se puede cancelar (feature 009, US3, FR-017,
     expect(screen.queryByText("Ya usaste una entrada")).toBeNull();
   });
 });
+
+describe("Tu compra: el acceso al chat (feature 011, US1)", () => {
+  it.each([
+    ["PENDIENTE", compraPendiente],
+    ["CONFIRMADA", compraConfirmada],
+    ["UTILIZADA", compraUtilizada],
+    ["CANCELADA", compraCancelada],
+    ["REEMBOLSADA", compraReembolsada],
+  ])("%s: «Chat con el organizador» lleva al chat de esa compra", async (_estado, compra) => {
+    await abrirCompra({ compra: [{ status: 200, json: { ...compra, id: "compra-nueva" } }] });
+
+    const push = jest.spyOn(router, "push").mockImplementation(() => {});
+    await fireEvent.press(await screen.findByRole("button", { name: "Chat con el organizador" }));
+
+    expect(push).toHaveBeenCalledWith({
+      pathname: "/compras/[compraId]/chat",
+      params: { compraId: "compra-nueva" },
+    });
+    push.mockRestore();
+  });
+});

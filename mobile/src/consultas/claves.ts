@@ -41,6 +41,12 @@ export const claves = {
   /** Una compra, leída por su comprador (feature 006). */
   compra: (usuarioId: string, compraId: string) => ["compra", usuarioId, compraId] as const,
   /**
+   * El chat de una compra, leído por una de sus dos partes (feature 011). No comparte prefijo con
+   * `["compra"]`: invalidar el chat no vuelve a pedir "Tu compra".
+   */
+  chatDeLaCompra: (usuarioId: string, compraId: string) =>
+    ["chat-de-la-compra", usuarioId, compraId] as const,
+  /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.
    */

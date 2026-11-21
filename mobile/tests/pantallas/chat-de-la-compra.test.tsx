@@ -1,0 +1,120 @@
+import type { UsuarioVista } from "@ai-ticket-it/shared";
+import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
+import { router } from "expo-router";
+
+import { chatDeEjemplo, compraConfirmada, MENSAJES_DEL_SEED, mensajeDeEjemplo } from "../helpers/compras";
+import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
+import { escribir, tituloDelHeader } from "../helpers/formulario";
+import { esperarPestanas } from "../helpers/pestanas";
+import { renderConDependencias } from "../helpers/render-con-dependencias";
+import { martin, todos } from "../helpers/usuarios";
+
+type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
+
+const COMPRA_ID = "compra-martin-festival-vip";
+const COMPRA = `/compras/${COMPRA_ID}`;
+const MENSAJES = `${COMPRA}/mensajes`;
+const TEXTO_NUEVO = "  ¿A qué hora abren las puertas?  ";
+
+const mensajeNuevo = mensajeDeEjemplo({
+  numero: 4,
+  texto: "¿A qué hora abren las puertas?",
+  enviadoEn: "2026-11-20T17:35:00.000Z",
+  enviadoEnLocal: "2026-11-20T14:35",
+});
+const conElMensajeNuevo = chatDeEjemplo({ mensajes: [...MENSAJES_DEL_SEED, mensajeNuevo] });
+
+interface Opciones {
+  usuario?: UsuarioVista;
+  chat?: Lista;
+  envio?: Lista;
+}
+
+function respuestas({ usuario = martin, chat = [{ status: 200, json: chatDeEjemplo() }], envio }: Opciones) {
+  return porRuta({
+    "/usuarios/actual": [{ status: 200, json: usuario }],
+    "/usuarios": [{ status: 200, json: todos }],
+    [MENSAJES]: [porMetodo({ GET: chat, POST: envio ?? [{ status: 201, json: mensajeNuevo }] })],
+    [COMPRA]: [{ status: 200, json: { ...compraConfirmada, id: COMPRA_ID } }],
+  });
+}
+
+/** Abre el chat de la compra VIP del Festival directamente (por la ruta tipada). */
+async function abrirChat(opciones: Opciones = {}) {
+  const resultado = await renderConDependencias({
+    usuarioRecordado: (opciones.usuario ?? martin).id,
+    respuestas: respuestas(opciones),
+  });
+  await esperarPestanas();
+  await act(() => router.push({ pathname: "/compras/[compraId]/chat", params: { compraId: COMPRA_ID } }));
+  return resultado;
+}
+
+const pedidosGet = (resultado: Awaited<ReturnType<typeof abrirChat>>) =>
+  resultado.falso.pedidosA(MENSAJES).filter((pedido) => pedido.metodo === "GET");
+const pedidosPost = (resultado: Awaited<ReturnType<typeof abrirChat>>) =>
+  resultado.falso.pedidosA(MENSAJES).filter((pedido) => pedido.metodo === "POST");
+
+describe("Chat de la compra: el comprador (feature 011, US1)", () => {
+  it("desde Tu compra, «Chat con el organizador» abre el chat, que se pide en nombre de Martín", async () => {
+    const resultado = await renderConDependencias({
+      usuarioRecordado: martin.id,
+      respuestas: respuestas({}),
+    });
+    await esperarPestanas();
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: COMPRA_ID } }));
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Chat con el organizador" }));
+
+    expect(await screen.findByRole("header", { name: "Festival Sonidos del Sur" })).toBeOnTheScreen();
+    expect(tituloDelHeader()).toBe("Chat de la compra");
+    const pedidos = pedidosGet(resultado);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]?.encabezados["X-Usuario-Id"]).toBe("usuario-martin");
+  });
+
+  it("el encabezado: el evento, la otra parte, el tipo con la cantidad y el estado", async () => {
+    await abrirChat();
+
+    expect(await screen.findByRole("header", { name: "Festival Sonidos del Sur" })).toBeOnTheScreen();
+    expect(screen.getByText("Con Lucía Álvarez · Organizador")).toBeOnTheScreen();
+    expect(screen.getByText("VIP · 2 entradas")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("los tres mensajes con su texto, su hora y su autor: los de Martín como «Vos»", async () => {
+    await abrirChat();
+
+    expect(await screen.findByText("Hola, ¿la entrada VIP incluye estacionamiento?")).toBeOnTheScreen();
+    expect(screen.getByText(MENSAJES_DEL_SEED[1]!.texto)).toBeOnTheScreen();
+    expect(screen.getByText("¡Genial, gracias!")).toBeOnTheScreen();
+    expect(screen.getByText("mié 18 nov 2026 · 15:30")).toBeOnTheScreen();
+    expect(screen.getByText("mié 18 nov 2026 · 17:20")).toBeOnTheScreen();
+    expect(screen.getAllByText("Vos")).toHaveLength(2);
+    expect(screen.getByText("Lucía Álvarez · Organizador")).toBeOnTheScreen();
+  });
+
+  it("Enviar manda el texto sin recortar, vacía el campo y vuelve a pedir el chat con el mensaje nuevo último", async () => {
+    const resultado = await abrirChat({
+      chat: [
+        { status: 200, json: chatDeEjemplo() },
+        { status: 200, json: conElMensajeNuevo },
+      ],
+    });
+    await screen.findByText("¡Genial, gracias!");
+
+    await escribir("Mensaje", TEXTO_NUEVO);
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(await screen.findByText("¿A qué hora abren las puertas?")).toBeOnTheScreen();
+    const envios = pedidosPost(resultado);
+    expect(envios).toHaveLength(1);
+    expect(JSON.parse(envios[0]?.cuerpo ?? "null")).toEqual({ texto: TEXTO_NUEVO });
+    expect(envios[0]?.encabezados["X-Usuario-Id"]).toBe("usuario-martin");
+    await waitFor(() => expect(screen.getByLabelText("Mensaje")).toHaveDisplayValue(""));
+    expect(pedidosGet(resultado)).toHaveLength(2);
+    // El nuevo es el último de la conversación.
+    const mensajes = screen.getAllByLabelText(/^Vos, comprador, |^Lucía Álvarez, organizador, /);
+    expect(within(mensajes.at(-1)!).getByText("¿A qué hora abren las puertas?")).toBeOnTheScreen();
+  });
+});
