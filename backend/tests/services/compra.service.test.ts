@@ -1,15 +1,17 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { CambioEstadoCompra, Compra } from "../../src/domain/compra";
+import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
 import {
   CompraNoEncontradaError,
+  EntradaNoEncontradaError,
   NoEncontradoError,
   ReferenciaInvalidaError,
   SinPermisoError,
 } from "../../src/errors/index";
-import { AHORA, DIA, compra, evento, lucia, relojFijo, relojMovible, tipo } from "../helpers/eventos";
+import { AHORA, DIA, HORA, compra, evento, lucia, relojFijo, relojMovible, tipo } from "../helpers/eventos";
 import { crearServicesDeEventos } from "../helpers/services-de-eventos";
 
 const MINUTO = 60 * 1000;
@@ -1992,5 +1994,191 @@ describe("CompraService.confirmarReembolso (feature 009, US2, R5)", () => {
       expect(guardar).not.toHaveBeenCalled();
       expect(cerrojo.clavesActivas).toBe(0);
     });
+  });
+});
+
+/**
+ * Uso de entradas (feature 010, R3/R4): los mismos datos que `entrada.service.test.ts`. El evento A
+ * de Lucía empieza 2 h después de AHORA (ventana abierta); el B, en 5 días (ventana cerrada).
+ */
+const generalDeLaPenia = tipo({ id: "tipo-a-general", nombre: "General", precio: 6000, cupo: 10 });
+
+function armarUso({ compras = [] as Compra[], reloj = relojMovible() } = {}) {
+  const servicios = crearServicesDeEventos({
+    eventos: [
+      evento({ id: "evento-a", nombre: "Peña", en: 2 * HORA, tiposEntrada: [generalDeLaPenia] }),
+      evento({
+        id: "evento-b",
+        nombre: "Festival",
+        tiposEntrada: [tipo({ id: "tipo-b-vip", nombre: "VIP" })],
+      }),
+    ],
+    compras,
+    reloj,
+  });
+  return { ...servicios, reloj };
+}
+
+/** Una compra de Martín de 3 General del evento A en `estado`. */
+const deMartin = (estado: EstadoCompra = EstadoCompra.CONFIRMADA, cambios = {}) =>
+  compra("evento-a", "tipo-a-general", estado, { id: `compra-martin-${estado}`, cantidad: 3, ...cambios });
+const codigoDe = (c: Compra, i = 0) => c.entradas[i]!.codigo;
+/** El código con minúsculas y un guion en el medio, como lo podría tipear el organizador. */
+const tipeado = (codigo: string) => `${codigo.slice(0, 4).toLowerCase()}-${codigo.slice(4).toLowerCase()}`;
+
+/** El error de dominio con el que rechaza `promesa`. */
+async function rechazoDeDominio(promesa: Promise<unknown>): Promise<ReglaDeNegocioError> {
+  try {
+    await promesa;
+  } catch (error) {
+    expect(error).toBeInstanceOf(ReglaDeNegocioError);
+    return error as ReglaDeNegocioError;
+  }
+  throw new Error("Debía rechazar con ReglaDeNegocioError.");
+}
+
+describe("CompraService.obtenerPorCodigoOFallar", () => {
+  it("devuelve la compra de ese evento con una entrada de ese código", async () => {
+    const confirmada = deMartin();
+    const { compraService } = armarUso({ compras: [confirmada] });
+    const encontrada = await compraService.obtenerPorCodigoOFallar("evento-a", codigoDe(confirmada, 2));
+    expect(encontrada.id).toBe(confirmada.id);
+  });
+
+  it("formato inválido, inexistente o de una compra de otro evento → EntradaNoEncontradaError", async () => {
+    const delFestival = compra("evento-b", "tipo-b-vip", EstadoCompra.CONFIRMADA, { id: "del-festival" });
+    const { compraService } = armarUso({ compras: [delFestival, deMartin()] });
+    for (const codigo of ["abc", "ZZZZZZZZ", codigoDe(delFestival)]) {
+      await expect(compraService.obtenerPorCodigoOFallar("evento-a", codigo)).rejects.toBeInstanceOf(
+        EntradaNoEncontradaError,
+      );
+    }
+  });
+});
+
+describe("CompraService.registrarUso (feature 010)", () => {
+  it("normaliza el código y pasa la entrada y la compra a UTILIZADA con el reloj leído dentro del cerrojo", async () => {
+    const confirmada = deMartin();
+    const { compraService, cerrojo, reloj, repositorioCompras } = armarUso({ compras: [confirmada] });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar").mockImplementation(async (_clave, operacion) => {
+      reloj.avanzar(MINUTO); // el reloj se mueve mientras espera el cerrojo
+      return operacion();
+    });
+
+    const vista = await compraService.registrarUso(
+      "evento-a",
+      tipeado(codigoDe(confirmada)),
+      "usuario-lucia",
+    );
+
+    const enElCerrojo = new Date(AHORA.getTime() + MINUTO);
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar.mock.calls[0]![0]).toBe("evento-a");
+    expect(vista).toMatchObject({
+      codigo: codigoDe(confirmada),
+      estado: EstadoCompra.UTILIZADA,
+      usadaEn: enElCerrojo.toISOString(),
+      compra: { estado: EstadoCompra.UTILIZADA, entradasUsadas: 1 },
+    });
+    const guardada = (await repositorioCompras.buscarPorId(confirmada.id))!;
+    expect(guardada.historial.at(-1)).toEqual({
+      estado: EstadoCompra.UTILIZADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: enElCerrojo,
+    });
+    expect(guardada.estadoDeEntrada(codigoDe(confirmada, 1))).toBe(EstadoCompra.CONFIRMADA);
+  });
+
+  it("una segunda entrada de la misma compra: entradasUsadas 2 y la compra no suma otro cambio", async () => {
+    const confirmada = deMartin();
+    const { compraService, repositorioCompras } = armarUso({ compras: [confirmada] });
+    await compraService.registrarUso("evento-a", codigoDe(confirmada, 0), "usuario-lucia");
+    const vista = await compraService.registrarUso("evento-a", codigoDe(confirmada, 1), "usuario-lucia");
+    expect(vista.compra.entradasUsadas).toBe(2);
+    const guardada = (await repositorioCompras.buscarPorId(confirmada.id))!;
+    expect(guardada.historial.filter((c) => c.estado === EstadoCompra.UTILIZADA)).toHaveLength(1);
+  });
+
+  it("un solo guardar de compras y ninguno de eventos: el cupo no cambia", async () => {
+    const confirmada = deMartin();
+    const { compraService, repositorioCompras, repositorioEventos } = armarUso({ compras: [confirmada] });
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+    await compraService.registrarUso("evento-a", codigoDe(confirmada), "usuario-lucia");
+    expect(guardarCompra).toHaveBeenCalledTimes(1);
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(
+      (await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-general")?.cupo,
+    ).toBe(10);
+  });
+
+  it("orden de rechazos: 404 evento → 403 → 404 entrada → FUERA_DE_HORARIO_DE_USO → TRANSICION_INVALIDA", async () => {
+    const pendienteDelFestival = compra("evento-b", "tipo-b-vip", EstadoCompra.PENDIENTE, { id: "festival" });
+    const usada = deMartin();
+    const { compraService } = armarUso({ compras: [pendienteDelFestival, usada] });
+    await compraService.registrarUso("evento-a", codigoDe(usada), "usuario-lucia");
+
+    await expect(compraService.registrarUso("evento-x", "ZZZZZZZZ", "usuario-martin")).rejects.toBeInstanceOf(
+      NoEncontradoError,
+    );
+    // También el comprador: solo el organizador registra el ingreso.
+    await expect(
+      compraService.registrarUso("evento-a", codigoDe(usada, 1), "usuario-martin"),
+    ).rejects.toBeInstanceOf(SinPermisoError);
+    await expect(compraService.registrarUso("evento-a", "ZZZZZZZZ", "usuario-lucia")).rejects.toBeInstanceOf(
+      EntradaNoEncontradaError,
+    );
+    const fuera = await rechazoDeDominio(
+      compraService.registrarUso("evento-b", codigoDe(pendienteDelFestival), "usuario-lucia"),
+    );
+    expect(fuera.codigo).toBe("FUERA_DE_HORARIO_DE_USO");
+    expect(fuera.message).toBe("El ingreso se registra desde el 15/11 08:00 hasta el 16/11 00:00.");
+    const yaUsada = await rechazoDeDominio(
+      compraService.registrarUso("evento-a", codigoDe(usada), "usuario-lucia"),
+    );
+    expect(yaUsada).toMatchObject({ codigo: "TRANSICION_INVALIDA", message: "Esta entrada ya se utilizó." });
+  });
+
+  it.each([
+    [EstadoCompra.PENDIENTE, "La compra de esta entrada todavía no se pagó."],
+    [EstadoCompra.CANCELADA, "La compra de esta entrada está cancelada."],
+    // Cancelada después de confirmada: la entrada tiene su propio cambio CANCELADA (feature 009).
+    [EstadoCompra.REEMBOLSADA, "La compra de esta entrada está cancelada."],
+  ])(
+    "una entrada de una compra %s → TRANSICION_INVALIDA con el mensaje de motivoNoUsable",
+    async (estado, mensaje) => {
+      const noUsable = deMartin(estado);
+      const { compraService } = armarUso({ compras: [noUsable] });
+      const error = await rechazoDeDominio(
+        compraService.registrarUso("evento-a", codigoDe(noUsable), "usuario-lucia"),
+      );
+      expect(error).toMatchObject({ codigo: "TRANSICION_INVALIDA", message: mensaje });
+    },
+  );
+
+  it("una pendiente vencida sin materializar → materializada y TRANSICION_INVALIDA «…está cancelada.»", async () => {
+    const pendiente = deMartin(EstadoCompra.PENDIENTE);
+    const { compraService, reloj, repositorioCompras } = armarUso({ compras: [pendiente] });
+    reloj.avanzar(15 * MINUTO);
+    const error = await rechazoDeDominio(
+      compraService.registrarUso("evento-a", codigoDe(pendiente), "usuario-lucia"),
+    );
+    expect(error).toMatchObject({
+      codigo: "TRANSICION_INVALIDA",
+      message: "La compra de esta entrada está cancelada.",
+    });
+    const guardada = (await repositorioCompras.buscarPorId(pendiente.id))!;
+    expect(guardada.estado).toBe(EstadoCompra.CANCELADA);
+    expect(guardada.fueVencida()).toBe(true);
+  });
+
+  it("toma el cerrojo del evento una vez y lo libera también ante un error", async () => {
+    const pendiente = deMartin(EstadoCompra.PENDIENTE);
+    const { compraService, cerrojo } = armarUso({ compras: [pendiente] });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    await rechazoDeDominio(compraService.registrarUso("evento-a", codigoDe(pendiente), "usuario-lucia"));
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    // Liberado: otra operación sobre el mismo evento no queda esperando.
+    await expect(cerrojo.ejecutar("evento-a", async () => "libre")).resolves.toBe("libre");
   });
 });

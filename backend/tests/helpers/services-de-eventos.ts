@@ -32,7 +32,8 @@ export interface DatosDeServicesDeEventos {
 /**
  * Los services de eventos y compras conectados como en `app.ts` (un cerrojo compartido,
  * `CompraService` sobre `EventoService` y `TipoEntradaService`, `EntradaService` sobre
- * `EventoService` y `UsuarioService`, `TipoEntradaService` sobre
+ * `CompraService` (el dueño de las compras guarda el uso), `EventoService` y `UsuarioService`,
+ * `TipoEntradaService` sobre
  * `EventoService`, que se apoya en `VencimientoService` y en los de categorías, usuarios y reseñas),
  * con repositorios en memoria armados con los datos de cada caso.
  */
@@ -79,13 +80,7 @@ export function crearServicesDeEventos({
     cerrojo,
     reloj,
   });
-  const entradaService = new EntradaService({
-    compras: repositorioCompras,
-    eventoService,
-    usuarioService,
-    cerrojo,
-    reloj,
-  });
+  const entradaService = new EntradaService({ compraService, eventoService, usuarioService, reloj });
   return {
     vencimientoService,
     eventoService,
