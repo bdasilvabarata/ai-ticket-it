@@ -31,10 +31,10 @@ import { diego, lucia, todos } from "../helpers/usuarios";
 type Lista = (RespuestaFalsa | FuncionRespuesta)[];
 
 const RUTA = "/eventos/evento-festival/compras";
-const FILA_FESTIVAL = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
+const FILA_FESTIVAL = "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 
 /**
- * Abre Mis eventos con Lucía, toca el Festival (editable) y después "Ver compras". `extra` suma o
+ * Abre Mis eventos con Lucía, toca el Festival y, en su hub, "Ver compras". `extra` suma o
  * reemplaza rutas del servidor falso.
  */
 async function abrirComprasDelFestival(compras: Lista, extra: Record<string, Lista> = {}) {
@@ -97,13 +97,13 @@ const martinUtilizada = compraDelEvento({
 });
 
 describe("Compras del evento (feature 008, US1)", () => {
-  it('"Ver compras" en la edición de un evento propio abre la pantalla con su título', async () => {
+  it('"Ver compras" en el hub de un evento propio abre la pantalla con su título', async () => {
     await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([martinConfirmada]) }]);
     await waitFor(() => expect(tituloDelHeader()).toBe("Compras del evento"));
     expect(await screen.findByText("Martín Benítez")).toBeOnTheScreen();
   });
 
-  it('"Ver compras" también está en la solo lectura de un evento realizado', async () => {
+  it('"Ver compras" también está en el hub de un evento realizado', async () => {
     const resultado = await renderConDependencias({
       usuarioRecordado: lucia.id,
       respuestas: porRuta({
@@ -131,14 +131,14 @@ describe("Compras del evento (feature 008, US1)", () => {
     await irAPestana("Mis eventos");
     await fireEvent.press(
       await screen.findByRole("button", {
-        name: "Ver Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
+        name: "Abrir Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
       }),
     );
     await screen.findByText("Realizado");
     await fireEvent.press(screen.getByRole("button", { name: "Ver compras" }));
 
     await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-noche-de-risas/compras"));
-    // El nombre también es el header de la solo lectura, que sigue montada debajo en la pila.
+    // El nombre también es el header del hub, que sigue montado debajo en la pila.
     expect(await screen.findByText("Los ingresos se registraron hasta el 11/12 02:00")).toBeOnTheScreen();
   });
 

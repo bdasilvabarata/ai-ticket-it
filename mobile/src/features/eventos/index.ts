@@ -8,5 +8,6 @@ export { DetalleEvento, type ComplementosDelDetalle } from "./pantallas/DetalleE
 export { EditarTipoEntrada } from "./pantallas/EditarTipoEntrada";
 export { EventoDelOrganizador } from "./pantallas/EventoDelOrganizador";
 export { Explorar } from "./pantallas/Explorar";
+export { HubDelEvento } from "./pantallas/HubDelEvento";
 export { MisEventos } from "./pantallas/MisEventos";
 export { useEvento } from "./useEvento";

@@ -10,12 +10,12 @@ export interface PropsFilaEvento {
   evento: EventoResumenVista;
 }
 
-/** Una fila de Mis eventos (contracts/app.md, "Mis eventos"): lleva al evento, para editarlo o verlo. */
+/** Una fila de Mis eventos (contracts/app.md, "Mis eventos"): lleva al hub del evento. */
 export function FilaEvento({ evento }: PropsFilaEvento) {
   const fechaHora = textoFechaHora(evento.fechaHoraLocal);
   const etiqueta = evento.realizado
-    ? `Ver ${evento.nombre}, realizado, ${fechaHora}`
-    : `Editar ${evento.nombre}, ${fechaHora}`;
+    ? `Abrir ${evento.nombre}, realizado, ${fechaHora}`
+    : `Abrir ${evento.nombre}, ${fechaHora}`;
   return (
     <Pressable
       accessibilityRole="button"

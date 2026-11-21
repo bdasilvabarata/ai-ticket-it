@@ -17,10 +17,10 @@ const COMPRAS = "/eventos/evento-festival/compras";
 const ENTRADA = "/eventos/evento-festival/entradas/7K3MQ9TB";
 const USO = `${ENTRADA}/uso`;
 const CAMPO = "Código de la entrada";
-const FILA_FESTIVAL = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
+const FILA_FESTIVAL = "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 const CONFIRMAR = "¿Registrar el ingreso?";
 
-/** Lucía: Mis eventos → Festival → "Ver compras" → "Registrar ingreso". */
+/** Lucía: Mis eventos → Festival (hub) → "Ver compras" → "Registrar ingreso". */
 async function abrirRegistrarIngreso({ entrada = [] as Lista, uso = [] as Lista } = {}) {
   const resultado = await renderConDependencias({
     usuarioRecordado: lucia.id,

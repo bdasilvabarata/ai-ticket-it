@@ -11,7 +11,9 @@ import { lucia, todos } from "../helpers/usuarios";
 
 const DESCARTAR = "¿Descartar los cambios?";
 const RUTA = "/eventos/evento-festival";
-const FILA = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
+/** La pantalla de edición (la ruta del evento es su hub). */
+const EDITAR = `${RUTA}/editar`;
+const FILA = "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 const realizado = errorApi("EVENTO_REALIZADO", "El evento ya se realizó: no se puede modificar.");
 const noExiste = errorApi("EVENTO_NO_ENCONTRADO", "No existe el evento.");
 
@@ -24,7 +26,7 @@ interface Opciones {
   misEventos?: () => EventoResumenVista[];
 }
 
-/** Abre Mis eventos con Lucía y toca la fila del Festival. */
+/** Abre Mis eventos con Lucía, toca la fila del Festival y, en su hub, "Editar evento". */
 async function abrirEditar({
   get = [{ status: 200, json: festivalCompleto }],
   put = [{ status: 200, json: festivalCompleto }],
@@ -46,7 +48,8 @@ async function abrirEditar({
   await esperarPestanas();
   await irAPestana("Mis eventos");
   await fireEvent.press(await screen.findByRole("button", { name: FILA }));
-  await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+  await fireEvent.press(await screen.findByRole("button", { name: "Editar evento" }));
+  await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
   await screen.findByLabelText("Nombre del evento");
   return resultado;
 }
@@ -55,7 +58,7 @@ const pedidos = (resultado: Awaited<ReturnType<typeof abrirEditar>>, metodo: str
   resultado.falso.pedidos.filter((p) => p.metodo === metodo);
 
 describe("Editar evento (US3)", () => {
-  it("tocar una fila lleva a /eventos/[eventoId] con el header Editar evento y los datos precargados", async () => {
+  it('"Editar evento" en el hub lleva a /eventos/[eventoId]/editar con el header Editar evento y los datos precargados', async () => {
     await abrirEditar();
 
     await waitFor(() => expect(tituloDelHeader()).toBe("Editar evento"));
@@ -182,7 +185,7 @@ describe("Editar evento (US3)", () => {
     expect(await screen.findByText("El evento ya se realizó: no se puede modificar.")).toBeOnTheScreen();
     await waitFor(() => expect(tituloDelHeader()).toBe("Evento realizado"));
     expect(screen.queryByRole("button", { name: "Guardar cambios" })).toBeNull();
-    expect(resultado.getPathname()).toBe(RUTA);
+    expect(resultado.getPathname()).toBe(EDITAR);
   });
 
   it("un 404 avisa El evento ya no existe. y vuelve a Mis eventos sin preguntar", async () => {
@@ -212,7 +215,7 @@ describe("Editar evento (US3)", () => {
     await screen.findByLabelText("Nombre del evento");
 
     await act(() => router.back());
-    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
   });
 
@@ -225,7 +228,7 @@ describe("Editar evento (US3)", () => {
     await tocarEnAlerta(alertas, DESCARTAR, "Seguir editando");
     await escribir("Nombre del evento", "Festival Sonidos del Sur");
     await act(() => router.back());
-    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(1);
   });
 
@@ -237,7 +240,7 @@ describe("Editar evento (US3)", () => {
     await act(() => router.back());
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(1);
     await tocarEnAlerta(alertas, DESCARTAR, "Descartar");
-    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
   });
 });
 

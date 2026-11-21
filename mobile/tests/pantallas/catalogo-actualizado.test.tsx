@@ -22,7 +22,7 @@ import { lucia, todos } from "../helpers/usuarios";
 jest.setTimeout(15_000);
 
 const RUTA = "/eventos/evento-festival";
-const FILA = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
+const FILA = "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 
 const festivalEnCatalogo: EventoCatalogoVista = {
   ...festival,
@@ -48,6 +48,7 @@ async function abrir(actual: () => CatalogoVista, put: FuncionRespuesta, del: Fu
   expect(await screen.findByText("Festival Sonidos del Sur")).toBeOnTheScreen();
   await irAPestana("Mis eventos");
   await fireEvent.press(await screen.findByRole("button", { name: FILA }));
+  await fireEvent.press(await screen.findByRole("button", { name: "Editar evento" }));
   await screen.findByLabelText("Nombre del evento");
   return resultado;
 }

@@ -10,9 +10,9 @@ import { VerEventoRealizado } from "./VerEventoRealizado";
 const AVISO_REALIZADO = "El evento ya se realizó: no se puede modificar.";
 
 /**
- * La ruta `/eventos/[eventoId]` (research R16): edita el evento o lo muestra en solo lectura según
- * el `realizado` del servidor, nunca según el reloj del teléfono (FR-010a). Así, un 409
- * `EVENTO_REALIZADO` pasa a solo lectura sin navegar.
+ * La ruta `/eventos/[eventoId]/editar` (research R16), que se abre desde el hub del evento: edita el
+ * evento o lo muestra en solo lectura según el `realizado` del servidor, nunca según el reloj del
+ * teléfono (FR-010a). Así, un 409 `EVENTO_REALIZADO` pasa a solo lectura sin navegar.
  */
 export function EventoDelOrganizador() {
   const { eventoId } = useLocalSearchParams<{ eventoId: string }>();

@@ -245,7 +245,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `compras/[compraId]/index` ("Tu compra"; desde la 011 en una carpeta, con el mismo `href`
     `/compras/[compraId]`, junto a `compras/[compraId]/chat`, "Chat de la compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
     organizador (feature 008) son `eventos/[eventoId]/compras` (`ComprasDelEvento`) y
-    `eventos/[eventoId]/ingreso` (`RegistrarIngreso`). El lint prohíbe importar
+    `eventos/[eventoId]/ingreso` (`RegistrarIngreso`); el evento propio es `eventos/[eventoId]/index`
+    (`HubDelEvento`, el hub) y su edición o solo lectura, `eventos/[eventoId]/editar`
+    (`EventoDelOrganizador`). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
   - **Base** (no importa features):
     - `src/api/` — el cliente HTTP y un archivo por recurso con sus funciones de endpoint,
@@ -296,8 +298,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       desplegable, `SelectorOrden` (tocar el elegido invierte el `sentido`), `TarjetaEvento`/`TarjetaSkeleton` y
       `useCatalogo`), el detalle público `DetalleEvento` (lo monta `DetalleEventoConCompras` de `compras` en
       `explorar/[eventoId]/index`, `FilaImagenes`;
-      ante un 404 llama a `useInvalidarCatalogo`), Mis eventos, Crear evento, `EventoDelOrganizador`
-      (edita o muestra en solo lectura según el `realizado` del servidor), los formularios de tipo
+      ante un 404 llama a `useInvalidarCatalogo`), Mis eventos, Crear evento, `HubDelEvento` (el hub
+      del evento propio, al que lleva cada fila de Mis eventos: nombre, categoría, fecha, "Realizado" y
+      los botones "Ver compras", "Registrar ingreso" y "Editar evento" —"Ver detalle" si está
+      realizado—), `EventoDelOrganizador` (en `/editar`: edita o muestra en solo lectura según el
+      `realizado` del servidor; guardar o eliminar vuelven a Mis eventos, atrás vuelve al hub), los formularios de tipo
       de entrada, `useMisEventos`/`useEvento`, las mutations de `mutaciones.ts` (en nombre del
       usuario **del formulario**, invalidan al terminar, también `["catalogo"]`), `fecha-de-pared.ts` (selector ⇄ `"YYYY-MM-DDTHH:mm"`,
       sin convertir zonas), `errores-de-formulario.ts` (la app no valida: muestra los detalles del
@@ -349,8 +354,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       Pagar y cancelar en "Tu compra" y "Confirmar reembolso" envían con `useEnvioUnico` (010:
       una marca sincrónica, porque el `Alert` responde antes de que se vuelva a dibujar: un
       segundo toque no manda otro pedido). `useCancelarCompra` invalida además, por prefijo,
-      `["compras-del-evento"]` y `["entrada-del-evento"]` (lo del organizador). "Ver compras", en la edición
-      y la solo lectura del evento propio, está en `eventos` y navega **por la ruta tipada** (sin
+      `["compras-del-evento"]` y `["entrada-del-evento"]` (lo del organizador). "Ver compras" y "Registrar
+      ingreso", en el hub del evento propio, están en `eventos` y navega **por la ruta tipada** (sin
       importar `compras`). La 011 suma `ChatDeLaCompra` ("Chat de la compra", en
       `PantallaDesplazable` con `empezarAlFinal`): `EncabezadoDelChat` (evento, "Con … · <rol>",
       tipo y cantidad, `EtiquetaEstadoCompra`), un `MensajeDelChat` por mensaje (propio a la derecha

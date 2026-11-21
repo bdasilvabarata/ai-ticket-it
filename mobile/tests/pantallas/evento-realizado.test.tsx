@@ -22,10 +22,11 @@ async function abrirRealizado() {
   await irAPestana("Mis eventos");
   await fireEvent.press(
     await screen.findByRole("button", {
-      name: "Ver Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
+      name: "Abrir Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
     }),
   );
-  await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-noche-de-risas"));
+  await fireEvent.press(await screen.findByRole("button", { name: "Ver detalle" }));
+  await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-noche-de-risas/editar"));
   return resultado;
 }
 
@@ -61,8 +62,9 @@ describe("Ver evento realizado (FR-006a)", () => {
     }
     expect(screen.queryByLabelText("Nombre del evento")).toBeNull();
 
+    // Vuelve al hub del evento, sin preguntar.
     await act(() => router.back());
-    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-noche-de-risas"));
     expect(alertasCon(alertas, "¿Descartar los cambios?")).toHaveLength(0);
   });
 });

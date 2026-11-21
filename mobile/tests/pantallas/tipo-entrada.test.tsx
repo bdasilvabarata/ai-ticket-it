@@ -11,7 +11,9 @@ import { lucia, todos } from "../helpers/usuarios";
 
 const DESCARTAR = "¿Descartar los cambios?";
 const RUTA = "/eventos/evento-festival";
-const FILA = "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
+/** La pantalla de edición (la ruta del evento es su hub). */
+const EDITAR = `${RUTA}/editar`;
+const FILA = "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00";
 const conPlatea: EventoVista = {
   ...festivalCompleto,
   tiposEntrada: [
@@ -47,7 +49,8 @@ async function abrirEvento({
   await esperarPestanas();
   await irAPestana("Mis eventos");
   await fireEvent.press(await screen.findByRole("button", { name: FILA }));
-  await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+  await fireEvent.press(await screen.findByRole("button", { name: "Editar evento" }));
+  await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
   await screen.findByRole("button", { name: "Editar VIP" });
   return resultado;
 }
@@ -85,7 +88,7 @@ describe("Agregar tipo de entrada (US3)", () => {
 
     await enviar("Agregar tipo de entrada");
 
-    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
     expect(await screen.findByRole("button", { name: "Editar Platea" })).toBeOnTheScreen();
     const [post] = pedidos(resultado, "POST");
     expect(post.url).toBe(`${URL_DE_PRUEBA}${RUTA}/tipos-entrada`);
@@ -145,7 +148,7 @@ describe("Agregar tipo de entrada (US3)", () => {
     await escribir("Nombre", "Platea");
     await enviar("Agregar tipo de entrada");
 
-    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
     expect(await screen.findByText("El evento ya se realizó: no se puede modificar.")).toBeOnTheScreen();
     await waitFor(() => expect(tituloDelHeader()).toBe("Evento realizado"));
   });
@@ -178,7 +181,7 @@ describe("Agregar tipo de entrada (US3)", () => {
     const alertas = espiarAlertas();
     const resultado = await abrirAgregar();
     await act(() => router.back());
-    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
   });
 
@@ -188,7 +191,7 @@ describe("Agregar tipo de entrada (US3)", () => {
     await escribir("Nombre", "Platea");
     await act(() => router.back());
     await tocarEnAlerta(alertas, DESCARTAR, "Descartar");
-    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
   });
 });
 
@@ -204,7 +207,7 @@ describe("Editar tipo de entrada (US3)", () => {
     await escribir("Cupo disponible", "10");
     await enviar("Guardar cambios");
 
-    await waitFor(() => expect(resultado.getPathname()).toBe(RUTA));
+    await waitFor(() => expect(resultado.getPathname()).toBe(EDITAR));
     const [put] = pedidos(resultado, "PUT");
     expect(put.url).toBe(`${URL_DE_PRUEBA}${RUTA}/tipos-entrada/tipo-festival-vip`);
     expect(JSON.parse(put.cuerpo ?? "null")).toEqual({

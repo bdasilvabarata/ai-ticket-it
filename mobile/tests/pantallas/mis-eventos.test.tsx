@@ -47,11 +47,11 @@ describe("Mis eventos (US2)", () => {
   it("con datos muestra cada evento en el orden del servidor, y Realizado solo en los realizados", async () => {
     const resultado = await abrirMisEventos([{ status: 200, json: [nocheDeRock, festival, nocheDeRisas] }]);
 
-    const filas = await screen.findAllByRole("button", { name: /^(Editar|Ver) / });
+    const filas = await screen.findAllByRole("button", { name: /^Abrir / });
     expect(filas.map((fila) => fila.props.accessibilityLabel)).toEqual([
-      "Editar Noche de Rock en el Club, mar 1 dic 2026 · 20:00",
-      "Editar Festival Sonidos del Sur, jue 10 dic 2026 · 14:00",
-      "Ver Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
+      "Abrir Noche de Rock en el Club, mar 1 dic 2026 · 20:00",
+      "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00",
+      "Abrir Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
     ]);
     const [rock, fest, risas] = filas;
     expect(within(rock).getByText("Noche de Rock en el Club")).toBeOnTheScreen();

@@ -74,8 +74,10 @@ function Pila({ estado }: { estado: EstadoSesion }) {
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         {/* Formularios y pantallas apiladas de la feature 004 (contracts/app.md, "Rutas"). */}
         <Stack.Screen name="eventos/nuevo" options={{ title: "Crear evento" }} />
-        {/* El título inicial; EventoDelOrganizador lo cambia a "Editar evento" o "Evento realizado". */}
+        {/* El hub del evento propio: sus datos y los accesos a compras, ingreso y edición. */}
         <Stack.Screen name="eventos/[eventoId]/index" options={{ title: "Evento" }} />
+        {/* El título inicial; EventoDelOrganizador lo cambia a "Editar evento" o "Evento realizado". */}
+        <Stack.Screen name="eventos/[eventoId]/editar" options={{ title: "Evento" }} />
         <Stack.Screen
           name="eventos/[eventoId]/tipos-entrada/nuevo"
           options={{ title: "Agregar tipo de entrada" }}
