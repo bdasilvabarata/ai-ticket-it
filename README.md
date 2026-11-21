@@ -27,6 +27,57 @@ Consigna y casos de uso: [`docs/consigna/consigna.md`](docs/consigna/consigna.md
 | Mobile | React Native con Expo + Expo Router |
 | Tests | Vitest + supertest · Jest + React Native Testing Library |
 
+## Arquitectura del Sistema
+
+El proyecto adopta un enfoque desacoplado en **Monorepo**, con contratos compartidos y patrones arquitectónicos específicos para cada plataforma:
+
+```mermaid
+flowchart TD
+    subgraph SHARED ["shared/ (Contratos Canónicos)"]
+        DTO["DTOs de Vista · ErrorApi · Enums (EstadoCompra) · Límites"]
+    end
+
+    subgraph BACKEND ["backend/ (Clean / Onion Architecture)"]
+        direction TB
+        CR_B["Composition Root (app.ts)"]
+        Routes["routes/ (Enrutado y Middlewares)"]
+        Ctrl["controllers/ (Adaptadores HTTP)"]
+        Svc["services/ (Casos de Uso / Orquestación)"]
+        Repo["repositories/ (Persistencia en Memoria con Map)"]
+        Dom["domain/ (Entidades ricas e Invariantes puras)"]
+
+        Routes --> Ctrl --> Svc --> Repo --> Dom
+    end
+
+    subgraph MOBILE ["mobile/ (Feature-Sliced Architecture)"]
+        direction TB
+        App["app/ (Rutas finas / Re-exports de Expo Router)"]
+        Nav["navegacion/ & composicion.ts (Composition Root)"]
+        Feat["features/<dominio>/ (Vertical Slices con Fachada index.ts)"]
+        Core["base/ (api HTTP · consultas React Query · tema · Boton)"]
+
+        App --> Nav --> Feat --> Core
+    end
+
+    Routes -.-> DTO
+    Core -.-> DTO
+```
+
+### 1. Backend: Capas Limpias con Dominio Rico (DDD táctico)
+- **Separación estricta de responsabilidades**: Las dependencias apuntan siempre hacia adentro (`routes → controllers → services → repositories → domain`).
+- **Dominio Puro**: Las entidades (`Evento`, `Compra`, `TipoEntrada`) son clases inmutables que encapsulan reglas de negocio e invariantes, totalmente aisladas de Express y de operaciones de entrada/salida.
+- **Inversión de Dependencias (DIP)**: Los servicios dependen de contratos abstractos de repositorio (`domain/repositorios.ts`), permitiendo que la persistencia en memoria sea un detalle de infraestructura reemplazable.
+- **Atomicidad y Concurrencia**: Control de concurrencia mediante cerrojos por agregado (`cerrojo-por-clave.ts`) y tramos síncronos sin `await` para garantizar la consistencia en el decremento de cupos.
+
+### 2. Mobile: Feature-Sliced Architecture & Thin Client
+- **Organización por Features (Vertical Slices)**: Cada funcionalidad de negocio (`usuarios`, `sesion`, `eventos`, `compras`) vive en su propio módulo encapsulado bajo `src/features/<dominio>/`.
+- **Patrón Fachada (Facade)**: Cada feature expone únicamente un `index.ts` público; la base y otras features no pueden importar archivos internos, regla auditada automáticamente por el linter (`eslint-plugin-import-x`).
+- **Validación Server-Driven**: La app no duplica la lógica de negocio del backend en servicios locales. La interfaz restringe la entrada de forma natural y el servidor actúa como única fuente de verdad, mapeando los errores de API (`ErrorDeApi` con `detalles`) directamente en los campos del formulario.
+- **Rutas Delgadas**: La capa de navegación (`mobile/app/`) no maneja estado, estilos ni lógica; solo re-exporta las pantallas de cada feature.
+
+### 3. Contrato Compartido (`shared/`)
+- Fuente única de verdad tipada para DTOs (`UsuarioVista`, `ErrorApi`), enumeraciones (`EstadoCompra`) y reglas globales (`LIMITES_COMPRA`), asegurando simetría estricta en tiempo de compilación entre frontend y backend.
+
 ## Para arrancar (backend)
 
 ### Requisitos previos
