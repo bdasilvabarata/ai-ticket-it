@@ -208,10 +208,10 @@ describe("Registrar ingreso (feature 008, US3)", () => {
         ["compra"],
         ["mis-compras"],
         ["mis-compras-del-evento"],
-        ["catalogo"],
       ]),
     );
-    expect(invalidar.mock.calls.some(([filtro]) => typeof filtro?.predicate === "function")).toBe(true);
+    expect(invalidar.mock.calls.some(([filtro]) => typeof filtro?.predicate === "function")).toBe(false);
+    expect(claves).not.toContainEqual(["catalogo"]);
     // "Compras del evento" (debajo en el Stack) se vuelve a pedir.
     await waitFor(() => expect(pedidos(resultado, "GET", COMPRAS).length).toBeGreaterThanOrEqual(2));
   });

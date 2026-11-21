@@ -4,23 +4,24 @@ import { useRef, useState, type ComponentRef } from "react";
 import { Alert, StyleSheet, Text, View, type TextInput } from "react-native";
 
 import { ErrorDeApi } from "../../../api";
-import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
-import { CampoDeTexto } from "../../eventos";
+import { PantallaDesplazable, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
-import { TarjetaEntrada } from "../componentes/TarjetaEntrada";
+import { BuscadorDeCodigo } from "../componentes/BuscadorDeCodigo";
+import { ResultadoDeIngreso } from "../componentes/ResultadoDeIngreso";
 import {
   esEventoInexistente,
   salirPorEventoInexistente,
   useSalirSiNoExisteElEvento,
 } from "../evento-inexistente";
-import { normalizarCodigo, textoMotivoNoUsable } from "../formato";
+import { normalizarCodigo } from "../formato";
 import { useRegistrarUso } from "../mutaciones";
 import { useEntradaDelEvento } from "../useEntradaDelEvento";
 
 /**
  * "Registrar ingreso" (feature 008, US3; contracts/app.md): el organizador ingresa el código de una
  * entrada, ve de quién es y, si se puede usar, registra el ingreso tras confirmarlo. Se llega desde
- * "Compras del evento"; el permiso y la ventana los decide el servidor.
+ * "Compras del evento"; el permiso y la ventana los decide el servidor. Se dibuja en dos piezas
+ * (feature 010, R8): `BuscadorDeCodigo` y `ResultadoDeIngreso`.
  */
 export function RegistrarIngreso() {
   const { eventoId } = useLocalSearchParams<{ eventoId: string }>();
@@ -31,8 +32,6 @@ export function RegistrarIngreso() {
 
 type Aviso = { tipo: "exito" | "error"; mensaje: string };
 
-const NO_ENCONTRADA = "ENTRADA_NO_ENCONTRADA";
-
 function Ingreso({ usuarioId, eventoId }: { usuarioId: string; eventoId: string }) {
   const [texto, setTexto] = useState("");
   const [codigo, setCodigo] = useState<string | null>(null);
@@ -40,12 +39,12 @@ function Ingreso({ usuarioId, eventoId }: { usuarioId: string; eventoId: string 
   const campo = useRef<ComponentRef<typeof TextInput>>(null);
   const consulta = useEntradaDelEvento(usuarioId, eventoId, codigo);
   const registrar = useRegistrarUso(usuarioId, eventoId);
-  const normalizado = normalizarCodigo(texto);
   useSalirSiNoExisteElEvento(consulta.error);
 
   const buscar = () => {
     setAviso(null);
     // El mismo código otra vez vuelve a pedirlo (su estado pudo cambiar).
+    const normalizado = normalizarCodigo(texto);
     if (normalizado === codigo) void consulta.refetch();
     else setCodigo(normalizado);
   };
@@ -83,83 +82,28 @@ function Ingreso({ usuarioId, eventoId }: { usuarioId: string; eventoId: string 
     ]);
   };
 
-  const noEncontrada = consulta.error instanceof ErrorDeApi && consulta.error.codigo === NO_ENCONTRADA;
-
   return (
     <View style={estilos.pantalla}>
       <PantallaDesplazable separacion={tema.espacio.normal}>
-        <CampoDeTexto
-          ref={campo}
-          etiqueta="Código de la entrada"
-          valor={texto}
-          alCambiar={setTexto}
-          autoCapitalize="characters"
-          autoCorrect={false}
-          maxLength={32}
-        />
-        <Boton texto="Buscar" deshabilitado={normalizado === ""} alPresionar={buscar} />
-        {aviso ? (
+        <BuscadorDeCodigo texto={texto} alCambiar={setTexto} alBuscar={buscar} refCampo={campo} />
+        {aviso && (
           <Text
             style={aviso.tipo === "exito" ? estilos.exito : estilos.error}
             accessibilityLiveRegion="polite"
           >
             {aviso.mensaje}
           </Text>
-        ) : null}
-        {codigo === null ? null : noEncontrada ? (
-          <Text style={estilos.error} accessibilityLiveRegion="polite">
-            No hay ninguna entrada con ese código en este evento.
-          </Text>
-        ) : (
-          <SegunConsulta
-            consulta={consulta}
-            mensajeVacio="No hay ninguna entrada con ese código en este evento."
-          >
-            {(entrada) => (
-              <View style={estilos.resultado}>
-                <TarjetaEntrada entrada={entrada} />
-                <Accion entrada={entrada} enCurso={registrar.isPending} alRegistrar={alRegistrar} />
-              </View>
-            )}
-          </SegunConsulta>
+        )}
+        {codigo !== null && (
+          <ResultadoDeIngreso consulta={consulta} enCurso={registrar.isPending} alRegistrar={alRegistrar} />
         )}
       </PantallaDesplazable>
     </View>
   );
 }
 
-/** "Registrar ingreso" si la entrada se puede usar; si no, el motivo en su lugar (FR-019). */
-function Accion({
-  entrada,
-  enCurso,
-  alRegistrar,
-}: {
-  entrada: EntradaDelEventoVista;
-  enCurso: boolean;
-  alRegistrar: (entrada: EntradaDelEventoVista) => void;
-}) {
-  const motivo = textoMotivoNoUsable(entrada);
-  if (motivo !== null) {
-    return (
-      <Text style={estilos.motivo} accessibilityLiveRegion="polite">
-        {motivo}
-      </Text>
-    );
-  }
-  return (
-    <Boton
-      texto="Registrar ingreso"
-      textoEnCurso="Registrando…"
-      enCurso={enCurso}
-      alPresionar={() => alRegistrar(entrada)}
-    />
-  );
-}
-
 const estilos = StyleSheet.create({
   pantalla: { flex: 1, backgroundColor: tema.colores.fondo },
-  resultado: { gap: tema.espacio.normal },
-  motivo: { ...tema.tipografia.cuerpoFuerte, color: tema.colores.texto },
   exito: { ...tema.tipografia.cuerpoFuerte, color: tema.colores.texto },
   error: { ...tema.tipografia.cuerpoFuerte, color: tema.colores.error },
 });
