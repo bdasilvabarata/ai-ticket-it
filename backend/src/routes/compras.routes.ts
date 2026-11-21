@@ -1,11 +1,12 @@
 import { Router, type RequestHandler } from "express";
 import type { CompraController } from "../controllers/compra.controller";
-import { compraPorId } from "../validations/compra.validation";
+import { compraPorId, mensajeNuevo } from "../validations/compra.validation";
 
 /**
  * `/compras`: la lista de las compras del usuario actual como comprador (feature 007) y ver, pagar
  * y cancelar una compra, solo su comprador (feature 006; una confirmada desde la 009), y confirmar
- * su reembolso, solo el organizador del evento (feature 009).
+ * su reembolso, solo el organizador del evento (feature 009), y el chat de la compra, solo entre su
+ * comprador y el organizador del evento (feature 011).
  */
 export function crearComprasRouter(controller: CompraController, requerirUsuario: RequestHandler): Router {
   const router = Router();
@@ -18,5 +19,9 @@ export function crearComprasRouter(controller: CompraController, requerirUsuario
   router.post("/:compraId/cancelacion", requerirUsuario, compraPorId.middleware, controller.cancelar);
   // El organizador confirma el reembolso de una cancelada (feature 009): sin cuerpo.
   router.post("/:compraId/reembolso", requerirUsuario, compraPorId.middleware, controller.confirmarReembolso);
+  // El chat de la compra (feature 011): las dos partes, en cualquier estado y momento (sin 409).
+  router.get("/:compraId/mensajes", requerirUsuario, compraPorId.middleware, controller.chat);
+  // El cuerpo es solo `{ texto }`: el autor sale de X-Usuario-Id y la fecha, del reloj.
+  router.post("/:compraId/mensajes", requerirUsuario, mensajeNuevo.middleware, controller.enviarMensaje);
   return router;
 }

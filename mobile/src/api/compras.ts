@@ -1,9 +1,12 @@
 import type {
+  ChatDeLaCompraVista,
   CompraDelEventoVista,
   ComprasDelEventoVista,
   CompraVista,
   DatosCompra,
+  DatosMensaje,
   EntradaDelEventoVista,
+  MensajeVista,
   MiCompraVista,
   MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
@@ -135,4 +138,32 @@ export function confirmarReembolso(
   return cliente.post<CompraDelEventoVista>(`${rutaDeLaCompra(compraId)}/reembolso`, undefined, {
     usuarioId,
   });
+}
+
+/**
+ * `GET /compras/:compraId/mensajes` (feature 011): el chat de la compra, con su encabezado y la otra
+ * parte. Solo para su comprador y el organizador del evento (si no, 403).
+ */
+export function obtenerChatDeLaCompra(
+  cliente: ClienteApi,
+  compraId: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<ChatDeLaCompraVista> {
+  return cliente.get<ChatDeLaCompraVista>(`${rutaDeLaCompra(compraId)}/mensajes`, {
+    signal: opciones.signal,
+  });
+}
+
+/**
+ * `POST /compras/:compraId/mensajes` (feature 011): solo el texto (el autor y la fecha los pone el
+ * servidor). Va en nombre del usuario de la pantalla y no se reintenta solo.
+ */
+export function enviarMensaje(
+  cliente: ClienteApi,
+  compraId: string,
+  { texto }: DatosMensaje,
+  { usuarioId }: { usuarioId: string },
+): Promise<MensajeVista> {
+  const datos: DatosMensaje = { texto };
+  return cliente.post<MensajeVista>(`${rutaDeLaCompra(compraId)}/mensajes`, datos, { usuarioId });
 }

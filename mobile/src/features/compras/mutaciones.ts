@@ -1,10 +1,17 @@
-import type { CompraDelEventoVista, DatosCompra, EntradaDelEventoVista } from "@ai-ticket-it/shared";
+import type {
+  CompraDelEventoVista,
+  DatosCompra,
+  DatosMensaje,
+  EntradaDelEventoVista,
+  MensajeVista,
+} from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query, type UseMutationResult } from "@tanstack/react-query";
 
 import {
   cancelarCompra,
   comprarEntradas,
   confirmarReembolso,
+  enviarMensaje,
   ErrorDeApi,
   pagarCompra,
   registrarUsoDeEntrada,
@@ -14,7 +21,8 @@ import { useClienteApi } from "../../consultas/cliente-api";
 
 // Las escrituras de compras van en nombre del usuario de la pantalla y no se reintentan solas
 // (`mutations.retry: false` del QueryClient). Con éxito o error invalidan lo que pudo cambiar: la
-// única fuente de verdad es el servidor (cupo, tope, estado).
+// única fuente de verdad es el servidor (cupo, tope, estado). Las que cambian el estado de una compra
+// invalidan también, por prefijo, `["chat-de-la-compra"]`: su encabezado lo muestra (feature 011, R10).
 
 /** `["evento", *, eventoId]`: el cupo cambió para todos los usuarios, no solo para el de la pantalla. */
 const delEvento =
@@ -67,6 +75,7 @@ export function usePagarCompra(usuarioId: string, compraId: string, eventoId: st
         queryClient.invalidateQueries({ queryKey: claves.misCompras(usuarioId) }),
         queryClient.invalidateQueries({ predicate: delEvento(eventoId) }),
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -95,6 +104,7 @@ export function useCancelarCompra(usuarioId: string, compraId: string, eventoId:
         queryClient.invalidateQueries({ queryKey: ["catalogo"] }),
         queryClient.invalidateQueries({ queryKey: ["compras-del-evento"] }),
         queryClient.invalidateQueries({ queryKey: ["entrada-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -125,6 +135,7 @@ export function useRegistrarUso(
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
   });
 }
@@ -151,6 +162,28 @@ export function useConfirmarReembolso(
         queryClient.invalidateQueries({ queryKey: ["compra"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras"] }),
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
+        queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
+  });
+}
+
+/**
+ * Envía un mensaje al chat de la compra (feature 011, R10), en nombre de `usuarioId` y sin
+ * reintentos. Al terminar, con éxito o error, invalida **solo el chat de esa compra**, pero para
+ * todos los usuarios de la caché (`["chat-de-la-compra", *, compraId]`): en la demo el comprador y
+ * el organizador alternan en el mismo celular. Nada más cambia por un mensaje (FR-019).
+ */
+export function useEnviarMensaje(
+  usuarioId: string,
+  compraId: string,
+): UseMutationResult<MensajeVista, Error, DatosMensaje> {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (datos: DatosMensaje) => enviarMensaje(cliente, compraId, datos, { usuarioId }),
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        predicate: ({ queryKey }) => queryKey[0] === "chat-de-la-compra" && queryKey[2] === compraId,
+      }),
   });
 }

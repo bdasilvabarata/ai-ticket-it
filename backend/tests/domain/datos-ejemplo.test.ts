@@ -334,6 +334,41 @@ describe("crearDatosEjemplo", () => {
     });
   });
 
+  describe("la conversación de Martín y Lucía en su compra VIP del Festival (feature 011, R8)", () => {
+    const vip = compras.find((c) => c.id === "compra-martin-festival-vip")!;
+    const MINUTO = 60 * 1000;
+
+    it("tiene tres mensajes de las dos partes, en orden, con los textos del seed", () => {
+      expect(vip.mensajes.map((m) => [m.autorId, m.texto])).toEqual([
+        ["usuario-martin", "Hola, ¿la entrada VIP incluye estacionamiento?"],
+        [
+          "usuario-lucia",
+          "¡Hola, Martín! Sí: con la entrada VIP tenés lugar en el estacionamiento del predio. Mostrá tu código en la barrera.",
+        ],
+        ["usuario-martin", "¡Genial, gracias!"],
+      ]);
+    });
+
+    it("a 10 min, 2 h y 3 h del alta: después de la confirmación y antes del arranque", () => {
+      const alta = vip.creadaEn.getTime();
+      expect(vip.mensajes.map((m) => m.enviadoEn.getTime() - alta)).toEqual([
+        10 * MINUTO,
+        2 * HORA,
+        3 * HORA,
+      ]);
+      const confirmacion = vip.historial.find((c) => c.estado === EstadoCompra.CONFIRMADA)!.fechaHora;
+      for (const mensaje of vip.mensajes) {
+        expect(mensaje.enviadoEn.getTime()).toBeGreaterThan(confirmacion.getTime());
+        expect(mensaje.enviadoEn.getTime()).toBeLessThan(ahora.getTime());
+      }
+    });
+
+    it("la compra sigue CONFIRMADA y ninguna otra compra del seed tiene mensajes", () => {
+      expect(vip.estado).toBe(EstadoCompra.CONFIRMADA);
+      for (const otra of compras.filter((c) => c !== vip)) expect(otra.mensajes).toEqual([]);
+    });
+  });
+
   it("deja los favoritos vacíos", () => {
     for (const usuario of usuarios) expect(usuario.favoritos).toEqual([]);
   });

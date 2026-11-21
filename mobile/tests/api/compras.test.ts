@@ -9,6 +9,8 @@ import {
   obtenerMisComprasDelEvento,
   cancelarCompra,
   confirmarReembolso,
+  enviarMensaje,
+  obtenerChatDeLaCompra,
   pagarCompra,
   registrarUsoDeEntrada,
 } from "../../src/api";
@@ -268,5 +270,58 @@ describe("confirmarReembolso (feature 009)", () => {
       codigo: "TRANSICION_INVALIDA",
       mensaje: "El reembolso de esta compra ya se confirmó.",
     });
+  });
+});
+
+describe("obtenerChatDeLaCompra (feature 011)", () => {
+  it("pide GET /compras/:id/mensajes con el usuario actual, el id escapado y sin cuerpo", async () => {
+    const vista = { compra: { id: "compra-1" }, otraParte: {}, mensajes: [] };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+
+    await expect(obtenerChatDeLaCompra(cliente, "compra 1/x")).resolves.toEqual(vista);
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras/compra%201%2Fx/mensajes`, metodo: "GET" });
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
+  });
+
+  it("pasa el signal", async () => {
+    const { cliente } = armar({ status: 200, json: {} });
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+    await obtenerChatDeLaCompra(cliente, "compra-1", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/compras/compra-1/mensajes", { signal: controlador.signal });
+  });
+});
+
+describe("enviarMensaje (feature 011)", () => {
+  it("envía POST /compras/:id/mensajes con exactamente { texto } en nombre del usuario dado", async () => {
+    const vista = { numero: 4, texto: "Hola" };
+    const { cliente, falso } = armar({ status: 201, json: vista });
+    const datos = { texto: "  Hola  ", autorId: "usuario-lucia" };
+
+    await expect(enviarMensaje(cliente, "compra-1", datos, { usuarioId: "usuario-martin" })).resolves.toEqual(
+      vista,
+    );
+    expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/compras/compra-1/mensajes`, metodo: "POST" });
+    // Sin recortar: la app no valida (lo hace el servidor).
+    expect(JSON.parse(falso.pedidos[0].cuerpo ?? "null")).toEqual({ texto: "  Hola  " });
+    expect(falso.pedidos[0].encabezados).toMatchObject({
+      "X-Usuario-Id": "usuario-martin",
+      "Content-Type": "application/json",
+    });
+  });
+
+  it("un 403 llega como ErrorDeApi con su mensaje", async () => {
+    const mensaje =
+      "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.";
+    const { cliente } = armar({ status: 403, json: { error: { codigo: "SIN_PERMISO", mensaje } } });
+    const error = await enviarMensaje(
+      cliente,
+      "compra-1",
+      { texto: "Hola" },
+      { usuarioId: "usuario-sofia" },
+    ).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(ErrorDeApi);
+    expect(error).toMatchObject({ status: 403, codigo: "SIN_PERMISO", mensaje });
   });
 });

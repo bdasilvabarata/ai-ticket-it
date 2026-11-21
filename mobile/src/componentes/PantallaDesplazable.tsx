@@ -1,6 +1,12 @@
 import { HeaderHeightContext } from "expo-router/react-navigation";
-import { useContext, type ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet } from "react-native";
+import { useContext, useRef, type ReactNode } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  type ScrollViewInstance,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { tema } from "./tema";
@@ -9,6 +15,11 @@ export interface PropsPantallaDesplazable {
   children: ReactNode;
   /** Separación entre los bloques de la pantalla (por defecto, `tema.espacio.amplio`). */
   separacion?: number;
+  /**
+   * Abre mostrando el final del contenido (feature 011, el chat): cada vez que cambia el tamaño del
+   * contenido, desplaza hasta el final sin animación. Sin la prop, la pantalla abre arriba.
+   */
+  empezarAlFinal?: boolean;
 }
 
 /**
@@ -23,11 +34,16 @@ export interface PropsPantallaDesplazable {
 export function PantallaDesplazable({
   children,
   separacion = tema.espacio.amplio,
+  empezarAlFinal = false,
 }: PropsPantallaDesplazable) {
   const { bottom } = useSafeAreaInsets();
   // Fuera de un navegador (tests de componentes) no hay header: 0.
   const altoDelHeader = useContext(HeaderHeightContext) ?? 0;
   const esIos = Platform.OS === "ios";
+  const scroll = useRef<ScrollViewInstance>(null);
+  const alCambiarElContenido = empezarAlFinal
+    ? () => scroll.current?.scrollToEnd({ animated: false })
+    : undefined;
 
   return (
     <KeyboardAvoidingView
@@ -36,6 +52,7 @@ export function PantallaDesplazable({
       keyboardVerticalOffset={altoDelHeader}
     >
       <ScrollView
+        ref={scroll}
         style={estilos.pantalla}
         contentContainerStyle={[
           estilos.contenido,
@@ -43,6 +60,7 @@ export function PantallaDesplazable({
         ]}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets={esIos}
+        onContentSizeChange={alCambiarElContenido}
       >
         {children}
       </ScrollView>

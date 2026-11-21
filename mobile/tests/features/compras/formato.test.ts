@@ -1,7 +1,12 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 
 import {
+  etiquetaDelMensaje,
   normalizarCodigo,
+  SIN_MENSAJES,
+  textoAutorDelMensaje,
+  textoOtraParte,
+  textoRolEnLaCompra,
   textoAccionDePago,
   textoAvisoDeMiCompra,
   textoCancelada,
@@ -435,5 +440,49 @@ describe("textoMotivoNoCancelable (feature 009, US3)", () => {
     expect(textoMotivoNoCancelable("cancelada")).toBeNull();
     expect(textoMotivoNoCancelable("reembolsada")).toBeNull();
     expect(textoMotivoNoCancelable(null)).toBeNull();
+  });
+});
+
+describe("textos del chat de la compra (feature 011, R12)", () => {
+  const lucia = { id: "usuario-lucia", nombre: "Lucía", apellido: "Álvarez", rol: "organizador" } as const;
+  const martin = { id: "usuario-martin", nombre: "Martín", apellido: "Benítez", rol: "comprador" } as const;
+  const mensaje = (autor: typeof lucia | typeof martin, texto: string, enviadoEnLocal: string) => ({
+    numero: 1,
+    autor,
+    texto,
+    enviadoEn: "2026-11-20T17:35:00.000Z",
+    enviadoEnLocal,
+  });
+
+  it("textoRolEnLaCompra", () => {
+    expect(textoRolEnLaCompra("comprador")).toBe("Comprador");
+    expect(textoRolEnLaCompra("organizador")).toBe("Organizador");
+  });
+
+  it("textoOtraParte", () => {
+    expect(textoOtraParte(lucia)).toBe("Con Lucía Álvarez · Organizador");
+    expect(textoOtraParte(martin)).toBe("Con Martín Benítez · Comprador");
+  });
+
+  it("textoAutorDelMensaje: «Vos» si es propio; si no, nombre y rol", () => {
+    const deMartin = mensaje(martin, "Hola", "2026-11-20T14:35");
+    expect(textoAutorDelMensaje(deMartin, "usuario-martin")).toBe("Vos");
+    expect(textoAutorDelMensaje(deMartin, "usuario-lucia")).toBe("Martín Benítez · Comprador");
+    expect(textoAutorDelMensaje(mensaje(lucia, "Hola", "2026-11-20T16:00"), "usuario-martin")).toBe(
+      "Lucía Álvarez · Organizador",
+    );
+  });
+
+  it("etiquetaDelMensaje: autor, rol, hora y texto en una sola frase", () => {
+    expect(
+      etiquetaDelMensaje(mensaje(martin, "¿A qué hora abren?", "2026-11-20T14:35"), "usuario-martin"),
+    ).toBe("Vos, comprador, vie 20 nov 2026 · 14:35: ¿A qué hora abren?");
+    expect(etiquetaDelMensaje(mensaje(lucia, "Abren a las 18.", "2026-11-20T16:00"), "usuario-martin")).toBe(
+      "Lucía Álvarez, organizador, vie 20 nov 2026 · 16:00: Abren a las 18.",
+    );
+  });
+
+  it("SIN_MENSAJES", () => {
+    expect(SIN_MENSAJES).toBe("Todavía no hay mensajes");
   });
 });

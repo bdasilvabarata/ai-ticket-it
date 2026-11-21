@@ -182,6 +182,8 @@ export const tema = {
   },
   /** Lo más que ocupa el botón del filtro de categoría junto al buscador: el campo conserva el resto. */
   anchoMaximoFiltro: "45%",
+  /** Lo más que ocupa un mensaje del chat: el margen del otro lado marca de quién es (feature 011). */
+  anchoMaximoMensaje: "85%",
   sombra,
   /** Lo que se "hunde" un elemento con sombra al presionarlo (lo mismo que mide su sombra). */
   desplazamientoPresionado: 3,

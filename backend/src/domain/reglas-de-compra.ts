@@ -136,4 +136,18 @@ export const REGLAS_DE_COMPRA: readonly ReglaDeCompra[] = [
         ? entradas.every((entrada) => entrada.cancelada)
         : entradas.every((entrada) => !entrada.cancelada),
   },
+  {
+    nombre: "mensajes-en-orden",
+    campo: "mensajes",
+    mensaje: "Los mensajes van en orden de envío y no son anteriores al alta de la compra.",
+    // Con un historial vacío no hay alta contra la cual comparar: ya lo informa `historial-valido`.
+    cumple: ({ historial, mensajes = [] }) => {
+      const alta = historial[0]?.fechaHora.getTime() ?? Number.NEGATIVE_INFINITY;
+      return mensajes.every(
+        (mensaje, i) =>
+          mensaje.enviadoEn.getTime() >= alta &&
+          (i === 0 || mensaje.enviadoEn.getTime() >= mensajes[i - 1]!.enviadoEn.getTime()),
+      );
+    },
+  },
 ];

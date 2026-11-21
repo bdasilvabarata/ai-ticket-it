@@ -17,6 +17,8 @@ export {
   obtenerMisCompras,
   obtenerMisComprasDelEvento,
   confirmarReembolso,
+  enviarMensaje,
+  obtenerChatDeLaCompra,
   pagarCompra,
   registrarUsoDeEntrada,
 } from "./compras";

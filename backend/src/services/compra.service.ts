@@ -1,16 +1,20 @@
 import {
   EstadoCompra,
+  type ChatDeLaCompraVista,
   type CompraDelEventoVista,
   type ComprasDelEventoVista,
   type CompraVista,
   type DatosCompra,
+  type DatosMensaje,
   type EntradaDelEventoVista,
+  type MensajeVista,
   type MiCompraVista,
   type MisComprasDelEventoVista,
 } from "@ai-ticket-it/shared";
 import { esCodigoValido, normalizarCodigo } from "../domain/codigo-de-entrada";
 import { Compra } from "../domain/compra";
 import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-evento";
+import type { Evento } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import { compararMisCompras } from "../domain/orden-mis-compras";
 import type { Reloj } from "../domain/reloj";
@@ -29,6 +33,7 @@ import {
   aVentanaDeUsoVista,
 } from "./compra.vistas";
 import type { EventoService } from "./evento.service";
+import { aChatDeLaCompraVista, aMensajeVista } from "./mensaje.vistas";
 import type { TipoEntradaService } from "./tipo-entrada.service";
 import type { UsuarioService } from "./usuario.service";
 
@@ -36,6 +41,18 @@ import type { UsuarioService } from "./usuario.service";
 function exigirQueEsSuya(compra: Compra, usuarioId: string): void {
   if (compra.compradorId !== usuarioId) {
     throw new SinPermisoError("Solo quien hizo la compra puede verla o pagarla.");
+  }
+}
+
+/**
+ * Solo el comprador y el organizador del evento leen y escriben en el chat de la compra (feature
+ * 011, R2; 403).
+ */
+function exigirQueEsParte(compra: Compra, evento: Evento, usuarioId: string): void {
+  if (compra.rolDe(usuarioId, evento.organizadorId) === null) {
+    throw new SinPermisoError(
+      "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.",
+    );
   }
 }
 
@@ -320,6 +337,42 @@ export class CompraService {
         aCompraDelEventoVista(compra, compradores.get(compra.compradorId)!, evento),
       ),
     };
+  }
+
+  /**
+   * El chat de la compra (feature 011, R5), solo para sus dos partes: 404 → 403. Lectura: sin
+   * cerrojo y sin guardar, con el estado **al día**; tres lecturas fijas (la compra, el evento y las
+   * dos partes en lote), haya los mensajes que haya.
+   */
+  async chat(compraId: string, usuarioId: string): Promise<ChatDeLaCompraVista> {
+    const ahora = this.#reloj.ahora();
+    const compra = await this.obtenerOFallar(compraId);
+    const evento = await this.#eventoService.obtenerOFallar(compra.eventoId);
+    exigirQueEsParte(compra, evento, usuarioId);
+    const partes = await this.#usuarioService.obtenerPorIds([compra.compradorId, evento.organizadorId]);
+    return aChatDeLaCompraVista(compra.alDia(ahora), evento, partes, usuarioId);
+  }
+
+  /**
+   * Un mensaje nuevo en el chat de la compra (feature 011, R4), de una de sus dos partes, en
+   * cualquier estado y momento. La compra se lee una vez afuera solo para saber qué cerrojo tomar.
+   * Bajo el cerrojo de su evento, con un único `ahora`: relee el evento y la compra, 403 si no es
+   * parte, y recién después materializa los vencimientos del evento (también el de esta compra) y
+   * relee la compra al día. Un solo `guardar`, el de la compra con el mensaje: el cupo no cambia.
+   */
+  async enviarMensaje(compraId: string, usuarioId: string, { texto }: DatosMensaje): Promise<MensajeVista> {
+    const { eventoId } = await this.obtenerOFallar(compraId);
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const guardado = await this.#eventoService.obtenerOFallar(eventoId);
+      exigirQueEsParte(await this.obtenerOFallar(compraId), guardado, usuarioId);
+      const evento = await this.#eventoService.obtenerAlDia(eventoId, ahora);
+      const conMensaje = (await this.obtenerOFallar(compraId)).enviarMensaje(usuarioId, texto, ahora);
+      await this.#compras.guardar(conMensaje);
+      const autor = await this.#usuarioService.obtenerOFallar(usuarioId);
+      const mensaje = conMensaje.mensajes.at(-1)!;
+      return aMensajeVista(mensaje, conMensaje.mensajes.length, conMensaje, evento, autor);
+    });
   }
 
   /** Sus compras de ese evento que cuentan para el tope en `ahora` (PENDIENTE no vencidas, CONFIRMADA y UTILIZADA). */

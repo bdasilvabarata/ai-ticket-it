@@ -51,6 +51,13 @@ describe("documentación de la API", () => {
     }
   });
 
+  it("documenta el chat de la compra (feature 011): GET y POST /compras/{compraId}/mensajes", async () => {
+    const { paths } = await obtenerEspecificacion();
+    const mensajes = paths["/compras/{compraId}/mensajes"];
+    expect(mensajes?.get).toBeDefined();
+    expect(mensajes?.post).toBeDefined();
+  });
+
   it("la colección de Postman solo usa rutas que existen", async () => {
     const archivo = path.resolve(import.meta.dirname, "../../src/docs/ai-ticket-it.postman_collection.json");
     const coleccion = JSON.parse(readFileSync(archivo, "utf8")) as {

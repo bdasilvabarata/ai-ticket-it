@@ -1,6 +1,6 @@
 import { EstadoCompra, LIMITES_COMPRA } from "@ai-ticket-it/shared";
 import { Categoria, type DatosCategoria } from "../domain/categoria";
-import { Compra, Entrada } from "../domain/compra";
+import { Compra, Entrada, Mensaje } from "../domain/compra";
 import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../domain/hora-buenos-aires";
 import { Usuario, type DatosUsuario } from "../domain/usuario";
@@ -231,6 +231,26 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { estado: EstadoCompra.CONFIRMADA, autor: porMartin, fechaHora: masMinutos(haceMartin, 5) },
       ],
       entradas: [new Entrada({ codigo: "FSVP7M01" }), new Entrada({ codigo: "FSVP7M02" })],
+      // El chat de la compra (feature 011, R8): Martín pregunta y Lucía responde, todo antes del
+      // arranque, así la conversación es la misma en cada arranque.
+      mensajes: [
+        new Mensaje({
+          autorId: martin,
+          texto: "Hola, ¿la entrada VIP incluye estacionamiento?",
+          enviadoEn: masMinutos(haceMartin, 10),
+        }),
+        new Mensaje({
+          autorId: lucia,
+          texto:
+            "¡Hola, Martín! Sí: con la entrada VIP tenés lugar en el estacionamiento del predio. Mostrá tu código en la barrera.",
+          enviadoEn: masMinutos(haceMartin, 2 * 60),
+        }),
+        new Mensaje({
+          autorId: martin,
+          texto: "¡Genial, gracias!",
+          enviadoEn: masMinutos(haceMartin, 3 * 60),
+        }),
+      ],
     }),
     new Compra({
       id: "compra-diego-festival-general",

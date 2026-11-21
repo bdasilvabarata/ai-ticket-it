@@ -1,8 +1,10 @@
 import type { CompraDelEventoVista } from "@ai-ticket-it/shared";
+import { router } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
 import { Boton, EtiquetaEstadoCompra, tema, textoEtiquetaEstado } from "../../../componentes";
 import { AvisoDeFormulario } from "../../eventos";
+import { nombreCompleto } from "../../usuarios";
 import { textoAvisoDeCompraDelEvento, textoCantidad, textoCompradaEl, textoTotal } from "../formato";
 
 export interface PropsFilaCompraDelEvento {
@@ -19,7 +21,9 @@ export interface PropsFilaCompraDelEvento {
  * Una compra de "Compras del evento" (contracts/app.md): comprador, tipo · cantidad · total, fecha
  * de compra, estado y su aviso. No es tocable (no abre "Tu compra") ni tiene acción de uso (FR-017):
  * un solo elemento accesible que resume la fila. Con el reembolso pendiente (feature 009), debajo y
- * como hermano de ese bloque, "Confirmar reembolso" y el error de esa fila.
+ * como hermano de ese bloque, "Confirmar reembolso" y el error de esa fila. Al pie (feature 011),
+ * en todos los estados y también con el evento realizado, "Abrir chat": otro hermano del bloque, para
+ * que TalkBack lo enfoque aparte, que abre "Chat de la compra" de esta compra.
  */
 export function FilaCompraDelEvento({
   compra,
@@ -27,7 +31,7 @@ export function FilaCompraDelEvento({
   enCurso = false,
   error = null,
 }: PropsFilaCompraDelEvento) {
-  const comprador = `${compra.comprador.nombre} ${compra.comprador.apellido}`;
+  const comprador = nombreCompleto(compra.comprador);
   const tipo = compra.tipoEntrada.nombre;
   const cantidad = textoCantidad(compra.cantidad);
   const total = textoTotal(compra.total);
@@ -58,6 +62,14 @@ export function FilaCompraDelEvento({
           />
         </View>
       ) : null}
+      <Boton
+        variante="texto"
+        texto="Abrir chat"
+        accessibilityLabel={`Abrir el chat con ${comprador}`}
+        alPresionar={() =>
+          router.push({ pathname: "/compras/[compraId]/chat", params: { compraId: compra.id } })
+        }
+      />
     </View>
   );
 }

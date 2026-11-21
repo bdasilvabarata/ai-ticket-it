@@ -26,6 +26,50 @@ function armar() {
   return servicios;
 }
 
+const rechazo = (r: PromiseSettledResult<unknown>) => (r as PromiseRejectedResult).reason as Error;
+
+/** Toma el cerrojo de `evento-a` y no lo suelta hasta `liberar()`; resuelve cuando ya lo tiene. */
+async function bloquear(cerrojo: Cerrojo) {
+  let liberar = () => {};
+  let bloqueo: Promise<void> = Promise.resolve();
+  await new Promise<void>((tomado) => {
+    bloqueo = cerrojo.ejecutar("evento-a", () => {
+      tomado();
+      return new Promise<void>((resolver) => (liberar = resolver));
+    });
+  });
+  return { liberar: () => liberar(), bloqueo };
+}
+
+/** Deja correr las lecturas previas al cerrojo (los repositorios en memoria resuelven en microtareas). */
+const dejarCorrer = () => new Promise<void>((resolver) => setTimeout(resolver, 0));
+
+/**
+ * Las dos operaciones esperando a la vez el cerrojo del evento, encoladas en el orden dado, y
+ * devueltas siempre como [a, b]. Lanzarlas con un `Promise.allSettled` desnudo deja ganar siempre
+ * a la misma (`cancelar` lee la compra antes de tomar el cerrojo), así que se las encola con el
+ * cerrojo tomado para recorrer los dos desenlaces.
+ */
+async function enCarrera<A, B>(
+  cerrojo: Cerrojo,
+  a: () => Promise<A>,
+  b: () => Promise<B>,
+  primeroA: boolean,
+): Promise<[PromiseSettledResult<A>, PromiseSettledResult<B>]> {
+  const { liberar, bloqueo } = await bloquear(cerrojo);
+  let pa: Promise<A> | undefined;
+  let pb: Promise<B> | undefined;
+  if (primeroA) pa = a();
+  else pb = b();
+  await dejarCorrer();
+  if (primeroA) pb = b();
+  else pa = a();
+  await dejarCorrer();
+  liberar();
+  await bloqueo;
+  return Promise.allSettled([pa!, pb!]);
+}
+
 const datosEvento = {
   nombre: "Nombre nuevo",
   descripcion: "Descripción nueva.",
@@ -337,50 +381,6 @@ describe("Concurrencia: cancelación y reembolso (feature 009, US4, SC-005)", ()
     return { ...servicios, reloj, cupoGuardado };
   }
 
-  const rechazo = (r: PromiseSettledResult<unknown>) => (r as PromiseRejectedResult).reason as Error;
-
-  /** Toma el cerrojo de `evento-a` y no lo suelta hasta `liberar()`; resuelve cuando ya lo tiene. */
-  async function bloquear(cerrojo: Cerrojo) {
-    let liberar = () => {};
-    let bloqueo: Promise<void> = Promise.resolve();
-    await new Promise<void>((tomado) => {
-      bloqueo = cerrojo.ejecutar("evento-a", () => {
-        tomado();
-        return new Promise<void>((resolver) => (liberar = resolver));
-      });
-    });
-    return { liberar: () => liberar(), bloqueo };
-  }
-
-  /** Deja correr las lecturas previas al cerrojo (los repositorios en memoria resuelven en microtareas). */
-  const dejarCorrer = () => new Promise<void>((resolver) => setTimeout(resolver, 0));
-
-  /**
-   * Las dos operaciones esperando a la vez el cerrojo del evento, encoladas en el orden dado, y
-   * devueltas siempre como [a, b]. Lanzarlas con un `Promise.allSettled` desnudo deja ganar siempre
-   * a la misma (`cancelar` lee la compra antes de tomar el cerrojo), así que se las encola con el
-   * cerrojo tomado para recorrer los dos desenlaces.
-   */
-  async function enCarrera<A, B>(
-    cerrojo: Cerrojo,
-    a: () => Promise<A>,
-    b: () => Promise<B>,
-    primeroA: boolean,
-  ): Promise<[PromiseSettledResult<A>, PromiseSettledResult<B>]> {
-    const { liberar, bloqueo } = await bloquear(cerrojo);
-    let pa: Promise<A> | undefined;
-    let pb: Promise<B> | undefined;
-    if (primeroA) pa = a();
-    else pb = b();
-    await dejarCorrer();
-    if (primeroA) pb = b();
-    else pa = a();
-    await dejarCorrer();
-    liberar();
-    await bloqueo;
-    return Promise.allSettled([pa!, pb!]);
-  }
-
   it("uso ‖ cancelación de la misma CONFIRMADA, 20 veces alternando el orden → siempre gana exactamente uno, con historial y cupo coherentes", async () => {
     const ganadores = new Set<string>();
     for (let i = 0; i < 20; i += 1) {
@@ -520,4 +520,117 @@ describe("Concurrencia: cancelación y reembolso (feature 009, US4, SC-005)", ()
     expect((await repositorioCompras.buscarPorId("compra-martin"))!.estado).toBe(EstadoCompra.CONFIRMADA);
     expect(await cupoGuardado()).toBe(7);
   });
+});
+
+describe("Concurrencia: chat de la compra (feature 011, US4, SC-005)", () => {
+  const INICIO = 2 * 60 * MINUTO;
+
+  /**
+   * Un evento de Lucía que empieza en 2 h (ventana de uso abierta) con General en 7 y una compra de
+   * Martín de 3 entradas en `estado`.
+   */
+  function armarChat(estado: EstadoCompra) {
+    const reloj = relojMovible();
+    const servicios = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", en: INICIO, tiposEntrada: [tipo({ id: "tipo-a-general", cupo: 7 })] }),
+      ],
+      compras: [compra("evento-a", "tipo-a-general", estado, { id: "compra-martin", cantidad: 3 })],
+      reloj,
+    });
+    const guardada = async () => (await servicios.repositorioCompras.buscarPorId("compra-martin"))!;
+    const cupoGuardado = async () =>
+      (await servicios.repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-general")?.cupo;
+    return { ...servicios, reloj, guardada, cupoGuardado };
+  }
+
+  it("N mensajes simultáneos de las dos partes → se guardan los N, en el orden en que entraron al cerrojo", async () => {
+    const { compraService, reloj, guardada } = armarChat(EstadoCompra.CONFIRMADA);
+    const N = 20;
+    const autores = Array.from({ length: N }, (_, i) => (i % 2 === 0 ? "usuario-martin" : "usuario-lucia"));
+
+    const pedidos = autores.map((autor, i) => {
+      const pedido = compraService.enviarMensaje("compra-martin", autor, { texto: `Mensaje ${i}` });
+      reloj.avanzar(1000);
+      return pedido;
+    });
+    const vistas = await Promise.all(pedidos);
+
+    const mensajes = (await guardada()).mensajes;
+    expect(mensajes.map((m) => m.texto)).toEqual(autores.map((_, i) => `Mensaje ${i}`));
+    expect(mensajes.map((m) => m.autorId)).toEqual(autores);
+    expect(vistas.map((v) => v.numero).toSorted((a, b) => a - b)).toEqual(
+      Array.from({ length: N }, (_, i) => i + 1),
+    );
+    // La regla `mensajes-en-orden`: el constructor de Compra la habría rechazado al guardar.
+    const fechas = mensajes.map((m) => m.enviadoEn.getTime());
+    expect(fechas).toEqual(fechas.toSorted((a, b) => a - b));
+  });
+
+  type Caso = {
+    nombre: string;
+    estado: EstadoCompra;
+    operacion: (s: ReturnType<typeof armarChat>) => Promise<unknown>;
+    antes?: (s: ReturnType<typeof armarChat>) => Promise<unknown>;
+    estadoFinal: EstadoCompra;
+    cupoFinal: number;
+  };
+
+  const casos: Caso[] = [
+    {
+      nombre: "pagar una PENDIENTE",
+      estado: EstadoCompra.PENDIENTE,
+      operacion: (s) => s.compraService.pagar("compra-martin", "usuario-martin"),
+      estadoFinal: EstadoCompra.CONFIRMADA,
+      cupoFinal: 7,
+    },
+    {
+      nombre: "cancelar una CONFIRMADA",
+      estado: EstadoCompra.CONFIRMADA,
+      operacion: (s) => s.compraService.cancelar("compra-martin", "usuario-martin"),
+      estadoFinal: EstadoCompra.CANCELADA,
+      cupoFinal: 10,
+    },
+    {
+      nombre: "registrar el uso de una entrada",
+      estado: EstadoCompra.CONFIRMADA,
+      operacion: async (s) =>
+        s.entradaService.registrarUso("evento-a", (await s.guardada()).entradas[0]!.codigo, "usuario-lucia"),
+      estadoFinal: EstadoCompra.UTILIZADA,
+      cupoFinal: 7,
+    },
+    {
+      nombre: "confirmar el reembolso",
+      estado: EstadoCompra.CONFIRMADA,
+      antes: (s) => s.compraService.cancelar("compra-martin", "usuario-martin"),
+      operacion: (s) => s.compraService.confirmarReembolso("compra-martin", "usuario-lucia"),
+      estadoFinal: EstadoCompra.REEMBOLSADA,
+      cupoFinal: 10,
+    },
+  ];
+
+  for (const caso of casos) {
+    for (const mensajePrimero of [true, false]) {
+      it(`mensaje ‖ ${caso.nombre} (${mensajePrimero ? "el mensaje" : "la otra"} llega primero) → se conservan los dos efectos`, async () => {
+        const servicios = armarChat(caso.estado);
+        await caso.antes?.(servicios);
+        const historialAntes = (await servicios.guardada()).historial.length;
+
+        const [mensaje, operacion] = await enCarrera(
+          servicios.cerrojo,
+          () => servicios.compraService.enviarMensaje("compra-martin", "usuario-martin", { texto: "Hola" }),
+          () => caso.operacion(servicios),
+          mensajePrimero,
+        );
+
+        expect(mensaje.status).toBe("fulfilled");
+        expect(operacion.status).toBe("fulfilled");
+        const final = await servicios.guardada();
+        expect(final.estado).toBe(caso.estadoFinal);
+        expect(final.historial).toHaveLength(historialAntes + 1);
+        expect(final.mensajes.map((m) => m.texto)).toEqual(["Hola"]);
+        expect(await servicios.cupoGuardado()).toBe(caso.cupoFinal);
+      });
+    }
+  }
 });

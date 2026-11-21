@@ -26,7 +26,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
 
 - `shared/` — tipos de contratos y enums compartidos (ej.: `EstadoCompra`, `CompraVista`) y los
   límites de compra `LIMITES_COMPRA` (4 entradas pagas por evento, 1 por tipo gratis, 15 minutos
-  para pagar), que usan el backend y la app.
+  para pagar), que usan el backend y la app. Desde la 011, `shared/src/mensaje.ts`:
+  `LIMITES_MENSAJE` (`largoMaximo: 500`), `DatosMensaje`, `RolEnLaCompra`, `ParteDeLaCompraVista`,
+  `MensajeVista` y `ChatDeLaCompraVista`.
 - `backend/src/` — Express en capas:
   `routes/ → controllers/ → services/ → repositories/ → domain/`, más `middlewares/`
   (usuario actual, logging, 404, registro y respuesta de errores), `validations/` (zod),
@@ -41,7 +43,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     arranque: su ventana de uso está abierta para probar "Registrar ingreso"; desde la 009, con dos
     compras canceladas del Maratón de Lucía: la de Diego con el reembolso pendiente y la de
     Valentina `REEMBOLSADA`; desde la 010, las entradas del seed llevan su `uso` o su `cancelacion`
-    explícitos);
+    explícitos; desde la 011, `compra-martin-festival-vip` trae una conversación de tres mensajes
+    entre Martín y Lucía, fechada desde el alta de la compra, y ninguna otra compra tiene mensajes);
     `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
@@ -62,7 +65,16 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `TRANSICION_INVALIDA`— y suma `POST /compras/:compraId/reembolso`: solo el organizador del
     evento, sin plazo, bajo el cerrojo con `obtenerDelOrganizador`, **un** `guardar` (el cupo no
     cambia) y responde `CompraDelEventoVista`; rechazos 401 → 400 → 404 → 403 → 409
-    `TRANSICION_INVALIDA`), `entradas` (feature 008: router hijo
+    `TRANSICION_INVALIDA`; la 011 suma el sub-recurso `GET` y `POST /compras/:compraId/mensajes`, el
+    chat de la compra: solo el comprador y el organizador del evento, en **cualquier** estado y con
+    el evento realizado, **sin 409**; orden de rechazos 401 → 400 (`params.compraId`; en el `POST`,
+    `body.texto`, recortado, de 1 a 500) → 404 `COMPRA_NO_ENCONTRADA` → 403 `SIN_PERMISO`;
+    `CompraService.chat` lee al día sin guardar ni cerrojo, con tres lecturas fijas (compra, evento,
+    las dos partes en lote) y responde `ChatDeLaCompraVista`; `CompraService.enviarMensaje` lee la
+    compra afuera solo para saber el `eventoId` y, bajo el cerrojo, relee evento y compra, verifica
+    el rol (403 antes de materializar nada), materializa el vencimiento con `obtenerAlDia`, relee la
+    compra y hace **un** `compras.guardar` (el cupo no cambia); responde `201 MensajeVista`; no hay
+    `PUT`, `PATCH` ni `DELETE`: los mensajes no se editan ni se borran), `entradas` (feature 008: router hijo
     `eventos/:eventoId/entradas` con `GET /:codigo` y `POST /:codigo/uso`, solo el organizador;
     `EntradaService` con `obtener` (lectura: busca la compra con
     `CompraService.obtenerPorCodigoOFallar`) y `registrarUso`, que desde la 010 **delega** en
@@ -148,6 +160,21 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `CANCELADA` y llega también en una `REEMBOLSADA`. `CompraService.cancelar` de una confirmada
     guarda primero la compra y después el evento con el cupo devuelto (como la de una pendiente);
     `CompraService.confirmarReembolso` lee la compra afuera solo para saber qué cerrojo tomar.
+  - **Chat de la compra** (feature 011): `domain/mensaje.ts` es un `Mensaje` inmutable **sin id**
+    (`autorId`, `texto` ya recortado de 1 a `LIMITES_MENSAJE.largoMaximo` y `enviadoEn` del reloj
+    del servidor; su posición en la conversación lo identifica), re-exportado por `compra.ts`. Los
+    mensajes viven en el agregado `Compra` y se guardan con ella (sin repositorio, service ni ids
+    nuevos; `app.ts` no cambia): `compra.mensajes` (congelado, `[]` por defecto y en
+    `Compra.registrar`), `enviarMensaje(autorId, texto, ahora)` (agrega al final y devuelve una
+    `Compra` nueva sin tocar estado, historial, entradas ni total; vale en los seis estados) y
+    `rolDe(usuarioId, organizadorId)` (`"comprador"` · `"organizador"` · `null`; no lanza: el 403 lo
+    decide el service). **Toda transición conserva los mensajes** (`#propiedades()` los incluye).
+    `REGLAS_DE_COMPRA` suma `mensajes-en-orden`: cada `enviadoEn` mayor o igual que el anterior y
+    que el alta de la compra. `services/mensaje.vistas.ts` arma `aChatDeLaCompraVista(compra,
+    evento, usuarios, usuarioId)` (encabezado con la compra al día, `otraParte` y los mensajes) y
+    `aMensajeVista` (`numero` desde 1, autor con su rol, `enviadoEn` ISO y `enviadoEnLocal` de Buenos
+    Aires), reusando `aTipoDeLaCompra`; sin códigos, historial, total ni `compradorId`. Las vistas de
+    la compra (`CompraVista`, `MiCompraVista`, `CompraDelEventoVista`) no traen los mensajes.
   - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
     nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
     (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
@@ -214,8 +241,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     compras · Mis eventos · Perfil; `seleccionar-usuario` es el selector (pantalla completa sin
     usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
     son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
-    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y `compras/[compraId]`
-    ("Tu compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
+    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y
+    `compras/[compraId]/index` ("Tu compra"; desde la 011 en una carpeta, con el mismo `href`
+    `/compras/[compraId]`, junto a `compras/[compraId]/chat`, "Chat de la compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
     organizador (feature 008) son `eventos/[eventoId]/compras` (`ComprasDelEvento`) y
     `eventos/[eventoId]/ingreso` (`RegistrarIngreso`). El lint prohíbe importar
     `react`, `react-native`, `@tanstack/react-query`, `@expo/vector-icons` o `expo-router` en `app/`.
@@ -234,7 +262,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `misComprasDelEvento(usuarioId, eventoId)` y `compra(usuarioId, compraId)`, y la 007,
       `misCompras(usuarioId)`, con el usuario en la posición 1 y sin compartir prefijo con
       `mis-compras-del-evento`; la 008, `comprasDelEvento(usuarioId, eventoId)` y
-      `entradaDelEvento(usuarioId, eventoId, codigo)`) y `cliente-api.tsx`
+      `entradaDelEvento(usuarioId, eventoId, codigo)`; la 011, `chatDeLaCompra(usuarioId, compraId)`
+      → `["chat-de-la-compra", usuarioId, compraId]`, sin prefijo común con `["compra"]`) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -246,7 +275,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `vacio` opcionales reemplazan a `Cargando` y a `ListaVacia`), `Cargando`, `MensajeError`,
       `ListaVacia` (con `accion` opcional), `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
       apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
-      campo; úsenla en vez de un `ScrollView` suelto), `EtiquetaEstadoCompra` (el **único**
+      campo; úsenla en vez de un `ScrollView` suelto; con `empezarAlFinal`, desde la 011, baja al
+      final cada vez que cambia el tamaño del contenido), `EtiquetaEstadoCompra` (el **único**
       componente que muestra el estado de una compra, con su etiqueta y color), la franja, `Logo` y `CargandoInicio`
       (la ruta `cargando`); todo por `index.ts`. Los textos usan un estilo de `tema.tipografia`
       (`...tema.tipografia.cuerpo, color: …`): con fuentes propias el peso es la familia, nunca
@@ -321,7 +351,21 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       segundo toque no manda otro pedido). `useCancelarCompra` invalida además, por prefijo,
       `["compras-del-evento"]` y `["entrada-del-evento"]` (lo del organizador). "Ver compras", en la edición
       y la solo lectura del evento propio, está en `eventos` y navega **por la ruta tipada** (sin
-      importar `compras`).
+      importar `compras`). La 011 suma `ChatDeLaCompra` ("Chat de la compra", en
+      `PantallaDesplazable` con `empezarAlFinal`): `EncabezadoDelChat` (evento, "Con … · <rol>",
+      tipo y cantidad, `EtiquetaEstadoCompra`), un `MensajeDelChat` por mensaje (propio a la derecha
+      como "Vos" sobre `resaltado`, ajeno a la izquierda con nombre y rol; cada uno un elemento
+      accesible con `etiquetaDelMensaje`), "Todavía no hay mensajes" sin tapar encabezado ni campo, y
+      el `CampoDeTexto` "Mensaje" con "Enviar" (`useEnvioUnico`; la app no valida: el 400 va junto al
+      campo y conserva el texto); un 403/404 al leer lo muestra `AvisoDeLaCompra` (compartido con "Tu
+      compra"). `useChatDeLaCompra` y `useEnviarMensaje(usuarioId, compraId)` (sin reintentos;
+      invalida **solo** `["chat-de-la-compra", *, compraId]`, para todos los usuarios de la caché, y
+      nada más: un mensaje no cambia la compra); la pantalla se refresca al volver con
+      `useRefrescarAlFocalizar`, sin sondeo. `usePagarCompra`, `useCancelarCompra`,
+      `useRegistrarUso` y `useConfirmarReembolso` invalidan además, por prefijo,
+      `["chat-de-la-compra"]` (el encabezado muestra el estado). Los accesos son "Chat con el
+      organizador" en "Tu compra" (en todos los estados) y "Abrir chat" en cada
+      `FilaCompraDelEvento`, **como hermano** del bloque accesible de la fila.
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la

@@ -3,12 +3,14 @@ import {
   LIMITES_BUSQUEDA,
   LIMITES_COMPRA,
   LIMITES_EVENTO,
+  LIMITES_MENSAJE,
   LIMITES_TIPO_ENTRADA,
   ORDENES_CATALOGO,
   type OrdenCatalogo,
   type CategoriaVista,
   type CompraVista,
   type DatosCompra,
+  type DatosMensaje,
   type MisComprasDelEventoVista,
   type DatosEvento,
   type DatosNuevoEvento,
@@ -79,6 +81,11 @@ describe("tipos compartidos", () => {
       entradasPorTipoGratis: 1,
       minutosParaPagar: 15,
     });
+  });
+
+  it("el texto de un mensaje del chat tiene como máximo 500 caracteres", () => {
+    expect(LIMITES_MENSAJE.largoMaximo).toBe(500);
+    expectTypeOf<DatosMensaje>().toEqualTypeOf<{ texto: string }>();
   });
 
   it("DatosCompra no lleva precio ni total, y CompraVista trae el estado y el historial", () => {

@@ -1,6 +1,6 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it, vi } from "vitest";
-import type { CambioEstadoCompra, Compra } from "../../src/domain/compra";
+import { Mensaje, type CambioEstadoCompra, type Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
@@ -2180,5 +2180,423 @@ describe("CompraService.registrarUso (feature 010)", () => {
     expect(ejecutar).toHaveBeenCalledTimes(1);
     // Liberado: otra operación sobre el mismo evento no queda esperando.
     await expect(cerrojo.ejecutar("evento-a", async () => "libre")).resolves.toBe("libre");
+  });
+});
+
+describe("Chat de la compra (feature 011): el comprador (US1) y el organizador (US2)", () => {
+  // Martín compró 2 VIP del Festival de Lucía en AHORA; el reloj, una hora después (una PENDIENTE
+  // ya está vencida; las demás no cambian).
+  const UNA_HORA_DESPUES = new Date(AHORA.getTime() + HORA);
+  const porMartin = { tipo: "usuario", usuarioId: "usuario-martin" } as const;
+  const porLucia = { tipo: "usuario", usuarioId: "usuario-lucia" } as const;
+  const enAhora = (
+    estado: EstadoCompra,
+    autor: CambioEstadoCompra["autor"] = porMartin,
+  ): CambioEstadoCompra => ({ estado, autor, fechaHora: AHORA });
+  const aLos = (minutos: number) => new Date(AHORA.getTime() + minutos * MINUTO);
+  const mensajesDePrueba = () => [
+    new Mensaje({ autorId: "usuario-martin", texto: "Hola", enviadoEn: aLos(1) }),
+    new Mensaje({ autorId: "usuario-lucia", texto: "Hola, Martín", enviadoEn: aLos(2) }),
+    new Mensaje({ autorId: "usuario-martin", texto: "Gracias", enviadoEn: aLos(3) }),
+  ];
+  const deMartin = (
+    estado: EstadoCompra,
+    cambios: {
+      eventoId?: string;
+      tipoEntradaId?: string;
+      creadaEn?: Date;
+      historial?: CambioEstadoCompra[];
+      mensajes?: Mensaje[];
+    } = {},
+  ) => {
+    const { eventoId = "evento-a", tipoEntradaId = "tipo-a-vip", ...resto } = cambios;
+    return compra(eventoId, tipoEntradaId, estado, { id: "compra-martin", cantidad: 2, ...resto });
+  };
+
+  /** Los servicios (por defecto, con el reloj una hora después de AHORA) y los repositorios espiados. */
+  function armarChat(compras: Compra[], reloj = relojFijo(UNA_HORA_DESPUES)) {
+    const servicios = armar({ compras, reloj });
+    return {
+      ...servicios,
+      guardarCompra: vi.spyOn(servicios.repositorioCompras, "guardar"),
+      guardarEvento: vi.spyOn(servicios.repositorioEventos, "guardar"),
+      ejecutar: vi.spyOn(servicios.cerrojo, "ejecutar"),
+    };
+  }
+
+  describe("CompraService.chat", () => {
+    it("los mensajes en orden, con la otra parte (la organizadora) y el encabezado de la compra", async () => {
+      const { compraService } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() }),
+      ]);
+
+      const chat = await compraService.chat("compra-martin", "usuario-martin");
+
+      expect(chat.compra).toEqual({
+        id: "compra-martin",
+        evento: { id: "evento-a", nombre: "Festival" },
+        tipoEntrada: { id: "tipo-a-vip", nombre: "VIP" },
+        cantidad: 2,
+        estado: EstadoCompra.CONFIRMADA,
+      });
+      expect(chat.otraParte).toEqual({
+        id: "usuario-lucia",
+        nombre: "Lucía",
+        apellido: "Álvarez",
+        rol: "organizador",
+      });
+      expect(chat.mensajes.map((m) => [m.numero, m.autor.id, m.autor.rol, m.texto])).toEqual([
+        [1, "usuario-martin", "comprador", "Hola"],
+        [2, "usuario-lucia", "organizador", "Hola, Martín"],
+        [3, "usuario-martin", "comprador", "Gracias"],
+      ]);
+      expect(chat.mensajes[0]).toMatchObject({
+        enviadoEn: "2026-11-10T15:01:00.000Z",
+        enviadoEnLocal: "2026-11-10T12:01",
+      });
+    });
+
+    it("al día: una PENDIENTE vencida se ve CANCELADA, sin guardar nada ni tomar el cerrojo", async () => {
+      const { compraService, repositorioCompras, guardarCompra, guardarEvento, ejecutar } = armarChat([
+        deMartin(EstadoCompra.PENDIENTE),
+      ]);
+
+      const chat = await compraService.chat("compra-martin", "usuario-martin");
+
+      expect(chat.compra.estado).toBe(EstadoCompra.CANCELADA);
+      expect(chat.mensajes).toEqual([]);
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+      expect(ejecutar).not.toHaveBeenCalled();
+      expect((await repositorioCompras.buscarPorId("compra-martin"))?.estado).toBe(EstadoCompra.PENDIENTE);
+    });
+
+    it.each([0, 3])(
+      "tres lecturas fijas con %i mensajes: la compra, el evento y las dos partes en lote",
+      async (cantidad) => {
+        const { compraService, repositorioCompras, repositorioEventos, usuarioService } = armarChat([
+          deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba().slice(0, cantidad) }),
+        ]);
+        const buscarCompra = vi.spyOn(repositorioCompras, "buscarPorId");
+        const buscarEvento = vi.spyOn(repositorioEventos, "buscarPorId");
+        const usuarios = vi.spyOn(usuarioService, "obtenerPorIds");
+        const usuario = vi.spyOn(usuarioService, "obtenerOFallar");
+
+        const chat = await compraService.chat("compra-martin", "usuario-martin");
+
+        expect(chat.mensajes).toHaveLength(cantidad);
+        expect(buscarCompra).toHaveBeenCalledTimes(1);
+        expect(buscarEvento).toHaveBeenCalledTimes(1);
+        expect(usuarios).toHaveBeenCalledTimes(1);
+        expect(usuarios).toHaveBeenCalledWith(["usuario-martin", "usuario-lucia"]);
+        expect(usuario).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe("CompraService.enviarMensaje", () => {
+    it("guarda el mensaje al final con un solo guardar y responde la MensajeVista", async () => {
+      const { compraService, repositorioCompras, repositorioEventos, guardarCompra, guardarEvento } =
+        armarChat([deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() })]);
+      const antes = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      const cupoAntes = await cupoDe(repositorioEventos, "tipo-a-vip");
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-martin", {
+        texto: "¿A qué hora abren?",
+      });
+
+      expect(vista).toEqual({
+        numero: 4,
+        autor: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez", rol: "comprador" },
+        texto: "¿A qué hora abren?",
+        enviadoEn: "2026-11-10T16:00:00.000Z",
+        enviadoEnLocal: "2026-11-10T13:00",
+      });
+      expect(guardarCompra).toHaveBeenCalledTimes(1);
+      expect(guardarEvento).not.toHaveBeenCalled();
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.mensajes).toHaveLength(4);
+      expect(guardada.mensajes.at(-1)).toMatchObject({
+        autorId: "usuario-martin",
+        texto: "¿A qué hora abren?",
+        enviadoEn: UNA_HORA_DESPUES,
+      });
+      expect(guardada.estado).toBe(antes.estado);
+      expect(guardada.historial).toEqual(antes.historial);
+      expect(guardada.entradas).toEqual(antes.entradas);
+      expect(guardada.total).toBe(antes.total);
+      expect(guardada.cantidad).toBe(antes.cantidad);
+      expect(guardada.reembolso).toBe(antes.reembolso);
+      expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(cupoAntes);
+    });
+
+    it("corre dentro del cerrojo del evento de la compra", async () => {
+      const { compraService, ejecutar } = armarChat([deMartin(EstadoCompra.CONFIRMADA)]);
+      await compraService.enviarMensaje("compra-martin", "usuario-martin", { texto: "Hola" });
+      expect(ejecutar).toHaveBeenCalledTimes(1);
+      expect(ejecutar).toHaveBeenCalledWith("evento-a", expect.any(Function));
+    });
+
+    it.each([
+      ["PENDIENTE", () => deMartin(EstadoCompra.PENDIENTE), EstadoCompra.PENDIENTE],
+      ["CONFIRMADA", () => deMartin(EstadoCompra.CONFIRMADA), EstadoCompra.CONFIRMADA],
+      ["UTILIZADA", () => deMartin(EstadoCompra.UTILIZADA), EstadoCompra.UTILIZADA],
+      ["CANCELADA por el comprador", () => deMartin(EstadoCompra.CANCELADA), EstadoCompra.CANCELADA],
+      [
+        "CANCELADA por vencimiento",
+        () =>
+          deMartin(EstadoCompra.CANCELADA, {
+            creadaEn: new Date(AHORA.getTime() - HORA),
+            historial: [
+              {
+                estado: EstadoCompra.PENDIENTE,
+                autor: porMartin,
+                fechaHora: new Date(AHORA.getTime() - HORA),
+              },
+              {
+                estado: EstadoCompra.CANCELADA,
+                autor: { tipo: "sistema" },
+                fechaHora: new Date(AHORA.getTime() - HORA + 15 * MINUTO),
+              },
+            ],
+          }),
+        EstadoCompra.CANCELADA,
+      ],
+      [
+        "REEMBOLSADA",
+        () =>
+          deMartin(EstadoCompra.REEMBOLSADA, {
+            historial: [
+              enAhora(EstadoCompra.PENDIENTE),
+              enAhora(EstadoCompra.CONFIRMADA),
+              enAhora(EstadoCompra.CANCELADA),
+              enAhora(EstadoCompra.REEMBOLSADA, porLucia),
+            ],
+          }),
+        EstadoCompra.REEMBOLSADA,
+      ],
+    ])("se acepta en una %s, que no cambia de estado", async (_nombre, crear, estado) => {
+      // Con el reloj en AHORA, la PENDIENTE todavía no venció.
+      const { compraService, repositorioCompras } = armarChat([crear()], relojFijo(AHORA));
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-martin", { texto: "Hola" });
+      expect(vista).toMatchObject({ numero: 1, texto: "Hola", autor: { rol: "comprador" } });
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(estado);
+      expect(guardada.mensajes).toHaveLength(1);
+    });
+
+    it("se acepta con el evento realizado", async () => {
+      const realizada = deMartin(EstadoCompra.CONFIRMADA, {
+        eventoId: "evento-pasado",
+        tipoEntradaId: "tipo-pasado-general",
+        creadaEn: new Date(AHORA.getTime() - 2 * DIA),
+      });
+      const { compraService, repositorioCompras } = armarChat([realizada]);
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-martin", {
+        texto: "¡Estuvo genial!",
+      });
+      expect(vista.numero).toBe(1);
+      expect((await repositorioCompras.buscarPorId("compra-martin"))?.mensajes).toHaveLength(1);
+    });
+
+    it("con la PENDIENTE vencida sin materializar: primero la cancela el sistema y devuelve el cupo, después guarda el mensaje", async () => {
+      const { compraService, repositorioCompras, repositorioEventos, guardarCompra, guardarEvento } =
+        armarChat([deMartin(EstadoCompra.PENDIENTE)]);
+
+      await compraService.enviarMensaje("compra-martin", "usuario-martin", { texto: "Se me venció" });
+
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.CANCELADA);
+      expect(guardada.fueVencida()).toBe(true);
+      expect(guardada.mensajes.map((m) => m.texto)).toEqual(["Se me venció"]);
+      expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(52);
+      // Orden de guardado de la 006: la vencida, el evento con el cupo devuelto y la compra con el mensaje.
+      expect(guardarCompra).toHaveBeenCalledTimes(2);
+      expect(guardarEvento).toHaveBeenCalledTimes(1);
+      const [primeraCompra, segundaCompra] = guardarCompra.mock.invocationCallOrder;
+      const [evento] = guardarEvento.mock.invocationCallOrder;
+      expect(primeraCompra).toBeLessThan(evento!);
+      expect(evento).toBeLessThan(segundaCompra!);
+    });
+
+    it("con otra PENDIENTE vencida en el evento, también la registra cancelada y le devuelve el cupo (FR-009, FR-010)", async () => {
+      const otra = compra("evento-a", "tipo-a-general", EstadoCompra.PENDIENTE, {
+        id: "compra-sofia",
+        compradorId: "usuario-sofia",
+        cantidad: 3,
+      });
+      const { compraService, repositorioCompras, repositorioEventos } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA),
+        otra,
+      ]);
+      const antes = (await repositorioCompras.buscarPorId("compra-martin"))!;
+
+      await compraService.enviarMensaje("compra-martin", "usuario-martin", { texto: "Hola" });
+
+      const deSofia = (await repositorioCompras.buscarPorId("compra-sofia"))!;
+      expect(deSofia.estado).toBe(EstadoCompra.CANCELADA);
+      expect(deSofia.fueVencida()).toBe(true);
+      expect(await cupoDe(repositorioEventos, "tipo-a-general")).toBe(13);
+      expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(50);
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.CONFIRMADA);
+      expect(guardada.historial).toEqual(antes.historial);
+      expect(guardada.mensajes).toHaveLength(1);
+    });
+  });
+
+  describe("el organizador (US2)", () => {
+    it("chat: los mismos mensajes, con el comprador como la otra parte y cada autor con su rol", async () => {
+      const { compraService } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() }),
+      ]);
+
+      const chat = await compraService.chat("compra-martin", "usuario-lucia");
+
+      expect(chat.otraParte).toEqual({
+        id: "usuario-martin",
+        nombre: "Martín",
+        apellido: "Benítez",
+        rol: "comprador",
+      });
+      expect(chat.mensajes.map((m) => [m.numero, m.autor.id, m.autor.rol, m.texto])).toEqual([
+        [1, "usuario-martin", "comprador", "Hola"],
+        [2, "usuario-lucia", "organizador", "Hola, Martín"],
+        [3, "usuario-martin", "comprador", "Gracias"],
+      ]);
+      expect(chat.compra.estado).toBe(EstadoCompra.CONFIRMADA);
+    });
+
+    it("enviarMensaje: guarda el mensaje con su autorId y responde rol organizador", async () => {
+      const { compraService, repositorioCompras, guardarCompra } = armarChat([
+        deMartin(EstadoCompra.CONFIRMADA, { mensajes: mensajesDePrueba() }),
+      ]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "Abrimos a las 18",
+      });
+
+      expect(vista).toEqual({
+        numero: 4,
+        autor: { id: "usuario-lucia", nombre: "Lucía", apellido: "Álvarez", rol: "organizador" },
+        texto: "Abrimos a las 18",
+        enviadoEn: "2026-11-10T16:00:00.000Z",
+        enviadoEnLocal: "2026-11-10T13:00",
+      });
+      expect(guardarCompra).toHaveBeenCalledTimes(1);
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.mensajes.at(-1)).toMatchObject({
+        autorId: "usuario-lucia",
+        texto: "Abrimos a las 18",
+        enviadoEn: UNA_HORA_DESPUES,
+      });
+    });
+
+    it("enviarMensaje: se acepta con el evento realizado", async () => {
+      const realizada = deMartin(EstadoCompra.CONFIRMADA, {
+        eventoId: "evento-pasado",
+        tipoEntradaId: "tipo-pasado-general",
+        creadaEn: new Date(AHORA.getTime() - 2 * DIA),
+      });
+      const { compraService, repositorioCompras } = armarChat([realizada]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "¡Gracias por venir!",
+      });
+
+      expect(vista).toMatchObject({ numero: 1, autor: { rol: "organizador" } });
+      expect((await repositorioCompras.buscarPorId("compra-martin"))?.mensajes).toHaveLength(1);
+    });
+
+    it("enviarMensaje: se acepta en una REEMBOLSADA, que no cambia de estado", async () => {
+      const reembolsada = deMartin(EstadoCompra.REEMBOLSADA, {
+        historial: [
+          enAhora(EstadoCompra.PENDIENTE),
+          enAhora(EstadoCompra.CONFIRMADA),
+          enAhora(EstadoCompra.CANCELADA),
+          enAhora(EstadoCompra.REEMBOLSADA, porLucia),
+        ],
+      });
+      const { compraService, repositorioCompras } = armarChat([reembolsada]);
+
+      const vista = await compraService.enviarMensaje("compra-martin", "usuario-lucia", {
+        texto: "Ya te devolvimos la plata",
+      });
+
+      expect(vista).toMatchObject({ numero: 1, autor: { rol: "organizador" } });
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.REEMBOLSADA);
+      expect(guardada.mensajes).toHaveLength(1);
+    });
+  });
+
+  describe("nadie más lee ni escribe (US3)", () => {
+    const MENSAJE_403 =
+      "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra.";
+    // Sofía también compró en el Festival de Lucía; Martín organiza evento-b, no el Festival.
+    const deSofia = (estado: EstadoCompra) =>
+      compra("evento-a", "tipo-a-general", estado, {
+        id: "compra-sofia",
+        compradorId: "usuario-sofia",
+        cantidad: 1,
+      });
+    const llamar = {
+      chat: (servicios: ReturnType<typeof armarChat>, compraId: string, usuarioId: string) =>
+        servicios.compraService.chat(compraId, usuarioId),
+      enviarMensaje: (servicios: ReturnType<typeof armarChat>, compraId: string, usuarioId: string) =>
+        servicios.compraService.enviarMensaje(compraId, usuarioId, { texto: "¿Me ven?" }),
+    };
+
+    describe.each(Object.entries(llamar))("%s", (_nombre, operacion) => {
+      it("con una compra inexistente: CompraNoEncontradaError (404)", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA)]);
+
+        await expect(operacion(servicios, "compra-x", "usuario-martin")).rejects.toBeInstanceOf(
+          CompraNoEncontradaError,
+        );
+      });
+
+      it("el 404 va antes del 403: una compra inexistente pedida por alguien ajeno", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA)]);
+
+        await expect(operacion(servicios, "compra-x", "usuario-sofia")).rejects.toBeInstanceOf(
+          CompraNoEncontradaError,
+        );
+      });
+
+      it("otro comprador del mismo evento: SinPermisoError con el mensaje del contrato", async () => {
+        const servicios = armarChat([deMartin(EstadoCompra.CONFIRMADA), deSofia(EstadoCompra.CONFIRMADA)]);
+
+        const rechazo = operacion(servicios, "compra-martin", "usuario-sofia");
+
+        await expect(rechazo).rejects.toBeInstanceOf(SinPermisoError);
+        await expect(rechazo).rejects.toThrow(MENSAJE_403);
+      });
+
+      it("el organizador de otro evento: SinPermisoError con el mensaje del contrato", async () => {
+        const servicios = armarChat([deSofia(EstadoCompra.CONFIRMADA)]);
+
+        const rechazo = operacion(servicios, "compra-sofia", "usuario-martin");
+
+        await expect(rechazo).rejects.toBeInstanceOf(SinPermisoError);
+        await expect(rechazo).rejects.toThrow(MENSAJE_403);
+      });
+    });
+
+    it("un 403 al enviar no guarda nada ni materializa el vencimiento de una PENDIENTE vencida", async () => {
+      const { compraService, repositorioCompras, repositorioEventos, guardarCompra, guardarEvento } =
+        armarChat([deMartin(EstadoCompra.PENDIENTE, { mensajes: mensajesDePrueba() })]);
+
+      await expect(
+        compraService.enviarMensaje("compra-martin", "usuario-sofia", { texto: "Hola" }),
+      ).rejects.toBeInstanceOf(SinPermisoError);
+
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+      const guardada = (await repositorioCompras.buscarPorId("compra-martin"))!;
+      expect(guardada.estado).toBe(EstadoCompra.PENDIENTE);
+      expect(guardada.mensajes).toHaveLength(3);
+      expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(50);
+    });
   });
 });
