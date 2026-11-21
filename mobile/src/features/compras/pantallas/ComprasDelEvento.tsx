@@ -1,6 +1,5 @@
 import type { CompraDelEventoVista, ComprasDelEventoVista } from "@ai-ticket-it/shared";
 import { router, useLocalSearchParams } from "expo-router";
-import { useRef } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
@@ -13,6 +12,7 @@ import { useSalirSiNoExisteElEvento } from "../evento-inexistente";
 import { textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
 import { useConfirmarReembolso } from "../mutaciones";
 import { useComprasDelEvento } from "../useComprasDelEvento";
+import { useEnvioUnico } from "../useEnvioUnico";
 import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
@@ -51,18 +51,11 @@ function Contenido({ usuarioId, vista }: { usuarioId: string; vista: ComprasDelE
   // Una sola mutation para todas las filas (feature 009): la fila en curso y su error salen de ella.
   const reembolso = useConfirmarReembolso(usuarioId, vista.evento.id);
   // Marca sincrónica: una segunda confirmación antes de que se vuelva a dibujar no manda otro pedido.
-  const enviando = useRef(false);
+  const enviarUnaVez = useEnvioUnico();
   const error = mensajeDeReembolso(reembolso.error);
 
-  const enviar = (compraId: string) => {
-    if (enviando.current) return;
-    enviando.current = true;
-    reembolso.mutate(compraId, {
-      onSettled: () => {
-        enviando.current = false;
-      },
-    });
-  };
+  const enviar = (compraId: string) =>
+    enviarUnaVez((terminar) => reembolso.mutate(compraId, { onSettled: terminar }));
   const confirmar = (compra: CompraDelEventoVista) =>
     Alert.alert(
       `¿Confirmar el reembolso a ${compra.comprador.nombre} ${compra.comprador.apellido}?`,

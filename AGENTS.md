@@ -107,7 +107,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `domain/orden-mis-compras.ts` (`compararMisCompras`: las de eventos no realizados primero por
     fecha ascendente, las de realizados por fecha descendente, desempates `creadaEn` descendente →
     `id`). `domain/dias-restantes.ts` (`diasRestantes(fechaHoraEvento, ahora)`: días de calendario
-    de Buenos Aires, `null` si el evento ya empezó) solo se calcula en una `CONFIRMADA`, en cada
+    de Buenos Aires con `diaDeCalendarioDeBuenosAires` de `hora-buenos-aires.ts`, `null` si el
+    evento ya empezó) solo se calcula en una `CONFIRMADA`, en cada
     consulta. `services/compra.vistas.ts` compone las vistas con piezas (feature 010):
     `estadoDeLaCompra` (estado, `canceladaDesde` y `reembolso`), `aTipoDeLaCompra`,
     `aCompradorVista` y `vencimiento`; `datosComunes` las junta para `aCompraVista` (la de la 006) y
@@ -315,8 +316,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       reintentos; una para todas las filas, con la fila en curso en `variables`), que invalida
       `comprasDelEvento` y, por prefijo, `["entrada-del-evento"]`, `["compra"]`, `["mis-compras"]` y
       `["mis-compras-del-evento"]` (no el evento ni el catálogo: el cupo no cambia).
-      `useCancelarCompra` invalida además, por prefijo, `["compras-del-evento"]` y
-      `["entrada-del-evento"]` (lo del organizador). "Ver compras", en la edición
+      Pagar y cancelar en "Tu compra" y "Confirmar reembolso" envían con `useEnvioUnico` (010:
+      una marca sincrónica, porque el `Alert` responde antes de que se vuelva a dibujar: un
+      segundo toque no manda otro pedido). `useCancelarCompra` invalida además, por prefijo,
+      `["compras-del-evento"]` y `["entrada-del-evento"]` (lo del organizador). "Ver compras", en la edición
       y la solo lectura del evento propio, está en `eventos` y navega **por la ruta tipada** (sin
       importar `compras`).
   - **Conectores** (los únicos fuera de `features/` que importan features):
