@@ -41,5 +41,13 @@ export type {
   OrganizadorVista,
   TipoEntradaVista,
 } from "./evento";
+export { LIMITES_MENSAJE } from "./mensaje";
+export type {
+  ChatDeLaCompraVista,
+  DatosMensaje,
+  MensajeVista,
+  ParteDeLaCompraVista,
+  RolEnLaCompra,
+} from "./mensaje";
 export type { SaludVista } from "./salud";
 export type { UsuarioVista } from "./usuario";
