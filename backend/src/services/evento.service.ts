@@ -5,6 +5,7 @@ import {
   type EventoVista,
   type OrdenCatalogo,
   type OrganizadorVista,
+  type PaginaDeReseniasVista,
   type ReseniasDelOrganizadorVista,
   type SentidoCatalogo,
 } from "@ai-ticket-it/shared";
@@ -26,7 +27,7 @@ import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
 import type { ReseniaService } from "./resenia.service";
-import { aReseniasDelOrganizadorVista, delLote } from "./resenia.vistas";
+import { aPaginaDeReseniasVista, aReseniasDelOrganizadorVista, delLote } from "./resenia.vistas";
 import type { UsuarioService } from "./usuario.service";
 import type { VencimientoService } from "./vencimiento.service";
 
@@ -254,14 +255,17 @@ export class EventoService {
   }
 
   /**
-   * "Reseñas del organizador" (feature 012, R7): el organizador del evento con su puntaje y las
-   * reseñas de **todos** sus eventos, de la más reciente a la más vieja. Lectura pública, sin cerrojo
-   * ni reloj, con cuatro lecturas fijas: el evento (404), los eventos del organizador, sus reseñas y
-   * los usuarios en lote (el organizador y los autores).
+   * "Reseñas del organizador" por páginas (feature 012, R7; feature 013, R5): el organizador del
+   * evento con el puntaje y la cantidad de **todas** sus reseñas y la página `pagina` de las de
+   * **todos** sus eventos, de la más reciente a la más vieja. Lectura pública, sin cerrojo ni reloj,
+   * con cuatro lecturas fijas: el evento (404), los eventos del organizador, sus reseñas y los
+   * usuarios en lote (el organizador y solo los autores de la página).
    */
-  async reseniasDelOrganizador(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+  async reseniasDelOrganizador(eventoId: string, pagina: number): Promise<PaginaDeReseniasVista> {
     const { organizadorId, susEventos, resenias } = await this.#reseniasDelOrganizador(eventoId);
-    return this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, resenias);
+    const { elementos, pagina: paginaVista } = paginar(resenias, pagina);
+    const vista = await this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, elementos);
+    return aPaginaDeReseniasVista(vista, paginaVista);
   }
 
   /**

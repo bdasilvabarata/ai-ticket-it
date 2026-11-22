@@ -820,10 +820,17 @@
           }
         },
         {
-          "name": "Reseñas del organizador (Hamlet, de Martín)",
+          "name": "Reseñas del organizador (Hamlet, de Martín; página 1)",
           "request": {
             "method": "GET",
             "url": { "raw": "{{baseUrl}}/eventos/evento-hamlet/resenias-del-organizador" }
+          }
+        },
+        {
+          "name": "Reseñas de Martín — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador?pagina=2" }
           }
         },
         {

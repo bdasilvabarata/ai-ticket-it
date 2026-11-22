@@ -61,6 +61,12 @@ export const claves = {
   reseniasDelOrganizador: (usuarioId: string, eventoId: string) =>
     ["resenias-del-organizador", usuarioId, eventoId] as const,
   /**
+   * Una página de "Reseñas del organizador" (feature 013, US5): la clave del resumen más la página, así
+   * el prefijo `["resenias-del-organizador"]` que invalida la reseña nueva alcanza todas.
+   */
+  paginaDeResenias: (usuarioId: string, eventoId: string, pagina: number) =>
+    ["resenias-del-organizador", usuarioId, eventoId, "pagina", pagina] as const,
+  /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.
    */

@@ -1104,40 +1104,61 @@
       }
     },
     "/eventos/{eventoId}/resenias-del-organizador": {
-      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        },
+        {
+          "$ref": "#/components/parameters/Pagina"
+        }
+      ],
       "get": {
         "tags": ["Reseñas"],
-        "summary": "Reseñas del organizador del evento (público)",
-        "description": "El organizador del evento con su puntaje y **todas** las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0) y coincide con el de `EventoVista.organizador` y la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 012).",
+        "summary": "Reseñas del organizador del evento, por páginas (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas y una página (de a 10) de las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). `organizador.cantidadResenias` es igual a `pagina.totalElementos` y el `organizador` es el mismo en todas las páginas, en `/resumen`, en `EventoVista.organizador` y en la tarjeta del catálogo. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0). No expone el id del autor, compras, códigos, totales ni estados (features 012 y 013).",
         "security": [],
         "responses": {
           "200": {
-            "description": "El organizador con su puntaje y las reseñas",
+            "description": "El organizador con su puntaje y una página de reseñas",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ReseniasDelOrganizadorVista" },
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeReseniasVista"
+                },
                 "examples": {
-                  "conResenias": {
-                    "summary": "Martín (Hamlet, en el seed)",
+                  "paginaDos": {
+                    "summary": "Martín (Jazz en el Patio, en el seed), página 2: la más vieja de las 11",
                     "value": {
                       "organizador": {
                         "id": "usuario-martin",
                         "nombre": "Martín",
                         "apellido": "Benítez",
-                        "puntaje": 4.666666666666667,
-                        "cantidadResenias": 3
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
                       },
                       "resenias": [
                         {
-                          "id": "resenia-valentina-jazz-en-el-patio",
+                          "id": "resenia-lucia-jazz-en-el-patio",
                           "puntuacion": 5,
-                          "comentario": "Excelente organización, entramos rapidísimo.",
-                          "autor": { "nombre": "Valentina", "apellido": "Gómez" },
-                          "evento": { "id": "evento-jazz-en-el-patio", "nombre": "Jazz en el Patio" },
-                          "creadaEn": "2026-11-16T00:00:00.000Z",
-                          "creadaEnLocal": "2026-11-15T21:00"
+                          "comentario": "Una noche hermosa: el cuarteto sonó impecable y el patio estaba lindísimo.",
+                          "autor": {
+                            "nombre": "Lucía",
+                            "apellido": "Álvarez"
+                          },
+                          "evento": {
+                            "id": "evento-jazz-en-el-patio",
+                            "nombre": "Jazz en el Patio"
+                          },
+                          "creadaEn": "2026-11-13T14:00:00.000Z",
+                          "creadaEnLocal": "2026-11-13T11:00"
                         }
-                      ]
+                      ],
+                      "pagina": {
+                        "numero": 2,
+                        "tamano": 10,
+                        "totalElementos": 11,
+                        "totalPaginas": 2
+                      }
                     }
                   },
                   "sinResenias": {
@@ -1150,21 +1171,34 @@
                         "puntaje": null,
                         "cantidadResenias": 0
                       },
-                      "resenias": []
+                      "resenias": [],
+                      "pagina": {
+                        "numero": 1,
+                        "tamano": 10,
+                        "totalElementos": 0,
+                        "totalPaginas": 0
+                      }
                     }
                   }
                 }
               }
             }
           },
-          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
           "404": {
             "description": "No existe el evento",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
                 "example": {
-                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
                 }
               }
             }
@@ -3186,7 +3220,7 @@
       },
       "ReseniasDelOrganizadorVista": {
         "type": "object",
-        "description": "El organizador del evento con su puntaje y las reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012).",
+        "description": "El organizador del evento con su puntaje y reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012). Es la respuesta de `/resumen`, con las 3 más recientes (feature 013).",
         "required": ["organizador", "resenias"],
         "properties": {
           "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
@@ -3194,6 +3228,20 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
           }
+        }
+      },
+      "PaginaDeReseniasVista": {
+        "type": "object",
+        "description": "Una página de \"Reseñas del organizador\" (feature 013): el organizador con el puntaje y la cantidad de todas, las reseñas de la página y la página con los totales.",
+        "required": ["organizador", "resenias", "pagina"],
+        "properties": {
+          "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
+          "resenias": {
+            "type": "array",
+            "maxItems": 10,
+            "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" }
         }
       },
       "RolEnLaCompra": {

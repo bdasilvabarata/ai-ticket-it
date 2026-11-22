@@ -881,15 +881,17 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
 
   it("evento inexistente → 404 EVENTO_NO_ENCONTRADO", async () => {
     const { eventoService } = servicios();
-    await expect(eventoService.reseniasDelOrganizador("evento-x")).rejects.toMatchObject({
+    await expect(eventoService.reseniasDelOrganizador("evento-x", 1)).rejects.toMatchObject({
       codigo: "EVENTO_NO_ENCONTRADO",
     });
-    await expect(eventoService.reseniasDelOrganizador("evento-x")).rejects.toBeInstanceOf(NoEncontradoError);
+    await expect(eventoService.reseniasDelOrganizador("evento-x", 1)).rejects.toBeInstanceOf(
+      NoEncontradoError,
+    );
   });
 
   it("las de todos los eventos del organizador (también el que se mira), ordenadas, sin las de otros", async () => {
     const { eventoService } = servicios();
-    const vista = await eventoService.reseniasDelOrganizador("evento-a");
+    const vista = await eventoService.reseniasDelOrganizador("evento-a", 1);
     expect(vista.resenias).toEqual([
       {
         id: "resenia-2",
@@ -912,7 +914,7 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
 
   it("el organizador con el puntaje sin redondear, igual al del detalle (FR-018)", async () => {
     const { eventoService } = servicios();
-    const vista = await eventoService.reseniasDelOrganizador("evento-pasado");
+    const vista = await eventoService.reseniasDelOrganizador("evento-pasado", 1);
     expect(vista.organizador).toEqual({
       id: "usuario-lucia",
       nombre: "Lucía",
@@ -926,7 +928,7 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
 
   it("sin reseñas: puntaje null, cantidad 0 y la lista vacía", async () => {
     const { eventoService } = crearServicesDeEventos({ eventos: [evento({ id: "evento-a" })] });
-    expect(await eventoService.reseniasDelOrganizador("evento-a")).toEqual({
+    expect(await eventoService.reseniasDelOrganizador("evento-a", 1)).toEqual({
       organizador: {
         id: "usuario-lucia",
         nombre: "Lucía",
@@ -935,6 +937,7 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
         cantidadResenias: 0,
       },
       resenias: [],
+      pagina: { numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 },
     });
   });
 
@@ -951,7 +954,7 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
     const cerrojo = vi.spyOn(s.cerrojo, "ejecutar");
     const guardarEvento = vi.spyOn(s.repositorioEventos, "guardar");
     const guardarResenia = vi.spyOn(s.repositorioResenias, "guardar");
-    await s.eventoService.reseniasDelOrganizador("evento-a");
+    await s.eventoService.reseniasDelOrganizador("evento-a", 1);
     expect(buscarPorId).toHaveBeenCalledTimes(1);
     expect(listarPorOrganizador).toHaveBeenCalledTimes(1);
     expect(listarPorOrganizador).toHaveBeenCalledWith("usuario-lucia");
@@ -1052,6 +1055,78 @@ describe("EventoService.resumenDeResenias (feature 013, R5)", () => {
       "usuario-sofia",
     ]);
     expect(usuarioPorId).not.toHaveBeenCalled();
+    expect(cerrojo).not.toHaveBeenCalled();
+  });
+});
+
+describe("EventoService.reseniasDelOrganizador: paginado (feature 013, US5)", () => {
+  // 11 reseñas de Lucía: la i-ésima, hace i horas (la 1 es la más reciente). Los autores rotan, así
+  // la página 2 (la más vieja) tiene un solo autor.
+  const AUTORES = ["usuario-diego", "usuario-sofia", "usuario-martin"] as const;
+  const once = Array.from(
+    { length: 11 },
+    (_, i) =>
+      new Resenia({
+        id: `resenia-${String(i + 1).padStart(2, "0")}`,
+        compradorId: AUTORES[i % AUTORES.length] ?? "usuario-diego",
+        eventoId: i % 2 === 0 ? "evento-a" : "evento-pasado",
+        puntuacion: (i % 5) + 1,
+        comentario: null,
+        creadaEn: new Date(AHORA.getTime() - (i + 1) * HORA),
+      }),
+  );
+  const eventosDeLucia = [
+    evento({ id: "evento-a", nombre: "Peña" }),
+    evento({ id: "evento-pasado", nombre: "Jazz", en: -3 * DIA }),
+  ];
+  const servicios = (resenias: Resenia[] = once) =>
+    crearServicesDeEventos({ eventos: eventosDeLucia, resenias });
+  const ids = (vista: { resenias: { id: string }[] }) => vista.resenias.map((r) => r.id);
+
+  it("página 1: las 10 más recientes y la página con los totales de todas", async () => {
+    const vista = await servicios().eventoService.reseniasDelOrganizador("evento-a", 1);
+    expect(ids(vista)).toEqual(once.slice(0, 10).map((r) => r.id));
+    expect(vista.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    expect(vista.organizador.cantidadResenias).toBe(vista.pagina.totalElementos);
+  });
+
+  it("página 2: la que queda, con el mismo organizador; concatenadas = la lista completa (SC-002)", async () => {
+    const { eventoService } = servicios();
+    const primera = await eventoService.reseniasDelOrganizador("evento-a", 1);
+    const segunda = await eventoService.reseniasDelOrganizador("evento-a", 2);
+    expect(ids(segunda)).toEqual(["resenia-11"]);
+    expect(segunda.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    expect(segunda.organizador).toEqual(primera.organizador);
+    expect([...ids(primera), ...ids(segunda)]).toEqual(once.map((r) => r.id));
+  });
+
+  it("una página posterior a la última devuelve la última con su número real", async () => {
+    const vista = await servicios().eventoService.reseniasDelOrganizador("evento-a", 9);
+    expect(vista.pagina.numero).toBe(2);
+    expect(ids(vista)).toEqual(["resenia-11"]);
+  });
+
+  it("el organizador es el del resumen y el del detalle (SC-005)", async () => {
+    const { eventoService } = servicios();
+    const vista = await eventoService.reseniasDelOrganizador("evento-a", 2);
+    expect(vista.organizador).toEqual((await eventoService.resumenDeResenias("evento-a")).organizador);
+    expect(vista.organizador).toEqual((await eventoService.obtener("evento-a")).organizador);
+  });
+
+  it("sin reseñas: la lista vacía, la página 1 y 0 páginas", async () => {
+    const vista = await servicios([]).eventoService.reseniasDelOrganizador("evento-a", 3);
+    expect(vista.resenias).toEqual([]);
+    expect(vista.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 });
+  });
+
+  it("un solo lote de usuarios: el organizador y solo los autores de la página", async () => {
+    const s = servicios();
+    const usuariosEnLote = vi.spyOn(s.repositorioUsuarios, "listarPorIds");
+    const cerrojo = vi.spyOn(s.cerrojo, "ejecutar");
+    await s.eventoService.reseniasDelOrganizador("evento-a", 2);
+    expect(usuariosEnLote).toHaveBeenCalledTimes(1);
+    // resenia-11 es la de i = 10 → AUTORES[10 % 3] = usuario-sofia.
+    expect([...(usuariosEnLote.mock.calls[0]?.[0] ?? [])].sort()).toEqual(["usuario-lucia", "usuario-sofia"]);
     expect(cerrojo).not.toHaveBeenCalled();
   });
 });

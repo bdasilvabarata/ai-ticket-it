@@ -5,7 +5,13 @@ import type { EventoController } from "../controllers/evento.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
 import { compraNueva, comprasDelEvento, consultaComprasDelEvento } from "../validations/compra.validation";
 import { entradaPorCodigo } from "../validations/entrada.validation";
-import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
+import {
+  consultaCatalogo,
+  consultaReseniasDelOrganizador,
+  eventoEditado,
+  eventoNuevo,
+  eventoPorId,
+} from "../validations/evento.validation";
 import { reseniaNueva } from "../validations/resenia.validation";
 import {
   tipoEntradaEditado,
@@ -72,11 +78,12 @@ export function crearEventosRouter(
   // Reseñas (feature 012): en nombre del usuario actual, con una compra UTILIZADA del evento (los 409
   // los decide el dominio). Sin PUT, PATCH ni DELETE: una reseña no se edita ni se borra.
   router.post("/:eventoId/resenias", requerirUsuario, reseniaNueva.middleware, controllers.compras.reseniar);
-  // Público, como el detalle (feature 012, R7): el organizador del evento con su puntaje y las
-  // reseñas de todos sus eventos. Un X-Usuario-Id, si llega, se ignora.
+  // Público, como el detalle (feature 012, R7): el organizador del evento con su puntaje y una
+  // página (`?pagina=N`, de a 10; feature 013) de las reseñas de todos sus eventos. Un X-Usuario-Id,
+  // si llega, se ignora.
   router.get(
     "/:eventoId/resenias-del-organizador",
-    eventoPorId.middleware,
+    consultaReseniasDelOrganizador.middleware,
     controller.reseniasDelOrganizador,
   );
   // Público (feature 013, R5): el resumen del detalle, con las 3 reseñas más recientes y el puntaje

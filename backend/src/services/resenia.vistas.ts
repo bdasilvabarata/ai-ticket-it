@@ -1,5 +1,7 @@
 import type {
   OrganizadorVista,
+  PaginaDeReseniasVista,
+  PaginaVista,
   ReseniaDelOrganizadorVista,
   ReseniasDelOrganizadorVista,
   ReseniaVista,
@@ -72,4 +74,12 @@ export function aReseniasDelOrganizadorVista(
       ),
     ),
   };
+}
+
+/** Una página de "Reseñas del organizador" (feature 013): la vista de la 012 más su `pagina`. */
+export function aPaginaDeReseniasVista(
+  vista: ReseniasDelOrganizadorVista,
+  pagina: PaginaVista,
+): PaginaDeReseniasVista {
+  return { ...vista, pagina };
 }

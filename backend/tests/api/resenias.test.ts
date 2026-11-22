@@ -231,13 +231,14 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
       puntaje: 52 / 11,
       cantidadResenias: 11,
     });
-    // Las de Jazz (012) son las más viejas: después de las 8 de los realizados de la 013.
+    // Las de Jazz (012) son las más viejas: después de las 8 de los realizados de la 013. La página
+    // 1 trae 10 y la más vieja queda en la 2.
+    expect(body.resenias).toHaveLength(10);
     expect(
-      body.resenias.slice(-3).map((r: { id: string; puntuacion: number }) => [r.id, r.puntuacion]),
+      body.resenias.slice(-2).map((r: { id: string; puntuacion: number }) => [r.id, r.puntuacion]),
     ).toEqual([
       ["resenia-valentina-jazz-en-el-patio", 5],
       ["resenia-diego-jazz-en-el-patio", 4],
-      ["resenia-lucia-jazz-en-el-patio", 5],
     ]);
     const deJazz = body.resenias.find((r: { id: string }) => r.id === "resenia-valentina-jazz-en-el-patio");
     expect(deJazz).toEqual({
@@ -267,6 +268,7 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
         cantidadResenias: 0,
       },
       resenias: [],
+      pagina: { numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 },
     });
   });
 
@@ -316,6 +318,103 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
     await reseniar(app, "usuario-lucia", DATOS);
     await reseniar(app, "usuario-sofia", DATOS);
     expect((await delOrganizador(app, "evento-noche-de-rock")).body).toEqual(antes);
+  });
+});
+
+describe("GET /api/eventos/:eventoId/resenias-del-organizador?pagina= (feature 013, US5)", () => {
+  const RUTA = "/api/eventos/evento-jazz-en-el-patio/resenias-del-organizador";
+  const pagina = (app: App, consulta = "", usuarioId?: string) => {
+    const pedido = request(app).get(`${RUTA}${consulta}`);
+    if (usuarioId !== undefined) pedido.set("X-Usuario-Id", usuarioId);
+    return pedido;
+  };
+  const ids = (body: { resenias: { id: string }[] }) => body.resenias.map((r) => r.id);
+
+  it("Martín (11): la página 1 trae 10 y la página con los totales de todas", async () => {
+    const { status, body } = await pagina(nuevaApp());
+    expect(status).toBe(200);
+    expect(body.resenias).toHaveLength(10);
+    expect(body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    expect(body.organizador.cantidadResenias).toBe(body.pagina.totalElementos);
+    expect(Object.keys(body).sort()).toEqual(["organizador", "pagina", "resenias"]);
+  });
+
+  it("?pagina=2 trae la más vieja; concatenadas, el orden de la 012 sin repetir (SC-002)", async () => {
+    const app = nuevaApp();
+    const primera = (await pagina(app)).body;
+    const segunda = (await pagina(app, "?pagina=2")).body;
+    expect(ids(segunda)).toEqual(["resenia-lucia-jazz-en-el-patio"]);
+    expect(segunda.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    const todas = [...primera.resenias, ...segunda.resenias];
+    expect(new Set(ids({ resenias: todas })).size).toBe(11);
+    const fechas = todas.map((r: { creadaEn: string }) => r.creadaEn);
+    expect(fechas).toEqual([...fechas].sort().reverse());
+  });
+
+  it("?pagina=9 devuelve la última con su número real", async () => {
+    const { status, body } = await pagina(nuevaApp(), "?pagina=9");
+    expect(status).toBe(200);
+    expect(body.pagina.numero).toBe(2);
+    expect(ids(body)).toEqual(["resenia-lucia-jazz-en-el-patio"]);
+  });
+
+  it("el organizador es igual en las dos páginas, en el resumen y en el detalle (SC-005)", async () => {
+    const app = nuevaApp();
+    const primera = (await pagina(app)).body;
+    const segunda = (await pagina(app, "?pagina=2")).body;
+    const resumen = (await request(app).get(`${RUTA}/resumen`)).body;
+    const detalle = (await request(app).get("/api/eventos/evento-jazz-en-el-patio")).body;
+    expect(segunda.organizador).toEqual(primera.organizador);
+    expect(resumen.organizador).toEqual(primera.organizador);
+    expect(detalle.organizador).toEqual(primera.organizador);
+  });
+
+  it.each(["0", "-1", "1.5", "abc", ""])("?pagina=%s → 400 sobre query.pagina", async (valor) => {
+    const { status, body } = await pagina(nuevaApp(), `?pagina=${valor}`);
+    expect(status).toBe(400);
+    expect(body.error.codigo).toBe("ENTRADA_INVALIDA");
+    expect(detallesDe(body, "query.pagina")).toEqual([
+      { campo: "query.pagina", mensaje: "Debe ser un entero mayor o igual a 1." },
+    ]);
+  });
+
+  it("un tamaño en la consulta se ignora: siguen siendo 10", async () => {
+    const { body } = await pagina(nuevaApp(), "?tamano=50&limite=50");
+    expect(body.resenias).toHaveLength(10);
+    expect(body.pagina.tamano).toBe(10);
+  });
+
+  it("sin reseñas (Lucía): la lista vacía, numero 1 y 0 páginas", async () => {
+    const { body } = await request(nuevaApp()).get(
+      "/api/eventos/evento-noche-de-rock/resenias-del-organizador?pagina=4",
+    );
+    expect(body.resenias).toEqual([]);
+    expect(body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 });
+  });
+
+  it("es público: la misma página sin X-Usuario-Id y con cualquier usuario", async () => {
+    const app = nuevaApp();
+    const sinUsuario = (await pagina(app, "?pagina=2")).body;
+    for (const usuarioId of ["usuario-martin", "usuario-diego", "usuario-nadie"]) {
+      expect((await pagina(app, "?pagina=2", usuarioId)).body).toEqual(sinUsuario);
+    }
+  });
+
+  it("404 EVENTO_NO_ENCONTRADO con un evento inexistente, también con página", async () => {
+    const { status, body } = await request(nuevaApp()).get(
+      "/api/eventos/evento-no-existe/resenias-del-organizador?pagina=2",
+    );
+    expect(status).toBe(404);
+    expect(body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+
+  it("sin el id del autor en ninguna página", async () => {
+    const app = nuevaApp();
+    for (const consulta of ["", "?pagina=2"]) {
+      const json = JSON.stringify((await pagina(app, consulta)).body);
+      expect(json).not.toContain("compradorId");
+      expect(json).not.toMatch(/usuario-(lucia|diego|sofia|valentina)/);
+    }
   });
 });
 

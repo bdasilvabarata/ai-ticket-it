@@ -1,4 +1,9 @@
-import { crearClienteApi, obtenerResumenDeResenias, reseniarEvento } from "../../src/api";
+import {
+  crearClienteApi,
+  obtenerReseniasDelOrganizador,
+  obtenerResumenDeResenias,
+  reseniarEvento,
+} from "../../src/api";
 import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
 
 const URL = "http://servidor:3000/api";
@@ -76,5 +81,45 @@ describe("obtenerResumenDeResenias (feature 013, US4)", () => {
     expect(get).toHaveBeenCalledWith("/eventos/evento-hamlet/resenias-del-organizador/resumen", {
       signal: controlador.signal,
     });
+  });
+});
+
+describe("obtenerReseniasDelOrganizador (feature 013, US5)", () => {
+  const vista = {
+    organizador: {
+      id: "usuario-martin",
+      nombre: "Martín",
+      apellido: "Benítez",
+      puntaje: 5,
+      cantidadResenias: 11,
+    },
+    resenias: [],
+    pagina: { numero: 2, tamano: 10, totalElementos: 11, totalPaginas: 2 },
+  };
+
+  it("en la página 1 pide GET /eventos/:id/resenias-del-organizador sin ?pagina, sin usuario, con el signal", async () => {
+    const { cliente, falso } = armar({ status: 200, json: vista });
+    const controlador = new AbortController();
+    const get = jest.spyOn(cliente, "get");
+
+    await expect(
+      obtenerReseniasDelOrganizador(cliente, "evento-jazz", 1, { signal: controlador.signal }),
+    ).resolves.toEqual(vista);
+
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/eventos/evento-jazz/resenias-del-organizador`,
+      metodo: "GET",
+    });
+    expect(get).toHaveBeenCalledWith("/eventos/evento-jazz/resenias-del-organizador", {
+      signal: controlador.signal,
+    });
+  });
+
+  it("en otra página agrega ?pagina=N", async () => {
+    const { cliente, falso } = armar({ status: 200, json: vista });
+
+    await obtenerReseniasDelOrganizador(cliente, "evento-jazz", 2);
+
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos/evento-jazz/resenias-del-organizador?pagina=2`);
   });
 });

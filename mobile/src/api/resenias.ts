@@ -1,4 +1,9 @@
-import type { DatosResenia, ReseniasDelOrganizadorVista, ReseniaVista } from "@ai-ticket-it/shared";
+import type {
+  DatosResenia,
+  PaginaDeReseniasVista,
+  ReseniasDelOrganizadorVista,
+  ReseniaVista,
+} from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
@@ -40,6 +45,24 @@ export function obtenerResumenDeResenias(
 ): Promise<ReseniasDelOrganizadorVista> {
   return cliente.get<ReseniasDelOrganizadorVista>(
     `${rutaDelEvento(eventoId)}/resenias-del-organizador/resumen`,
+    { signal: opciones.signal },
+  );
+}
+
+/**
+ * `GET /eventos/:eventoId/resenias-del-organizador?pagina=N` (features 012 y 013): el organizador con
+ * el puntaje y la cantidad de todas sus reseñas y una página de 10. `pagina` va solo si no es la 1.
+ * Público en el servidor.
+ */
+export function obtenerReseniasDelOrganizador(
+  cliente: ClienteApi,
+  eventoId: string,
+  pagina: number,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<PaginaDeReseniasVista> {
+  const consulta = pagina === 1 ? "" : `?pagina=${pagina}`;
+  return cliente.get<PaginaDeReseniasVista>(
+    `${rutaDelEvento(eventoId)}/resenias-del-organizador${consulta}`,
     { signal: opciones.signal },
   );
 }
