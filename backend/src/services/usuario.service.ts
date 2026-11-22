@@ -90,6 +90,16 @@ export class UsuarioService {
   }
 
   /**
+   * Saca el evento de los favoritos de todos los usuarios que lo tienen (feature 014, research R5):
+   * de a uno y bajo el cerrojo de cada uno, relee, desmarca y guarda. La llama `EventoService`
+   * después de eliminar el evento y de liberar su cerrojo (sin cerrojos anidados).
+   */
+  async quitarFavoritoDeTodos(eventoId: string): Promise<void> {
+    const usuarios = await this.#usuarios.listarPorFavorito(eventoId);
+    for (const { id } of usuarios) await this.desmarcarFavorito(id, eventoId);
+  }
+
+  /**
    * Leer-modificar-guardar bajo el cerrojo del usuario: relee adentro, aplica el cambio y guarda
    * solo si devolvió otro objeto (un cambio que no cambia nada no guarda).
    */

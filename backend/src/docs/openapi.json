@@ -66,6 +66,25 @@
         }
       }
     },
+    "/usuarios/actual/favoritos": {
+      "get": {
+        "tags": ["Favoritos"],
+        "summary": "Mis favoritos",
+        "description": "Los eventos favoritos del usuario actual, como tarjetas del catálogo (la misma vista que `GET /eventos`: organizador, puntaje, `precioDesde` y `agotado` con el cupo al día). Primero los no realizados por `fechaHora` ascendente y después los realizados por `fechaHora` descendente; desempate nombre → id. Sin páginas: llega entera, `[]` sin favoritos. Un favorito cuyo evento ya no existe no aparece. Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Los favoritos, en orden",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
     "/usuarios/actual/favoritos/{eventoId}": {
       "put": {
         "tags": ["Favoritos"],
@@ -402,7 +421,7 @@
       "delete": {
         "tags": ["Eventos"],
         "summary": "Eliminar un evento (organizador)",
-        "description": "Solo si no se realizó y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "description": "Solo si no se realizó y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029). Al eliminarse, el evento sale de los favoritos de todos los usuarios (feature 014).",
         "security": [{ "usuarioSimulado": [] }],
         "responses": {
           "204": { "description": "Eliminado, sin cuerpo" },

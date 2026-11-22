@@ -4,6 +4,7 @@ import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
 import { Resenia } from "../../src/domain/resenia";
+import { Usuario } from "../../src/domain/usuario";
 import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
 import {
   AHORA,
@@ -12,11 +13,14 @@ import {
   compra,
   diego,
   evento,
+  lucia,
+  martin,
   musica,
   relojFijo,
   relojMovible,
   resenia,
   SIN_PAGINAS,
+  sofia,
   teatro,
   tipo,
 } from "../helpers/eventos";
@@ -205,6 +209,82 @@ describe("EventoService.eliminar", () => {
       codigo: "EVENTO_CON_COMPRAS",
     });
     expect((await repositorioEventos.listar()).map((e) => e.id)).toEqual(["evento-a", "evento-pasado"]);
+  });
+});
+
+describe("EventoService.eliminar: limpieza de favoritos (feature 014, R5)", () => {
+  const conFavoritos = (usuario: Usuario, favoritos: string[]) => new Usuario({ ...usuario, favoritos });
+
+  it("un evento eliminado sale de los favoritos de todos los que lo tenían", async () => {
+    const { eventoService, repositorioUsuarios } = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a" }), evento({ id: "evento-b" })],
+      usuarios: [
+        lucia,
+        conFavoritos(martin, ["evento-a", "evento-b"]),
+        conFavoritos(diego, ["evento-b", "evento-a"]),
+        conFavoritos(sofia, ["evento-b"]),
+      ],
+    });
+    await eventoService.eliminar("evento-a", "usuario-lucia");
+    const favoritos = async (id: string) => (await repositorioUsuarios.buscarPorId(id))?.favoritos;
+    expect(await favoritos("usuario-martin")).toEqual(["evento-b"]);
+    expect(await favoritos("usuario-diego")).toEqual(["evento-b"]);
+    expect(await favoritos("usuario-sofia")).toEqual(["evento-b"]);
+  });
+
+  it("si la eliminación se rechaza (403, con compras, realizado) ningún favorito cambia", async () => {
+    const servicios = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a" }), evento({ id: "evento-pasado", en: -DIA })],
+      compras: [compra("evento-a", "tipo-evento-a-general", EstadoCompra.CANCELADA)],
+      usuarios: [lucia, martin, conFavoritos(diego, ["evento-a", "evento-pasado"])],
+    });
+    const quitar = vi.spyOn(servicios.usuarioService, "quitarFavoritoDeTodos");
+    const guardar = vi.spyOn(servicios.repositorioUsuarios, "guardar");
+    await expect(servicios.eventoService.eliminar("evento-a", "usuario-martin")).rejects.toMatchObject({
+      constructor: SinPermisoError,
+    });
+    await expect(servicios.eventoService.eliminar("evento-a", "usuario-lucia")).rejects.toMatchObject({
+      codigo: "EVENTO_CON_COMPRAS",
+    });
+    await expect(servicios.eventoService.eliminar("evento-pasado", "usuario-lucia")).rejects.toMatchObject({
+      codigo: "EVENTO_REALIZADO",
+    });
+    expect(quitar).not.toHaveBeenCalled();
+    expect(guardar).not.toHaveBeenCalled();
+    expect((await servicios.repositorioUsuarios.buscarPorId("usuario-diego"))?.favoritos).toEqual([
+      "evento-a",
+      "evento-pasado",
+    ]);
+  });
+
+  it("la limpieza corre después de liberar el cerrojo del evento (sin anidar)", async () => {
+    const servicios = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a" })],
+      usuarios: [lucia, conFavoritos(diego, ["evento-a"])],
+    });
+    const orden: string[] = [];
+    const ejecutar = servicios.cerrojo.ejecutar.bind(servicios.cerrojo);
+    vi.spyOn(servicios.cerrojo, "ejecutar").mockImplementation(async (clave, operacion) => {
+      orden.push(`toma:${clave}`);
+      try {
+        return await ejecutar(clave, operacion);
+      } finally {
+        orden.push(`libera:${clave}`);
+      }
+    });
+    const quitar = servicios.usuarioService.quitarFavoritoDeTodos.bind(servicios.usuarioService);
+    vi.spyOn(servicios.usuarioService, "quitarFavoritoDeTodos").mockImplementation((eventoId) => {
+      orden.push("limpieza");
+      return quitar(eventoId);
+    });
+    await servicios.eventoService.eliminar("evento-a", "usuario-lucia");
+    expect(orden).toEqual([
+      "toma:evento-a",
+      "libera:evento-a",
+      "limpieza",
+      "toma:usuario:usuario-diego",
+      "libera:usuario:usuario-diego",
+    ]);
   });
 });
 
@@ -414,6 +494,173 @@ describe("EventoService.crear", () => {
       },
     );
     expect(await repositorioEventos.listar()).toEqual([]);
+  });
+});
+
+describe("EventoService.favoritosDe (feature 014, R6)", () => {
+  const conFavoritos = (favoritos: string[]) => new Usuario({ ...diego, favoritos });
+  const ids = (vista: readonly { id: string }[]) => vista.map((e) => e.id);
+
+  it("primero los próximos por fecha ascendente y después los realizados por fecha descendente", async () => {
+    const { eventoService } = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-lejano", en: 9 * DIA }),
+        evento({ id: "evento-viejo", en: -9 * DIA }),
+        evento({ id: "evento-cerca", en: DIA }),
+        evento({ id: "evento-ayer", en: -DIA }),
+        evento({ id: "evento-no-favorito", en: 2 * DIA }),
+      ],
+      usuarios: [lucia, conFavoritos(["evento-viejo", "evento-lejano", "evento-ayer", "evento-cerca"])],
+    });
+    const favoritos = await eventoService.favoritosDe("usuario-diego");
+    expect(ids(favoritos)).toEqual(["evento-cerca", "evento-lejano", "evento-ayer", "evento-viejo"]);
+    expect(favoritos.map((e) => e.realizado)).toEqual([false, false, true, true]);
+  });
+
+  it("a la misma fecha desempata por nombre sin mayúsculas ni tildes y, con el mismo nombre, por id", async () => {
+    const { eventoService } = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-z", nombre: "Ópera" }),
+        evento({ id: "evento-c", nombre: "banda" }),
+        evento({ id: "evento-b", nombre: "Ópera" }),
+      ],
+      usuarios: [lucia, conFavoritos(["evento-z", "evento-c", "evento-b"])],
+    });
+    expect(ids(await eventoService.favoritosDe("usuario-diego"))).toEqual([
+      "evento-c",
+      "evento-b",
+      "evento-z",
+    ]);
+  });
+
+  it("cada tarjeta es igual a la del mismo evento en el catálogo (SC-006)", async () => {
+    const { eventoService } = crearServicesDeEventos({
+      eventos: [
+        evento({
+          id: "evento-a",
+          tiposEntrada: [
+            tipo({ id: "tipo-a-general", precio: 8000, cupo: 0 }),
+            tipo({ id: "tipo-a-kids", nombre: "Kids", precio: 500, cupo: 3 }),
+          ],
+        }),
+        evento({
+          id: "evento-b",
+          organizadorId: "usuario-martin",
+          categoriaId: teatro.id,
+          en: 2 * DIA,
+          tiposEntrada: [tipo({ id: "tipo-b-general", cupo: 0 })],
+        }),
+        evento({ id: "evento-pasado", en: -DIA }),
+      ],
+      // Una pendiente vencida devuelve cupo: "agotado" se calcula al día, igual que en el catálogo.
+      compras: [
+        compra("evento-b", "tipo-b-general", EstadoCompra.PENDIENTE, {
+          creadaEn: new Date(AHORA.getTime() - HORA),
+        }),
+      ],
+      resenias: [resenia("evento-pasado", 4), resenia("evento-pasado", 5)],
+      usuarios: [lucia, martin, conFavoritos(["evento-b", "evento-a"])],
+    });
+    const { eventos: catalogo } = await eventoService.listar({ texto: "", orden: "fecha" });
+    const favoritos = await eventoService.favoritosDe("usuario-diego");
+    expect(favoritos).toEqual(catalogo);
+    expect(ids(favoritos)).toEqual(["evento-b", "evento-a"]);
+    expect(favoritos[0]?.agotado).toBe(false);
+    expect(favoritos[1]?.organizador.puntaje).toBe(4.5);
+  });
+
+  it("sin favoritos responde [] sin pedir lotes", async () => {
+    const servicios = crearServicesDeEventos({ eventos: [evento({ id: "evento-a" })] });
+    const categorias = vi.spyOn(servicios.repositorioCategorias, "listarPorIds");
+    const resenias = vi.spyOn(servicios.repositorioResenias, "listarPorEventos");
+    expect(await servicios.eventoService.favoritosDe("usuario-diego")).toEqual([]);
+    expect(categorias).not.toHaveBeenCalled();
+    expect(resenias).not.toHaveBeenCalled();
+  });
+
+  it("un favorito próximo cuya fecha pasa queda en el grupo de los realizados", async () => {
+    const reloj = relojMovible();
+    const { eventoService } = crearServicesDeEventos({
+      reloj,
+      eventos: [
+        evento({ id: "evento-pronto", en: HORA }),
+        evento({ id: "evento-lejano", en: 9 * DIA }),
+        evento({ id: "evento-pasado", en: -DIA }),
+      ],
+      usuarios: [lucia, conFavoritos(["evento-pronto", "evento-lejano", "evento-pasado"])],
+    });
+    expect(ids(await eventoService.favoritosDe("usuario-diego"))).toEqual([
+      "evento-pronto",
+      "evento-lejano",
+      "evento-pasado",
+    ]);
+    reloj.avanzar(2 * HORA);
+    const despues = await eventoService.favoritosDe("usuario-diego");
+    expect(ids(despues)).toEqual(["evento-lejano", "evento-pronto", "evento-pasado"]);
+    expect(despues.map((e) => e.realizado)).toEqual([false, true, true]);
+  });
+
+  it("omite sin fallar un id guardado cuyo evento ya no existe (FR-010)", async () => {
+    const { eventoService } = crearServicesDeEventos({
+      eventos: [evento({ id: "evento-a" })],
+      usuarios: [lucia, conFavoritos(["evento-eliminado", "evento-a"])],
+    });
+    expect(ids(await eventoService.favoritosDe("usuario-diego"))).toEqual(["evento-a"]);
+  });
+
+  it("un usuario inexistente lanza USUARIO_NO_ENCONTRADO", async () => {
+    const { eventoService } = crearServicesDeEventos();
+    await expect(eventoService.favoritosDe("usuario-x")).rejects.toMatchObject({
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+
+  it("hace las mismas lecturas con 1 y con 5 favoritos, sin guardar ni tomar cerrojos (FR-011)", async () => {
+    const organizadores = ["usuario-lucia", "usuario-martin", "usuario-sofia"];
+    const eventos = Array.from({ length: 5 }, (_, i) =>
+      evento({ id: `evento-${i}`, organizadorId: organizadores[i % 3], en: (i - 2) * DIA + HORA }),
+    );
+    async function lecturas(favoritos: string[]) {
+      const servicios = crearServicesDeEventos({
+        eventos,
+        usuarios: [lucia, martin, sofia, conFavoritos(favoritos)],
+      });
+      const espias = {
+        usuario: vi.spyOn(servicios.repositorioUsuarios, "buscarPorId"),
+        eventos: vi.spyOn(servicios.repositorioEventos, "listar"),
+        porId: vi.spyOn(servicios.repositorioEventos, "buscarPorId"),
+        porOrganizador: vi.spyOn(servicios.repositorioEventos, "listarPorOrganizador"),
+        resenias: vi.spyOn(servicios.repositorioResenias, "listarPorEventos"),
+        pendientes: vi.spyOn(servicios.repositorioCompras, "listarPendientesPorEventos"),
+        categorias: vi.spyOn(servicios.repositorioCategorias, "listarPorIds"),
+        usuarios: vi.spyOn(servicios.repositorioUsuarios, "listarPorIds"),
+      };
+      const cerrojo = vi.spyOn(servicios.cerrojo, "ejecutar");
+      const guardados = [
+        vi.spyOn(servicios.repositorioUsuarios, "guardar"),
+        vi.spyOn(servicios.repositorioEventos, "guardar"),
+        vi.spyOn(servicios.repositorioCompras, "guardar"),
+      ];
+      const vista = await servicios.eventoService.favoritosDe("usuario-diego");
+      expect(vista).toHaveLength(favoritos.length);
+      expect(cerrojo).not.toHaveBeenCalled();
+      for (const guardar of guardados) expect(guardar).not.toHaveBeenCalled();
+      return Object.fromEntries(
+        Object.entries(espias).map(([nombre, espia]) => [nombre, espia.mock.calls.length]),
+      );
+    }
+    const conUno = await lecturas(["evento-3"]);
+    expect(conUno).toEqual({
+      usuario: 1,
+      eventos: 1,
+      porId: 0,
+      porOrganizador: 0,
+      resenias: 1,
+      pendientes: 1,
+      categorias: 1,
+      usuarios: 1,
+    });
+    expect(await lecturas(eventos.map((e) => e.id))).toEqual(conUno);
   });
 });
 

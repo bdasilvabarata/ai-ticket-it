@@ -193,13 +193,13 @@ FR-009, en lote; eliminar un evento lo saca de los favoritos de todos.
 `organizador`/`puntaje`/`cantidadResenias` que en `GET /eventos`, `[]` sin favoritos; eliminar un
 evento sin compras y ver que sale de las listas.
 
-- [ ] T013 [US2] Refactor sin cambio de comportamiento en `backend/src/services/evento.service.ts`:
+- [X] T013 [US2] Refactor sin cambio de comportamiento en `backend/src/services/evento.service.ts`:
   extraer de `listar` (013) el método privado `#tarjetasDelCatalogo(eventos, todos, ahora)` (puntajes
   con `reseniaService.puntajesPorOrganizador`, cupo al día con `#conCupoAlDia`, categorías y
   organizadores con `obtenerPorIds`) y que `listar` lo use para la página; verde
   `backend/tests/services/evento.service.test.ts` y `backend/tests/api/eventos.test.ts` sin
   tocarlos.
-- [ ] T014 [US2] Test de `EventoService.favoritosDe(usuarioId)` en
+- [X] T014 [US2] Test de `EventoService.favoritosDe(usuarioId)` en
   `backend/tests/services/evento.service.test.ts` (con stub `favoritosDe(usuarioId):
   Promise<EventoCatalogoVista[]>`): primero los no realizados por `fechaHora` ascendente y después
   los realizados por `fechaHora` descendente, con `realizado: true` en estos; desempate nombre → id;
@@ -212,10 +212,10 @@ evento sin compras y ver que sale de las listas.
   se **omite** sin fallar (FR-010); con repositorios espiados, la cantidad de lecturas es la misma
   con 1 y con 5 favoritos (usuario, `eventos.listar` una vez, reseñas, pendientes, categorías y
   usuarios en lote; FR-011); no guarda nada ni toma cerrojos.
-- [ ] T015 [US2] Implementar `favoritosDe` (research R6): `usuarioService.obtenerOFallar(usuarioId)`,
+- [X] T015 [US2] Implementar `favoritosDe` (research R6): `usuarioService.obtenerOFallar(usuarioId)`,
   `eventos.listar()` una vez, filtrar los que existen en `usuario.favoritos`, ordenar con
   `ordenDeMisEventos(ahora)` y armar con `#tarjetasDelCatalogo`; `ahora` del reloj; verde T014.
-- [ ] T016 [US2] Test de la limpieza al eliminar en `backend/tests/services/usuario.service.test.ts`
+- [X] T016 [US2] Test de la limpieza al eliminar en `backend/tests/services/usuario.service.test.ts`
   y `backend/tests/services/evento.service.test.ts` (con stub
   `quitarFavoritoDeTodos(eventoId): Promise<void>` en `UsuarioService`):
   `quitarFavoritoDeTodos` usa `listarPorFavorito` y, de a uno y bajo la clave `usuario:<id>` de cada uno,
@@ -225,18 +225,18 @@ evento sin compras y ver que sale de las listas.
   409 realizado) ningún favorito cambia y `quitarFavoritoDeTodos` no se llama; la limpieza corre
   **después** de liberar el cerrojo del evento (sin anidar: al entrar a `quitarFavoritoDeTodos`, el
   `cerrojo.ejecutar` del evento ya resolvió).
-- [ ] T017 [US2] Implementar `UsuarioService.quitarFavoritoDeTodos` y el segundo tramo de
+- [X] T017 [US2] Implementar `UsuarioService.quitarFavoritoDeTodos` y el segundo tramo de
   `EventoService.eliminar` en `backend/src/services/usuario.service.ts` y
   `backend/src/services/evento.service.ts` (research R5: después del `await` del cerrojo y solo si
   no lanzó); verde T016.
-- [ ] T018 [US2] Test de API de la lista en `backend/tests/api/favoritos.test.ts` (con stub
+- [X] T018 [US2] Test de API de la lista en `backend/tests/api/favoritos.test.ts` (con stub
   `EventoController.favoritos` y la ruta `router.get("/actual/favoritos", requerirUsuario, …)` antes
   de `/:id`): 401 sin usuario; `200 []` sin favoritos; tras marcar un próximo y un realizado, el
   orden de FR-009; marcar dos veces → aparece una vez (SC-003); la de Lucía no trae los de Diego;
   Lucía elimina un evento propio sin compras que Diego tenía → la lista de Diego ya no lo trae; un
   `DELETE /eventos/:id` rechazado no cambia la lista; `GET /eventos` y `GET /eventos/:id` responden
   **lo mismo** con y sin `X-Usuario-Id` y con usuarios con favoritos distintos (FR-013, SC-004).
-- [ ] T019 [US2] Implementar `EventoController.favoritos` en
+- [X] T019 [US2] Implementar `EventoController.favoritos` en
   `backend/src/controllers/evento.controller.ts` y documentar `GET /usuarios/actual/favoritos`
   (`200` arreglo de `EventoCatalogoVista`, `401`) bajo el tag `Favoritos` en
   `backend/src/docs/openapi.json`, más la nota en `DELETE /eventos/{eventoId}` ("al eliminarse, el

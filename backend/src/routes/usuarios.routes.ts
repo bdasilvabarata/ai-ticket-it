@@ -18,7 +18,9 @@ export function crearUsuariosRouter(
   router.get("/", controller.listar);
   // Requiere usuario. Declaradas antes que /:id ("actual" no es un id válido, no hay ambigüedad).
   router.get("/actual", requerirUsuario, controller.obtenerActual);
-  // Favoritos del usuario actual (feature 014): 401 → 400 params.eventoId → 404 evento.
+  // Favoritos del usuario actual (feature 014): la lista (401) y marcar o desmarcar
+  // (401 → 400 params.eventoId → 404 evento).
+  router.get("/actual/favoritos", requerirUsuario, eventos.favoritos);
   router.put("/actual/favoritos/:eventoId", requerirUsuario, eventoPorId.middleware, eventos.marcarFavorito);
   router.delete(
     "/actual/favoritos/:eventoId",

@@ -235,3 +235,46 @@ describe("UsuarioService.desmarcarFavorito (feature 014)", () => {
     });
   });
 });
+
+describe("UsuarioService.quitarFavoritoDeTodos (feature 014, R5)", () => {
+  const conE1 = (usuario: Usuario, otros: string[] = []) =>
+    new Usuario({ ...usuario, favoritos: [...otros, "e1"] });
+
+  it("lo saca de todos los que lo tenían, de a uno bajo la clave de cada uno, conservando los demás", async () => {
+    const { service, repositorioUsuarios, cerrojo } = crearService([
+      conE1(lucia, ["e2"]),
+      martin,
+      conE1(diego, ["e3", "e4"]),
+    ]);
+    const listarPorFavorito = vi.spyOn(repositorioUsuarios, "listarPorFavorito");
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    const espiaCerrojo = vi.spyOn(cerrojo, "ejecutar");
+    await service.quitarFavoritoDeTodos("e1");
+    expect(listarPorFavorito).toHaveBeenCalledWith("e1");
+    expect(espiaCerrojo.mock.calls.map(([clave]) => clave)).toEqual(["usuario:u1", "usuario:u3"]);
+    expect(guardar).toHaveBeenCalledTimes(2);
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e2"]);
+    expect((await repositorioUsuarios.buscarPorId("u2"))?.favoritos).toEqual([]);
+    expect((await repositorioUsuarios.buscarPorId("u3"))?.favoritos).toEqual(["e3", "e4"]);
+  });
+
+  it("relee cada usuario adentro del cerrojo: no pisa un favorito marcado mientras tanto", async () => {
+    const { service, repositorioUsuarios } = crearService([conE1(lucia)]);
+    const listarPorFavorito = repositorioUsuarios.listarPorFavorito.bind(repositorioUsuarios);
+    // Entre la lista y la limpieza, el usuario marca otro evento.
+    vi.spyOn(repositorioUsuarios, "listarPorFavorito").mockImplementation(async (eventoId) => {
+      const usuarios = await listarPorFavorito(eventoId);
+      await service.marcarFavorito("u1", "e5");
+      return usuarios;
+    });
+    await service.quitarFavoritoDeTodos("e1");
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e5"]);
+  });
+
+  it("sin usuarios que lo tengan no guarda nada", async () => {
+    const { service, repositorioUsuarios } = crearService([lucia, martin]);
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    await service.quitarFavoritoDeTodos("e1");
+    expect(guardar).not.toHaveBeenCalled();
+  });
+});

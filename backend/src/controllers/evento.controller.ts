@@ -59,6 +59,11 @@ export class EventoController {
     res.json(await this.eventoService.actualizar(eventoId, usuarioActual(req).id, datos));
   };
 
+  /** Requiere usuario (feature 014): los favoritos del usuario actual, como tarjetas del catálogo. */
+  favoritos = async (req: Request, res: Response): Promise<void> => {
+    res.json(await this.eventoService.favoritosDe(usuarioActual(req).id));
+  };
+
   /** Requiere usuario (feature 014): marca el evento como favorito; `204` también si ya lo era. */
   marcarFavorito = async (req: Request, res: Response): Promise<void> => {
     const { eventoId } = eventoPorId.leer(req, "params");

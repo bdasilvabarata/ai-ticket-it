@@ -1,6 +1,7 @@
 import {
   LIMITES_PAGINACION,
   type CatalogoVista,
+  type EventoCatalogoVista,
   type EventoResumenVista,
   type EventoVista,
   type OrdenCatalogo,
@@ -17,7 +18,7 @@ import {
   type DatosDeTipoEntrada,
 } from "../domain/evento";
 import { palabrasDeBusqueda } from "../domain/busqueda";
-import { calcularPuntaje, type Resenia } from "../domain/resenia";
+import { calcularPuntaje, type Puntaje, type Resenia } from "../domain/resenia";
 import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import { paginar } from "../domain/paginacion";
 import type { Reloj } from "../domain/reloj";
@@ -146,26 +147,60 @@ export class EventoService {
       sentido,
     );
     const { elementos, pagina: paginaVista } = paginar(ordenados, pagina);
-
-    // Solo para los eventos de la página: el cupo (y "Agotado") al día, que cuenta las entradas de las
-    // compras pendientes vencidas (006, R3), y las categorías y los organizadores en lote.
-    const enLaPagina = await this.#conCupoAlDia(
+    const eventos = await this.#tarjetasDelCatalogo(
       elementos.map((elemento) => elemento.evento),
+      puntajes,
       ahora,
     );
+    return { eventos, pagina: paginaVista, hayEventosProximos };
+  }
+
+  /**
+   * "Mis favoritos" (feature 014, research R6): las tarjetas del catálogo de los eventos favoritos
+   * del usuario que **existen** (un id huérfano se omite sin fallar, FR-010), en el orden de Mis
+   * eventos (`ordenDeMisEventos`: próximos por fecha ascendente, realizados por fecha descendente,
+   * desempate nombre → id). Lectura sin cerrojo ni guardado, con lecturas fijas sin importar la
+   * cantidad de favoritos (FR-011): el usuario, los eventos y, si hay alguno, las de las tarjetas.
+   */
+  async favoritosDe(usuarioId: string): Promise<EventoCatalogoVista[]> {
+    const usuario = await this.#usuarioService.obtenerOFallar(usuarioId);
+    const ahora = this.#reloj.ahora();
+    const todos = await this.#eventos.listar();
+    const favoritos = todos
+      .filter((evento) => usuario.tieneFavorito(evento.id))
+      .toSorted(ordenDeMisEventos(ahora));
+    if (favoritos.length === 0) return [];
+    // El puntaje de cada organizador con todos sus eventos, como en el catálogo (FR-008).
+    const organizadorIds = new Set(favoritos.map((e) => e.organizadorId));
+    const puntajes = await this.#reseniaService.puntajesPorOrganizador(
+      todos.filter((e) => organizadorIds.has(e.organizadorId)),
+    );
+    return this.#tarjetasDelCatalogo(favoritos, puntajes, ahora);
+  }
+
+  /**
+   * Las tarjetas del catálogo de `eventos`, en ese orden (013, R3; 014, R6): el cupo (y "Agotado") al
+   * día, que cuenta las entradas de las compras pendientes vencidas (006, R3), y las categorías y los
+   * organizadores en lote. `puntajes` tiene el de cada organizador de `eventos`.
+   */
+  async #tarjetasDelCatalogo(
+    eventos: readonly Evento[],
+    puntajes: Map<string, Puntaje>,
+    ahora: Date,
+  ): Promise<EventoCatalogoVista[]> {
+    const alDia = await this.#conCupoAlDia(eventos, ahora);
     const [categorias, organizadores] = await Promise.all([
-      this.#categoriaService.obtenerPorIds(enLaPagina.map((e) => e.categoriaId)),
-      this.#usuarioService.obtenerPorIds([...new Set(enLaPagina.map((e) => e.organizadorId))]),
+      this.#categoriaService.obtenerPorIds(alDia.map((e) => e.categoriaId)),
+      this.#usuarioService.obtenerPorIds([...new Set(alDia.map((e) => e.organizadorId))]),
     ]);
     // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
-    const eventos = enLaPagina.map((evento) => {
+    return alDia.map((evento) => {
       const organizador = aOrganizadorVista(
         organizadores.get(evento.organizadorId)!,
         puntajes.get(evento.organizadorId)!,
       );
       return aEventoCatalogoVista(evento, categorias.get(evento.categoriaId)!, organizador, ahora);
     });
-    return { eventos, pagina: paginaVista, hayEventosProximos };
   }
 
   /** Los eventos que organiza el usuario actual, en el orden de Mis eventos. */
@@ -229,7 +264,11 @@ export class EventoService {
     });
   }
 
-  /** Elimina un evento propio, no realizado y sin compras (en ningún estado). Bajo el cerrojo del evento. */
+  /**
+   * Elimina un evento propio, no realizado y sin compras (en ningún estado), bajo el cerrojo del
+   * evento. Después de liberarlo, y solo si se eliminó, lo saca de los favoritos de todos los
+   * usuarios (feature 014, research R5: lo escribe el dueño de los usuarios, sin cerrojos anidados).
+   */
   async eliminar(id: string, usuarioId: string): Promise<void> {
     await this.#cerrojo.ejecutar(id, async () => {
       const ahora = this.#reloj.ahora();
@@ -238,6 +277,7 @@ export class EventoService {
       evento.verificarQueSePuedeEliminar({ ahora, tieneCompras });
       await this.#eventos.eliminarPorId(id);
     });
+    await this.#usuarioService.quitarFavoritoDeTodos(id);
   }
 
   /**

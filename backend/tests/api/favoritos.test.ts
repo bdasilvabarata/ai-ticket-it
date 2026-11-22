@@ -1,3 +1,4 @@
+import type { Express } from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
@@ -115,5 +116,77 @@ describe("PUT y DELETE /api/usuarios/actual/favoritos/:eventoId (feature 014, US
     await request(app).put(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
     await request(app).delete(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
     expect(await eventos.buscarPorId("evento-a")).toBe(antes);
+  });
+});
+
+describe("GET /api/usuarios/actual/favoritos (feature 014, US2)", () => {
+  const ids = (respuesta: request.Response) => (respuesta.body as { id: string }[]).map((e) => e.id);
+  const lista = (app: Express, usuarioId: string) => request(app).get(RUTA).set("X-Usuario-Id", usuarioId);
+
+  it("sin X-Usuario-Id o con uno inexistente → 401", async () => {
+    const { app } = crearAppDeFavoritos();
+    esperarError(await request(app).get(RUTA), 401, "USUARIO_NO_IDENTIFICADO");
+    esperarError(await lista(app, "usuario-nadie"), 401, "USUARIO_NO_IDENTIFICADO");
+  });
+
+  it("sin favoritos → 200 []", async () => {
+    const { app } = crearAppDeFavoritos();
+    const respuesta = await lista(app, DIEGO);
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual([]);
+  });
+
+  it("primero los próximos y después los realizados, como tarjetas del catálogo (FR-008, FR-009)", async () => {
+    const { app } = crearAppDeFavoritos();
+    for (const id of ["evento-pasado", "evento-a", "evento-propio"]) {
+      await request(app).put(`${RUTA}/${id}`).set("X-Usuario-Id", DIEGO);
+    }
+    const respuesta = await lista(app, DIEGO);
+    expect(respuesta.status).toBe(200);
+    // evento-a y evento-propio son a la misma hora: desempate por nombre.
+    expect(ids(respuesta)).toEqual(["evento-a", "evento-propio", "evento-pasado"]);
+    expect((respuesta.body as { realizado: boolean }[]).map((e) => e.realizado)).toEqual([
+      false,
+      false,
+      true,
+    ]);
+    const catalogo = await request(app).get("/api/eventos");
+    expect(respuesta.body.slice(0, 2)).toEqual(catalogo.body.eventos);
+  });
+
+  it("marcar dos veces → aparece una vez (SC-003), y la de Lucía no trae los de Diego (FR-006)", async () => {
+    const { app } = crearAppDeFavoritos();
+    await request(app).put(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
+    await request(app).put(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
+    expect(ids(await lista(app, DIEGO))).toEqual(["evento-a"]);
+    expect((await lista(app, LUCIA)).body).toEqual([]);
+  });
+
+  it("un evento eliminado sale de la lista; una eliminación rechazada no la cambia (FR-010)", async () => {
+    const { app } = crearAppDeFavoritos();
+    await request(app).put(`${RUTA}/evento-propio`).set("X-Usuario-Id", DIEGO);
+    await request(app).put(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
+    // Lucía no organiza evento-a: 403 y la lista sigue igual.
+    expect((await request(app).delete("/api/eventos/evento-a").set("X-Usuario-Id", LUCIA)).status).toBe(403);
+    expect(ids(await lista(app, DIEGO))).toEqual(["evento-a", "evento-propio"]);
+    expect((await request(app).delete("/api/eventos/evento-propio").set("X-Usuario-Id", LUCIA)).status).toBe(
+      204,
+    );
+    expect(ids(await lista(app, DIEGO))).toEqual(["evento-a"]);
+  });
+
+  it("el catálogo y el detalle responden lo mismo con y sin usuario y con favoritos distintos (FR-013)", async () => {
+    const { app } = crearAppDeFavoritos();
+    await request(app).put(`${RUTA}/evento-a`).set("X-Usuario-Id", DIEGO);
+    await request(app).put(`${RUTA}/evento-propio`).set("X-Usuario-Id", LUCIA);
+    for (const ruta of ["/api/eventos", "/api/eventos/evento-a"]) {
+      const sinUsuario = await request(app).get(ruta);
+      expect(sinUsuario.status).toBe(200);
+      expect((await request(app).get(ruta).set("X-Usuario-Id", DIEGO)).body).toEqual(sinUsuario.body);
+      expect((await request(app).get(ruta).set("X-Usuario-Id", LUCIA)).body).toEqual(sinUsuario.body);
+      expect((await request(app).get(ruta).set("X-Usuario-Id", "usuario-martin")).body).toEqual(
+        sinUsuario.body,
+      );
+    }
   });
 });
