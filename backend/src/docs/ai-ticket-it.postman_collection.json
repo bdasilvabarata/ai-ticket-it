@@ -827,6 +827,13 @@
           }
         },
         {
+          "name": "Reseñas de Martín — resumen",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador/resumen" }
+          }
+        },
+        {
           "name": "Reseñas del organizador sin reseñas (Noche de Rock, de Lucía)",
           "request": {
             "method": "GET",

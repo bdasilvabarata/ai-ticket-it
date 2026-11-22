@@ -964,3 +964,94 @@ describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
     expect(guardarResenia).not.toHaveBeenCalled();
   });
 });
+
+describe("EventoService.resumenDeResenias (feature 013, R5)", () => {
+  const conAutor = (
+    id: string,
+    eventoId: string,
+    compradorId: string,
+    puntuacion: number,
+    haceHoras: number,
+  ) =>
+    new Resenia({
+      id,
+      compradorId,
+      eventoId,
+      puntuacion,
+      comentario: null,
+      creadaEn: new Date(AHORA.getTime() - haceHoras * HORA),
+    });
+  const eventosDeLucia = [
+    evento({ id: "evento-a", nombre: "Peña" }),
+    evento({ id: "evento-pasado", nombre: "Jazz", en: -3 * DIA }),
+  ];
+  const deMartin = evento({ id: "evento-de-martin", organizadorId: "usuario-martin" });
+  const cinco = [
+    conAutor("resenia-1", "evento-pasado", "usuario-diego", 4, 10),
+    conAutor("resenia-2", "evento-a", "usuario-sofia", 5, 2),
+    conAutor("resenia-3", "evento-pasado", "usuario-sofia", 3, 12),
+    conAutor("resenia-4", "evento-a", "usuario-martin", 2, 20),
+    conAutor("resenia-5", "evento-pasado", "usuario-martin", 1, 30),
+    conAutor("resenia-otro", "evento-de-martin", "usuario-diego", 1, 1),
+  ];
+  const servicios = (resenias = cinco) =>
+    crearServicesDeEventos({ eventos: [...eventosDeLucia, deMartin], resenias });
+
+  it("evento inexistente → 404 EVENTO_NO_ENCONTRADO", async () => {
+    await expect(servicios().eventoService.resumenDeResenias("evento-x")).rejects.toBeInstanceOf(
+      NoEncontradoError,
+    );
+  });
+
+  it("las 3 más recientes (creadaEn descendente → id) y el puntaje de todas", async () => {
+    const { eventoService } = servicios();
+    const vista = await eventoService.resumenDeResenias("evento-a");
+    expect(vista.resenias.map((r) => r.id)).toEqual(["resenia-2", "resenia-1", "resenia-3"]);
+    expect(vista.organizador).toEqual({
+      id: "usuario-lucia",
+      nombre: "Lucía",
+      apellido: "Álvarez",
+      puntaje: 15 / 5,
+      cantidadResenias: 5,
+    });
+    expect(vista.organizador).toEqual((await eventoService.obtener("evento-a")).organizador);
+  });
+
+  it("con 3 o menos, todas; sin reseñas, la lista vacía y puntaje null", async () => {
+    expect(
+      (await servicios(cinco.slice(0, 2)).eventoService.resumenDeResenias("evento-a")).resenias,
+    ).toHaveLength(2);
+    expect(await servicios([]).eventoService.resumenDeResenias("evento-a")).toEqual({
+      organizador: {
+        id: "usuario-lucia",
+        nombre: "Lucía",
+        apellido: "Álvarez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+      resenias: [],
+    });
+  });
+
+  it("lecturas fijas y un solo lote de usuarios: el organizador y los autores de las 3", async () => {
+    const s = servicios();
+    const buscarPorId = vi.spyOn(s.repositorioEventos, "buscarPorId");
+    const listarPorOrganizador = vi.spyOn(s.repositorioEventos, "listarPorOrganizador");
+    const listarPorEventos = vi.spyOn(s.repositorioResenias, "listarPorEventos");
+    const usuariosEnLote = vi.spyOn(s.repositorioUsuarios, "listarPorIds");
+    const usuarioPorId = vi.spyOn(s.repositorioUsuarios, "buscarPorId");
+    const cerrojo = vi.spyOn(s.cerrojo, "ejecutar");
+    await s.eventoService.resumenDeResenias("evento-a");
+    expect(buscarPorId).toHaveBeenCalledTimes(1);
+    expect(listarPorOrganizador).toHaveBeenCalledTimes(1);
+    expect(listarPorEventos).toHaveBeenCalledTimes(1);
+    expect(usuariosEnLote).toHaveBeenCalledTimes(1);
+    expect([...(usuariosEnLote.mock.calls[0]?.[0] ?? [])].sort()).toEqual([
+      "usuario-diego",
+      "usuario-lucia",
+      "usuario-sofia",
+    ]);
+    expect(usuarioPorId).not.toHaveBeenCalled();
+    expect(cerrojo).not.toHaveBeenCalled();
+  });
+});

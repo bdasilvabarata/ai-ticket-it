@@ -33,7 +33,7 @@ function respuestaDeExplorar(url: string): RespuestaFalsa | null {
   if (url.endsWith("/categorias")) return { status: 200, json: [] };
   if (/\/eventos\/[^/]+\/mis-compras$/.test(url)) return { status: 200, json: sinCompras };
   if (/\/api\/compras$/.test(url)) return { status: 200, json: [] };
-  if (/\/eventos\/[^/]+\/resenias-del-organizador$/.test(url)) {
+  if (/\/eventos\/[^/]+\/resenias-del-organizador\/resumen$/.test(url)) {
     return { status: 200, json: reseniasDelOrganizadorDeEjemplo() };
   }
   return null;

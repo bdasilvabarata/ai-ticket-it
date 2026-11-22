@@ -1172,6 +1172,124 @@
         }
       }
     },
+    "/eventos/{eventoId}/resenias-del-organizador/resumen": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        }
+      ],
+      "get": {
+        "tags": ["Reseñas"],
+        "summary": "Resumen de las reseñas del organizador para el detalle (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas (de **todos** sus eventos) y las **3** más recientes (`LIMITES_PAGINACION.reseniasEnElDetalle`; todas si tiene 3 o menos), con `creadaEn` descendente → `id`. Es la sección \"Reseñas del organizador\" del detalle: la app muestra \"Ver todas las reseñas\" si `cantidadResenias` es mayor que 3. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `organizador` es igual al de la colección, al de `EventoVista.organizador` y al de la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 013).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El organizador con su puntaje y las 3 reseñas más recientes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReseniasDelOrganizadorVista"
+                },
+                "examples": {
+                  "conResenias": {
+                    "summary": "Martín (Jazz en el Patio, en el seed): 11 reseñas, se ven las 3 del Tango",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-martin",
+                        "nombre": "Martín",
+                        "apellido": "Benítez",
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
+                      },
+                      "resenias": [
+                        {
+                          "id": "resenia-valentina-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": "Ya quiero que repitan la milonga.",
+                          "autor": {
+                            "nombre": "Valentina",
+                            "apellido": "Gómez"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T20:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T17:00"
+                        },
+                        {
+                          "id": "resenia-diego-tango-en-la-terraza",
+                          "puntuacion": 4,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Diego",
+                            "apellido": "Fernández"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T12:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T09:00"
+                        },
+                        {
+                          "id": "resenia-sofia-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Sofía",
+                            "apellido": "Castro"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T06:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T03:00"
+                        }
+                      ]
+                    }
+                  },
+                  "sinResenias": {
+                    "summary": "Lucía (Noche de Rock, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-lucia",
+                        "nombre": "Lucía",
+                        "apellido": "Álvarez",
+                        "puntaje": null,
+                        "cantidadResenias": 0
+                      },
+                      "resenias": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/compras": {
       "get": {
         "tags": ["Compras"],

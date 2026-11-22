@@ -173,6 +173,30 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       // El cupo ya descuenta las 3 compras utilizadas de abajo (feature 012): 60 − 3.
       tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 57 }],
     },
+    // Feature 013 (R11): dos realizados más de Martín, cada uno con 4 compras utilizadas y su reseña
+    // (abajo), para que "Ver todas las reseñas" tenga 2 páginas (11 reseñas: 10 + 1).
+    {
+      slug: "taller-de-escritura",
+      nombre: "Taller de escritura creativa",
+      descripcion: "Una tarde de consignas, lecturas y devoluciones.",
+      categoriaId: categoriaId("Conferencias"),
+      fechaHora: fechaLocal(ahora, -5, 18),
+      multimedia: [imagen("taller-escritura")],
+      organizadorId: martin,
+      // El cupo ya descuenta las 4 compras utilizadas de abajo: 30 − 4.
+      tiposEntrada: [{ nombre: "General", descripcion: "Materiales incluidos.", precio: 7000, cupo: 26 }],
+    },
+    {
+      slug: "tango-en-la-terraza",
+      nombre: "Tango en la terraza",
+      descripcion: "Orquesta típica y milonga al atardecer.",
+      categoriaId: categoriaId("Música"),
+      fechaHora: fechaLocal(ahora, -2, 19),
+      multimedia: [imagen("tango-terraza")],
+      organizadorId: martin,
+      // El cupo ya descuenta las 4 compras utilizadas de abajo: 100 − 4.
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 9000, cupo: 96 }],
+    },
     {
       slug: "maraton-10k",
       nombre: "Maratón Ciudad 10K",
@@ -512,8 +536,9 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   );
 
   // Reseñas (feature 012, R10): compras UTILIZADA de una entrada en dos eventos ya realizados, cada
-  // una con su reseña posterior al uso. Martín (Jazz) queda en ≈ 4,7 con 3 reseñas y Sofía (Noche de
-  // risas) en 2,5 con 2; Lucía, sin reseñas. La de Martín en la Peña sigue sin reseña (la demo).
+  // una con su reseña posterior al uso. Sofía (Noche de risas) queda en 2,5 con 2; Lucía, sin
+  // reseñas. La de Martín en la Peña sigue sin reseña (la demo). Desde la 013 (R11), Martín suma al
+  // Taller de escritura y al Tango (posteriores a las de Jazz): 11 reseñas, 52 / 11 ≈ 4,7.
   const eventoPorId = new Map(eventos.map((evento) => [evento.id, evento]));
   const resenias: Resenia[] = [];
   const asistencias: {
@@ -571,6 +596,78 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       reseniaHoras: 2 * 24,
       puntuacion: 2,
       comentario: null,
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "lucia",
+      codigo: "TXSC1A01",
+      usoMinutos: -30,
+      reseniaHoras: 6,
+      puntuacion: 5,
+      comentario: "Consignas muy disparadoras y un grupo hermoso.",
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "sofia",
+      codigo: "TXSC1S01",
+      usoMinutos: -25,
+      reseniaHoras: 20,
+      puntuacion: 5,
+      comentario: null,
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "diego",
+      codigo: "TXSC1D01",
+      usoMinutos: -20,
+      reseniaHoras: 30,
+      puntuacion: 5,
+      comentario: "Salí con tres cuentos empezados.",
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "valentina",
+      codigo: "TXSC1V01",
+      usoMinutos: -10,
+      reseniaHoras: 48,
+      puntuacion: 4,
+      comentario: "Muy bueno, aunque se hizo corto.",
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "lucia",
+      codigo: "TNGT1A01",
+      usoMinutos: -40,
+      reseniaHoras: 3,
+      puntuacion: 5,
+      comentario: "La orquesta, la terraza y el atardecer: todo perfecto.",
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "sofia",
+      codigo: "TNGT1S01",
+      usoMinutos: -30,
+      reseniaHoras: 8,
+      puntuacion: 5,
+      comentario: null,
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "diego",
+      codigo: "TNGT1D01",
+      usoMinutos: -20,
+      reseniaHoras: 14,
+      puntuacion: 4,
+      comentario: null,
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "valentina",
+      codigo: "TNGT1V01",
+      usoMinutos: -15,
+      reseniaHoras: 22,
+      puntuacion: 5,
+      comentario: "Ya quiero que repitan la milonga.",
     },
   ];
   for (const asistencia of asistencias) {

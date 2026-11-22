@@ -79,6 +79,13 @@ export function crearEventosRouter(
     eventoPorId.middleware,
     controller.reseniasDelOrganizador,
   );
+  // Público (feature 013, R5): el resumen del detalle, con las 3 reseñas más recientes y el puntaje
+  // de todas.
+  router.get(
+    "/:eventoId/resenias-del-organizador/resumen",
+    eventoPorId.middleware,
+    controller.resumenDeResenias,
+  );
   router.use("/:eventoId/tipos-entrada", crearTiposEntradaRouter(controllers.tiposEntrada, requerirUsuario));
   router.use("/:eventoId/entradas", crearEntradasRouter(controllers.entradas, requerirUsuario));
   return router;

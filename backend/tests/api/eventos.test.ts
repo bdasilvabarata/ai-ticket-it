@@ -343,7 +343,7 @@ describe("GET /api/eventos: orden (US4)", () => {
         }[]
       ).map((e) => [e.organizador.id, e.organizador]),
     );
-    expect(organizadores.get("usuario-martin")).toMatchObject({ puntaje: 14 / 3, cantidadResenias: 3 });
+    expect(organizadores.get("usuario-martin")).toMatchObject({ puntaje: 52 / 11, cantidadResenias: 11 });
     expect(organizadores.get(SOFIA)).toMatchObject({ puntaje: 2.5, cantidadResenias: 2 });
     expect(organizadores.get(LUCIA)).toMatchObject({ puntaje: null, cantidadResenias: 0 });
   });
@@ -643,7 +643,7 @@ describe("GET /api/eventos/:eventoId", () => {
     });
   });
 
-  it("suma el organizador con su puntaje sin redondear (las 3 reseñas de Jazz), sin X-Usuario-Id", async () => {
+  it("suma el organizador con su puntaje sin redondear (sus 11 reseñas, 013), sin X-Usuario-Id", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos/evento-hamlet");
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toMatchObject({
@@ -654,8 +654,8 @@ describe("GET /api/eventos/:eventoId", () => {
         id: "usuario-martin",
         nombre: "Martín",
         apellido: "Benítez",
-        puntaje: 14 / 3,
-        cantidadResenias: 3,
+        puntaje: 52 / 11,
+        cantidadResenias: 11,
       },
     });
   });

@@ -545,7 +545,7 @@ describe("Detalle del evento: ver mis entradas (corrección de la 006)", () => {
 });
 
 describe("Detalle del evento: reseñas del organizador (feature 012, US2)", () => {
-  const RUTA_RESENIAS_HAMLET = "/eventos/evento-hamlet/resenias-del-organizador";
+  const RUTA_RESENIAS_HAMLET = "/eventos/evento-hamlet/resenias-del-organizador/resumen";
   const martinConPuntaje = { ...hamletCompleto.organizador, puntaje: 14 / 3, cantidadResenias: 3 };
   const TRES_RESENIAS = [
     reseniaDelOrganizadorDeEjemplo(),
@@ -633,5 +633,46 @@ describe("Detalle del evento: reseñas del organizador (feature 012, US2)", () =
     expect(screen.getByText("Platea")).toBeOnTheScreen();
     await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
     expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+  });
+
+  describe("el resumen de 3 y Ver todas las reseñas (feature 013, US4)", () => {
+    const conOnce = conHamlet([
+      {
+        status: 200,
+        json: reseniasDelOrganizadorDeEjemplo({
+          organizador: { ...martinConPuntaje, puntaje: 52 / 11, cantidadResenias: 11 },
+          resenias: TRES_RESENIAS,
+        }),
+      },
+    ]);
+
+    it("con 11 reseñas: el puntaje y la cantidad de todas, las 3 del resumen y Ver todas las reseñas debajo", async () => {
+      await abrirDetalle("Hamlet", conOnce);
+
+      expect(await screen.findByText("4,7 · 11 reseñas")).toBeOnTheScreen();
+      expect(screen.getAllByLabelText(/, Jazz en el Patio, /)).toHaveLength(3);
+      expect(screen.getByRole("button", { name: "Ver todas las reseñas" })).toBeOnTheScreen();
+    });
+
+    it("tocar Ver todas las reseñas abre Reseñas del organizador del mismo evento", async () => {
+      const resultado = await abrirDetalle("Hamlet", conOnce);
+
+      await fireEvent.press(await screen.findByRole("button", { name: "Ver todas las reseñas" }));
+
+      await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-hamlet/resenias"));
+      expect(tituloDelHeader()).toBe("Reseñas del organizador");
+    });
+
+    it("con 3 reseñas (o menos) no está el botón", async () => {
+      await abrirDetalle("Hamlet", conTres);
+      expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+      expect(screen.queryByRole("button", { name: "Ver todas las reseñas" })).toBeNull();
+    });
+
+    it("sin reseñas: Todavía no tiene reseñas, sin puntaje ni botón", async () => {
+      await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+      expect(await screen.findByText("Todavía no tiene reseñas")).toBeOnTheScreen();
+      expect(screen.queryByRole("button", { name: "Ver todas las reseñas" })).toBeNull();
+    });
   });
 });

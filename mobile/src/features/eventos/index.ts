@@ -17,5 +17,6 @@ export { EventoDelOrganizador } from "./pantallas/EventoDelOrganizador";
 export { Explorar } from "./pantallas/Explorar";
 export { HubDelEvento } from "./pantallas/HubDelEvento";
 export { MisEventos } from "./pantallas/MisEventos";
+export { TodasLasResenias } from "./pantallas/TodasLasResenias";
 export { useConfirmarDescarte } from "./useConfirmarDescarte";
 export { useEvento } from "./useEvento";

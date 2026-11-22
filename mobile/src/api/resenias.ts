@@ -29,15 +29,17 @@ export function reseniarEvento(
 }
 
 /**
- * `GET /eventos/:eventoId/resenias-del-organizador` (feature 012): el organizador del evento con su
- * puntaje y las reseñas de todos sus eventos. Público en el servidor.
+ * `GET /eventos/:eventoId/resenias-del-organizador/resumen` (feature 013, R5): el organizador del
+ * evento con el puntaje y la cantidad de todas sus reseñas y las 3 más recientes (la sección del
+ * detalle). Público en el servidor.
  */
-export function obtenerReseniasDelOrganizador(
+export function obtenerResumenDeResenias(
   cliente: ClienteApi,
   eventoId: string,
   opciones: { signal?: AbortSignal } = {},
 ): Promise<ReseniasDelOrganizadorVista> {
-  return cliente.get<ReseniasDelOrganizadorVista>(`${rutaDelEvento(eventoId)}/resenias-del-organizador`, {
-    signal: opciones.signal,
-  });
+  return cliente.get<ReseniasDelOrganizadorVista>(
+    `${rutaDelEvento(eventoId)}/resenias-del-organizador/resumen`,
+    { signal: opciones.signal },
+  );
 }

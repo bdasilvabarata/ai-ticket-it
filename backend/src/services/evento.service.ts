@@ -1,11 +1,12 @@
-import type {
-  CatalogoVista,
-  EventoResumenVista,
-  EventoVista,
-  OrdenCatalogo,
-  OrganizadorVista,
-  ReseniasDelOrganizadorVista,
-  SentidoCatalogo,
+import {
+  LIMITES_PAGINACION,
+  type CatalogoVista,
+  type EventoResumenVista,
+  type EventoVista,
+  type OrdenCatalogo,
+  type OrganizadorVista,
+  type ReseniasDelOrganizadorVista,
+  type SentidoCatalogo,
 } from "@ai-ticket-it/shared";
 import {
   Evento,
@@ -15,7 +16,7 @@ import {
   type DatosDeTipoEntrada,
 } from "../domain/evento";
 import { palabrasDeBusqueda } from "../domain/busqueda";
-import { calcularPuntaje } from "../domain/resenia";
+import { calcularPuntaje, type Resenia } from "../domain/resenia";
 import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import { paginar } from "../domain/paginacion";
 import type { Reloj } from "../domain/reloj";
@@ -259,17 +260,49 @@ export class EventoService {
    * los usuarios en lote (el organizador y los autores).
    */
   async reseniasDelOrganizador(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+    const { organizadorId, susEventos, resenias } = await this.#reseniasDelOrganizador(eventoId);
+    return this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, resenias);
+  }
+
+  /**
+   * El resumen de "Reseñas del organizador" para el detalle (feature 013, R5): el organizador con el
+   * puntaje y la cantidad de **todas** sus reseñas y las `LIMITES_PAGINACION.reseniasEnElDetalle`
+   * más recientes. Las mismas lecturas fijas que la colección; los usuarios del lote son el
+   * organizador y solo los autores de las que se devuelven.
+   */
+  async resumenDeResenias(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+    const { organizadorId, susEventos, resenias } = await this.#reseniasDelOrganizador(eventoId);
+    const recientes = resenias.slice(0, LIMITES_PAGINACION.reseniasEnElDetalle);
+    return this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, recientes);
+  }
+
+  /** Las lecturas de la 012: el evento (404), los eventos de su organizador y sus reseñas, ordenadas. */
+  async #reseniasDelOrganizador(
+    eventoId: string,
+  ): Promise<{ organizadorId: string; susEventos: Evento[]; resenias: Resenia[] }> {
     const { organizadorId } = await this.obtenerOFallar(eventoId);
     const susEventos = await this.#eventos.listarPorOrganizador(organizadorId);
     const resenias = await this.#reseniaService.listarDeEventos(susEventos);
-    const autores = resenias.map((resenia) => resenia.compradorId);
+    return { organizadorId, susEventos, resenias };
+  }
+
+  /**
+   * La vista con el puntaje de `todas` (el mismo cálculo y el mismo conjunto que `#organizadorVista`,
+   * FR-018) y las reseñas de `mostradas`, con **un** lote de usuarios: el organizador y sus autores.
+   */
+  async #aReseniasDelOrganizadorVista(
+    organizadorId: string,
+    susEventos: readonly Evento[],
+    todas: readonly Resenia[],
+    mostradas: readonly Resenia[],
+  ): Promise<ReseniasDelOrganizadorVista> {
+    const autores = mostradas.map((resenia) => resenia.compradorId);
     const usuarios = await this.#usuarioService.obtenerPorIds([...new Set([organizadorId, ...autores])]);
-    // El mismo cálculo y el mismo conjunto que `#organizadorVista` (FR-018), sin otra lectura.
-    const puntaje = calcularPuntaje(resenias.map((resenia) => resenia.puntuacion));
+    const puntaje = calcularPuntaje(todas.map((resenia) => resenia.puntuacion));
     const organizador = aOrganizadorVista(delLote(usuarios, organizadorId, "el usuario"), puntaje);
     return aReseniasDelOrganizadorVista(
       organizador,
-      resenias,
+      mostradas,
       usuarios,
       new Map(susEventos.map((evento) => [evento.id, evento])),
     );

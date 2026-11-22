@@ -39,11 +39,11 @@ describe("crearDatosEjemplo", () => {
     expect(categorias).toHaveLength(6);
   });
 
-  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 5, 5 y 4; Diego y Valentina ninguno", () => {
+  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 5, 7 y 4; Diego y Valentina ninguno", () => {
     expect(usuarios).toHaveLength(5);
     const cuenta = contarPorOrganizador();
     expect(cuenta.get("usuario-lucia")).toBe(5);
-    expect(cuenta.get("usuario-martin")).toBe(5);
+    expect(cuenta.get("usuario-martin")).toBe(7);
     expect(cuenta.get("usuario-sofia")).toBe(4);
     expect(cuenta.has("usuario-diego")).toBe(false);
     expect(cuenta.has("usuario-valentina")).toBe(false);
@@ -52,8 +52,8 @@ describe("crearDatosEjemplo", () => {
     expect(usuarios.length - organizan.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("tiene 14 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
-    expect(eventos).toHaveLength(14);
+  it("tiene 16 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
+    expect(eventos).toHaveLength(16);
     expect(new Set(eventos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(2);
     expect(new Set(eventos.map((evento) => evento.categoriaId)).size).toBeGreaterThanOrEqual(2);
     for (const evento of eventos) expect(evento.tiposEntrada.length).toBeGreaterThanOrEqual(1);
@@ -96,9 +96,9 @@ describe("crearDatosEjemplo", () => {
     expect(eventos.find((e) => e.id === "evento-hamlet")?.estaAgotado()).toBe(true);
   });
 
-  it("tiene 12 eventos próximos (2 páginas del catálogo: 10 + 2, feature 013) y 2 realizados", () => {
+  it("tiene 12 eventos próximos (2 páginas del catálogo: 10 + 2, feature 013) y 4 realizados", () => {
     const realizados = eventos.filter((evento) => evento.estaRealizado(ahora));
-    expect(realizados).toHaveLength(2);
+    expect(realizados).toHaveLength(4);
     expect(eventos.length - realizados.length).toBe(12);
   });
 
@@ -472,6 +472,9 @@ describe("crearDatosEjemplo", () => {
       ["jazz-en-el-patio", "valentina"],
       ["noche-de-risas", "diego"],
       ["noche-de-risas", "valentina"],
+      ...["taller-de-escritura", "tango-en-la-terraza"].flatMap((evento) =>
+        ["lucia", "sofia", "diego", "valentina"].map((autor) => [evento, autor]),
+      ),
     ])("%s: %s tiene una compra UTILIZADA de una entrada, usada dentro de la ventana", (evento, autor) => {
       const compra = porId.get(`compra-${autor}-${evento}-general`)!;
       const suEvento = eventoPorId.get(`evento-${evento}`)!;
@@ -501,6 +504,7 @@ describe("crearDatosEjemplo", () => {
         ["resenia-valentina-jazz-en-el-patio", "usuario-valentina", jazz.id, 5],
         ["resenia-diego-noche-de-risas", "usuario-diego", risas.id, 3],
         ["resenia-valentina-noche-de-risas", "usuario-valentina", risas.id, 2],
+        ...resenias.slice(5).map((r) => [r.id, r.compradorId, r.eventoId, r.puntuacion]),
       ]);
       expect(resenias.find((r) => r.id === "resenia-diego-noche-de-risas")?.comentario).not.toBeNull();
       expect(resenias.find((r) => r.id === "resenia-valentina-noche-de-risas")?.comentario).toBeNull();
@@ -540,6 +544,40 @@ describe("crearDatosEjemplo", () => {
       expect(pena.estado).toBe(EstadoCompra.UTILIZADA);
       expect(pena.entradasUsadas).toBe(1);
       expect(resenias.some((r) => r.compradorId === "usuario-martin")).toBe(false);
+    });
+
+    describe("los dos realizados de Martín de la 013 (R11)", () => {
+      const NUEVOS = ["evento-taller-de-escritura", "evento-tango-en-la-terraza"];
+      const deMartin = new Set(eventos.filter((e) => e.organizadorId === "usuario-martin").map((e) => e.id));
+      const suyas = resenias.filter((r) => deMartin.has(r.eventoId));
+
+      it("son de Martín, realizados y fuera del catálogo, con 4 compras UTILIZADA cada uno", () => {
+        for (const id of NUEVOS) {
+          const evento = eventoPorId.get(id)!;
+          expect(evento.organizadorId).toBe("usuario-martin");
+          expect(evento.estaRealizado(ahora)).toBe(true);
+          const delEvento = compras.filter((c) => c.eventoId === id);
+          expect(delEvento).toHaveLength(4);
+          for (const compra of delEvento) expect(compra.estado).toBe(EstadoCompra.UTILIZADA);
+          expect(evento.tiposEntrada[0]!.cupo).toBe(id === NUEVOS[0] ? 30 - 4 : 100 - 4);
+        }
+      });
+
+      it("Martín tiene 11 reseñas que suman 52 (≈ 4,7), algunas sin comentario", () => {
+        expect(suyas).toHaveLength(11);
+        expect(suyas.reduce((suma, r) => suma + r.puntuacion, 0)).toBe(52);
+        const nuevas = suyas.filter((r) => NUEVOS.includes(r.eventoId));
+        expect(nuevas.map((r) => r.puntuacion)).toEqual([5, 5, 5, 4, 5, 5, 4, 5]);
+        expect(nuevas.some((r) => r.comentario === null)).toBe(true);
+        expect(nuevas.some((r) => r.comentario !== null)).toBe(true);
+      });
+
+      it("las 8 nuevas son posteriores a las de Jazz (las 3 más recientes de Martín son de la 013)", () => {
+        const deJazz = suyas.filter((r) => r.eventoId === jazz.id).map((r) => r.creadaEn.getTime());
+        for (const resenia of suyas.filter((r) => NUEVOS.includes(r.eventoId))) {
+          expect(resenia.creadaEn.getTime()).toBeGreaterThan(Math.max(...deJazz));
+        }
+      });
     });
 
     it("los cupos descuentan las entradas nuevas: Jazz 60 − 3 y Noche de risas 80 − 2", () => {

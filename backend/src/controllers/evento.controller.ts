@@ -42,6 +42,12 @@ export class EventoController {
     res.json(await this.eventoService.reseniasDelOrganizador(eventoId));
   };
 
+  /** Público (feature 013, R5): el organizador con su puntaje y las 3 reseñas más recientes. */
+  resumenDeResenias = async (req: Request, res: Response<ReseniasDelOrganizadorVista>): Promise<void> => {
+    const { eventoId } = eventoPorId.leer(req, "params");
+    res.json(await this.eventoService.resumenDeResenias(eventoId));
+  };
+
   actualizar = async (req: Request, res: Response<EventoVista>): Promise<void> => {
     const { eventoId } = eventoEditado.leer(req, "params");
     const datos = eventoEditado.leer(req, "body");

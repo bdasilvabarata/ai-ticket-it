@@ -502,8 +502,10 @@ describe("GET /api/eventos/:eventoId/mis-compras: confirmadas (corrección de la
 });
 
 /** Sin las diez compras del Festival que suma el seed de la 013 (R11), que no cambian estas demos. */
+// Las compras que suma el seed de la 013: las diez del Festival (R11, US3) y las de los dos
+// realizados de Martín (US4).
 const sinLasDeLa013 = <T extends { id: string }>(vistas: T[]) =>
-  vistas.filter((c) => !/-festival-\d+$/.test(c.id));
+  vistas.filter((c) => !/-festival-\d+$|-(taller-de-escritura|tango-en-la-terraza)-general$/.test(c.id));
 
 describe("GET /api/compras (feature 007)", () => {
   const listar = (app: App, usuarioId?: string, ruta = "/api/compras") => {
@@ -617,7 +619,7 @@ describe("GET /api/compras (feature 007)", () => {
   it("Lucía (organiza el Festival) → 200 con solo su compra de Jazz, ya reseñada (012)", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-lucia");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual([
+    expect(sinLasDeLa013(respuesta.body as { id: string }[])).toEqual([
       expect.objectContaining({
         id: "compra-lucia-jazz-en-el-patio-general",
         resenia: expect.objectContaining({ puntuacion: 5 }),
