@@ -190,3 +190,25 @@ describe("GET /api/usuarios/actual/favoritos (feature 014, US2)", () => {
     }
   });
 });
+
+describe("GET /api/usuarios/actual/favoritos con los datos de ejemplo (feature 014, US4)", () => {
+  it("Diego: Clásico de básquet → Festival Sonidos del Sur → Noche de risas (realizado) (US4-1, SC-007)", async () => {
+    const respuesta = await request(crearApp()).get(RUTA).set("X-Usuario-Id", DIEGO);
+    expect(respuesta.status).toBe(200);
+    const lista = respuesta.body as { id: string; realizado: boolean }[];
+    expect(lista.map(({ id, realizado }) => ({ id, realizado }))).toEqual([
+      { id: "evento-clasico-de-basquet", realizado: false },
+      { id: "evento-festival-sonidos-del-sur", realizado: false },
+      { id: "evento-noche-de-risas", realizado: true },
+    ]);
+  });
+
+  it("Lucía y Martín no tienen favoritos (US4-2)", async () => {
+    const app = crearApp();
+    for (const usuarioId of [LUCIA, "usuario-martin"]) {
+      const respuesta = await request(app).get(RUTA).set("X-Usuario-Id", usuarioId);
+      expect(respuesta.status).toBe(200);
+      expect(respuesta.body).toEqual([]);
+    }
+  });
+});

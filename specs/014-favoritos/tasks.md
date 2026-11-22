@@ -253,14 +253,14 @@ evento sin compras y ver que sale de las listas.
 **Independent Test**: con `crearApp()` recién creada, la lista de Diego es Clásico de básquet →
 Festival Sonidos del Sur → Noche de risas (realizado); la de Lucía y la de Martín, `[]`.
 
-- [ ] T020 [US4] Test en `backend/tests/domain/datos-ejemplo.test.ts` (y uno de API en
+- [X] T020 [US4] Test en `backend/tests/domain/datos-ejemplo.test.ts` (y uno de API en
   `backend/tests/api/favoritos.test.ts` con `crearApp()` por defecto): `usuario-diego` tiene
   `evento-festival-sonidos-del-sur`, `evento-clasico-de-basquet` y `evento-noche-de-risas`;
   `usuario-valentina`, `evento-noche-de-rock` y `evento-jazz-en-el-patio`; `usuario-sofia`,
   `evento-clasico-de-basquet` (propio) y `evento-maraton-10k`; `usuario-lucia` y `usuario-martin`,
   `[]`; todos los ids existen en el seed; la lista de Diego por API sale en el orden Clásico de
   básquet → Festival Sonidos del Sur → Noche de risas (`realizado: true`) (US4-1, SC-007).
-- [ ] T021 [US4] Cargar esos favoritos en `backend/src/seed/datos-ejemplo.ts` (los ids con el mismo
+- [X] T021 [US4] Cargar esos favoritos en `backend/src/seed/datos-ejemplo.ts` (los ids con el mismo
   `slug` que usa el seed, sin repetir) y sumar la carpeta "Favoritos" con los tres pedidos (`GET`,
   `PUT` y `DELETE`, con `X-Usuario-Id`) a `backend/src/docs/ai-ticket-it.postman_collection.json`;
   verde T020 y `test:afectados -w backend` (los tests del seed y los que cuentan usuarios o eventos

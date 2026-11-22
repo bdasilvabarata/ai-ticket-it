@@ -63,12 +63,35 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     { id: categoriaId("Stand-up"), nombre: "Stand-up", descripcion: "Comedia y monólogos en vivo." },
   ];
 
+  // Favoritos de la feature 014 (R10): Diego cubre los dos grupos de la lista (dos próximos y la
+  // Noche de risas, realizada), Sofía tiene uno propio (estrella en "Mis eventos") y Lucía y Martín,
+  // ninguno (el vacío). Los ids son `evento-<slug>`, como los de `eventosSinIds`.
+  const eventoId = (slugEvento: string) => `evento-${slugEvento}`;
   const datosUsuarios: DatosUsuario[] = [
     { id: "usuario-lucia", nombre: "Lucía", apellido: "Álvarez", favoritos: [] },
     { id: "usuario-martin", nombre: "Martín", apellido: "Benítez", favoritos: [] },
-    { id: "usuario-sofia", nombre: "Sofía", apellido: "Castro", favoritos: [] },
-    { id: "usuario-diego", nombre: "Diego", apellido: "Fernández", favoritos: [] },
-    { id: "usuario-valentina", nombre: "Valentina", apellido: "Gómez", favoritos: [] },
+    {
+      id: "usuario-sofia",
+      nombre: "Sofía",
+      apellido: "Castro",
+      favoritos: [eventoId("clasico-de-basquet"), eventoId("maraton-10k")],
+    },
+    {
+      id: "usuario-diego",
+      nombre: "Diego",
+      apellido: "Fernández",
+      favoritos: [
+        eventoId("festival-sonidos-del-sur"),
+        eventoId("clasico-de-basquet"),
+        eventoId("noche-de-risas"),
+      ],
+    },
+    {
+      id: "usuario-valentina",
+      nombre: "Valentina",
+      apellido: "Gómez",
+      favoritos: [eventoId("noche-de-rock"), eventoId("jazz-en-el-patio")],
+    },
   ];
 
   const lucia = "usuario-lucia";
