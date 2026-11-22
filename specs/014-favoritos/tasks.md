@@ -81,7 +81,7 @@ estrellas indicadoras en el resto de las listas, y US4 (P3), los favoritos de ej
 
 **Purpose**: partir de una base en verde. No hay dependencias ni carpetas nuevas.
 
-- [ ] T001 Verificar que se está en `feature/014-favoritos` y que la suite completa (`npm test`,
+- [X] T001 Verificar que se está en `feature/014-favoritos` y que la suite completa (`npm test`,
   `npm run lint`, `npm run typecheck`, `npm run format:check`) está en verde antes de tocar código;
   si algo falla, reportarlo antes de seguir.
 
