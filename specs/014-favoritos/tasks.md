@@ -361,7 +361,7 @@ catálogo con su estrella indicadora y "Realizado", y la limpieza en la caché a
 favoritos": tarjetas en el orden del servidor con la estrella, el realizado con "Realizado";
 vacío con "Ir a Explorar"; tocar una abre el detalle.
 
-- [ ] T030 [P] [US2] Test en `mobile/tests/features/eventos/tarjeta-evento.test.tsx` (con stub
+- [X] T030 [P] [US2] Test en `mobile/tests/features/eventos/tarjeta-evento.test.tsx` (con stub
   `MarcaFavorito()` en `mobile/src/features/eventos/componentes/MarcaFavorito.tsx` y la prop
   `esFavorito?: boolean` en `TarjetaEvento`): con `esFavorito` la etiqueta accesible termina en ",
   en favoritos" y la estrella no es un elemento accesible aparte; sin la prop, ni estrella ni
@@ -373,7 +373,7 @@ vacío con "Ir a Explorar"; tocar una abre el detalle.
   derecha del título para que no lo tape; exportar `MarcaFavorito` por
   `mobile/src/features/eventos/index.ts`; verde, y `mobile/tests/pantallas/explorar.test.tsx` sigue
   en verde.
-- [ ] T031 [US2] Test nuevo `mobile/tests/pantallas/mis-favoritos.test.tsx` (con stub de la
+- [X] T031 [US2] Test nuevo `mobile/tests/pantallas/mis-favoritos.test.tsx` (con stub de la
   pantalla `MisFavoritos` en `mobile/src/features/eventos/pantallas/MisFavoritos.tsx`, exportada por
   el `index.ts` de `eventos`, la ruta `mobile/app/favoritos.tsx` con su re-export de una línea y el
   `Stack.Screen name="favoritos"` con `title: "Mis favoritos"` dentro del guard con usuario de
@@ -383,17 +383,17 @@ vacío con "Ir a Explorar"; tocar una abre el detalle.
   servidor, cada una con ", en favoritos" y el realizado con "Realizado" (US2-1/2); tocar una abre
   `/explorar/<eventoId>` (US2-4); desmarcar en el detalle y volver → la lista se vuelve a pedir y
   ya no lo trae (US2-5); el header dice "Mis favoritos" y tiene atrás.
-- [ ] T032 [US2] Implementar `MisFavoritos` (`SegunConsulta` con `useFavoritos()`, `ListaVacia`
+- [X] T032 [US2] Implementar `MisFavoritos` (`SegunConsulta` con `useFavoritos()`, `ListaVacia`
   con la acción "Ir a Explorar" → `router.navigate("/")`, como en `MisCompras`, `TarjetaEvento` con `esFavorito` y el
   `onPress` al detalle por la ruta tipada, `useRefrescarAlFocalizar` de `src/componentes`) y dejar
   la ruta y el `Stack.Screen` definitivos; verde T031 y `npm run typecheck -w mobile` (rutas
   tipadas).
-- [ ] T033 [US2] Test en `mobile/tests/pantallas/perfil.test.tsx` y cambio en
+- [X] T033 [US2] Test en `mobile/tests/pantallas/perfil.test.tsx` y cambio en
   `mobile/src/features/sesion/pantallas/Perfil.tsx`: botón "Mis favoritos" (`Boton` del tema)
   encima de "Cambiar usuario" que abre `/favoritos` con `router.push` por la ruta tipada, sin
   importar `eventos`; la barra inferior sigue con Explorar · Mis compras · Mis eventos · Perfil
   (`mobile/tests/pantallas/navegacion.test.tsx` sin cambios); verde.
-- [ ] T034 [US2] Test en `mobile/tests/pantallas/editar-evento.test.tsx` (o
+- [X] T034 [US2] Test en `mobile/tests/pantallas/editar-evento.test.tsx` (o
   `evento-propio.test.tsx`, donde ya se prueba eliminar) y cambio en
   `mobile/src/features/eventos/mutaciones.ts`: tras eliminar un evento, `useEliminarEvento`
   invalida por prefijo `["favoritos"]` (los de todos los usuarios de la caché: se vuelve a pedir

@@ -1,5 +1,6 @@
 export { AvisoDeFormulario } from "./componentes/AvisoDeFormulario";
 export { CampoDeTexto } from "./componentes/CampoDeTexto";
+export { MarcaFavorito } from "./componentes/MarcaFavorito";
 export { MensajeDeCampo } from "./componentes/MensajeDeCampo";
 export { Puntuacion } from "./componentes/Puntuacion";
 export {
@@ -17,6 +18,7 @@ export { EventoDelOrganizador } from "./pantallas/EventoDelOrganizador";
 export { Explorar } from "./pantallas/Explorar";
 export { HubDelEvento } from "./pantallas/HubDelEvento";
 export { MisEventos } from "./pantallas/MisEventos";
+export { MisFavoritos } from "./pantallas/MisFavoritos";
 export { TodasLasResenias } from "./pantallas/TodasLasResenias";
 export { useConfirmarDescarte } from "./useConfirmarDescarte";
 export { useEvento } from "./useEvento";

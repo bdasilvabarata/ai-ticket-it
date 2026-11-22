@@ -24,6 +24,9 @@ import { esNoEncontrado } from "./errores-de-formulario";
 /** El prefijo de todas las consultas del catálogo (`claves.catalogo`). */
 const CATALOGO: QueryKey = ["catalogo"];
 
+/** El prefijo de los favoritos de todos los usuarios (`claves.favoritos`, feature 014). */
+const FAVORITOS: QueryKey = ["favoritos"];
+
 function useInvalidar() {
   const queryClient = useQueryClient();
   return (clavesAInvalidar: QueryKey[], sinVolverAPedir: QueryKey[] = []) =>
@@ -68,7 +71,8 @@ export function useActualizarEvento(usuarioId: string, eventoId: string) {
 
 /**
  * Eliminar cambia la cantidad de eventos del selector. El evento se marca invalidado sin volver a
- * pedirlo: ya no existe y la pantalla se va.
+ * pedirlo: ya no existe y la pantalla se va. El servidor lo saca de los favoritos de todos (feature
+ * 014, FR-010): se invalidan, por prefijo, los de todos los usuarios de la caché.
  */
 export function useEliminarEvento(usuarioId: string, eventoId: string) {
   const cliente = useClienteApi();
@@ -76,7 +80,10 @@ export function useEliminarEvento(usuarioId: string, eventoId: string) {
   return useMutation({
     mutationFn: () => eliminarEvento(cliente, eventoId, { usuarioId }),
     onSettled: () =>
-      invalidar([claves.misEventos(usuarioId), claves.usuarios()], [claves.evento(usuarioId, eventoId)]),
+      invalidar(
+        [claves.misEventos(usuarioId), claves.usuarios(), FAVORITOS],
+        [claves.evento(usuarioId, eventoId)],
+      ),
   });
 }
 
