@@ -1,4 +1,4 @@
-import { crearClienteApi, reseniarEvento } from "../../src/api";
+import { crearClienteApi, obtenerReseniasDelOrganizador, reseniarEvento } from "../../src/api";
 import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
 
 const URL = "http://servidor:3000/api";
@@ -46,5 +46,35 @@ describe("reseniarEvento (feature 012)", () => {
     await reseniarEvento(cliente, "evento-pena", datos, { usuarioId: "usuario-martin" });
 
     expect(JSON.parse(falso.pedidos[0].cuerpo ?? "null")).toEqual({ puntuacion: 5, comentario: "" });
+  });
+});
+
+describe("obtenerReseniasDelOrganizador (feature 012)", () => {
+  it("pide GET /eventos/:id/resenias-del-organizador y pasa el signal", async () => {
+    const vista = {
+      organizador: {
+        id: "usuario-martin",
+        nombre: "Martín",
+        apellido: "Benítez",
+        puntaje: 5,
+        cantidadResenias: 1,
+      },
+      resenias: [],
+    };
+    const { cliente, falso } = armar({ status: 200, json: vista });
+    const controlador = new AbortController();
+    const get = jest.spyOn(cliente, "get");
+
+    await expect(
+      obtenerReseniasDelOrganizador(cliente, "evento-hamlet", { signal: controlador.signal }),
+    ).resolves.toEqual(vista);
+
+    expect(falso.pedidos[0]).toMatchObject({
+      url: `${URL}/eventos/evento-hamlet/resenias-del-organizador`,
+      metodo: "GET",
+    });
+    expect(get).toHaveBeenCalledWith("/eventos/evento-hamlet/resenias-del-organizador", {
+      signal: controlador.signal,
+    });
   });
 });

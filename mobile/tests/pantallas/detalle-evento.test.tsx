@@ -12,8 +12,11 @@ import {
   maratonCompleta,
   maratonEnCatalogo,
   nocheDeRisasCompleta,
+  reseniaDelOrganizadorDeEjemplo,
+  reseniasDelOrganizadorDeEjemplo,
   rockEnCatalogo,
 } from "../helpers/eventos";
+import { etiquetaDeResenia } from "../../src/features/eventos/formato";
 import {
   compraCanceladaPorElComprador,
   compraConfirmada,
@@ -538,5 +541,97 @@ describe("Detalle del evento: ver mis entradas (corrección de la 006)", () => {
     expect(
       await screen.findByText("Todavía no tenés entradas confirmadas para este evento."),
     ).toBeOnTheScreen();
+  });
+});
+
+describe("Detalle del evento: reseñas del organizador (feature 012, US2)", () => {
+  const RUTA_RESENIAS_HAMLET = "/eventos/evento-hamlet/resenias-del-organizador";
+  const martinConPuntaje = { ...hamletCompleto.organizador, puntaje: 14 / 3, cantidadResenias: 3 };
+  const TRES_RESENIAS = [
+    reseniaDelOrganizadorDeEjemplo(),
+    reseniaDelOrganizadorDeEjemplo({
+      id: "resenia-diego-jazz-en-el-patio",
+      puntuacion: 4,
+      comentario: null,
+      autor: { nombre: "Diego", apellido: "Fernández" },
+      creadaEnLocal: "2026-11-12T21:00",
+    }),
+    reseniaDelOrganizadorDeEjemplo({
+      id: "resenia-lucia-jazz-en-el-patio",
+      comentario: "Una noche hermosa.",
+      autor: { nombre: "Lucía", apellido: "Álvarez" },
+      creadaEnLocal: "2026-11-11T11:00",
+    }),
+  ];
+  const conHamlet = (resenias: Lista) => ({
+    listado: [{ status: 200, json: catalogo([hamletEnCatalogo]) }] as Lista,
+    detalles: {
+      "/eventos/evento-hamlet": [{ status: 200, json: hamletCompleto }] as Lista,
+      [RUTA_RESENIAS_HAMLET]: resenias,
+    },
+  });
+  const conTres = conHamlet([
+    {
+      status: 200,
+      json: reseniasDelOrganizadorDeEjemplo({ organizador: martinConPuntaje, resenias: TRES_RESENIAS }),
+    },
+  ]);
+
+  it("al final del detalle: el título, el puntaje como en la tarjeta y una fila por reseña en el orden del servidor", async () => {
+    const { falso } = await abrirDetalle("Hamlet", conTres);
+
+    expect(await screen.findByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+    const filas = screen.getAllByLabelText(/, Jazz en el Patio, /);
+    expect(filas.map((fila) => fila.props.accessibilityLabel)).toEqual(TRES_RESENIAS.map(etiquetaDeResenia));
+    expect(screen.getByText("Valentina Gómez")).toBeOnTheScreen();
+    expect(screen.getAllByText("Jazz en el Patio")).toHaveLength(3);
+    expect(screen.getByText("dom 15 nov 2026")).toBeOnTheScreen();
+    expect(screen.getByText("Excelente organización, entramos rapidísimo.")).toBeOnTheScreen();
+    expect(screen.getByText("Una noche hermosa.")).toBeOnTheScreen();
+    expect(falso.pedidos.some((p) => p.url.endsWith(RUTA_RESENIAS_HAMLET) && p.metodo === "GET")).toBe(true);
+  });
+
+  it("sin reseñas: Todavía no tiene reseñas, sin puntaje; el organizador ve la misma sección", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    expect(await screen.findByText("Todavía no tiene reseñas")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(screen.queryByText("Sin reseñas")).toBeNull();
+    expect(screen.queryByText(/^0/)).toBeNull();
+  });
+
+  it("como otro usuario (Martín) se ve lo mismo", async () => {
+    await abrirDetalle("Hamlet", { ...conTres, usuario: martin });
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+    expect(screen.getAllByLabelText(/, Jazz en el Patio, /)).toHaveLength(3);
+  });
+
+  it("mientras carga la sección, el resto del detalle ya se ve", async () => {
+    await abrirDetalle("Hamlet", conHamlet(["colgar"]));
+
+    expect(await screen.findByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.getByText("Platea")).toBeOnTheScreen();
+    expect(screen.queryByText("Todavía no tiene reseñas")).toBeNull();
+  });
+
+  it("un error de la sección se muestra solo en la sección, con Reintentar y los tipos a la vista", async () => {
+    await abrirDetalle(
+      "Hamlet",
+      conHamlet([
+        { status: 500, json: errorApi("ERROR_INTERNO", "No pudimos traer las reseñas.") },
+        {
+          status: 200,
+          json: reseniasDelOrganizadorDeEjemplo({ organizador: martinConPuntaje, resenias: TRES_RESENIAS }),
+        },
+      ]),
+    );
+
+    expect(await screen.findByText("No pudimos traer las reseñas.")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Hamlet, versión contemporánea" })).toBeOnTheScreen();
+    expect(screen.getByText("Platea")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
   });
 });

@@ -1,4 +1,4 @@
-import type { DatosResenia, ReseniaVista } from "@ai-ticket-it/shared";
+import type { DatosResenia, ReseniasDelOrganizadorVista, ReseniaVista } from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
@@ -26,4 +26,18 @@ export function reseniarEvento(
 ): Promise<ReseniaVista> {
   const datos: CuerpoResenia = { puntuacion, comentario };
   return cliente.post<ReseniaVista>(`${rutaDelEvento(eventoId)}/resenias`, datos, { usuarioId });
+}
+
+/**
+ * `GET /eventos/:eventoId/resenias-del-organizador` (feature 012): el organizador del evento con su
+ * puntaje y las reseñas de todos sus eventos. Público en el servidor.
+ */
+export function obtenerReseniasDelOrganizador(
+  cliente: ClienteApi,
+  eventoId: string,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<ReseniasDelOrganizadorVista> {
+  return cliente.get<ReseniasDelOrganizadorVista>(`${rutaDelEvento(eventoId)}/resenias-del-organizador`, {
+    signal: opciones.signal,
+  });
 }

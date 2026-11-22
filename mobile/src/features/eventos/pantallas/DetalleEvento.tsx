@@ -9,6 +9,7 @@ import { nombreCompleto } from "../../usuarios";
 import { FilaImagenes } from "../componentes/FilaImagenes";
 import { ListaTiposEntrada } from "../componentes/ListaTiposEntrada";
 import { MarcaRealizado } from "../componentes/MarcaRealizado";
+import { ReseniasDelOrganizador } from "../componentes/ReseniasDelOrganizador";
 import { esNoEncontrado } from "../errores-de-formulario";
 import { textoFechaHora, textoPuntaje } from "../formato";
 import { useInvalidarCatalogo } from "../useCatalogo";
@@ -66,15 +67,17 @@ function DetalleSegunConsulta({
   }
   return (
     <SegunConsulta consulta={consulta} mensajeVacio="No encontramos este evento.">
-      {(evento) => <ContenidoDelDetalle evento={evento} complementos={complementos} />}
+      {(evento) => <ContenidoDelDetalle usuarioId={usuarioId} evento={evento} complementos={complementos} />}
     </SegunConsulta>
   );
 }
 
 function ContenidoDelDetalle({
+  usuarioId,
   evento,
   complementos: { AccionDeTipo, SeccionPropia },
 }: {
+  usuarioId: string;
   evento: EventoVista;
   complementos: ComplementosDelDetalle;
 }) {
@@ -113,6 +116,7 @@ function ContenidoDelDetalle({
           accionDeTipo={AccionDeTipo ? (tipo) => <AccionDeTipo evento={evento} tipo={tipo} /> : undefined}
         />
       </View>
+      <ReseniasDelOrganizador usuarioId={usuarioId} eventoId={evento.id} />
     </PantallaDesplazable>
   );
 }

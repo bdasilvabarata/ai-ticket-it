@@ -1,7 +1,12 @@
 // Textos derivados de un evento, sin React y sin `Intl` (research R18): el resultado es el mismo
 // en Node (tests) y en Hermes (teléfono), y no depende de la zona del teléfono.
 
-import { LIMITES_RESENIA, type OrdenCatalogo, type SentidoCatalogo } from "@ai-ticket-it/shared";
+import {
+  LIMITES_RESENIA,
+  type OrdenCatalogo,
+  type ReseniaDelOrganizadorVista,
+  type SentidoCatalogo,
+} from "@ai-ticket-it/shared";
 
 const DIAS = ["dom", "lun", "mar", "mié", "jue", "vie", "sáb"] as const;
 const MESES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"] as const;
@@ -65,4 +70,20 @@ export function textoSentido(orden: OrdenCatalogo, sentido: SentidoCatalogo): st
 /** La puntuación de una reseña (feature 012): 4 → "Puntuación: 4 de 5". */
 export function textoPuntuacion(puntuacion: number): string {
   return `Puntuación: ${puntuacion} de ${LIMITES_RESENIA.puntuacionMaxima}`;
+}
+
+/** El vacío de "Reseñas del organizador" (feature 012): sin puntaje, ni "0" ni "Sin reseñas". */
+export const SIN_RESENIAS = "Todavía no tiene reseñas";
+
+/** "2026-11-15T21:00" (hora de pared de Buenos Aires) → "dom 15 nov 2026": el día, sin hora. */
+export function textoFechaResenia(creadaEnLocal: string): string {
+  return textoFechaHora(creadaEnLocal).split(" · ")[0] ?? "";
+}
+
+/** La etiqueta accesible de una fila de "Reseñas del organizador": un único elemento por reseña. */
+export function etiquetaDeResenia(resenia: ReseniaDelOrganizadorVista): string {
+  const { autor, evento, puntuacion, comentario, creadaEnLocal } = resenia;
+  const encabezado = `${autor.nombre} ${autor.apellido}, ${evento.nombre}, ${textoFechaResenia(creadaEnLocal)}`;
+  const cuerpo = `${textoPuntuacion(puntuacion)}.${comentario === null ? "" : ` ${comentario}`}`;
+  return `${encabezado}: ${cuerpo}`;
 }
