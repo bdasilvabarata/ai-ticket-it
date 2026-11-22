@@ -576,10 +576,11 @@ describe("GET /api/compras (feature 007)", () => {
     ]);
   });
 
-  it("Diego → 200 con su compra CANCELADA por el sistema y la del Maratón, cancelada por él (009)", async () => {
+  it("Diego → 200 con su compra CANCELADA por el sistema, la del Maratón cancelada por él (009) y las reseñadas (012)", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-diego");
     expect(respuesta.status).toBe(200);
-    // El Festival (+30 días) antes que el Maratón (+45 días): no realizados, por fecha ascendente.
+    // El Festival (+30 días) antes que el Maratón (+45 días): no realizados, por fecha ascendente;
+    // después, los realizados por fecha descendente: la Noche de risas (−3 días) y Jazz (−10 días).
     expect(respuesta.body).toEqual([
       expect.objectContaining({
         id: "compra-diego-festival-general",
@@ -594,13 +595,31 @@ describe("GET /api/compras (feature 007)", () => {
         canceladaDesde: "CONFIRMADA",
         reembolso: { estado: "pendiente", monto: 30000 },
       }),
+      expect.objectContaining({
+        id: "compra-diego-noche-de-risas-general",
+        estado: EstadoCompra.UTILIZADA,
+        resenia: expect.objectContaining({ puntuacion: 3 }),
+        puedeReseniar: false,
+      }),
+      expect.objectContaining({
+        id: "compra-diego-jazz-en-el-patio-general",
+        estado: EstadoCompra.UTILIZADA,
+        resenia: expect.objectContaining({ puntuacion: 4 }),
+        puedeReseniar: false,
+      }),
     ]);
   });
 
-  it("Lucía (organiza el Festival) → 200 []", async () => {
+  it("Lucía (organiza el Festival) → 200 con solo su compra de Jazz, ya reseñada (012)", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-lucia");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual([]);
+    expect(respuesta.body).toEqual([
+      expect.objectContaining({
+        id: "compra-lucia-jazz-en-el-patio-general",
+        resenia: expect.objectContaining({ puntuacion: 5 }),
+        puedeReseniar: false,
+      }),
+    ]);
   });
 
   it("una query se ignora", async () => {

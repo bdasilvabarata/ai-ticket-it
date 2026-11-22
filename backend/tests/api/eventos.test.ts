@@ -2,12 +2,22 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
+import { ReseniaRepository } from "../../src/repositories/resenia.repository";
 import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
 import { compra, relojFijo } from "../helpers/eventos";
 
 // Repositorios de ejemplo nuevos por app, armados con el instante del reloj fijo.
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
 const nuevaApp = () => crearApp({ reloj });
+/** El seed sin las reseñas de la 012: todos los organizadores sin puntaje (las reglas de la 005). */
+const appSinResenias = () =>
+  crearApp({
+    reloj,
+    repositorios: {
+      ...crearRepositoriosDeEjemplo(reloj.ahora()),
+      resenias: new ReseniaRepository([]),
+    },
+  });
 
 const LUCIA = "usuario-lucia";
 const SOFIA = "usuario-sofia";
@@ -46,7 +56,7 @@ describe("GET /api/eventos (catálogo)", () => {
     expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
   });
 
-  it("Hamlet sale agotado, la Maratón gratis y todos sin puntaje", async () => {
+  it("Hamlet sale agotado, la Maratón gratis y cada organizador con su puntaje (012, R10)", async () => {
     const { body } = await request(nuevaApp()).get("/api/eventos");
     const porId = new Map((body.eventos as { id: string }[]).map((e) => [e.id, e]));
     expect(porId.get("evento-hamlet")).toMatchObject({ agotado: true, precioDesde: 18000 });
@@ -62,9 +72,9 @@ describe("GET /api/eventos (catálogo)", () => {
       cantidadTiposEntrada: 2,
       precioDesde: 8000,
       agotado: false,
-      organizador: { id: SOFIA, nombre: "Sofía", apellido: "Castro", puntaje: null, cantidadResenias: 0 },
+      organizador: { id: SOFIA, nombre: "Sofía", apellido: "Castro", puntaje: 2.5, cantidadResenias: 2 },
     });
-    for (const evento of body.eventos) {
+    for (const evento of body.eventos.filter((e: { organizadorId: string }) => e.organizadorId === LUCIA)) {
       expect(evento.organizador).toMatchObject({ puntaje: null, cantidadResenias: 0 });
     }
   });
@@ -164,7 +174,8 @@ describe("GET /api/eventos: orden (US4)", () => {
   });
 
   it("orden=puntaje sin reseñas y sin orden → igual que por fecha", async () => {
-    expect(idsDelCatalogo(await catalogo("orden=puntaje"))).toEqual(PROXIMOS_POR_FECHA);
+    const sinResenias = await request(appSinResenias()).get("/api/eventos?orden=puntaje");
+    expect(idsDelCatalogo(sinResenias)).toEqual(PROXIMOS_POR_FECHA);
     expect(idsDelCatalogo(await catalogo("orden=fecha"))).toEqual(PROXIMOS_POR_FECHA);
   });
 
@@ -185,7 +196,8 @@ describe("GET /api/eventos: orden (US4)", () => {
   });
 
   it("orden=puntaje&sentido=asc sin reseñas → igual que por fecha (sin puntaje siempre al final)", async () => {
-    expect(idsDelCatalogo(await catalogo("orden=puntaje&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
+    const sinResenias = await request(appSinResenias()).get("/api/eventos?orden=puntaje&sentido=asc");
+    expect(idsDelCatalogo(sinResenias)).toEqual(PROXIMOS_POR_FECHA);
   });
 
   it.each(["sentido=arriba", "sentido=asc&sentido=desc"])("%s → 400 sobre query.sentido", async (query) => {
@@ -467,7 +479,7 @@ describe("GET /api/eventos/:eventoId", () => {
     });
   });
 
-  it("suma el organizador con su puntaje (sin reseñas en el seed), sin X-Usuario-Id", async () => {
+  it("suma el organizador con su puntaje sin redondear (las 3 reseñas de Jazz), sin X-Usuario-Id", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos/evento-hamlet");
     expect(respuesta.status).toBe(200);
     expect(respuesta.body).toMatchObject({
@@ -478,8 +490,8 @@ describe("GET /api/eventos/:eventoId", () => {
         id: "usuario-martin",
         nombre: "Martín",
         apellido: "Benítez",
-        puntaje: null,
-        cantidadResenias: 0,
+        puntaje: 14 / 3,
+        cantidadResenias: 3,
       },
     });
   });
