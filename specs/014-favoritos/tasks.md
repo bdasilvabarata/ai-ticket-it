@@ -445,7 +445,7 @@ estrellas.
 
 **Purpose**: documentación, backlog y verificación final.
 
-- [ ] T038 [P] Actualizar `AGENTS.md`: en el mapa del backend, el recurso `usuarios` con
+- [X] T038 [P] Actualizar `AGENTS.md`: en el mapa del backend, el recurso `usuarios` con
   `GET`/`PUT`/`DELETE /usuarios/actual/favoritos[/:eventoId]` (orden de rechazos, `204`
   idempotentes, sin 409), `Usuario.tieneFavorito/marcarFavorito/desmarcarFavorito` y la invariante,
   `RepositorioUsuarios.guardar`/`listarPorFavorito`, el cerrojo único compartido con `UsuarioService`
@@ -457,8 +457,8 @@ estrellas.
   `useCambiarFavorito`, `EstrellaFavorito`, `MarcaFavorito` (`TarjetaEvento`, `FilaEvento`,
   `FilaMiCompra`), la ruta `favoritos` y `MisFavoritos`, el botón de Perfil, la invalidación de
   `["favoritos"]` en `useEliminarEvento` y que el helper responde `[]` a los favoritos.
-- [ ] T039 [P] Marcar la 014 en `docs/backlog.md` con su estado y el enlace a `specs/014-favoritos/`.
-- [ ] T040 Suite completa en verde (`npm test`, `npm run lint`, `npm run typecheck`,
+- [X] T039 [P] Marcar la 014 en `docs/backlog.md` con su estado y el enlace a `specs/014-favoritos/`.
+- [X] T040 Suite completa en verde (`npm test`, `npm run lint`, `npm run typecheck`,
   `npm run format:check`) y recorrido de `specs/014-favoritos/quickstart.md` (los `curl` de la API
   con `npm start` y, si se puede, la tabla de la app con Expo Go); anotar en el PR lo que no se
   pudo probar a mano.

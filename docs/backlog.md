@@ -24,7 +24,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 011 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 007, 008, 010 | integrada |
 | 012 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008, 010 | integrada |
 | 013 | **Paginación**: páginas de hasta 10 elementos, armadas en el servidor, con un paginador común en la app (hasta 5 botones: primera, última, actual, anterior y siguiente), en el catálogo de Explorar, en Compras del evento y en las reseñas del organizador (el detalle muestra las 3 más recientes con el puntaje y la cantidad reales) | UC-02, UC-03, UC-10 | P3 | 005, 008, 012 | en PR |
-| 014 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 005 | pendiente |
+| 014 | *(Opcional)* **Favoritos**: guardar eventos favoritos (estrella en el detalle, "Mis favoritos" desde Perfil y estrellas indicadoras en Explorar, Mis eventos y Mis compras) — [`specs/014-favoritos/`](../specs/014-favoritos/) | — (contexto de la consigna) | P4 | 005 | en PR |
 | 015 | **Pulido estético**: sombras/elevación de tarjetas, bordes y transiciones, aplicados de forma global en `tema.ts` y los componentes base (nunca pantalla por pantalla), cuando UC-01 a UC-12 funcionen de punta a punta con sus tests en verde | — | P4 | 004 a 013 | pendiente |
 
 ## Cambios de proceso
