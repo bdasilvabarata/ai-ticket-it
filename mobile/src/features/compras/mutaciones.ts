@@ -170,12 +170,6 @@ export function useConfirmarReembolso(
   });
 }
 
-/**
- * Envía un mensaje al chat de la compra (feature 011, R10), en nombre de `usuarioId` y sin
- * reintentos. Al terminar, con éxito o error, invalida **solo el chat de esa compra**, pero para
- * todos los usuarios de la caché (`["chat-de-la-compra", *, compraId]`): en la demo el comprador y
- * el organizador alternan en el mismo celular. Nada más cambia por un mensaje (FR-019).
- */
 /** Lo que una reseña nueva cambia: la reseña propia en las compras y el puntaje del organizador. */
 const PREFIJOS_CON_RESENIAS = [
   "compra",
@@ -209,6 +203,12 @@ export function useReseniarEvento(
   });
 }
 
+/**
+ * Envía un mensaje al chat de la compra (feature 011, R10), en nombre de `usuarioId` y sin
+ * reintentos. Al terminar, con éxito o error, invalida **solo el chat de esa compra**, pero para
+ * todos los usuarios de la caché (`["chat-de-la-compra", *, compraId]`): en la demo el comprador y
+ * el organizador alternan en el mismo celular. Nada más cambia por un mensaje (FR-019).
+ */
 export function useEnviarMensaje(
   usuarioId: string,
   compraId: string,

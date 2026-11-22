@@ -28,7 +28,10 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   límites de compra `LIMITES_COMPRA` (4 entradas pagas por evento, 1 por tipo gratis, 15 minutos
   para pagar), que usan el backend y la app. Desde la 011, `shared/src/mensaje.ts`:
   `LIMITES_MENSAJE` (`largoMaximo: 500`), `DatosMensaje`, `RolEnLaCompra`, `ParteDeLaCompraVista`,
-  `MensajeVista` y `ChatDeLaCompraVista`.
+  `MensajeVista` y `ChatDeLaCompraVista`. Desde la 012, `shared/src/resenia.ts`: `LIMITES_RESENIA`
+  (`puntuacionMinima: 1`, `puntuacionMaxima: 5`, `comentarioLargoMaximo: 500`), `DatosResenia`,
+  `ReseniaVista`, `ReseniaDelOrganizadorVista` (autor sin id) y `ReseniasDelOrganizadorVista`; y
+  `CompraVista` (también `MiCompraVista`) suma `resenia: ReseniaVista | null` y `puedeReseniar`.
 - `backend/src/` — Express en capas:
   `routes/ → controllers/ → services/ → repositories/ → domain/`, más `middlewares/`
   (usuario actual, logging, 404, registro y respuesta de errores), `validations/` (zod),
@@ -44,7 +47,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     compras canceladas del Maratón de Lucía: la de Diego con el reembolso pendiente y la de
     Valentina `REEMBOLSADA`; desde la 010, las entradas del seed llevan su `uso` o su `cancelacion`
     explícitos; desde la 011, `compra-martin-festival-vip` trae una conversación de tres mensajes
-    entre Martín y Lucía, fechada desde el alta de la compra, y ninguna otra compra tiene mensajes);
+    entre Martín y Lucía, fechada desde el alta de la compra, y ninguna otra compra tiene mensajes;
+    desde la 012, "Jazz en el Patio" de Martín tiene compras `UTILIZADA` y reseñas 5, 4 y 5 de Lucía,
+    Diego y Valentina (≈ 4,7) y "Stand-up: Noche de risas" de Sofía, de Diego y Valentina con 3 y 2
+    —esta sin comentario— (2,5); `resenia-<autor>-<slug>`, cada una posterior al uso; Lucía no tiene
+    reseñas y `compra-martin-pena-general` sigue `UTILIZADA` "1 de 3" sin reseñar, para la demo);
     `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
@@ -81,9 +88,15 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `CompraService.registrarUso` (bajo el cerrojo, con el mismo orden de chequeos); orden de chequeos
     del uso: 401 → 400 → 404 `EVENTO_NO_ENCONTRADO` → 403 → 404 `ENTRADA_NO_ENCONTRADA`
     (`EntradaNoEncontradaError`, también para un código de otro evento o con formato inválido) →
-    409 `FUERA_DE_HORARIO_DE_USO` → 409 `TRANSICION_INVALIDA`) y `resenias` **mínimo** (feature 005: entidad `Resenia`,
-    `RepositorioResenias.listarPorEventos` y `ReseniaService` con `puntajesPorOrganizador` /
-    `puntajeDe`, sin endpoints; lo amplía la 012; vacío en el seed).
+    409 `FUERA_DE_HORARIO_DE_USO` → 409 `TRANSICION_INVALIDA`) y `resenias` (feature 005 mínima,
+    ampliada en la 012, sin router propio: las dos rutas en `eventos.routes.ts`):
+    `POST /eventos/:eventoId/resenias` (en `CompraController`, con usuario, `201 ReseniaVista`; orden
+    de rechazos 401 → 400 (`params.eventoId`, `body.puntuacion` entero de 1 a 5, `body.comentario`
+    hasta 500) → 404 `EVENTO_NO_ENCONTRADO` → 409 `RESENIA_PROPIO_EVENTO` → 409
+    `SIN_COMPRA_UTILIZADA` → 409 `RESENIA_REPETIDA`; bajo el cerrojo del evento, sin tocar la compra
+    ni el cupo; **no hay** `PUT`, `PATCH` ni `DELETE`: una reseña no se edita ni se borra) y
+    `GET /eventos/:eventoId/resenias-del-organizador` (en `EventoController`, **público**, sin
+    cerrojo ni reloj, cuatro lecturas fijas, `ReseniasDelOrganizadorVista`).
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
     los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden` y `sentido`, más
     `hayEventosProximos`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae
@@ -175,6 +188,30 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `aMensajeVista` (`numero` desde 1, autor con su rol, `enviadoEn` ISO y `enviadoEnLocal` de Buenos
     Aires), reusando `aTipoDeLaCompra`; sin códigos, historial, total ni `compradorId`. Las vistas de
     la compra (`CompraVista`, `MiCompraVista`, `CompraDelEventoVista`) no traen los mensajes.
+  - **Reseñas** (feature 012): `domain/resenia.ts` es una `Resenia` inmutable con `puntuacion`,
+    `comentario` (`string | null`, ya recortado, de 1 a 500; la constitución lo llama "detalle") y
+    `creadaEn`; `Resenia.crear(datos, ahora)` recorta y pasa `""` a `null`. Funciones puras del mismo
+    módulo: `exigirQuePuedeReseniar({ usuarioId, evento, compras })` (409 `RESENIA_PROPIO_EVENTO` al
+    organizador aunque tenga compras; si no, 409 `SIN_COMPRA_UTILIZADA` sin alguna compra
+    `UTILIZADA`: una entrada usada alcanza, no se mira si el evento terminó),
+    `exigirQueNoReseniO(existente)` (409 `RESENIA_REPETIDA`: una por comprador y evento, aunque tenga
+    varias compras) y `compararResenias` (`creadaEn` descendente → `id`). `RepositorioResenias` suma
+    `siguienteId`, `buscarPorEventoYComprador`, `listarPorComprador` y `guardar` (sin
+    `eliminarPorId`). `ReseniaService` (sigue recibiendo solo `{ resenias }`) suma `registrar(datos,
+    ahora)` (se usa **dentro del cerrojo del que llama**; 409 repetida; un `guardar`),
+    `deCompradorEnEvento`, `deComprador` (un `Map` por `eventoId` en una lectura) y `listarDeEventos`
+    (una `listarPorEventos`, en orden). `CompraService.reseniar(eventoId, usuarioId, datos)` toma el
+    cerrojo del evento, lee `ahora` adentro, `eventoService.obtenerOFallar` (404), las compras del
+    comprador en el evento, `exigirQuePuedeReseniar` y `reseniaService.registrar`; **no** llama a
+    `obtenerAlDia` ni guarda compras ni eventos. `EventoService.reseniasDelOrganizador(eventoId)`:
+    evento, eventos del organizador, sus reseñas y **un** `usuarioService.obtenerPorIds` (organizador y
+    autores), con el puntaje calculado igual que en `OrganizadorVista`. `services/resenia.vistas.ts`
+    arma `aReseniaVista`, `aReseniaDelOrganizadorVista` y `aReseniasDelOrganizadorVista` (sin
+    `compradorId`, compras, códigos ni estados), y `compra.vistas.ts` suma la pieza
+    `reseniaDeLaCompra(compra, resenia)`: `resenia` solo en una `UTILIZADA`, `puedeReseniar =
+    UTILIZADA && sin reseña`; `aCompraVista`/`aMiCompraVista` reciben la reseña (`obtener` y
+    `misComprasDelEvento` leen `deCompradorEnEvento`, `misCompras` lee `deComprador` una vez; alta, pago
+    y cancelación pasan `null`), y `CompraDelEventoVista` no la trae.
   - **Vencimiento perezoso** (feature 006): una `PENDIENTE` vence a los 15 minutos sin que corra
     nada en segundo plano. `VencimientoService` (solo el agregado `Compra`) calcula el cupo liberado
     (`cupoLiberadoPorTipo`, sin guardar, **una** `listarPendientesPorEventos` por pedido) o lo
@@ -214,7 +251,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `obtenerPorIds`) y `ReseniaService` para el organizador y su puntaje; `ReseniaService` recibe
     los eventos por parámetro y no depende de `EventoService` (sin ciclos). `EventoService` recibe
     también `VencimientoService`, y `CompraService` (dueño de `Compra`, con `obtenerOFallar`) recibe
-    `EventoService` y `TipoEntradaService`; cada uno escribe solo su agregado. `CompraService` es el
+    `EventoService`, `TipoEntradaService` y, desde la 012, `ReseniaService` (ya armado antes:
+    `EventoService → ReseniaService` y `CompraService → ReseniaService`, sin ciclo); cada uno escribe solo su agregado. `CompraService` es el
     **único** service de casos de uso que guarda compras (la excepción es
     `VencimientoService.vencerPendientes`). `EntradaService` (feature 008; desde la 010) recibe
     `CompraService`, `EventoService` y `UsuarioService`, **no** `RepositorioCompras` ni el cerrojo.
@@ -243,7 +281,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
     `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y
     `compras/[compraId]/index` ("Tu compra"; desde la 011 en una carpeta, con el mismo `href`
-    `/compras/[compraId]`, junto a `compras/[compraId]/chat`, "Chat de la compra"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
+    `/compras/[compraId]`, junto a `compras/[compraId]/chat`, "Chat de la compra", y desde la 012
+    `compras/[compraId]/resenia`, "Reseñar evento"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
     organizador (feature 008) son `eventos/[eventoId]/compras` (`ComprasDelEvento`) y
     `eventos/[eventoId]/ingreso` (`RegistrarIngreso`); el evento propio es `eventos/[eventoId]/index`
     (`HubDelEvento`, el hub) y su edición o solo lectura, `eventos/[eventoId]/editar`
@@ -265,7 +304,9 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `misCompras(usuarioId)`, con el usuario en la posición 1 y sin compartir prefijo con
       `mis-compras-del-evento`; la 008, `comprasDelEvento(usuarioId, eventoId)` y
       `entradaDelEvento(usuarioId, eventoId, codigo)`; la 011, `chatDeLaCompra(usuarioId, compraId)`
-      → `["chat-de-la-compra", usuarioId, compraId]`, sin prefijo común con `["compra"]`) y `cliente-api.tsx`
+      → `["chat-de-la-compra", usuarioId, compraId]`, sin prefijo común con `["compra"]`; la 012,
+      `reseniasDelOrganizador(usuarioId, eventoId)` → `["resenias-del-organizador", usuarioId,
+      eventoId]`, sin prefijo común con `["evento"]`) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -310,7 +351,16 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       formulario **solo si hay cambios** (`hayCambios`, con `mismosValores` de `formulario.ts`), con `usePreventRemove`; `salirSinConfirmar(navegar)` tras guardar o ante un 404).
       `DetalleEvento` acepta `complementos` opcionales (`ComplementosDelDetalle`: `AccionDeTipo` al
       lado de cada tipo, vía la prop `accionDeTipo` de `ListaTiposEntrada`, y `SeccionPropia` antes
-      de "Tipos de entrada"): así otra feature le suma cosas **sin que `eventos` la importe**;
+      de "Tipos de entrada"): así otra feature le suma cosas **sin que `eventos` la importe**. La
+      012 suma, al final de `DetalleEvento` (lo ven todos, también el organizador),
+      `ReseniasDelOrganizador` ("Reseñas del organizador": `textoPuntaje` igual al de la tarjeta y una
+      `FilaResenia` por reseña, cada una un elemento accesible con `etiquetaDeResenia`; vacío
+      `SIN_RESENIAS`, "Todavía no tiene reseñas", sin puntaje; su propio `SegunConsulta`, así un
+      error o la espera no tapan el resto del detalle) con `useReseniasDelOrganizador`; y
+      `Puntuacion` (cinco estrellas de solo lectura, llenas por forma, leída con `textoPuntuacion`:
+      "Puntuación: 4 de 5"). `index.ts` exporta además `Puntuacion`, `textoPuntuacion`,
+      `MensajeDeCampo`, `useConfirmarDescarte`, `erroresDeFormulario` (con el formulario `"resenia"`:
+      `puntuacion` y `comentario`), `SIN_ERRORES` y `ErroresDeFormulario`, que usa `compras`;
     - `compras/` (feature 006; **depende de `eventos`** por su `index.ts`, nunca al revés: el lint
       lo rechaza como ciclo) — `DetalleEventoConCompras` (el detalle con "Comprar" por tipo, "Sos el
       organizador de este evento", "Ver mis entradas" y "Tus compras pendientes" con "Pagar" y
@@ -376,7 +426,20 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `useRegistrarUso` y `useConfirmarReembolso` invalidan además, por prefijo,
       `["chat-de-la-compra"]` (el encabezado muestra el estado). Los accesos son "Chat con el
       organizador" en "Tu compra" (en todos los estados) y "Abrir chat" en cada
-      `FilaCompraDelEvento`, **como hermano** del bloque accesible de la fila.
+      `FilaCompraDelEvento`, **como hermano** del bloque accesible de la fila. La 012 suma
+      `ReseniarEvento` ("Reseñar evento", `compras/[compraId]/resenia`, dibujada desde `useCompra`):
+      `SelectorPuntuacion` (cinco `radio` "N de 5" sin ninguno elegido, el elegido con relleno y
+      estrella llena), el `CampoDeTexto` "Comentario (opcional)" y "Enviar" (`useEnvioUnico`; la app no
+      valida: el 400 va junto a cada campo con `erroresDeFormulario(error, "resenia")` y el 409 en
+      `AvisoDeFormulario`, conservando lo escrito; `useConfirmarDescarte` si hay puntuación o texto);
+      con la compra ya reseñada o no `UTILIZADA`, el aviso de `textoAvisoResenia` sin formulario.
+      `ReseniaDeLaCompra` (`BotonReseniar` + `TuResenia`, con `ReseniaPropia`) decide por
+      `puedeReseniar`/`resenia` del servidor: en "Tu compra", después de las entradas; en
+      `FilaMiCompra`, la reseña dentro del `Pressable` (y en su etiqueta, con `textoReseniaPropia`) y
+      "Reseñar evento" **como hermano**. `useReseniarEvento(usuarioId, eventoId)` (sin reintentos) con
+      éxito invalida por prefijo `["compra"]`, `["mis-compras"]`, `["mis-compras-del-evento"]`,
+      `["evento"]`, `["catalogo"]` y `["resenias-del-organizador"]` (cambia el puntaje del
+      organizador), sin esperar las relecturas antes de volver.
   - **Conectores** (los únicos fuera de `features/` que importan features):
     - `src/composicion.ts` — **composition root** de la app, sin contexto: `crearDependencias({
       fetch, almacenamiento, urlEntorno, hostUri })` y `crearDependenciasDeProduccion()` arman la
@@ -397,8 +460,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     guarda (`@ts-expect-error` sobre una ruta inexistente).
   - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
     `renderConDependencias` (la app real con `fetch` falso; si un test no registra lo que pide
-    Explorar al entrar —el catálogo y las categorías—, el detalle —`mis-compras`— o la pestaña
-    "Mis compras" —`GET /compras`— responde vacío) y `crearFetchFalso`/`porRuta`
+    Explorar al entrar —el catálogo y las categorías—, el detalle —`mis-compras` y, desde la 012,
+    `resenias-del-organizador`— o la pestaña "Mis compras" —`GET /compras`— responde vacío) y `crearFetchFalso`/`porRuta`
     (registra método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
     `conexion/` y `pantallas/`, y los de cada feature en `features/<dominio>/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.
