@@ -13,7 +13,8 @@
     { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
     { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
     { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" },
-    { "name": "Compras del evento", "description": "Las compras de un evento, para su organizador (UC-02)" }
+    { "name": "Compras del evento", "description": "Las compras de un evento, para su organizador (UC-02)" },
+    { "name": "Reseñas", "description": "Reseñas de eventos (UC-09, UC-10)" }
   ],
   "paths": {
     "/salud": {
@@ -934,6 +935,130 @@
                         "codigo": "TRANSICION_INVALIDA",
                         "mensaje": "La compra de esta entrada fue reembolsada."
                       }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/resenias": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Reseñas"],
+        "summary": "Reseñar un evento al que se asistió (comprador con una compra UTILIZADA)",
+        "description": "Registra la reseña del usuario de `X-Usuario-Id` (feature 012): una por comprador y evento, que no se edita ni se borra (no hay `PUT`, `PATCH` ni `DELETE`). Hace falta una compra UTILIZADA del evento (una \"1 de 3\" alcanza); no importa si el evento ya se realizó. La fecha es la del reloj del servidor y el comentario se recorta. Corre bajo el cerrojo del evento y no cambia la compra ni el cupo. Orden de los rechazos: 401 → 400 → 404 → 409 `RESENIA_PROPIO_EVENTO` → 409 `SIN_COMPRA_UTILIZADA` → 409 `RESENIA_REPETIDA`.",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatosResenia" },
+              "example": { "puntuacion": 4, "comentario": "Muy buena organización" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "La reseña creada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReseniaVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "puntuacionFaltante": {
+                    "summary": "puntuacion faltante",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.puntuacion", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "puntuacionFueraDeRango": {
+                    "summary": "puntuacion no entera o fuera de 1 a 5",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.puntuacion", "mensaje": "Debe ser un entero de 1 a 5." }
+                        ]
+                      }
+                    }
+                  },
+                  "comentarioLargo": {
+                    "summary": "comentario de más de 500 caracteres",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.comentario", "mensaje": "Debe tener como máximo 500 caracteres." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Regla de las reseñas: el organizador (`RESENIA_PROPIO_EVENTO`), sin compra UTILIZADA (`SIN_COMPRA_UTILIZADA`) o ya reseñado (`RESENIA_REPETIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "propioEvento": {
+                    "value": {
+                      "error": {
+                        "codigo": "RESENIA_PROPIO_EVENTO",
+                        "mensaje": "No podés reseñar un evento que organizás."
+                      }
+                    }
+                  },
+                  "sinCompraUtilizada": {
+                    "value": {
+                      "error": {
+                        "codigo": "SIN_COMPRA_UTILIZADA",
+                        "mensaje": "Solo podés reseñar un evento al que asististe (con una compra utilizada)."
+                      }
+                    }
+                  },
+                  "repetida": {
+                    "value": {
+                      "error": { "codigo": "RESENIA_REPETIDA", "mensaje": "Ya reseñaste este evento." }
                     }
                   }
                 }
@@ -2185,9 +2310,20 @@
           "canceladaDesde",
           "reembolso",
           "cancelable",
-          "motivoNoCancelable"
+          "motivoNoCancelable",
+          "resenia",
+          "puedeReseniar"
         ],
         "properties": {
+          "resenia": {
+            "allOf": [{ "$ref": "#/components/schemas/ReseniaVista" }],
+            "nullable": true,
+            "description": "La reseña de su comprador a este evento, solo si la compra está UTILIZADA; si no, null (feature 012). Dos compras UTILIZADA del mismo evento muestran la misma."
+          },
+          "puedeReseniar": {
+            "type": "boolean",
+            "description": "UTILIZADA y sin reseña de ese comprador y evento (feature 012). Lo decide el servidor en cada consulta."
+          },
           "id": { "type": "string", "format": "uuid" },
           "compradorId": { "type": "string", "example": "usuario-sofia" },
           "evento": {
@@ -2318,9 +2454,20 @@
           "canceladaPor",
           "entradasUsadas",
           "canceladaDesde",
-          "reembolso"
+          "reembolso",
+          "resenia",
+          "puedeReseniar"
         ],
         "properties": {
+          "resenia": {
+            "allOf": [{ "$ref": "#/components/schemas/ReseniaVista" }],
+            "nullable": true,
+            "description": "La reseña de su comprador a este evento, solo si la compra está UTILIZADA; si no, null (feature 012). Dos compras UTILIZADA del mismo evento muestran la misma."
+          },
+          "puedeReseniar": {
+            "type": "boolean",
+            "description": "UTILIZADA y sin reseña de ese comprador y evento (feature 012). Lo decide el servidor en cada consulta."
+          },
           "id": { "type": "string", "example": "compra-martin-festival-vip" },
           "evento": {
             "type": "object",
@@ -2665,6 +2812,52 @@
             "example": "2026-11-18T20:15",
             "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
             "nullable": true
+          }
+        }
+      },
+      "DatosResenia": {
+        "type": "object",
+        "description": "Cuerpo de `POST /eventos/{eventoId}/resenias` (feature 012): la puntuación y un comentario opcional. El autor, el evento y la fecha los pone el servidor; las claves desconocidas se descartan.",
+        "required": ["puntuacion"],
+        "properties": {
+          "puntuacion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Entero de 1 a 5.",
+            "example": 4
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Opcional. Se recorta; vacío o de solo espacios queda sin comentario (`null`). Hasta 500 caracteres después de recortar.",
+            "example": "Muy buena organización"
+          }
+        }
+      },
+      "ReseniaVista": {
+        "type": "object",
+        "description": "La reseña propia (feature 012): en la compra (`CompraVista.resenia`) y en la respuesta del alta.",
+        "required": ["id", "eventoId", "puntuacion", "comentario", "creadaEn", "creadaEnLocal"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "eventoId": { "type": "string", "example": "evento-pena-en-la-rueda" },
+          "puntuacion": { "type": "integer", "minimum": 1, "maximum": 5, "example": 4 },
+          "comentario": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ya recortado; `null` si no se escribió nada.",
+            "example": "Muy buena organización"
+          },
+          "creadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante ISO UTC (reloj del servidor)."
+          },
+          "creadaEnLocal": {
+            "type": "string",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires.",
+            "example": "2026-11-21T22:30"
           }
         }
       },

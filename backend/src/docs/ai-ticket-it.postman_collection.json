@@ -728,6 +728,62 @@
           }
         }
       ]
+    },
+    {
+      "name": "Reseñas (012)",
+      "item": [
+        {
+          "name": "Reseñar evento (Martín, Peña)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"puntuacion\": 4,\n  \"comentario\": \"Muy buena organización\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reseñar de nuevo → 409 RESENIA_REPETIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 5\n}" }
+          }
+        },
+        {
+          "name": "Reseñar como organizadora (Lucía) → 409 RESENIA_PROPIO_EVENTO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-lucia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 5\n}" }
+          }
+        },
+        {
+          "name": "Puntuación 6 → 400 ENTRADA_INVALIDA (body.puntuacion)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 6\n}" }
+          }
+        }
+      ]
     }
   ]
 }

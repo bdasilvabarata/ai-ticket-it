@@ -6,6 +6,7 @@ import type { TipoEntradaController } from "../controllers/tipo-entrada.controll
 import { compraNueva, comprasDelEvento } from "../validations/compra.validation";
 import { entradaPorCodigo } from "../validations/entrada.validation";
 import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
+import { reseniaNueva } from "../validations/resenia.validation";
 import {
   tipoEntradaEditado,
   tipoEntradaNuevo,
@@ -67,6 +68,9 @@ export function crearEventosRouter(
     comprasDelEvento.middleware,
     controllers.compras.misComprasDelEvento,
   );
+  // Reseñas (feature 012): en nombre del usuario actual, con una compra UTILIZADA del evento (los 409
+  // los decide el dominio). Sin PUT, PATCH ni DELETE: una reseña no se edita ni se borra.
+  router.post("/:eventoId/resenias", requerirUsuario, reseniaNueva.middleware, controllers.compras.reseniar);
   router.use("/:eventoId/tipos-entrada", crearTiposEntradaRouter(controllers.tiposEntrada, requerirUsuario));
   router.use("/:eventoId/entradas", crearEntradasRouter(controllers.entradas, requerirUsuario));
   return router;

@@ -58,6 +58,13 @@ describe("documentación de la API", () => {
     expect(mensajes?.post).toBeDefined();
   });
 
+  it("documenta el alta de reseñas (feature 012): POST /eventos/{eventoId}/resenias, sin PUT, PATCH ni DELETE", async () => {
+    const { paths } = await obtenerEspecificacion();
+    const resenias = paths["/eventos/{eventoId}/resenias"];
+    expect(resenias?.post).toBeDefined();
+    expect(resenias?.put ?? resenias?.patch ?? resenias?.delete).toBeUndefined();
+  });
+
   it("la colección de Postman solo usa rutas que existen", async () => {
     const archivo = path.resolve(import.meta.dirname, "../../src/docs/ai-ticket-it.postman_collection.json");
     const coleccion = JSON.parse(readFileSync(archivo, "utf8")) as {

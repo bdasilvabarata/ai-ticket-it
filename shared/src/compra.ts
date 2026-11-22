@@ -1,4 +1,5 @@
 import type { EstadoCompra } from "./estado-compra";
+import type { ReseniaVista } from "./resenia";
 
 /** Límites de una compra: los usan la validación, el dominio y los textos de la app. */
 export const LIMITES_COMPRA = {
@@ -76,6 +77,13 @@ export interface CompraVista {
   cancelable: boolean;
   /** Por qué no se puede cancelar (feature 009); `null` si se puede. Al día con el reloj del servidor. */
   motivoNoCancelable: MotivoNoCancelable | null;
+  /**
+   * La reseña de su comprador a este evento (feature 012), solo si la compra está UTILIZADA; si no,
+   * `null`. Dos compras UTILIZADA del mismo evento muestran la misma.
+   */
+  resenia: ReseniaVista | null;
+  /** Si su comprador puede reseñar el evento desde esta compra (feature 012): UTILIZADA y sin reseña. */
+  puedeReseniar: boolean;
 }
 
 /**

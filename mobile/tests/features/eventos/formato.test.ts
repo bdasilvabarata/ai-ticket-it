@@ -5,6 +5,7 @@ import {
   textoPrecio,
   textoPrecioDesde,
   textoPuntaje,
+  textoPuntuacion,
   textoSentido,
 } from "../../../src/features/eventos/formato";
 
@@ -73,5 +74,15 @@ describe("textoSentido", () => {
     ["puntaje", "asc", "Menor puntaje primero"],
   ] as const)("%s %s → %s", (orden, sentido, texto) => {
     expect(textoSentido(orden, sentido)).toBe(texto);
+  });
+});
+
+describe("textoPuntuacion (feature 012)", () => {
+  it.each([
+    [1, "Puntuación: 1 de 5"],
+    [4, "Puntuación: 4 de 5"],
+    [5, "Puntuación: 5 de 5"],
+  ])("%p → %p", (puntuacion, texto) => {
+    expect(textoPuntuacion(puntuacion)).toBe(texto);
   });
 });

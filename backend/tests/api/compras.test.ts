@@ -1100,3 +1100,47 @@ describe("POST /api/compras/:compraId/reembolso (feature 009, US2)", () => {
     });
   });
 });
+
+describe("La reseña en las compras del comprador (feature 012, R6)", () => {
+  const COMPRA_PENA = "compra-martin-pena-general";
+
+  it("GET /compras/:id, GET /compras y GET /eventos/:id/mis-compras traen resenia y puedeReseniar", async () => {
+    const app = nuevaApp();
+    const deMartin = (ruta: string) => request(app).get(ruta).set("X-Usuario-Id", "usuario-martin");
+
+    expect((await deMartin(`/api/compras/${COMPRA_PENA}`)).body).toMatchObject({
+      resenia: null,
+      puedeReseniar: true,
+    });
+    const filas = (await deMartin("/api/compras")).body as { id: string }[];
+    expect(filas.find((fila) => fila.id === COMPRA_PENA)).toMatchObject({
+      resenia: null,
+      puedeReseniar: true,
+    });
+    for (const fila of filas) {
+      expect(fila).toHaveProperty("resenia");
+      expect(fila).toHaveProperty("puedeReseniar");
+    }
+    const delEvento = (await deMartin("/api/eventos/evento-pena-en-la-rueda/mis-compras")).body;
+    expect(delEvento.confirmadas).toEqual([
+      expect.objectContaining({ id: COMPRA_PENA, resenia: null, puedeReseniar: true }),
+    ]);
+
+    const alta = await request(app)
+      .post("/api/eventos/evento-pena-en-la-rueda/resenias")
+      .set("X-Usuario-Id", "usuario-martin")
+      .send({ puntuacion: 4 });
+
+    const despues = (await deMartin("/api/compras")).body as { id: string }[];
+    expect(despues.find((fila) => fila.id === COMPRA_PENA)).toMatchObject({
+      resenia: alta.body,
+      puedeReseniar: false,
+    });
+    expect(
+      (await deMartin("/api/eventos/evento-pena-en-la-rueda/mis-compras")).body.confirmadas[0],
+    ).toMatchObject({
+      resenia: alta.body,
+      puedeReseniar: false,
+    });
+  });
+});

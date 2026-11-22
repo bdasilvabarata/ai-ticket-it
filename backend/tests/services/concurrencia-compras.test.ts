@@ -634,3 +634,69 @@ describe("Concurrencia: chat de la compra (feature 011, US4, SC-005)", () => {
     }
   }
 });
+
+describe("Concurrencia: reseñas (feature 012, US1, R3)", () => {
+  /** Un evento de Lucía en 2 h (ventana abierta) con compras UTILIZADA de 3 entradas de Martín y Sofía. */
+  function armarResenias() {
+    return crearServicesDeEventos({
+      eventos: [
+        evento({
+          id: "evento-a",
+          en: 2 * 60 * MINUTO,
+          tiposEntrada: [tipo({ id: "tipo-a-general", cupo: 7 })],
+        }),
+      ],
+      compras: [
+        compra("evento-a", "tipo-a-general", EstadoCompra.UTILIZADA, { id: "compra-martin", cantidad: 3 }),
+        compra("evento-a", "tipo-a-general", EstadoCompra.UTILIZADA, {
+          id: "compra-sofia",
+          compradorId: "usuario-sofia",
+          cantidad: 3,
+        }),
+      ],
+      reloj: relojMovible(),
+    });
+  }
+
+  it("10 reseñas simultáneas del mismo comprador y evento → una guardada y nueve RESENIA_REPETIDA", async () => {
+    const { compraService, repositorioResenias } = armarResenias();
+
+    const resultados = await Promise.allSettled(
+      Array.from({ length: 10 }, (_, i) =>
+        compraService.reseniar("evento-a", "usuario-martin", { puntuacion: 4, comentario: `Reseña ${i}` }),
+      ),
+    );
+
+    expect(resultados.filter((r) => r.status === "fulfilled")).toHaveLength(1);
+    for (const r of resultados.filter((r) => r.status === "rejected")) {
+      expect(rechazo(r)).toMatchObject({ codigo: "RESENIA_REPETIDA" });
+    }
+    expect(await repositorioResenias.listarPorComprador("usuario-martin")).toHaveLength(1);
+  });
+
+  it("reseñas simultáneas de dos compradores del mismo evento → las dos se guardan", async () => {
+    const { compraService, repositorioResenias } = armarResenias();
+
+    await Promise.all([
+      compraService.reseniar("evento-a", "usuario-martin", { puntuacion: 4, comentario: "" }),
+      compraService.reseniar("evento-a", "usuario-sofia", { puntuacion: 2, comentario: "" }),
+    ]);
+
+    expect(
+      (await repositorioResenias.listarPorEventos(["evento-a"])).map((r) => r.compradorId).toSorted(),
+    ).toEqual(["usuario-martin", "usuario-sofia"]);
+  });
+
+  it("una reseña a la vez que el uso de otra entrada de la misma compra → se conservan los dos efectos", async () => {
+    const { compraService, entradaService, repositorioCompras, repositorioResenias } = armarResenias();
+    const codigo = (await repositorioCompras.buscarPorId("compra-martin"))!.entradas[1]!.codigo;
+
+    await Promise.all([
+      compraService.reseniar("evento-a", "usuario-martin", { puntuacion: 5, comentario: "" }),
+      entradaService.registrarUso("evento-a", codigo, "usuario-lucia"),
+    ]);
+
+    expect((await repositorioCompras.buscarPorId("compra-martin"))!.entradasUsadas).toBe(2);
+    expect(await repositorioResenias.listarPorComprador("usuario-martin")).toHaveLength(1);
+  });
+});

@@ -8,6 +8,7 @@ import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { AvisoDeLaCompra, CompraNoEncontrada } from "../componentes/AvisoDeLaCompra";
 import { ListaDeEntradas } from "../componentes/ListaDeEntradas";
+import { ReseniaDeLaCompra } from "../componentes/ReseniaDeLaCompra";
 import { ResumenCompra } from "../componentes/ResumenCompra";
 import {
   textoAccionDePago,
@@ -89,6 +90,8 @@ function ContenidoDeLaCompra({ usuarioId, compra }: { usuarioId: string; compra:
         <Boton variante="aviso" texto="Chat con el organizador" alPresionar={() => irAlChat(compra.id)} />
       </View>
       {conEntradas(compra) ? <TusEntradas compra={compra} /> : null}
+      {/* "Reseñar evento" o "Tu reseña", según el servidor (feature 012). */}
+      <ReseniaDeLaCompra compra={compra} />
       {conEntradas(compra) ? <Cancelacion usuarioId={usuarioId} compra={compra} /> : null}
       {compra.estado === EstadoCompra.PENDIENTE ? (
         <Pago usuarioId={usuarioId} compra={compra} />

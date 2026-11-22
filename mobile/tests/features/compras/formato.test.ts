@@ -23,6 +23,8 @@ import {
   textoEntradasUsadas,
   textoMotivoNoCancelable,
   textoMotivoNoUsable,
+  textoAvisoResenia,
+  textoReseniaPropia,
   textoReembolsada,
   textoResumenDeTipo,
   textoTotal,
@@ -41,6 +43,8 @@ import {
   compraReembolsada,
   entradaDelEvento,
   miCompra,
+  compraUtilizada,
+  reseniaDeEjemplo,
   ventanaDelFestival,
 } from "../../helpers/compras";
 
@@ -493,5 +497,33 @@ describe("textoComprasSinResponder (grupo 4)", () => {
     expect(textoComprasSinResponder(0)).toBeNull();
     expect(textoComprasSinResponder(1)).toBe("1 compra con un mensaje sin responder");
     expect(textoComprasSinResponder(3)).toBe("3 compras con mensajes sin responder");
+  });
+});
+
+describe("textoAvisoResenia (feature 012)", () => {
+  it("con su reseña: «Ya reseñaste este evento»", () => {
+    expect(textoAvisoResenia({ ...compraUtilizada, resenia: reseniaDeEjemplo(), puedeReseniar: false })).toBe(
+      "Ya reseñaste este evento",
+    );
+  });
+
+  it("sin reseña y sin poder reseñar (no está UTILIZADA): el motivo", () => {
+    expect(textoAvisoResenia(compraConfirmada)).toBe("Solo podés reseñar un evento al que asististe.");
+  });
+
+  it("si puede reseñar, ningún aviso", () => {
+    expect(textoAvisoResenia({ ...compraUtilizada, puedeReseniar: true })).toBeNull();
+  });
+});
+
+describe("textoReseniaPropia (feature 012)", () => {
+  it("la puntuación y el comentario", () => {
+    expect(textoReseniaPropia(reseniaDeEjemplo())).toBe(
+      "Tu reseña: Puntuación: 4 de 5. Muy buena organización",
+    );
+  });
+
+  it("sin comentario, solo la puntuación", () => {
+    expect(textoReseniaPropia(reseniaDeEjemplo({ comentario: null }))).toBe("Tu reseña: Puntuación: 4 de 5");
   });
 });

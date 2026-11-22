@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Mensaje, type CambioEstadoCompra, type Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
+import { Resenia } from "../../src/domain/resenia";
 import { Usuario } from "../../src/domain/usuario";
 import {
   CompraNoEncontradaError,
@@ -87,6 +88,8 @@ describe("CompraService.crear", () => {
       reembolso: null,
       cancelable: true,
       motivoNoCancelable: null,
+      resenia: null,
+      puedeReseniar: false,
     });
     expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(48);
     const guardada = await repositorioCompras.buscarPorId(vista.id);
@@ -732,6 +735,8 @@ describe("CompraService.misCompras (feature 007)", () => {
       entradasUsadas: 0,
       canceladaDesde: null,
       reembolso: null,
+      resenia: null,
+      puedeReseniar: false,
     });
     expect(vista).not.toHaveProperty("historial");
     expect(vista).not.toHaveProperty("compradorId");
@@ -2628,5 +2633,337 @@ describe("Chat de la compra (feature 011): el comprador (US1) y el organizador (
       expect(guardada.mensajes).toHaveLength(3);
       expect(await cupoDe(repositorioEventos, "tipo-a-vip")).toBe(50);
     });
+  });
+});
+
+describe("CompraService.reseniar (feature 012, US1, R2, R3)", () => {
+  const generalDeLaPenia = tipo({ id: "tipo-a-general", nombre: "General", cupo: 10 });
+
+  /** La Peña de Lucía (en 2 h: ventana abierta, no realizada) y un evento suyo ya realizado. */
+  function armarResenia({ compras = [] as Compra[], resenias = [] as Resenia[] } = {}) {
+    const reloj = relojMovible();
+    const servicios = crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", nombre: "Peña", en: 2 * HORA, tiposEntrada: [generalDeLaPenia] }),
+        evento({ id: "evento-pasado", en: -DIA, tiposEntrada: [tipo({ id: "tipo-pasado-general" })] }),
+      ],
+      compras,
+      resenias,
+      reloj,
+    });
+    return { ...servicios, reloj };
+  }
+
+  /** Una compra de Martín de 3 entradas en `estado` (UTILIZADA: "1 de 3"). */
+  const deMartinEn = (estado: EstadoCompra, eventoId = "evento-a", id = `compra-martin-${estado}`) =>
+    compra(eventoId, eventoId === "evento-a" ? "tipo-a-general" : "tipo-pasado-general", estado, {
+      id,
+      cantidad: 3,
+    });
+
+  const reseniaPrevia = (compradorId: string) =>
+    new Resenia({
+      id: "resenia-previa",
+      compradorId,
+      eventoId: "evento-a",
+      puntuacion: 3,
+      comentario: null,
+      creadaEn: AHORA,
+    });
+
+  const DATOS = { puntuacion: 4, comentario: "  Muy buena organización  " };
+
+  it("con una UTILIZADA «1 de 3» responde la ReseniaVista con el reloj leído dentro del cerrojo", async () => {
+    const utilizada = deMartinEn(EstadoCompra.UTILIZADA);
+    expect(utilizada.entradasUsadas).toBe(1);
+    const { compraService, cerrojo, reloj, repositorioResenias } = armarResenia({ compras: [utilizada] });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar").mockImplementation(async (_clave, operacion) => {
+      reloj.avanzar(MINUTO); // el reloj se mueve mientras espera el cerrojo
+      return operacion();
+    });
+
+    const vista = await compraService.reseniar("evento-a", "usuario-martin", DATOS);
+
+    const enElCerrojo = new Date(AHORA.getTime() + MINUTO);
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar.mock.calls[0]![0]).toBe("evento-a");
+    expect(vista).toEqual({
+      id: expect.stringMatching(UUID),
+      eventoId: "evento-a",
+      puntuacion: 4,
+      comentario: "Muy buena organización",
+      creadaEn: enElCerrojo.toISOString(),
+      creadaEnLocal: "2026-11-10T12:01",
+    });
+    const guardada = await repositorioResenias.buscarPorEventoYComprador("evento-a", "usuario-martin");
+    expect(guardada).toMatchObject({ id: vista.id, compradorId: "usuario-martin", puntuacion: 4 });
+  });
+
+  it("un comentario vacío queda en null", async () => {
+    const { compraService } = armarResenia({ compras: [deMartinEn(EstadoCompra.UTILIZADA)] });
+    const vista = await compraService.reseniar("evento-a", "usuario-martin", {
+      puntuacion: 5,
+      comentario: "",
+    });
+    expect(vista.comentario).toBeNull();
+  });
+
+  it("no guarda compras ni eventos ni materializa vencimientos: la compra y el cupo quedan iguales (FR-007)", async () => {
+    const conMensajes = compra("evento-a", "tipo-a-general", EstadoCompra.UTILIZADA, {
+      id: "compra-martin-con-mensajes",
+      cantidad: 3,
+      mensajes: [new Mensaje({ autorId: "usuario-martin", texto: "Hola", enviadoEn: AHORA })],
+    });
+    const { compraService, eventoService, repositorioCompras, repositorioEventos } = armarResenia({
+      compras: [conMensajes],
+    });
+    const antes = await repositorioCompras.buscarPorId("compra-martin-con-mensajes");
+    const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+    const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+    const obtenerAlDia = vi.spyOn(eventoService, "obtenerAlDia");
+
+    await compraService.reseniar("evento-a", "usuario-martin", DATOS);
+
+    expect(guardarCompra).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(obtenerAlDia).not.toHaveBeenCalled();
+    const despues = (await repositorioCompras.buscarPorId("compra-martin-con-mensajes"))!;
+    expect(despues).toBe(antes);
+    expect(despues).toMatchObject({ estado: EstadoCompra.UTILIZADA, total: 1000, entradasUsadas: 1 });
+    expect(despues.historial).toHaveLength(3);
+    expect(despues.mensajes).toHaveLength(1);
+    expect(
+      (await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-general")?.cupo,
+    ).toBe(10);
+  });
+
+  it("vale con el evento no realizado (ventana abierta) y con uno ya realizado", async () => {
+    const { compraService } = armarResenia({
+      compras: [
+        deMartinEn(EstadoCompra.UTILIZADA),
+        deMartinEn(EstadoCompra.UTILIZADA, "evento-pasado", "compra-martin-pasado"),
+      ],
+    });
+    await expect(compraService.reseniar("evento-a", "usuario-martin", DATOS)).resolves.toMatchObject({
+      eventoId: "evento-a",
+    });
+    await expect(compraService.reseniar("evento-pasado", "usuario-martin", DATOS)).resolves.toMatchObject({
+      eventoId: "evento-pasado",
+    });
+  });
+
+  it("un evento inexistente → EVENTO_NO_ENCONTRADO y nada guardado", async () => {
+    const { compraService, repositorioResenias } = armarResenia({
+      compras: [deMartinEn(EstadoCompra.UTILIZADA)],
+    });
+    const guardar = vi.spyOn(repositorioResenias, "guardar");
+    const rechazo = compraService.reseniar("evento-x", "usuario-martin", DATOS);
+    await expect(rechazo).rejects.toBeInstanceOf(NoEncontradoError);
+    await expect(rechazo).rejects.toMatchObject({ codigo: "EVENTO_NO_ENCONTRADO" });
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it("el organizador → RESENIA_PROPIO_EVENTO, aunque no tenga compras", async () => {
+    const { compraService, repositorioResenias } = armarResenia();
+    const guardar = vi.spyOn(repositorioResenias, "guardar");
+    const error = await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-lucia", DATOS));
+    expect(error).toMatchObject({
+      codigo: "RESENIA_PROPIO_EVENTO",
+      message: "No podés reseñar un evento que organizás.",
+    });
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it("solo una CONFIRMADA → SIN_COMPRA_UTILIZADA", async () => {
+    const { compraService } = armarResenia({ compras: [deMartinEn(EstadoCompra.CONFIRMADA)] });
+    const error = await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-martin", DATOS));
+    expect(error).toMatchObject({
+      codigo: "SIN_COMPRA_UTILIZADA",
+      message: "Solo podés reseñar un evento al que asististe (con una compra utilizada).",
+    });
+  });
+
+  it("con una reseña previa del mismo comprador y evento → RESENIA_REPETIDA y queda una sola", async () => {
+    const previa = reseniaPrevia("usuario-martin");
+    const { compraService, repositorioResenias } = armarResenia({
+      compras: [deMartinEn(EstadoCompra.UTILIZADA)],
+      resenias: [previa],
+    });
+    const error = await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-martin", DATOS));
+    expect(error).toMatchObject({ codigo: "RESENIA_REPETIDA", message: "Ya reseñaste este evento." });
+    expect(await repositorioResenias.listarPorComprador("usuario-martin")).toEqual([previa]);
+  });
+
+  it("orden: 404 → propio evento → sin utilizada → repetida", async () => {
+    const { compraService } = armarResenia({ resenias: [reseniaPrevia("usuario-sofia")] });
+    // Sin compras y con un evento inexistente: primero el 404.
+    await expect(compraService.reseniar("evento-x", "usuario-lucia", DATOS)).rejects.toBeInstanceOf(
+      NoEncontradoError,
+    );
+    // El organizador sin compras: propio evento antes que sin utilizada.
+    expect((await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-lucia", DATOS))).codigo).toBe(
+      "RESENIA_PROPIO_EVENTO",
+    );
+    // Con una reseña previa pero sin compra UTILIZADA: sin utilizada antes que repetida.
+    expect((await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-sofia", DATOS))).codigo).toBe(
+      "SIN_COMPRA_UTILIZADA",
+    );
+  });
+
+  it("toma el cerrojo del evento una vez y lo libera también ante un error", async () => {
+    const { compraService, cerrojo } = armarResenia({ compras: [deMartinEn(EstadoCompra.CONFIRMADA)] });
+    const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+    await rechazoDeDominio(compraService.reseniar("evento-a", "usuario-martin", DATOS));
+    expect(ejecutar).toHaveBeenCalledTimes(1);
+    expect(ejecutar.mock.calls[0]![0]).toBe("evento-a");
+    await expect(cerrojo.ejecutar("evento-a", async () => "libre")).resolves.toBe("libre");
+  });
+});
+
+describe("La reseña en las vistas del comprador (feature 012, US1, R6)", () => {
+  const generalDeLaPenia = tipo({ id: "tipo-a-general", nombre: "General", cupo: 10 });
+
+  function armarVistas({ compras = [] as Compra[], resenias = [] as Resenia[] } = {}) {
+    return crearServicesDeEventos({
+      eventos: [
+        evento({ id: "evento-a", nombre: "Peña", en: 2 * HORA, tiposEntrada: [generalDeLaPenia] }),
+        evento({ id: "evento-b", organizadorId: "usuario-sofia", tiposEntrada: [tipo({ id: "tipo-b" })] }),
+      ],
+      compras,
+      resenias,
+    });
+  }
+
+  const deMartinEn = (estado: EstadoCompra, id = `compra-martin-${estado}`, eventoId = "evento-a") =>
+    compra(eventoId, eventoId === "evento-a" ? "tipo-a-general" : "tipo-b", estado, { id, cantidad: 3 });
+
+  const suReseniaDe = (eventoId = "evento-a") =>
+    new Resenia({
+      id: `resenia-martin-${eventoId}`,
+      compradorId: "usuario-martin",
+      eventoId,
+      puntuacion: 4,
+      comentario: "Muy buena",
+      creadaEn: AHORA,
+    });
+
+  const VISTA_DE_LA_RESENIA = {
+    id: "resenia-martin-evento-a",
+    eventoId: "evento-a",
+    puntuacion: 4,
+    comentario: "Muy buena",
+    creadaEn: "2026-11-10T15:00:00.000Z",
+    creadaEnLocal: "2026-11-10T12:00",
+  };
+
+  it("una UTILIZADA sin reseña: resenia null y puedeReseniar true", async () => {
+    const { compraService } = armarVistas({ compras: [deMartinEn(EstadoCompra.UTILIZADA)] });
+    const vista = await compraService.obtener("compra-martin-UTILIZADA", "usuario-martin");
+    expect(vista).toMatchObject({ resenia: null, puedeReseniar: true });
+  });
+
+  it("una UTILIZADA con reseña: la ReseniaVista y puedeReseniar false", async () => {
+    const { compraService } = armarVistas({
+      compras: [deMartinEn(EstadoCompra.UTILIZADA)],
+      resenias: [suReseniaDe()],
+    });
+    const vista = await compraService.obtener("compra-martin-UTILIZADA", "usuario-martin");
+    expect(vista.resenia).toEqual(VISTA_DE_LA_RESENIA);
+    expect(vista.puedeReseniar).toBe(false);
+  });
+
+  it("una reseña de otro evento no cuenta", async () => {
+    const { compraService } = armarVistas({
+      compras: [deMartinEn(EstadoCompra.UTILIZADA)],
+      resenias: [suReseniaDe("evento-b")],
+    });
+    const vista = await compraService.obtener("compra-martin-UTILIZADA", "usuario-martin");
+    expect(vista).toMatchObject({ resenia: null, puedeReseniar: true });
+  });
+
+  it("dos UTILIZADA del mismo evento muestran la misma reseña (escenario 4)", async () => {
+    const { compraService } = armarVistas({
+      compras: [
+        deMartinEn(EstadoCompra.UTILIZADA, "compra-1"),
+        deMartinEn(EstadoCompra.UTILIZADA, "compra-2"),
+      ],
+      resenias: [suReseniaDe()],
+    });
+    const { confirmadas } = await compraService.misComprasDelEvento("evento-a", "usuario-martin");
+    expect(confirmadas.map((c) => c.resenia)).toEqual([VISTA_DE_LA_RESENIA, VISTA_DE_LA_RESENIA]);
+    expect(confirmadas.map((c) => c.puedeReseniar)).toEqual([false, false]);
+  });
+
+  it.each([
+    EstadoCompra.PENDIENTE,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CANCELADA,
+    EstadoCompra.REEMBOLSADA,
+  ])("una %s: puedeReseniar false y, aunque haya reseña del evento, resenia null", async (estado) => {
+    const sinResenia = armarVistas({ compras: [deMartinEn(estado)] });
+    expect(await sinResenia.compraService.obtener(`compra-martin-${estado}`, "usuario-martin")).toMatchObject(
+      { resenia: null, puedeReseniar: false },
+    );
+    const conResenia = armarVistas({ compras: [deMartinEn(estado)], resenias: [suReseniaDe()] });
+    expect(await conResenia.compraService.obtener(`compra-martin-${estado}`, "usuario-martin")).toMatchObject(
+      { resenia: null, puedeReseniar: false },
+    );
+  });
+
+  it("misComprasDelEvento lee la reseña una sola vez", async () => {
+    const { compraService, repositorioResenias } = armarVistas({
+      compras: [
+        deMartinEn(EstadoCompra.UTILIZADA, "compra-1"),
+        deMartinEn(EstadoCompra.CONFIRMADA, "compra-2"),
+      ],
+    });
+    const buscar = vi.spyOn(repositorioResenias, "buscarPorEventoYComprador");
+    const vista = await compraService.misComprasDelEvento("evento-a", "usuario-martin");
+    expect(buscar).toHaveBeenCalledTimes(1);
+    expect(buscar).toHaveBeenCalledWith("evento-a", "usuario-martin");
+    expect(vista.confirmadas.map((c) => c.puedeReseniar).toSorted()).toEqual([false, true]);
+  });
+
+  it("misCompras: los dos campos por compra, con una sola lectura de reseñas para N compras", async () => {
+    const { compraService, repositorioResenias } = armarVistas({
+      compras: [
+        deMartinEn(EstadoCompra.UTILIZADA, "compra-a-utilizada"),
+        deMartinEn(EstadoCompra.CANCELADA, "compra-a-cancelada"),
+        deMartinEn(EstadoCompra.UTILIZADA, "compra-b-utilizada", "evento-b"),
+      ],
+      resenias: [suReseniaDe()],
+    });
+    const listar = vi.spyOn(repositorioResenias, "listarPorComprador");
+    const buscar = vi.spyOn(repositorioResenias, "buscarPorEventoYComprador");
+
+    const vistas = await compraService.misCompras("usuario-martin");
+
+    expect(listar).toHaveBeenCalledTimes(1);
+    expect(listar).toHaveBeenCalledWith("usuario-martin");
+    expect(buscar).not.toHaveBeenCalled();
+    const porId = new Map(vistas.map((v) => [v.id, v]));
+    expect(porId.get("compra-a-utilizada")).toMatchObject({
+      resenia: VISTA_DE_LA_RESENIA,
+      puedeReseniar: false,
+    });
+    expect(porId.get("compra-a-cancelada")).toMatchObject({ resenia: null, puedeReseniar: false });
+    expect(porId.get("compra-b-utilizada")).toMatchObject({ resenia: null, puedeReseniar: true });
+  });
+
+  it("misCompras sin compras no lee reseñas", async () => {
+    const { compraService, repositorioResenias } = armarVistas();
+    const listar = vi.spyOn(repositorioResenias, "listarPorComprador");
+    expect(await compraService.misCompras("usuario-martin")).toEqual([]);
+    expect(listar).not.toHaveBeenCalled();
+  });
+
+  it("CompraDelEventoVista (la del organizador) no trae los campos", async () => {
+    const { compraService } = armarVistas({
+      compras: [deMartinEn(EstadoCompra.UTILIZADA)],
+      resenias: [suReseniaDe()],
+    });
+    const { compras } = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
+    expect(compras[0]).not.toHaveProperty("resenia");
+    expect(compras[0]).not.toHaveProperty("puedeReseniar");
   });
 });

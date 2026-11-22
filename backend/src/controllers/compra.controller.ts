@@ -6,11 +6,13 @@ import type {
   MensajeVista,
   MiCompraVista,
   MisComprasDelEventoVista,
+  ReseniaVista,
 } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { CompraService } from "../services/compra.service";
 import { compraNueva, compraPorId, comprasDelEvento, mensajeNuevo } from "../validations/compra.validation";
+import { reseniaNueva } from "../validations/resenia.validation";
 
 /** HTTP de las compras: lee la entrada ya validada y llama al service (sin reglas). */
 export class CompraController {
@@ -56,6 +58,13 @@ export class CompraController {
   confirmarReembolso = async (req: Request, res: Response<CompraDelEventoVista>): Promise<void> => {
     const { compraId } = compraPorId.leer(req, "params");
     res.json(await this.compraService.confirmarReembolso(compraId, usuarioActual(req).id));
+  };
+
+  /** `POST /eventos/:eventoId/resenias` (feature 012): la reseña del usuario actual a ese evento. */
+  reseniar = async (req: Request, res: Response<ReseniaVista>): Promise<void> => {
+    const { eventoId } = reseniaNueva.leer(req, "params");
+    const datos = reseniaNueva.leer(req, "body");
+    res.status(201).json(await this.compraService.reseniar(eventoId, usuarioActual(req).id, datos));
   };
 
   /** `GET /compras/:compraId/mensajes` (feature 011): el chat, para sus dos partes. */
