@@ -21,8 +21,8 @@ listas (Explorar, Mis compras, Mis eventos, Mis favoritos) y abre "Mis favoritos
   con usuario; `PUT` y `DELETE` son idempotentes y responden `204`; la lista,
   `EventoCatalogoVista[]` sin páginas. Rechazos 401 → 400 → 404, sin 409.
 - **Services** (R3, R4):
-  - `UsuarioService` (dueño de `Usuario`) hace las escrituras bajo un **cerrojo por usuario**
-    (`cerrojoDeUsuarios`, instancia propia).
+  - `UsuarioService` (dueño de `Usuario`) hace las escrituras bajo el **cerrojo único** de la
+    app con la clave `usuario:<id>` (la misma instancia que los services de eventos).
   - `EventoService` orquesta: 404 del evento con su `obtenerOFallar` y después pide la escritura a
     `UsuarioService`, sin tomar el cerrojo del evento (FR-007).
   - La lista reusa el armado de tarjetas del catálogo, extraído a un método privado, en lote y con
@@ -88,13 +88,13 @@ componentes, 3 hooks.
 | II. Test-First | ✅ | TDD con stubs de firma real; cada regla (idempotencia, sin repetir, 404, limpieza al eliminar, orden, huérfano omitido) con su test |
 | III. Capas | ✅ | dominio sin IO (`Usuario` con comportamiento); `UsuarioService` único que escribe usuarios; 404 del evento solo en `EventoService`; sin ciclos (`EventoService → UsuarioService`, ya existente); controllers sin reglas; lote sin N+1 |
 | III. Cada agregado lo escribe su dueño | ✅ | eliminar un evento pide la limpieza a `UsuarioService` (R5) |
-| IV. Memoria / cerrojo | ✅ | un cerrojo por usuario, instancia única inyectada desde `app.ts` (R4); sin anidar: la limpieza corre después del cerrojo del evento (R5) |
+| IV. Memoria / cerrojo | ✅ | la única instancia del cerrojo de la app, inyectada desde `app.ts`, con claves `usuario:<id>` para las escrituras de usuarios (R4); sin anidar: la limpieza corre después del cerrojo del evento (R5) |
 | IV. Operaciones atómicas por evento | ✅ | marcar no modifica el evento, sus tipos ni sus compras: no necesita su cerrojo |
 | V. Contrato | ✅ | `/api/usuarios/actual/favoritos`, plural y kebab-case; errores con el formato único; OpenAPI + test de cobertura de rutas; `contracts/api.md` |
 | VI. Identidad simulada | ✅ | las tres rutas con `X-Usuario-Id`; cada usuario solo opera sus favoritos (el recurso es "actual"); vista explícita `EventoCatalogoVista` |
 | VII. App | ✅ | `fetch` solo en `src/api/`; cuatro estados en "Mis favoritos"; estrella por forma (llena/vacía), no solo color; `accessibilityLabel` y `selected` |
 | VIII. Tipos compartidos | ✅ | sin tipos nuevos: reusa `EventoCatalogoVista` |
-| IX. Calidad / YAGNI | ✅ | sin entidad, repositorio ni service nuevos; la única pieza extra (el segundo cerrojo) se justifica en R4 |
+| IX. Calidad / YAGNI | ✅ | sin entidad, repositorio, service ni cerrojo nuevos |
 | Reglas de dependencia de mobile | ✅ | todo en `eventos`; `compras` lo usa por su `index.ts`; Perfil navega por ruta tipada; dos hooks genéricos bajan a la base (R7) |
 
 **Post-diseño**: sin cambios; ninguna violación que justificar.
@@ -131,14 +131,14 @@ backend/src/
 ├── controllers/evento.controller.ts      # cambia: favoritos, marcarFavorito, desmarcarFavorito
 ├── routes/usuarios.routes.ts   # cambia: recibe también EventoController; /actual/favoritos[/:eventoId]
 ├── routes/index.ts             # cambia: pasa los dos controllers
-├── app.ts                      # cambia: cerrojoDeUsuarios → UsuarioService
+├── app.ts                      # cambia: el cerrojo existente también → UsuarioService
 ├── seed/datos-ejemplo.ts       # cambia: favoritos de Diego, Valentina y Sofía
 └── docs/openapi.json · ai-ticket-it.postman_collection.json   # cambian
 
 backend/tests/
 ├── domain/usuario.test.ts · evento.test.ts · datos-ejemplo.test.ts
 ├── repositories/usuario.repository.test.ts     # nuevo
-├── services/usuario.service.test.ts            # nuevo (cerrojo, limpieza)
+├── services/usuario.service.test.ts            # cambia (cerrojo, marcar/desmarcar, limpieza)
 ├── services/evento.service.test.ts             # favoritosDe, eliminar limpia
 └── api/favoritos.test.ts · docs.test.ts        # nuevo / cambia
 
@@ -171,7 +171,7 @@ carpetas nuevas. `shared/` no cambia.
 
 1. **Dominio y repositorio**: `Usuario` (métodos e invariante), `ordenDeMisEventos`,
    `RepositorioUsuarios.guardar`/`listarPorFavorito`.
-2. **US1 backend — marcar y desmarcar**: cerrojo por usuario en `UsuarioService`, casos de uso en
+2. **US1 backend — marcar y desmarcar**: claves `usuario:<id>` del cerrojo en `UsuarioService`, casos de uso en
    `EventoService`, controller, rutas, OpenAPI; tests de API con el orden de rechazos e idempotencia.
 3. **US2 backend — la lista y la limpieza**: `#tarjetasDelCatalogo` (refactor de `listar` con su
    suite en verde), `favoritosDe`, `GET`; `eliminar` limpia (FR-010) y el huérfano se omite.
@@ -184,6 +184,6 @@ carpetas nuevas. `shared/` no cambia.
 
 ## Complexity Tracking
 
-Sin violaciones de la constitución. La única pieza que no existía —un segundo `CerrojoPorClave`
-para los usuarios— se justifica en research R4 (cambios concurrentes del mismo usuario y "sin
-cerrojos anidados" al limpiar después de eliminar).
+Sin violaciones de la constitución ni piezas nuevas: las escrituras de usuarios reusan la única
+instancia del cerrojo con claves `usuario:<id>` (research R4), y la limpieza al eliminar corre
+después de liberar la clave del evento, sin anidar (R5).

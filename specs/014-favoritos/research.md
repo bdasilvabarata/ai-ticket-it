@@ -92,14 +92,17 @@ repositorio (repetiría el 404 del evento fuera de su dueño).
 
 ---
 
-## R4 — Concurrencia: un cerrojo por usuario, separado del de eventos
+## R4 — Concurrencia: el cerrojo único de la app, con claves `usuario:<id>`
 
 **Decisión**:
 
-- `app.ts` crea un **segundo** `CerrojoPorClave`, `cerrojoDeUsuarios`, que recibe solo
-  `UsuarioService`. Cada escritura de un usuario corre bajo
-  `cerrojoDeUsuarios.ejecutar(usuarioId, …)`: relee el usuario, aplica `marcar`/`desmarcar` y
-  guarda solo si cambió (un `marcar` repetido no guarda).
+- `UsuarioService` recibe por constructor **la misma** instancia de `CerrojoPorClave` que ya
+  comparten los services de eventos (constitución: "El cerrojo es una única instancia por app").
+  Cada escritura de un usuario corre bajo `cerrojo.ejecutar("usuario:<id>", …)` (la clave
+  la arma un `#claveDe(usuarioId)` privado del service): relee el usuario, aplica
+  `marcar`/`desmarcar` y guarda solo si cambió (un `marcar` repetido no guarda).
+- Las claves no chocan: los ids de eventos son `evento-…` (seed) o UUID (`siguienteId`), nunca
+  empiezan con `usuario:`. Marcar toma `usuario:<id>`, nunca la clave de un evento.
 - Marcar y desmarcar **no** toman el cerrojo del evento (FR-007): no esperan a las compras.
 - Las lecturas (la lista) no toman ningún cerrojo.
 
@@ -107,11 +110,12 @@ repositorio (repetiría el 404 del evento fuera de su dueño).
 teléfonos, FR-003 / US1-3) sobre eventos distintos no deben perder uno de los dos cambios. Con los
 repositorios en memoria hoy no se intercalan, pero la regla del cerrojo existe para que el diseño
 no dependa de eso (constitución, "Operaciones atómicas por evento"; la misma razón que el cerrojo
-de eventos). Una instancia aparte deja claro qué protege cada una y evita mezclar ids de eventos y
-de usuarios en las mismas claves.
+de eventos). Reusar la instancia cumple al pie de la letra "una única instancia por app" y no suma
+piezas: `app.ts` y el helper de tests pasan la que ya tienen.
 
-**Alternativas**: el mismo cerrojo de eventos con claves `usuario:<id>` (mezcla dos espacios de
-claves en la instancia que la constitución describe como "el cerrojo del evento"); sin cerrojo
+**Alternativas**: un segundo `CerrojoPorClave` (`cerrojoDeUsuarios`) solo para `UsuarioService`
+(separa los espacios de claves, pero choca con "una única instancia por app" de la constitución);
+sin cerrojo
 (correcto hoy solo por un detalle de la implementación en memoria); tomar el cerrojo del evento
 (haría esperar a marcar detrás de las compras, contra FR-007, y no protege al usuario: dos marcas
 de eventos distintos toman cerrojos distintos).
@@ -135,7 +139,10 @@ favorito cambia (FR-010).
 existe justo antes de que se elimine y guardar después de la limpieza. Ese id queda en el usuario,
 pero la lista lee los eventos que existen y lo **omite sin fallar** (FR-010, R6), y la app solo
 pinta estrellas sobre eventos que muestra. Desmarcarlo responde 404 (el evento no existe, FR-004);
-es invisible para el usuario.
+es invisible para el usuario. Tampoco vuelve a aparecer: los ids de eventos nuevos son UUID
+(`EventoRepository.siguienteId` usa `randomUUID()`) y no se reusan, así que ningún evento futuro
+puede tener ese id. La carrera no se cierra del todo a propósito: hacerlo exigiría anidar cerrojos
+o que marcar tome el cerrojo del evento (contra FR-007).
 
 **Por qué**:
 

@@ -159,7 +159,7 @@ y en "Mis favoritos"; desmarcarlo y comprobar que desaparece de todas.
    mismo que al tocar el resto de la tarjeta o fila (abrir el detalle o "Tu compra"): la estrella
    de una lista no cambia el favorito.
 5. **Given** el lector de pantalla, **When** recorre una tarjeta o fila de un evento favorito,
-   **Then** su etiqueta dice "En favoritos"; la estrella no es un elemento aparte.
+   **Then** su etiqueta termina en ", en favoritos"; la estrella no es un elemento aparte.
 6. **Given** dos usuarios que miran el mismo catálogo, **When** cada uno ve las tarjetas, **Then**
    los eventos, su orden y sus páginas son los mismos para los dos; solo cambia dónde está la
    estrella.
@@ -198,9 +198,10 @@ esos eventos; elegir a otro usuario sin favoritos y comprobar el vacío.
   eliminarlo, sale de los favoritos de todos los usuarios que lo tenían, y deja de aparecer en sus
   listas. Si la eliminación falla (por ejemplo, porque el evento tiene compras), ningún favorito
   cambia.
-- Un usuario que marca un evento justo mientras su organizador lo elimina: el resultado final no
-  deja ese evento en sus favoritos; y si por cualquier motivo quedara un id de un evento que ya no
-  existe, la lista lo omite sin fallar (red de seguridad, FR-010).
+- Un usuario que marca un evento justo mientras su organizador lo elimina: puede quedar guardado
+  el id de un evento que ya no existe. La lista lo omite sin fallar (FR-010), ninguna estrella lo
+  muestra y no vuelve a aparecer, porque los ids de eventos nuevos no se reusan. Desmarcarlo
+  responde "no encontrado", como cualquier evento inexistente (FR-004).
 - El propio evento: el organizador puede marcarlo como favorito desde su detalle público como
   cualquier otro, y ve la estrella indicadora en su tarjeta de Explorar y en "Mis eventos". El hub
   del evento propio (al que lleva "Mis eventos") no tiene la estrella para marcar: se marca desde
@@ -275,7 +276,7 @@ esos eventos; elegir a otro usuario sin favoritos y comprobar el vacío.
   de "Mis favoritos"— DEBE mostrar una **estrella indicadora** en una esquina de cada evento que
   sea favorito del usuario actual, y ninguna en los demás. La estrella indicadora NO es tocable
   por separado (tocarla es tocar la tarjeta o fila) y NO es un elemento accesible aparte: la
-  etiqueta de la tarjeta o fila suma "En favoritos". No se agrega a listas de un solo evento
+  etiqueta de la tarjeta o fila suma ", en favoritos". No se agrega a listas de un solo evento
   (Compras del evento, Registrar ingreso, "Ver mis entradas").
 - **FR-016**: Mientras un cambio de favorito está en curso, un segundo toque sobre la estrella del
   detalle NO DEBE enviar otro pedido; la estrella muestra que está en curso.

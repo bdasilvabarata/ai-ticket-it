@@ -70,7 +70,7 @@ Todo lo de favoritos es de la feature `eventos` (research R7); `compras` usa lo 
   - **cargando**: `Cargando` (o esqueletos de tarjeta);
   - **error**: `MensajeError` con reintentar;
   - **vacío**: `ListaVacia` "Todavía no tenés favoritos" con la acción "Ir a Explorar", que lleva
-    a la pestaña Explorar (`router.dismissTo("/")`);
+    a la pestaña Explorar (`router.navigate("/")`, como "Mis compras");
   - **con favoritos**: una `TarjetaEvento` por favorito con `esFavorito`, en el orden del servidor;
     tocarla abre `/explorar/[eventoId]` (US2-4).
 - Se vuelve a pedir en cada foco salvo el primero (`useRefrescarAlFocalizar`), así desmarcar en el

@@ -43,7 +43,7 @@ Sin estados intermedios ni fecha de marcado (spec, Key Entities).
 
 | Service | Método nuevo | Hace |
 |---|---|---|
-| `UsuarioService` | `marcarFavorito(usuarioId, eventoId)` | bajo `cerrojoDeUsuarios` (R4): relee (404 del usuario), marca y guarda si cambió |
+| `UsuarioService` | `marcarFavorito(usuarioId, eventoId)` | bajo el cerrojo con la clave `usuario:<id>` (R4): relee (404 del usuario), marca y guarda si cambió |
 | `UsuarioService` | `desmarcarFavorito(usuarioId, eventoId)` | ídem con `desmarcarFavorito` |
 | `UsuarioService` | `quitarFavoritoDeTodos(eventoId)` | `listarPorFavorito` y, de a uno, bajo el cerrojo de cada usuario, relee, desmarca y guarda (R5) |
 | `EventoService` | `marcarFavorito(eventoId, usuarioId)` · `desmarcarFavorito(eventoId, usuarioId)` | `obtenerOFallar(eventoId)` (404) → `usuarioService.…`; sin cerrojo del evento (FR-007) |
@@ -52,8 +52,8 @@ Sin estados intermedios ni fecha de marcado (spec, Key Entities).
 
 `ordenDeMisEventos(ahora)` (`domain/evento.ts`) suma el desempate nombre → id (FR-009).
 
-`UsuarioService` recibe además `cerrojo` (el `cerrojoDeUsuarios`, una instancia propia creada en
-`app.ts`).
+`UsuarioService` recibe además `cerrojo`: la **misma** instancia que comparten los services de
+eventos (una sola por app), con claves `usuario:<id>`.
 
 ## Vistas (`shared/`)
 
