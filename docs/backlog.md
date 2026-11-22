@@ -22,7 +22,7 @@ Cada feature se desarrolla en su rama `feature/NNN-slug` con el flujo de Spec Ki
 | 009 | **Cancelar compra** con reembolso, respetando las reglas de cancelación | UC-07, UC-08 | P2 | 007 | integrada |
 | 010 | **Refactor de 007, 008 y 009**: `Entrada` con estado explícito, invariantes de `Compra` legibles, un solo dueño de `RepositorioCompras`, vistas sin mapeos repetidos y "Registrar ingreso" en componentes; sin cambiar contratos de API ni comportamiento (ver "Alcance de la 010") | — | P2 | 007, 008, 009 | en PR |
 | 011 | **Chat de la compra** entre comprador y organizador | UC-05, UC-06 | P2 | 007, 008, 010 | en PR |
-| 012 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008, 010 | pendiente |
+| 012 | **Reseñas**: puntuar y comentar un evento con entrada utilizada; ver reseñas del organizador; alimenta el puntaje usado en 005 | UC-09, UC-10 | P3 | 008, 010 | tasks |
 | 013 | *(Opcional)* **Favoritos**: guardar eventos favoritos | — (contexto de la consigna) | P4 | 005 | pendiente |
 | 014 | **Pulido estético**: sombras/elevación de tarjetas, bordes y transiciones, aplicados de forma global en `tema.ts` y los componentes base (nunca pantalla por pantalla), cuando UC-01 a UC-12 funcionen de punta a punta con sus tests en verde | — | P4 | 004 a 012 | pendiente |
 

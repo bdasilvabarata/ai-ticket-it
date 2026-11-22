@@ -49,5 +49,12 @@ export type {
   ParteDeLaCompraVista,
   RolEnLaCompra,
 } from "./mensaje";
+export { LIMITES_RESENIA } from "./resenia";
+export type {
+  DatosResenia,
+  ReseniaDelOrganizadorVista,
+  ReseniasDelOrganizadorVista,
+  ReseniaVista,
+} from "./resenia";
 export type { SaludVista } from "./salud";
 export type { UsuarioVista } from "./usuario";
