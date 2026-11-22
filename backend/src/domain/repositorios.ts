@@ -13,6 +13,10 @@ export interface RepositorioUsuarios {
   buscarPorId(id: string): Promise<Usuario | null>;
   /** Los que existen de esos ids (posiblemente ninguno), sin repetir: para `obtenerPorIds`. */
   listarPorIds(ids: readonly string[]): Promise<Usuario[]>;
+  /** Los que tienen ese evento entre sus favoritos (posiblemente ninguno). */
+  listarPorFavorito(eventoId: string): Promise<Usuario[]>;
+  /** Da de alta o reemplaza la instancia por id (las entidades son inmutables). */
+  guardar(usuario: Usuario): Promise<void>;
 }
 
 export interface RepositorioCategorias {

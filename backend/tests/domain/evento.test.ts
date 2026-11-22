@@ -8,9 +8,12 @@ function tipo(cambios: Partial<typeof datosTipo> = {}): TipoEntrada {
   return new TipoEntrada({ ...datosTipo, ...cambios });
 }
 
-function evento(tiposEntrada: TipoEntrada[] = [tipo()], cambios: { nombre?: string; fechaHora?: Date } = {}) {
+function evento(
+  tiposEntrada: TipoEntrada[] = [tipo()],
+  cambios: { id?: string; nombre?: string; fechaHora?: Date } = {},
+) {
   return new Evento({
-    id: "e1",
+    id: cambios.id ?? "e1",
     nombre: cambios.nombre ?? "Noche de Rock",
     descripcion: "Tres bandas.",
     categoriaId: "c1",
@@ -494,6 +497,38 @@ describe("ordenDeMisEventos", () => {
       "ayer",
       "hace 5",
     ]);
+  });
+
+  describe("desempate a la misma fecha (feature 014)", () => {
+    const ahora = new Date("2026-12-01T00:00:00Z");
+    const proxima = new Date("2026-12-10T21:00:00Z");
+    const pasada = new Date("2026-11-10T21:00:00Z");
+    const con = (id: string, nombre: string, fechaHora: Date) => evento([tipo()], { id, nombre, fechaHora });
+
+    it("dos próximos a la misma fecha van por nombre sin mayúsculas ni tildes", () => {
+      const eventos = [con("e1", "zamba", proxima), con("e2", "Ópera", proxima), con("e3", "árbol", proxima)];
+      expect(eventos.toSorted(ordenDeMisEventos(ahora)).map((e) => e.nombre)).toEqual([
+        "árbol",
+        "Ópera",
+        "zamba",
+      ]);
+    });
+
+    it("dos realizados a la misma fecha también van por nombre ascendente", () => {
+      const eventos = [con("e1", "Zamba", pasada), con("e2", "Ópera", pasada), con("e3", "Árbol", pasada)];
+      expect(eventos.toSorted(ordenDeMisEventos(ahora)).map((e) => e.nombre)).toEqual([
+        "Árbol",
+        "Ópera",
+        "Zamba",
+      ]);
+    });
+
+    it("con el mismo nombre (sin distinguir mayúsculas ni tildes) decide el id", () => {
+      const eventos = [con("e3", "Opera", proxima), con("e1", "ópera", proxima), con("e2", "OPERA", proxima)];
+      expect(eventos.toSorted(ordenDeMisEventos(ahora)).map((e) => e.id)).toEqual(["e1", "e2", "e3"]);
+      const realizados = eventos.map((e, i) => con(e.id, ["Opera", "ópera", "OPERA"][i], pasada));
+      expect(realizados.toSorted(ordenDeMisEventos(ahora)).map((e) => e.id)).toEqual(["e1", "e2", "e3"]);
+    });
   });
 });
 

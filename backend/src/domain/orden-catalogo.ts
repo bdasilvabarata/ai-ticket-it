@@ -21,8 +21,12 @@ type Comparador = (a: Ordenable, b: Ordenable) => number;
 const comparadorDeNombres = new Intl.Collator("es", { sensitivity: "base" });
 
 const porFecha: Comparador = (a, b) => a.fechaHora.getTime() - b.fechaHora.getTime();
-const porNombre: Comparador = (a, b) => comparadorDeNombres.compare(a.nombre, b.nombre);
-const porId: Comparador = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+/** Por nombre, sin mayúsculas ni tildes: el desempate del catálogo y de Mis eventos (feature 014). */
+export const porNombre = (a: Pick<Ordenable, "nombre">, b: Pick<Ordenable, "nombre">): number =>
+  comparadorDeNombres.compare(a.nombre, b.nombre);
+/** Por id: el último desempate, así dos elementos empatados salen siempre igual. */
+export const porId = (a: Pick<Ordenable, "id">, b: Pick<Ordenable, "id">): number =>
+  a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 const porPrecio: Comparador = (a, b) => a.precioDesde - b.precioDesde;
 
 /** Sin puntaje (`null`) siempre al final, nunca como 0, en cualquier sentido. */

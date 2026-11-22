@@ -163,6 +163,14 @@ export const maratonEnCatalogo: EventoCatalogoVista = {
   organizador: luciaOrganizadora,
 };
 
+/** Una tarjeta realizada, como la devuelve "Mis favoritos" (feature 014): el catálogo no las trae. */
+export const nocheDeRisasEnCatalogo: EventoCatalogoVista = {
+  ...nocheDeRisas,
+  precioDesde: 6000,
+  agotado: false,
+  organizador: { ...luciaOrganizadora, puntaje: 4.5, cantidadResenias: 12 },
+};
+
 /**
  * Un catálogo de una sola página con esos eventos (feature 013). Con `pagina`, la que se quiera
  * (por ejemplo, la 2 de 12 eventos).

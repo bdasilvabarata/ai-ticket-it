@@ -26,7 +26,7 @@ export interface ControllersApi {
 export function crearRouterApi(controllers: ControllersApi, requerirUsuario: RequestHandler): Router {
   const router = Router();
   router.use("/salud", crearSaludRouter(controllers.salud));
-  router.use("/usuarios", crearUsuariosRouter(controllers.usuarios, requerirUsuario));
+  router.use("/usuarios", crearUsuariosRouter(controllers.usuarios, controllers.eventos, requerirUsuario));
   router.use("/categorias", crearCategoriasRouter(controllers.categorias));
   router.use("/eventos", crearEventosRouter(controllers, requerirUsuario));
   router.use("/compras", crearComprasRouter(controllers.compras, requerirUsuario));

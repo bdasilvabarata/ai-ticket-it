@@ -586,8 +586,37 @@ describe("crearDatosEjemplo", () => {
     });
   });
 
-  it("deja los favoritos vacíos", () => {
-    for (const usuario of usuarios) expect(usuario.favoritos).toEqual([]);
+  describe("favoritos (feature 014, R10)", () => {
+    const favoritosDe = (usuarioId: string) =>
+      usuarios.find((usuario) => usuario.id === usuarioId)?.favoritos;
+
+    it("Diego, Valentina y Sofía tienen favoritos; Lucía y Martín, ninguno", () => {
+      expect(favoritosDe("usuario-diego")).toEqual([
+        "evento-festival-sonidos-del-sur",
+        "evento-clasico-de-basquet",
+        "evento-noche-de-risas",
+      ]);
+      expect(favoritosDe("usuario-valentina")).toEqual(["evento-noche-de-rock", "evento-jazz-en-el-patio"]);
+      expect(favoritosDe("usuario-sofia")).toEqual(["evento-clasico-de-basquet", "evento-maraton-10k"]);
+      expect(favoritosDe("usuario-lucia")).toEqual([]);
+      expect(favoritosDe("usuario-martin")).toEqual([]);
+    });
+
+    it("todos los favoritos son eventos del seed, y el Clásico de básquet es de Sofía (propio)", () => {
+      const idsDeEventos = new Set(eventos.map((evento) => evento.id));
+      for (const usuario of usuarios) {
+        for (const eventoId of usuario.favoritos) expect(idsDeEventos.has(eventoId)).toBe(true);
+      }
+      const clasico = eventos.find((evento) => evento.id === "evento-clasico-de-basquet");
+      expect(clasico?.organizadorId).toBe("usuario-sofia");
+    });
+
+    it("los de Diego cubren los dos grupos: dos próximos y la Noche de risas realizada", () => {
+      const realizado = (id: string) => eventos.find((evento) => evento.id === id)?.estaRealizado(ahora);
+      expect(realizado("evento-festival-sonidos-del-sur")).toBe(false);
+      expect(realizado("evento-clasico-de-basquet")).toBe(false);
+      expect(realizado("evento-noche-de-risas")).toBe(true);
+    });
   });
 
   it("construye entidades de dominio, así sus invariantes validan los datos de ejemplo", () => {

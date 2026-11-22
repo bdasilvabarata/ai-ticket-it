@@ -1,18 +1,37 @@
-import { fireEvent, screen, within } from "expo-router/testing-library";
+import type { EventoCatalogoVista } from "@ai-ticket-it/shared";
+import { fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 
-import { errorApi, festival, hamletDeMartin, nocheDeRisas, nocheDeRock } from "../helpers/eventos";
+import {
+  errorApi,
+  festival,
+  festivalCompleto,
+  hamletDeMartin,
+  luciaOrganizadora,
+  nocheDeRisas,
+  nocheDeRock,
+  rockEnCatalogo,
+} from "../helpers/eventos";
 import { porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { lucia, martin, todos } from "../helpers/usuarios";
 
-async function abrirMisEventos(misEventos: RespuestaFalsa[] | FuncionRespuesta) {
+type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
+
+const FAVORITOS = "/usuarios/actual/favoritos";
+const MARCA = "marca-favorito";
+
+async function abrirMisEventos(
+  misEventos: RespuestaFalsa[] | FuncionRespuesta,
+  extra: Record<string, Lista> = {},
+) {
   const resultado = await renderConDependencias({
     usuarioRecordado: lucia.id,
     respuestas: porRuta({
       "/usuarios/actual": [{ status: 200, json: lucia }],
       "/usuarios": [{ status: 200, json: todos }],
       "/eventos/mios": typeof misEventos === "function" ? [misEventos] : misEventos,
+      ...extra,
     }),
   });
   await esperarPestanas();
@@ -79,5 +98,57 @@ describe("Mis eventos (US2)", () => {
 
     expect(await screen.findByText("Hamlet, versión contemporánea")).toBeOnTheScreen();
     expect(screen.queryByText("Noche de Rock en el Club")).toBeNull();
+  });
+});
+
+describe("Mis eventos: estrellas de favoritos (feature 014, US3)", () => {
+  const festivalEnCatalogo: EventoCatalogoVista = {
+    ...festival,
+    precioDesde: 20000,
+    agotado: false,
+    organizador: luciaOrganizadora,
+  };
+  const tresEventos: RespuestaFalsa[] = [{ status: 200, json: [nocheDeRock, festival, nocheDeRisas] }];
+
+  it("solo un evento propio favorito tiene la estrella y ', en favoritos' (US3-3)", async () => {
+    await abrirMisEventos(tresEventos, { [FAVORITOS]: [{ status: 200, json: [festivalEnCatalogo] }] });
+
+    const conEstrella = await screen.findByRole("button", { name: /, en favoritos$/ });
+    expect(conEstrella.props.accessibilityLabel).toBe(
+      "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00, en favoritos",
+    );
+    expect(within(conEstrella).getByTestId(MARCA, { includeHiddenElements: true })).toBeTruthy();
+    const filas = screen.getAllByRole("button", { name: /^Abrir / });
+    expect(filas.map((fila) => fila.props.accessibilityLabel)).toEqual([
+      "Abrir Noche de Rock en el Club, mar 1 dic 2026 · 20:00",
+      "Abrir Festival Sonidos del Sur, jue 10 dic 2026 · 14:00, en favoritos",
+      "Abrir Stand-up: Noche de risas, realizado, sáb 7 nov 2026 · 22:00",
+    ]);
+    expect(screen.queryAllByTestId(MARCA, { includeHiddenElements: true })).toHaveLength(1);
+  });
+
+  it("con los favoritos fallando, la lista se ve igual y sin estrellas", async () => {
+    await abrirMisEventos(tresEventos, {
+      [FAVORITOS]: [{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }],
+    });
+
+    expect(await screen.findAllByRole("button", { name: /^Abrir / })).toHaveLength(3);
+    expect(screen.queryAllByTestId(MARCA, { includeHiddenElements: true })).toHaveLength(0);
+    expect(screen.queryByText("Falló el servidor.")).toBeNull();
+  });
+
+  it("tocar la fila favorita abre el hub, que no tiene estrella para marcar", async () => {
+    const resultado = await abrirMisEventos(tresEventos, {
+      [FAVORITOS]: [{ status: 200, json: [festivalEnCatalogo, rockEnCatalogo] }],
+      "/eventos/evento-festival": [{ status: 200, json: festivalCompleto }],
+    });
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: /^Abrir Festival Sonidos del Sur, .*, en favoritos$/ }),
+    );
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-festival"));
+    expect(await screen.findByRole("button", { name: "Ver compras" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /favoritos/ })).toBeNull();
   });
 });

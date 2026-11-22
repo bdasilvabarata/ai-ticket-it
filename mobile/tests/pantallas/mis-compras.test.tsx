@@ -702,3 +702,54 @@ describe("Mis compras: la reseña (feature 012, US1, FR-012)", () => {
     expect(falso.pedidosA(MIS_COMPRAS).filter((p) => p.metodo === "GET").length).toBeGreaterThanOrEqual(2);
   });
 });
+
+describe("Mis compras: estrellas de favoritos (feature 014, US3)", () => {
+  const FAVORITOS = "/usuarios/actual/favoritos";
+  const MARCA = "marca-favorito";
+  const tresCompras: Lista = [{ status: 200, json: [maratonPendiente, festivalVip, maratonGratis] }];
+
+  it("todas las compras de un evento favorito tienen la estrella y ', en favoritos'; las demás no (US3-2)", async () => {
+    const { falso } = await abrirMisCompras(tresCompras, {
+      [FAVORITOS]: [{ status: 200, json: [maratonEnCatalogo] }],
+    });
+
+    await screen.findAllByRole("button", { name: /, en favoritos$/ });
+    const [pendiente, vip, gratis] = await filas();
+    expect([pendiente, vip, gratis].map((fila) => fila.props.accessibilityLabel)).toEqual([
+      "Ver la compra de 2 Inscripción para Maratón Ciudad 10K, en favoritos",
+      "Ver la compra de 2 VIP para Festival Sonidos del Sur",
+      "Ver la compra de 1 Carrera kids para Maratón Ciudad 10K, en favoritos",
+    ]);
+    expect(within(pendiente).getByTestId(MARCA, { includeHiddenElements: true })).toBeTruthy();
+    expect(within(gratis).getByTestId(MARCA, { includeHiddenElements: true })).toBeTruthy();
+    expect(within(vip).queryByTestId(MARCA, { includeHiddenElements: true })).toBeNull();
+    expect(falso.pedidosA(FAVORITOS).at(-1)?.encabezados["X-Usuario-Id"]).toBe(martin.id);
+  });
+
+  it("la fila favorita abre Tu compra y Pagar sigue como hermano, fuera de la fila", async () => {
+    const { falso } = await abrirMisCompras([{ status: 200, json: [maratonPendiente] }], {
+      [FAVORITOS]: [{ status: 200, json: [maratonEnCatalogo] }],
+      [`/compras/${maratonPendiente.id}`]: ["colgar"],
+    });
+    const fila = await screen.findByRole("button", {
+      name: /^Ver la compra de 2 Inscripción .*, en favoritos$/,
+    });
+    expect(within(fila).queryByLabelText("Pagar la compra de 2 Inscripción")).toBeNull();
+    expect(screen.getByRole("button", { name: "Pagar la compra de 2 Inscripción" })).toBeOnTheScreen();
+
+    await fireEvent.press(fila);
+
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+    expect(falso.pedidosA(`/compras/${maratonPendiente.id}`)).toHaveLength(1);
+  });
+
+  it("con los favoritos fallando, la lista se ve igual y sin estrellas", async () => {
+    await abrirMisCompras(tresCompras, {
+      [FAVORITOS]: [{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }],
+    });
+
+    expect(await filas()).toHaveLength(3);
+    expect(screen.queryAllByTestId(MARCA, { includeHiddenElements: true })).toHaveLength(0);
+    expect(screen.queryByText("Falló el servidor.")).toBeNull();
+  });
+});

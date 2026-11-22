@@ -1,6 +1,7 @@
 import { normalizarParaBuscar } from "./busqueda";
 import { ReglaDeNegocioError } from "./errores";
 import { esEnteroNoNegativo, esTextoConContenido, Invariantes } from "./invariantes";
+import { porId, porNombre } from "./orden-catalogo";
 
 // En `es`, con sensitivity "base", "Platea" = " PLATEA " = "Plátea", pero "Año" ≠ "Ano" (R14).
 const comparadorDeNombres = new Intl.Collator("es", { sensitivity: "base" });
@@ -347,13 +348,14 @@ export class Evento {
 
 /**
  * Orden de Mis eventos (FR-004) según `ahora`: primero los próximos, del más cercano al más lejano;
- * después los realizados, del más reciente al más antiguo.
+ * después los realizados, del más reciente al más antiguo. A la misma fecha, por nombre (sin
+ * mayúsculas ni tildes, como el catálogo) y después por id (feature 014: también ordena Mis favoritos).
  */
 export function ordenDeMisEventos(ahora: Date): (a: Evento, b: Evento) => number {
   return (a, b) => {
     const aRealizado = a.estaRealizado(ahora);
     if (aRealizado !== b.estaRealizado(ahora)) return aRealizado ? 1 : -1;
     const diferencia = a.fechaHora.getTime() - b.fechaHora.getTime();
-    return aRealizado ? -diferencia : diferencia;
+    return (aRealizado ? -diferencia : diferencia) || porNombre(a, b) || porId(a, b);
   };
 }

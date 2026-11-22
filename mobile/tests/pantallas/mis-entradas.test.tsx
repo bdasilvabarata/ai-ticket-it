@@ -1,4 +1,4 @@
-import type { CompraVista } from "@ai-ticket-it/shared";
+import type { CompraVista, EventoCatalogoVista } from "@ai-ticket-it/shared";
 import { act, screen } from "expo-router/testing-library";
 import { router } from "expo-router";
 
@@ -14,14 +14,16 @@ import { martin, todos } from "../helpers/usuarios";
 
 const MIS_COMPRAS = "/eventos/evento-maraton-10k/mis-compras";
 
-async function abrirMisEntradas(confirmadas: CompraVista[]) {
+/** `favoritos` (feature 014) reemplaza el catálogo de Explorar, montado debajo, por uno vacío. */
+async function abrirMisEntradas(confirmadas: CompraVista[], favoritos: EventoCatalogoVista[] = []) {
   await renderConDependencias({
     usuarioRecordado: martin.id,
     respuestas: porRuta({
       "/usuarios/actual": [{ status: 200, json: martin }],
       "/usuarios": [{ status: 200, json: todos }],
       "/categorias": [{ status: 200, json: [] }],
-      [CATALOGO_INICIAL]: [{ status: 200, json: catalogo([maratonEnCatalogo]) }],
+      [CATALOGO_INICIAL]: [{ status: 200, json: catalogo(favoritos.length > 0 ? [] : [maratonEnCatalogo]) }],
+      "/usuarios/actual/favoritos": [{ status: 200, json: favoritos }],
       [MIS_COMPRAS]: [
         {
           status: 200,
@@ -52,5 +54,13 @@ describe("Mis entradas: códigos de las entradas (feature 008)", () => {
     expect(await screen.findByText("1 de 2 entradas usadas")).toBeOnTheScreen();
     expect(screen.getByLabelText("Estado: Utilizada")).toBeOnTheScreen();
     expect(screen.getByLabelText("Entrada 1, código 7 K 3 M Q 9 T B, Utilizada")).toBeOnTheScreen();
+  });
+});
+
+describe("Mis entradas: sin estrellas de favoritos (feature 014, FR-015)", () => {
+  it("con el evento entre los favoritos, las compras no llevan estrella", async () => {
+    await abrirMisEntradas([compraConfirmada], [maratonEnCatalogo]);
+    expect(await screen.findByText("7K3M-Q9TB")).toBeOnTheScreen();
+    expect(screen.queryAllByTestId("marca-favorito", { includeHiddenElements: true })).toHaveLength(0);
   });
 });

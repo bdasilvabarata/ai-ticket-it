@@ -100,6 +100,8 @@ function Pila({ estado }: { estado: EstadoSesion }) {
         <Stack.Screen name="compras/[compraId]/index" options={{ title: "Tu compra" }} />
         <Stack.Screen name="compras/[compraId]/chat" options={{ title: "Chat de la compra" }} />
         <Stack.Screen name="compras/[compraId]/resenia" options={{ title: "Reseñar evento" }} />
+        {/* Los favoritos del usuario actual, desde Perfil (feature 014). */}
+        <Stack.Screen name="favoritos" options={{ title: "Mis favoritos" }} />
       </Stack.Protected>
       {/* Expo Router no admite declarar dos veces la misma pantalla: el selector va una sola vez.
           Sin usuario es la única ruta disponible, a pantalla completa. Con usuario, (tabs) está

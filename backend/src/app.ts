@@ -47,11 +47,12 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
     ...repositorios,
   };
 
-  const usuarioService = new UsuarioService({ usuarios, eventos });
+  // Una sola instancia: los services que modifican eventos y usuarios comparten el cerrojo
+  // (research R2; feature 014, R4: los usuarios con claves `usuario:<id>`).
+  const cerrojo = new CerrojoPorClave();
+  const usuarioService = new UsuarioService({ usuarios, eventos, cerrojo });
   const categoriaService = new CategoriaService({ categorias });
   const reseniaService = new ReseniaService({ resenias });
-  // Una sola instancia: los services que modifican eventos comparten el cerrojo (research R2).
-  const cerrojo = new CerrojoPorClave();
   // Vence las compras pendientes a los 15 minutos; lo necesita el dueño del evento (research R4).
   const vencimientoService = new VencimientoService({ compras });
   // Eventos se apoya en los dueños de categorías, usuarios y reseñas (constitución 2.2.0, principio III).

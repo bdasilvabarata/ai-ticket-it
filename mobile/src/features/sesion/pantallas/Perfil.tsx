@@ -5,7 +5,10 @@ import { Boton, tema } from "../../../componentes";
 import { nombreCompleto } from "../../usuarios";
 import { useSesion } from "../SesionProvider";
 
-/** Perfil: el usuario actual y "Cambiar usuario" (contracts/app.md "Perfil", FR-019). */
+/**
+ * Perfil: el usuario actual, "Mis favoritos" (feature 014) y "Cambiar usuario" (contracts/app.md
+ * "Perfil", FR-019).
+ */
 export function Perfil() {
   const { estado } = useSesion();
   if (estado.fase !== "con-usuario") return null; // el guard ya no muestra esta ruta
@@ -25,6 +28,13 @@ export function Perfil() {
           <Text style={estilos.aviso}>No se pudieron cargar los datos del usuario.</Text>
         </>
       )}
+      {/* Feature 014: por la ruta tipada, sin importar `eventos`. */}
+      <Boton
+        variante="aviso"
+        texto="Mis favoritos"
+        alPresionar={() => router.push("/favoritos")}
+        style={estilos.boton}
+      />
       <Boton
         texto="Cambiar usuario"
         alPresionar={() => router.push("/seleccionar-usuario")}

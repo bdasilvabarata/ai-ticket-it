@@ -647,3 +647,119 @@ describe("Explorar: por páginas (feature 013, US1)", () => {
     expect(boton(2)).toBeSelected();
   });
 });
+
+describe("Explorar: estrellas de favoritos (feature 014, US3)", () => {
+  const FAVORITOS = "/usuarios/actual/favoritos";
+  const MARCA = "marca-favorito";
+  const conTres = {
+    [CATALOGO_INICIAL]: [
+      { status: 200, json: catalogo([rockEnCatalogo, clasicoEnCatalogo, maratonEnCatalogo]) },
+    ],
+  };
+  const estrellas = () => screen.queryAllByTestId(MARCA, { includeHiddenElements: true });
+
+  it("solo las tarjetas de los favoritos tienen la estrella y ', en favoritos' (US3-1)", async () => {
+    await abrirExplorar({
+      ...conTres,
+      [FAVORITOS]: [{ status: 200, json: [maratonEnCatalogo, clasicoEnCatalogo] }],
+    });
+
+    const conEstrella = await screen.findAllByRole("button", { name: /, en favoritos$/ });
+    expect(conEstrella.map((tarjeta) => tarjeta.props.accessibilityLabel)).toEqual([
+      expect.stringMatching(/^Clásico de básquet, /),
+      expect.stringMatching(/^Maratón Ciudad 10K, /),
+    ]);
+    const [rock] = await tarjetas();
+    expect(rock.props.accessibilityLabel).not.toMatch(/en favoritos/);
+    expect(within(rock).queryByTestId(MARCA, { includeHiddenElements: true })).toBeNull();
+    expect(estrellas()).toHaveLength(2);
+  });
+
+  it("tocar una tarjeta favorita abre el detalle (US3-4)", async () => {
+    const resultado = await abrirExplorar({
+      ...conTres,
+      [FAVORITOS]: [{ status: 200, json: [maratonEnCatalogo] }],
+      "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }],
+    });
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: /^Maratón Ciudad 10K, .*, en favoritos$/ }),
+    );
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+  });
+
+  it("con los favoritos cargando, el catálogo se ve igual y sin estrellas (US3-7)", async () => {
+    await abrirExplorar({ ...conTres, [FAVORITOS]: ["colgar"] });
+
+    expect(await tarjetas()).toHaveLength(3);
+    expect(estrellas()).toHaveLength(0);
+    expect(screen.queryByText("Cargando…")).toBeNull();
+  });
+
+  it("con los favoritos fallando, el catálogo se ve igual, sin estrellas ni error propio (US3-7)", async () => {
+    await abrirExplorar({
+      ...conTres,
+      [FAVORITOS]: [{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }],
+    });
+
+    expect(await tarjetas()).toHaveLength(3);
+    await waitFor(() => expect(screen.queryByLabelText("Cargando eventos")).toBeNull());
+    expect(estrellas()).toHaveLength(0);
+    expect(screen.queryByText("Falló el servidor.")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Reintentar" })).toBeNull();
+  });
+
+  it("el pedido del catálogo no depende de los favoritos ni del usuario (US3-6, FR-013)", async () => {
+    const segunUsuario: FuncionRespuesta = (_url, init) => {
+      const usuarioId = (init?.headers as Record<string, string>)["X-Usuario-Id"];
+      return { status: 200, json: usuarioId === martin.id ? [rockEnCatalogo] : [maratonEnCatalogo] };
+    };
+    const { falso } = await abrirExplorar({ ...conTres, [FAVORITOS]: [segunUsuario] });
+    expect(
+      await screen.findByRole("button", { name: /^Maratón Ciudad 10K, .*, en favoritos$/ }),
+    ).toBeOnTheScreen();
+
+    await irAPestana("Perfil");
+    await fireEvent.press(await screen.findByRole("button", { name: "Cambiar usuario" }));
+    await fireEvent.press(
+      await screen.findByRole("button", { name: `Elegir a ${martin.nombre} ${martin.apellido}` }),
+    );
+    await esperarPestanas();
+    await irAPestana("Explorar");
+
+    expect(
+      await screen.findByRole("button", { name: /^Noche de Rock en el Club, .*, en favoritos$/ }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Maratón Ciudad 10K, .*, en favoritos$/ })).toBeNull();
+    const pedidos = falso.pedidosA(CATALOGO_INICIAL);
+    expect(pedidos.length).toBeGreaterThanOrEqual(1);
+    for (const pedido of pedidos) {
+      expect(pedido.url).toBe(`${URL_DE_PRUEBA}${CATALOGO_INICIAL}`);
+      expect(pedido.encabezados["X-Usuario-Id"]).toBeUndefined();
+    }
+  });
+
+  it("marcar en el detalle y volver muestra la estrella sin volver a pedir el catálogo (FR-018)", async () => {
+    const { falso } = await abrirExplorar({
+      ...conTres,
+      [FAVORITOS]: [
+        { status: 200, json: [] },
+        { status: 200, json: [maratonEnCatalogo] },
+      ],
+      [`${FAVORITOS}/evento-maraton-10k`]: [{ status: 204, texto: "" }],
+      "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }],
+    });
+    await fireEvent.press(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Agregar a favoritos" }));
+    expect(await screen.findByRole("button", { name: "Quitar de favoritos" })).toBeOnTheScreen();
+    const pedidosDelCatalogo = falso.pedidosA(CATALOGO_INICIAL).length;
+
+    await act(() => router.back());
+
+    expect(
+      await screen.findByRole("button", { name: /^Maratón Ciudad 10K, .*, en favoritos$/ }),
+    ).toBeOnTheScreen();
+    expect(falso.pedidosA(CATALOGO_INICIAL)).toHaveLength(pedidosDelCatalogo);
+  });
+});

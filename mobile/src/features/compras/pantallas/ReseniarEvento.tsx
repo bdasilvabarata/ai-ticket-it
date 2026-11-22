@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi } from "../../../api";
-import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import { Boton, PantallaDesplazable, SegunConsulta, tema, useEnvioUnico } from "../../../componentes";
 import {
   AvisoDeFormulario,
   CampoDeTexto,
@@ -19,7 +19,6 @@ import { SelectorPuntuacion } from "../componentes/SelectorPuntuacion";
 import { textoAvisoResenia } from "../formato";
 import { useReseniarEvento } from "../mutaciones";
 import { useCompra } from "../useCompra";
-import { useEnvioUnico } from "../useEnvioUnico";
 
 /**
  * "Reseñar evento" (feature 012, contracts/app.md): la reseña del evento de una compra UTILIZADA. Se

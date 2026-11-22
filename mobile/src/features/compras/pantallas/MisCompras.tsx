@@ -1,11 +1,17 @@
 import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
-import { ListaVacia, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import {
+  ListaVacia,
+  PantallaDesplazable,
+  SegunConsulta,
+  tema,
+  useRefrescarAlFocalizar,
+} from "../../../componentes";
+import { useIdsDeFavoritos } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaMiCompra } from "../componentes/FilaMiCompra";
 import { useMisCompras } from "../useMisCompras";
-import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 import { useRefrescarAlVencer } from "../useRefrescarAlVencer";
 
 /**
@@ -25,6 +31,8 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
   const { refetch } = consulta;
   useRefrescarAlFocalizar(refetch);
   useRefrescarAlVencer(consulta.data, refetch);
+  // Las estrellas indicadoras (feature 014): sin favoritos cargados, ninguna.
+  const idsDeFavoritos = useIdsDeFavoritos();
 
   return (
     <View style={estilos.pantalla}>
@@ -41,7 +49,11 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
         {(compras) => (
           <PantallaDesplazable separacion={tema.espacio.medio}>
             {compras.map((compra) => (
-              <FilaMiCompra key={compra.id} compra={compra} />
+              <FilaMiCompra
+                key={compra.id}
+                compra={compra}
+                esFavorito={idsDeFavoritos.has(compra.evento.id)}
+              />
             ))}
           </PantallaDesplazable>
         )}

@@ -53,6 +53,35 @@
       ]
     },
     {
+      "name": "Favoritos",
+      "item": [
+        {
+          "name": "Mis favoritos (Diego: próximos y después realizados)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos" }
+          }
+        },
+        {
+          "name": "Marcar la Noche de Rock como favorito (Diego) → 204, también si ya lo era",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos/evento-noche-de-rock" }
+          }
+        },
+        {
+          "name": "Desmarcar la Noche de Rock (Diego) → 204, también si no lo era",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos/evento-noche-de-rock" }
+          }
+        }
+      ]
+    },
+    {
       "name": "Categorías",
       "item": [
         {

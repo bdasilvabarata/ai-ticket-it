@@ -4,7 +4,16 @@ import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Boton, Paginador, PantallaDesplazable, SegunConsulta, tema, usePagina } from "../../../componentes";
+import {
+  Boton,
+  Paginador,
+  PantallaDesplazable,
+  SegunConsulta,
+  tema,
+  useEnvioUnico,
+  usePagina,
+  useRefrescarAlFocalizar,
+} from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
@@ -15,8 +24,6 @@ import { SIN_COMPRAS, textoSinComprasDelFiltro, type FiltroDeCompras } from "../
 import { textoComprasSinResponder, textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
 import { useConfirmarReembolso } from "../mutaciones";
 import { useComprasDelEvento } from "../useComprasDelEvento";
-import { useEnvioUnico } from "../useEnvioUnico";
-import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
  * "Compras del evento" (feature 008, UC-02): las compras de un evento propio, al día, con la ventana

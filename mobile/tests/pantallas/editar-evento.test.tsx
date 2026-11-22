@@ -2,12 +2,12 @@ import type { EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 import { router } from "expo-router";
 
-import { errorApi, festival, festivalCompleto, nocheDeRock } from "../helpers/eventos";
+import { errorApi, festival, festivalCompleto, maratonEnCatalogo, nocheDeRock } from "../helpers/eventos";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { alertasCon, escribir, espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias, URL_DE_PRUEBA } from "../helpers/render-con-dependencias";
-import { lucia, todos } from "../helpers/usuarios";
+import { diego, lucia, todos } from "../helpers/usuarios";
 
 const DESCARTAR = "¿Descartar los cambios?";
 const RUTA = "/eventos/evento-festival";
@@ -279,6 +279,28 @@ describe("Eliminar evento (US4)", () => {
     expect(screen.queryByText("Festival Sonidos del Sur")).toBeNull();
     expect(pedidos(resultado, "DELETE")[0].encabezados["X-Usuario-Id"]).toBe(lucia.id);
     expect(alertasCon(alertas, DESCARTAR)).toHaveLength(0);
+  });
+
+  it("eliminar invalida los favoritos de todos los usuarios de la caché (feature 014, FR-010)", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirEditar();
+    const { queryClient } = resultado.deps;
+    // Los favoritos de dos usuarios ya leídos: el evento eliminado sale de los de todos. Los de
+    // Lucía los observan sus listas (las estrellas): se vuelven a pedir; los de Diego quedan
+    // invalidados para cuando se lean.
+    queryClient.setQueryData(["favoritos", diego.id], [maratonEnCatalogo]);
+    const favoritosDeLucia = () =>
+      resultado.falso
+        .pedidosA("/usuarios/actual/favoritos")
+        .filter((pedido) => pedido.metodo === "GET" && pedido.encabezados["X-Usuario-Id"] === lucia.id)
+        .length;
+    await fireEvent.press(await screen.findByRole("button", { name: "Eliminar evento" }));
+    const antes = favoritosDeLucia();
+    await tocarEnAlerta(alertas, '¿Eliminar "Festival Sonidos del Sur"?', "Eliminar");
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
+    await waitFor(() => expect(favoritosDeLucia()).toBeGreaterThan(antes));
+    expect(queryClient.getQueryState(["favoritos", diego.id])?.isInvalidated).toBe(true);
   });
 
   it("EVENTO_CON_COMPRAS muestra el aviso del servidor", async () => {

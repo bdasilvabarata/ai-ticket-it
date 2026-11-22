@@ -10,6 +10,7 @@ import { SelectorOrden } from "../componentes/SelectorOrden";
 import { TarjetaEvento } from "../componentes/TarjetaEvento";
 import { TarjetaSkeleton } from "../componentes/TarjetaSkeleton";
 import { useCatalogo } from "../useCatalogo";
+import { useIdsDeFavoritos } from "../useFavoritos";
 import { useValorDemorado } from "../useValorDemorado";
 
 /** La lista se actualiza este tiempo después de la última tecla (FR-014). */
@@ -57,6 +58,8 @@ export function Explorar() {
   // Desde la primera tecla hasta que llega la respuesta del texto nuevo, el skeleton: nunca quedan a
   // la vista los resultados del texto anterior (FR-007).
   const escribiendo = texto.trim() !== textoDemorado;
+  // Las estrellas indicadoras (feature 014): sin favoritos cargados, ninguna; el catálogo no cambia.
+  const idsDeFavoritos = useIdsDeFavoritos();
 
   // Elegir una categoría cierra el desplegable.
   const elegirCategoria = (id: string | null) => {
@@ -127,7 +130,11 @@ export function Explorar() {
             contentContainerStyle={estilos.lista}
             keyboardShouldPersistTaps="handled"
             renderItem={({ item }) => (
-              <TarjetaEvento evento={item} alPresionar={() => abrirDetalle(item.id)} />
+              <TarjetaEvento
+                evento={item}
+                esFavorito={idsDeFavoritos.has(item.id)}
+                alPresionar={() => abrirDetalle(item.id)}
+              />
             )}
             // Feature 013 (R9): debajo de la última tarjeta. La página marcada es la de la respuesta
             // (FR-005); al cambiarla, la lista se vuelve a montar arriba después del skeleton.

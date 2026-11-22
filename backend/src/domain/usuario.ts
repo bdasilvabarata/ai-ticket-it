@@ -19,11 +19,32 @@ export class Usuario {
     new Invariantes()
       .exigir(esTextoConContenido(nombre), "nombre", "Es obligatorio.")
       .exigir(esTextoConContenido(apellido), "apellido", "Es obligatorio.")
+      .exigir(new Set(favoritos).size === favoritos.length, "favoritos", "No puede repetir eventos.")
       .verificar();
     this.id = id;
     this.nombre = nombre.trim();
     this.apellido = apellido.trim();
     this.favoritos = [...favoritos];
+  }
+
+  tieneFavorito(eventoId: string): boolean {
+    return this.favoritos.includes(eventoId);
+  }
+
+  /** Un `Usuario` nuevo con el evento al final; si ya lo tenía, este mismo (idempotente). */
+  marcarFavorito(eventoId: string): Usuario {
+    if (this.tieneFavorito(eventoId)) return this;
+    return this.#conFavoritos([...this.favoritos, eventoId]);
+  }
+
+  /** Un `Usuario` nuevo sin el evento; si no lo tenía, este mismo (idempotente). */
+  desmarcarFavorito(eventoId: string): Usuario {
+    if (!this.tieneFavorito(eventoId)) return this;
+    return this.#conFavoritos(this.favoritos.filter((id) => id !== eventoId));
+  }
+
+  #conFavoritos(favoritos: string[]): Usuario {
+    return new Usuario({ id: this.id, nombre: this.nombre, apellido: this.apellido, favoritos });
   }
 }
 

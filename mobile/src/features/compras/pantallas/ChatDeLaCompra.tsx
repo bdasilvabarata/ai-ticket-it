@@ -4,7 +4,14 @@ import { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import {
+  Boton,
+  PantallaDesplazable,
+  SegunConsulta,
+  tema,
+  useEnvioUnico,
+  useRefrescarAlFocalizar,
+} from "../../../componentes";
 import { AvisoDeFormulario, CampoDeTexto } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { AvisoDeLaCompra, CompraNoEncontrada } from "../componentes/AvisoDeLaCompra";
@@ -13,8 +20,6 @@ import { MensajeDelChat } from "../componentes/MensajeDelChat";
 import { SIN_MENSAJES } from "../formato";
 import { useEnviarMensaje } from "../mutaciones";
 import { useChatDeLaCompra } from "../useChatDeLaCompra";
-import { useEnvioUnico } from "../useEnvioUnico";
-import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
  * "Chat de la compra" (feature 011, contracts/app.md): la conversación entre el comprador y el

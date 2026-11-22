@@ -4,6 +4,7 @@ import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Boton, Ilustracion, SegunConsulta, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { FilaEvento } from "../componentes/FilaEvento";
+import { useIdsDeFavoritos } from "../useFavoritos";
 import { useMisEventos } from "../useMisEventos";
 
 /** Mis eventos: los que organiza el usuario actual (contracts/app.md, "Mis eventos"). */
@@ -17,6 +18,8 @@ const crearEvento = () => router.push("/eventos/nuevo");
 
 function ListaDeMisEventos({ usuarioId }: { usuarioId: string }) {
   const consulta = useMisEventos(usuarioId);
+  // Las estrellas indicadoras (feature 014): sin favoritos cargados, ninguna.
+  const idsDeFavoritos = useIdsDeFavoritos();
   return (
     <View style={estilos.pantalla}>
       {/* El vacío lleva su propia acción ("Crear tu primer evento"), así que lo resuelve la lista. */}
@@ -34,7 +37,7 @@ function ListaDeMisEventos({ usuarioId }: { usuarioId: string }) {
               keyExtractor={(evento) => evento.id}
               contentContainerStyle={estilos.lista}
               ListHeaderComponent={<Boton texto="Crear evento" alPresionar={crearEvento} />}
-              renderItem={({ item }) => <FilaEvento evento={item} />}
+              renderItem={({ item }) => <FilaEvento evento={item} esFavorito={idsDeFavoritos.has(item.id)} />}
             />
           )
         }

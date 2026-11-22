@@ -24,3 +24,20 @@ describe("claves.paginaDeResenias (feature 013, US5)", () => {
     expect(clave.slice(0, 3)).toEqual(claves.reseniasDelOrganizador("usuario-diego", "evento-jazz"));
   });
 });
+
+describe("claves.favoritos (feature 014)", () => {
+  it("lleva el usuario en la posición 1", () => {
+    expect(claves.favoritos("usuario-diego")).toEqual(["favoritos", "usuario-diego"]);
+  });
+
+  it("no comparte prefijo con el catálogo, el evento, Mis eventos ni Mis compras", () => {
+    const prefijo = claves.favoritos("usuario-diego")[0];
+    const otras = [
+      claves.catalogo({ texto: "", categoriaId: null, orden: "fecha", sentido: "asc", pagina: 1 }),
+      claves.evento("usuario-diego", "evento-noche-de-rock"),
+      claves.misEventos("usuario-diego"),
+      claves.misCompras("usuario-diego"),
+    ];
+    for (const clave of otras) expect(clave[0]).not.toBe(prefijo);
+  });
+});
