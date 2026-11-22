@@ -1135,3 +1135,31 @@ describe("Compras del evento por páginas (feature 013, US3)", () => {
     expect(chip("Cancelada")).toBeChecked();
   });
 });
+
+describe("Compras del evento: sin estrellas de favoritos (feature 014, FR-015)", () => {
+  it("con el evento entre los favoritos, las filas no llevan estrella ni ', en favoritos'", async () => {
+    const festivalEnCatalogo = {
+      ...festival,
+      precioDesde: 20000,
+      agotado: false,
+      organizador: { ...lucia, puntaje: null, cantidadResenias: 0 },
+    };
+    await renderConDependencias({
+      usuarioRecordado: lucia.id,
+      respuestas: porRuta({
+        "/usuarios/actual": [{ status: 200, json: lucia }],
+        "/usuarios": [{ status: 200, json: todos }],
+        "/usuarios/actual/favoritos": [{ status: 200, json: [festivalEnCatalogo] }],
+        [RUTA]: [{ status: 200, json: comprasDelFestival([martinConfirmada, martinUtilizada]) }],
+      }),
+    });
+    await esperarPestanas();
+    await act(() =>
+      router.push({ pathname: "/eventos/[eventoId]/compras", params: { eventoId: festival.id } }),
+    );
+
+    expect(await screen.findAllByText("Martín Benítez")).toHaveLength(2);
+    expect(screen.queryAllByTestId("marca-favorito", { includeHiddenElements: true })).toHaveLength(0);
+    expect(screen.queryByLabelText(/en favoritos/)).toBeNull();
+  });
+});

@@ -8,6 +8,7 @@ import {
   tema,
   useRefrescarAlFocalizar,
 } from "../../../componentes";
+import { useIdsDeFavoritos } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaMiCompra } from "../componentes/FilaMiCompra";
 import { useMisCompras } from "../useMisCompras";
@@ -30,6 +31,8 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
   const { refetch } = consulta;
   useRefrescarAlFocalizar(refetch);
   useRefrescarAlVencer(consulta.data, refetch);
+  // Las estrellas indicadoras (feature 014): sin favoritos cargados, ninguna.
+  const idsDeFavoritos = useIdsDeFavoritos();
 
   return (
     <View style={estilos.pantalla}>
@@ -46,7 +49,11 @@ function ListaDeMisCompras({ usuarioId }: { usuarioId: string }) {
         {(compras) => (
           <PantallaDesplazable separacion={tema.espacio.medio}>
             {compras.map((compra) => (
-              <FilaMiCompra key={compra.id} compra={compra} />
+              <FilaMiCompra
+                key={compra.id}
+                compra={compra}
+                esFavorito={idsDeFavoritos.has(compra.evento.id)}
+              />
             ))}
           </PantallaDesplazable>
         )}

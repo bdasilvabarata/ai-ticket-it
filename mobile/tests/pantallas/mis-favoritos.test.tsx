@@ -121,13 +121,18 @@ describe("Mis favoritos: los cuatro estados (FR-019)", () => {
   });
 
   it("ante un error muestra el mensaje y Reintentar, nunca un vacío falso (US2-6)", async () => {
-    const { falso } = await abrirMisFavoritos([
-      { status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") },
-      { status: 200, json: [maratonEnCatalogo] },
-    ]);
+    // Falla hasta que se toca Reintentar: Explorar, debajo, también lee los favoritos (las
+    // estrellas) y comparte la consulta.
+    let falla = true;
+    const segunElMomento: FuncionRespuesta = () =>
+      falla
+        ? { status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }
+        : { status: 200, json: [maratonEnCatalogo] };
+    const { falso } = await abrirMisFavoritos([segunElMomento]);
     expect(await screen.findByText("Falló el servidor.")).toBeOnTheScreen();
     expect(screen.queryByText("Todavía no tenés favoritos")).toBeNull();
     const antes = falso.pedidosA(FAVORITOS).length;
+    falla = false;
 
     await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
 

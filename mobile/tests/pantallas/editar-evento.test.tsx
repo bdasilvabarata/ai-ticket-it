@@ -285,15 +285,21 @@ describe("Eliminar evento (US4)", () => {
     const alertas = espiarAlertas();
     const resultado = await abrirEditar();
     const { queryClient } = resultado.deps;
-    // Los favoritos de dos usuarios ya leídos: el evento eliminado sale de los de todos.
-    queryClient.setQueryData(["favoritos", lucia.id], [maratonEnCatalogo]);
+    // Los favoritos de dos usuarios ya leídos: el evento eliminado sale de los de todos. Los de
+    // Lucía los observan sus listas (las estrellas): se vuelven a pedir; los de Diego quedan
+    // invalidados para cuando se lean.
     queryClient.setQueryData(["favoritos", diego.id], [maratonEnCatalogo]);
-
+    const favoritosDeLucia = () =>
+      resultado.falso
+        .pedidosA("/usuarios/actual/favoritos")
+        .filter((pedido) => pedido.metodo === "GET" && pedido.encabezados["X-Usuario-Id"] === lucia.id)
+        .length;
     await fireEvent.press(await screen.findByRole("button", { name: "Eliminar evento" }));
+    const antes = favoritosDeLucia();
     await tocarEnAlerta(alertas, '¿Eliminar "Festival Sonidos del Sur"?', "Eliminar");
 
     await waitFor(() => expect(resultado.getPathname()).toBe("/mis-eventos"));
-    expect(queryClient.getQueryState(["favoritos", lucia.id])?.isInvalidated).toBe(true);
+    await waitFor(() => expect(favoritosDeLucia()).toBeGreaterThan(antes));
     expect(queryClient.getQueryState(["favoritos", diego.id])?.isInvalidated).toBe(true);
   });
 

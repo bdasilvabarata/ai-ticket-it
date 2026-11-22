@@ -412,7 +412,7 @@ actual, sin cambiar el catálogo ni tapar las listas con estados propios de los 
 solo en esos eventos; con `GET /usuarios/actual/favoritos` fallando, las listas se ven igual y sin
 estrellas.
 
-- [ ] T035 [US3] Test en `mobile/tests/pantallas/explorar.test.tsx`: las tarjetas de los favoritos
+- [X] T035 [US3] Test en `mobile/tests/pantallas/explorar.test.tsx`: las tarjetas de los favoritos
   tienen ", en favoritos" y las demás no (US3-1); tocar una tarjeta favorita abre el detalle (US3-4);
   con la consulta de favoritos cargando o fallando, el catálogo se ve igual, sin estrellas y sin
   cargando ni error propio (US3-7); el pedido del catálogo es el mismo (ruta, query y sin depender de
@@ -420,13 +420,13 @@ estrellas.
   la estrella **sin** volver a pedir el catálogo (FR-018). Implementar en
   `mobile/src/features/eventos/pantallas/Explorar.tsx`: `useIdsDeFavoritos()` una vez y
   `esFavorito={ids.has(evento.id)}` en cada `TarjetaEvento`; verde.
-- [ ] T036 [P] [US3] Test en `mobile/tests/pantallas/mis-eventos.test.tsx` y cambios en
+- [X] T036 [P] [US3] Test en `mobile/tests/pantallas/mis-eventos.test.tsx` y cambios en
   `mobile/src/features/eventos/componentes/FilaEvento.tsx` (prop `esFavorito?: boolean`,
   `MarcaFavorito` en la esquina y ", en favoritos" en la etiqueta) y
   `mobile/src/features/eventos/pantallas/MisEventos.tsx` (`useIdsDeFavoritos()` una vez): un evento
   propio favorito tiene la estrella y el sufijo, los demás no (US3-3); tocar la fila sigue abriendo
   el hub; el hub (`HubDelEvento`) **no** tiene estrella para marcar; verde.
-- [ ] T037 [P] [US3] Test en `mobile/tests/pantallas/mis-compras.test.tsx` y cambios en
+- [X] T037 [P] [US3] Test en `mobile/tests/pantallas/mis-compras.test.tsx` y cambios en
   `FilaMiCompra` (`mobile/src/features/compras/componentes/FilaMiCompra.tsx`: prop
   `esFavorito?: boolean`, `MarcaFavorito` importada del `index.ts` de `eventos`, dentro del
   `Pressable`, y ", en favoritos" en su etiqueta) y
