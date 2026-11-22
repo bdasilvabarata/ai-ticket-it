@@ -64,6 +64,14 @@ export interface RepositorioCompras {
 
 /** Reseñas (mínimo de la 005): lo justo para el puntaje del organizador. La 012 lo amplía. */
 export interface RepositorioResenias {
+  /** Un id nuevo (UUID) para una reseña. */
+  siguienteId(): string;
   /** Las reseñas de esos eventos (posiblemente ninguna). */
   listarPorEventos(eventoIds: readonly string[]): Promise<Resenia[]>;
+  /** La reseña de ese comprador a ese evento, o `null` (hay a lo sumo una). */
+  buscarPorEventoYComprador(eventoId: string, compradorId: string): Promise<Resenia | null>;
+  /** Las reseñas de ese autor, de todos los eventos (posiblemente ninguna). */
+  listarPorComprador(compradorId: string): Promise<Resenia[]>;
+  /** Alta, o reemplazo de la del mismo id. No hay baja: una reseña no se borra (FR-006b). */
+  guardar(resenia: Resenia): Promise<void>;
 }
