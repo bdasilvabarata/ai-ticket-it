@@ -3,7 +3,17 @@ import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
 import { router } from "expo-router";
 
 import { compraConfirmada, compraUtilizada, reseniaDeEjemplo } from "../helpers/compras";
-import { errorApi, maratonCompleta } from "../helpers/eventos";
+import {
+  CATALOGO_INICIAL,
+  catalogo,
+  errorApi,
+  festivalCompleto,
+  luciaOrganizadora,
+  maratonCompleta,
+  maratonEnCatalogo,
+  reseniaDelOrganizadorDeEjemplo,
+  reseniasDelOrganizadorDeEjemplo,
+} from "../helpers/eventos";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { alertasCon, escribir, espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas } from "../helpers/pestanas";
@@ -230,5 +240,111 @@ describe("Reseñar evento (feature 012, US1)", () => {
       compra: [{ status: 404, json: errorApi("COMPRA_NO_ENCONTRADA", "No existe la compra.") }],
     });
     expect(await screen.findAllByText("No encontramos esta compra.")).not.toHaveLength(0);
+  });
+});
+
+describe("después de reseñar, el puntaje se pone al día (feature 012, US3, SC-006, FR-011)", () => {
+  // Recorre Explorar, dos detalles, "Tu compra" y el formulario: supera los 5 s de Jest.
+  jest.setTimeout(20_000);
+
+  const FESTIVAL = `/eventos/${festivalCompleto.id}`;
+  const RESENIAS_FESTIVAL = `${FESTIVAL}/resenias-del-organizador`;
+  const SIN_RESENIAS_EN_TARJETA = "Organiza Lucía Álvarez · Sin reseñas";
+  const CON_RESENIA_EN_TARJETA = "Organiza Lucía Álvarez · 4,0 · 1 reseña";
+
+  /** El servidor antes y después de que Martín reseña la Maratón de Lucía con un 4. */
+  function servidor() {
+    let reseniado = false;
+    const lucia = () =>
+      reseniado ? { ...luciaOrganizadora, puntaje: 4, cantidadResenias: 1 } : luciaOrganizadora;
+    const reseniaNueva = reseniaDelOrganizadorDeEjemplo({
+      id: "resenia-martin-maraton",
+      puntuacion: 4,
+      comentario: "Muy buena organización",
+      autor: { nombre: "Martín", apellido: "Benítez" },
+      evento: { id: maratonCompleta.id, nombre: maratonCompleta.nombre },
+    });
+    const anterior = reseniaDelOrganizadorDeEjemplo({ comentario: "Una reseña vieja." });
+    return porRuta({
+      "/usuarios/actual": [{ status: 200, json: martin }],
+      "/usuarios": [{ status: 200, json: todos }],
+      [CATALOGO_INICIAL]: [
+        () => ({ status: 200, json: catalogo([{ ...maratonEnCatalogo, organizador: lucia() }]) }),
+      ],
+      [FESTIVAL]: [() => ({ status: 200, json: { ...festivalCompleto, organizador: lucia() } })],
+      [RESENIAS_FESTIVAL]: [
+        () => ({
+          status: 200,
+          json: reseniasDelOrganizadorDeEjemplo({
+            organizador: lucia(),
+            resenias: reseniado ? [reseniaNueva, anterior] : [anterior],
+          }),
+        }),
+      ],
+      [COMPRA]: [() => ({ status: 200, json: reseniado ? reseniada : reseniable })],
+      [RESENIAS]: [
+        porMetodo({
+          POST: [
+            () => {
+              reseniado = true;
+              return { status: 201, json: reseniaDeEjemplo() };
+            },
+          ],
+        }),
+      ],
+    });
+  }
+
+  const abrirFestival = () =>
+    act(() => router.push({ pathname: "/explorar/[eventoId]", params: { eventoId: festivalCompleto.id } }));
+
+  it("Explorar, el detalle de otro evento de Lucía y su sección se vuelven a pedir y muestran la reseña", async () => {
+    const resultado = await renderConDependencias({ usuarioRecordado: martin.id, respuestas: servidor() });
+    await esperarPestanas();
+    expect(await screen.findByText(SIN_RESENIAS_EN_TARJETA)).toBeOnTheScreen();
+
+    // El detalle del Festival queda en la caché antes de reseñar.
+    await abrirFestival();
+    expect(await screen.findByText("Una reseña vieja.")).toBeOnTheScreen();
+    expect(screen.queryByText("Muy buena organización")).toBeNull();
+    await act(() => router.back());
+
+    await act(() => router.push({ pathname: "/compras/[compraId]", params: { compraId: COMPRA_ID } }));
+    await act(() =>
+      router.push({ pathname: "/compras/[compraId]/resenia", params: { compraId: COMPRA_ID } }),
+    );
+    await fireEvent.press(await screen.findByRole("radio", { name: "4 de 5" }));
+    await escribir(COMENTARIO, "Muy buena organización");
+    await enviar();
+    await waitFor(() => expect(resultado.getPathname()).toBe(COMPRA));
+
+    // De vuelta en Explorar: el catálogo se volvió a pedir y la tarjeta muestra el puntaje nuevo.
+    await act(() => router.dismissAll());
+    await waitFor(() => expect(resultado.falso.pedidosA(CATALOGO_INICIAL)).toHaveLength(2));
+    expect(await screen.findByText(CON_RESENIA_EN_TARJETA)).toBeOnTheScreen();
+
+    // El detalle de otro evento del mismo organizador: evento y sección otra vez, la reseña primera.
+    await abrirFestival();
+    await waitFor(() => expect(resultado.falso.pedidosA(FESTIVAL)).toHaveLength(2));
+    await waitFor(() => expect(resultado.falso.pedidosA(RESENIAS_FESTIVAL)).toHaveLength(2));
+    expect(await screen.findByText("Muy buena organización")).toBeOnTheScreen();
+    const comentarios = screen.getAllByText(/Muy buena organización|Una reseña vieja\./);
+    expect(comentarios.map((c) => c.props.children)).toEqual(["Muy buena organización", "Una reseña vieja."]);
+    expect(screen.getAllByText("4,0 · 1 reseña").length).toBeGreaterThan(0);
+  });
+
+  it("cambiar de usuario no reusa la sección del anterior: la vuelve a pedir", async () => {
+    const resultado = await renderConDependencias({ usuarioRecordado: martin.id, respuestas: servidor() });
+    await esperarPestanas();
+    await abrirFestival();
+    expect(await screen.findByText("Una reseña vieja.")).toBeOnTheScreen();
+    expect(resultado.falso.pedidosA(RESENIAS_FESTIVAL)).toHaveLength(1);
+
+    await act(() => router.push("/seleccionar-usuario"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Lucía Álvarez" }));
+    await abrirFestival();
+
+    await waitFor(() => expect(resultado.falso.pedidosA(RESENIAS_FESTIVAL)).toHaveLength(2));
+    expect(await screen.findByText("Una reseña vieja.")).toBeOnTheScreen();
   });
 });

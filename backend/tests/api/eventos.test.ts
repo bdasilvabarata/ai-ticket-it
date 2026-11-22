@@ -195,6 +195,43 @@ describe("GET /api/eventos: orden (US4)", () => {
     expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
   });
 
+  it("orden=puntaje&sentido=desc con el seed: Martín (4,7) → Sofía (2,5) → Lucía sin reseñas (012, SC-005)", async () => {
+    const respuesta = await catalogo("orden=puntaje&sentido=desc");
+    expect(idsDelCatalogo(respuesta)).toEqual([
+      "evento-hamlet",
+      "evento-charla-ia-aplicada",
+      "evento-clasico-de-basquet",
+      "evento-pena-en-la-rueda",
+      "evento-noche-de-rock",
+      "evento-festival-sonidos-del-sur",
+      "evento-maraton-10k",
+    ]);
+    expect(idsDelCatalogo(respuesta)).not.toEqual(PROXIMOS_POR_FECHA);
+    expect(idsDelCatalogo(await catalogo("orden=puntaje"))).toEqual(idsDelCatalogo(respuesta));
+    const organizadores = new Map(
+      (
+        respuesta.body.eventos as {
+          organizador: { id: string; puntaje: number | null; cantidadResenias: number };
+        }[]
+      ).map((e) => [e.organizador.id, e.organizador]),
+    );
+    expect(organizadores.get("usuario-martin")).toMatchObject({ puntaje: 14 / 3, cantidadResenias: 3 });
+    expect(organizadores.get(SOFIA)).toMatchObject({ puntaje: 2.5, cantidadResenias: 2 });
+    expect(organizadores.get(LUCIA)).toMatchObject({ puntaje: null, cantidadResenias: 0 });
+  });
+
+  it("orden=puntaje&sentido=asc con el seed: Sofía → Martín → los sin reseñas al final", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=puntaje&sentido=asc"))).toEqual([
+      "evento-clasico-de-basquet",
+      "evento-hamlet",
+      "evento-charla-ia-aplicada",
+      "evento-pena-en-la-rueda",
+      "evento-noche-de-rock",
+      "evento-festival-sonidos-del-sur",
+      "evento-maraton-10k",
+    ]);
+  });
+
   it("orden=puntaje&sentido=asc sin reseñas → igual que por fecha (sin puntaje siempre al final)", async () => {
     const sinResenias = await request(appSinResenias()).get("/api/eventos?orden=puntaje&sentido=asc");
     expect(idsDelCatalogo(sinResenias)).toEqual(PROXIMOS_POR_FECHA);
