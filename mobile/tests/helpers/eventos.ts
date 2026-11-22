@@ -1,12 +1,14 @@
-import type {
-  CatalogoVista,
-  CategoriaVista,
-  EventoCatalogoVista,
-  EventoResumenVista,
-  EventoVista,
-  OrganizadorVista,
-  ReseniaDelOrganizadorVista,
-  ReseniasDelOrganizadorVista,
+import {
+  LIMITES_PAGINACION,
+  type CatalogoVista,
+  type CategoriaVista,
+  type EventoCatalogoVista,
+  type EventoResumenVista,
+  type EventoVista,
+  type OrganizadorVista,
+  type PaginaVista,
+  type ReseniaDelOrganizadorVista,
+  type ReseniasDelOrganizadorVista,
 } from "@ai-ticket-it/shared";
 
 // Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
@@ -161,11 +163,23 @@ export const maratonEnCatalogo: EventoCatalogoVista = {
   organizador: luciaOrganizadora,
 };
 
+/**
+ * Un catálogo de una sola página con esos eventos (feature 013). Con `pagina`, la que se quiera
+ * (por ejemplo, la 2 de 12 eventos).
+ */
 export function catalogo(
   eventos: EventoCatalogoVista[],
   hayEventosProximos = eventos.length > 0,
+  pagina: Partial<PaginaVista> = {},
 ): CatalogoVista {
-  return { eventos, hayEventosProximos };
+  return { eventos, pagina: paginaDe(eventos.length, pagina), hayEventosProximos };
+}
+
+/** La `PaginaVista` de una lista de `totalElementos` (por defecto, la página 1). */
+export function paginaDe(totalElementos: number, cambios: Partial<PaginaVista> = {}): PaginaVista {
+  const tamano = LIMITES_PAGINACION.tamanoDePagina;
+  const total = cambios.totalElementos ?? totalElementos;
+  return { numero: 1, tamano, totalElementos: total, totalPaginas: Math.ceil(total / tamano), ...cambios };
 }
 
 /** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */

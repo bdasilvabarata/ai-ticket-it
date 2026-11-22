@@ -69,6 +69,10 @@
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos" } }
         },
         {
+          "name": "Explorar — página 2",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?pagina=2" } }
+        },
+        {
           "name": "Buscar texto=basquet (sin tildes)",
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?texto=basquet" } }
         },

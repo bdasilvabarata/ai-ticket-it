@@ -218,3 +218,6 @@ export function resenia(eventoId: string, puntuacion: number): Resenia {
     creadaEn: AHORA,
   });
 }
+
+/** La página de una lista vacía (feature 013, FR-005): la 1, sin elementos. */
+export const SIN_PAGINAS = { numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 } as const;

@@ -3,7 +3,7 @@ import { router } from "expo-router";
 import { useState } from "react";
 import { FlatList, StyleSheet, TextInput, View } from "react-native";
 
-import { ListaVacia, SegunConsulta, tema } from "../../../componentes";
+import { ListaVacia, Paginador, SegunConsulta, tema, usePagina } from "../../../componentes";
 import { BotonCategoria } from "../componentes/BotonCategoria";
 import { SelectorCategoria } from "../componentes/SelectorCategoria";
 import { SelectorOrden } from "../componentes/SelectorOrden";
@@ -38,7 +38,8 @@ function CargandoEventos() {
 /**
  * Explorar: el catálogo de eventos próximos (contracts/app.md, "Explorar"). La consulta (texto,
  * categoría, orden y sentido) vive acá: la pestaña no se desmonta al apilar el detalle, así que se
- * conserva (FR-024). La categoría es un desplegable a la derecha del buscador: cerrado no ocupa lugar.
+ * conserva (FR-024), y también la página (feature 013). La categoría es un desplegable a la derecha del
+ * buscador: cerrado no ocupa lugar.
  */
 export function Explorar() {
   const [texto, setTexto] = useState("");
@@ -49,7 +50,10 @@ export function Explorar() {
     sentido: "asc",
   });
   const textoDemorado = useValorDemorado(texto.trim(), DEMORA_DEL_BUSCADOR_MS);
-  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden, sentido });
+  // Cambiar el texto (ya demorado), la categoría, el orden o el sentido vuelve a la página 1, en el
+  // mismo render (feature 013, R7, FR-013).
+  const [pagina, cambiarPagina] = usePagina(JSON.stringify({ textoDemorado, categoriaId, orden, sentido }));
+  const consulta = useCatalogo({ texto: textoDemorado, categoriaId, orden, sentido, pagina });
   // Desde la primera tecla hasta que llega la respuesta del texto nuevo, el skeleton: nunca quedan a
   // la vista los resultados del texto anterior (FR-007).
   const escribiendo = texto.trim() !== textoDemorado;
@@ -125,6 +129,9 @@ export function Explorar() {
             renderItem={({ item }) => (
               <TarjetaEvento evento={item} alPresionar={() => abrirDetalle(item.id)} />
             )}
+            // Feature 013 (R9): debajo de la última tarjeta. La página marcada es la de la respuesta
+            // (FR-005); al cambiarla, la lista se vuelve a montar arriba después del skeleton.
+            ListFooterComponent={<Paginador pagina={catalogo.pagina} alCambiar={cambiarPagina} />}
           />
         )}
       </SegunConsulta>

@@ -51,7 +51,7 @@ const rutaDelTipo = (eventoId: string, tipoId: string) =>
  */
 export function listarEventos(
   cliente: ClienteApi,
-  { texto, categoriaId, orden = "fecha", sentido = SENTIDO_INICIAL[orden] }: ConsultaCatalogo,
+  { texto, categoriaId, orden = "fecha", sentido = SENTIDO_INICIAL[orden], pagina = 1 }: ConsultaCatalogo,
   opciones: ConSignal = {},
 ): Promise<CatalogoVista> {
   const parametros = new URLSearchParams();
@@ -60,6 +60,8 @@ export function listarEventos(
   if (categoriaId) parametros.append("categoriaId", categoriaId);
   parametros.append("orden", orden);
   parametros.append("sentido", sentido);
+  // Feature 013: la página 1 no se manda, así sus URLs siguen siendo las de la 005.
+  if (pagina !== 1) parametros.append("pagina", String(pagina));
   return cliente.get<CatalogoVista>(`/eventos?${parametros.toString()}`, {
     signal: opciones.signal,
     usuarioId: null,

@@ -2,9 +2,11 @@ import { EstadoCompra } from "@ai-ticket-it/shared";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import { crearApp } from "../../src/app";
+import { CompraRepository } from "../../src/repositories/compra.repository";
+import { EventoRepository } from "../../src/repositories/evento.repository";
 import { ReseniaRepository } from "../../src/repositories/resenia.repository";
 import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
-import { compra, relojFijo } from "../helpers/eventos";
+import { compra, DIA, evento, musica, relojFijo, resenia, SIN_PAGINAS, teatro } from "../helpers/eventos";
 
 // Repositorios de ejemplo nuevos por app, armados con el instante del reloj fijo.
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
@@ -28,36 +30,66 @@ function esperarError(respuesta: request.Response, status: number, codigo: strin
   expect(respuesta.body).toMatchObject({ error: { codigo, mensaje: expect.any(String) } });
 }
 
+type RespuestaDelCatalogo = Pick<request.Response, "status" | "body">;
+
 /** Los ids del catálogo, en el orden de la respuesta. */
-const idsDelCatalogo = (respuesta: request.Response) =>
+const idsDelCatalogo = (respuesta: RespuestaDelCatalogo) =>
   (respuesta.body.eventos as { id: string }[]).map((e) => e.id);
 
+/**
+ * El catálogo entero de una consulta (feature 013): pide todas sus páginas y concatena los eventos,
+ * que salen en el orden de la lista completa (SC-002). Un rechazo vuelve tal cual.
+ */
+async function catalogoEntero(app: ReturnType<typeof nuevaApp>, query = ""): Promise<RespuestaDelCatalogo> {
+  const primera = await request(app).get(`/api/eventos?${query}`);
+  if (primera.status !== 200) return primera;
+  const eventos = [...primera.body.eventos];
+  for (let numero = 2; numero <= primera.body.pagina.totalPaginas; numero += 1) {
+    const siguiente = await request(app).get(`/api/eventos?${query}&pagina=${numero}`);
+    eventos.push(...siguiente.body.eventos);
+  }
+  return { status: primera.status, body: { ...primera.body, eventos } };
+}
+
+/** Los 12 próximos del seed (feature 013, R11), por fecha: 2 páginas (10 + 2). */
 const PROXIMOS_POR_FECHA = [
   "evento-pena-en-la-rueda",
   "evento-noche-de-rock",
+  "evento-feria-del-libro-independiente",
   "evento-clasico-de-basquet",
+  "evento-match-de-impro",
   "evento-hamlet",
+  "evento-torneo-de-futbol-5",
   "evento-charla-ia-aplicada",
+  "evento-microfono-abierto",
+  "evento-feria-de-cerveza-artesanal",
   "evento-festival-sonidos-del-sur",
   "evento-maraton-10k",
 ];
 
 describe("GET /api/eventos (catálogo)", () => {
-  it("es público: los 7 próximos del seed por fecha, con hayEventosProximos", async () => {
+  it("es público: los 10 primeros de los 12 próximos del seed por fecha, con hayEventosProximos (013)", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos");
     expect(respuesta.status).toBe(200);
-    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA.slice(0, 10));
+    expect(respuesta.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 12, totalPaginas: 2 });
     expect(respuesta.body.hayEventosProximos).toBe(true);
+  });
+
+  it("?pagina=2 → los 2 restantes del seed (013)", async () => {
+    const respuesta = await request(nuevaApp()).get("/api/eventos?pagina=2");
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA.slice(10));
+    expect(respuesta.body.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 12, totalPaginas: 2 });
   });
 
   it("un X-Usuario-Id inválido se ignora", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos").set("X-Usuario-Id", "nadie");
     expect(respuesta.status).toBe(200);
-    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA);
+    expect(idsDelCatalogo(respuesta)).toEqual(PROXIMOS_POR_FECHA.slice(0, 10));
   });
 
   it("Hamlet sale agotado, la Maratón gratis y cada organizador con su puntaje (012, R10)", async () => {
-    const { body } = await request(nuevaApp()).get("/api/eventos");
+    const { body } = await catalogoEntero(nuevaApp());
     const porId = new Map((body.eventos as { id: string }[]).map((e) => [e.id, e]));
     expect(porId.get("evento-hamlet")).toMatchObject({ agotado: true, precioDesde: 18000 });
     expect(porId.get("evento-maraton-10k")).toMatchObject({ agotado: false, precioDesde: 0 });
@@ -86,12 +118,98 @@ describe("GET /api/eventos (catálogo)", () => {
     });
     const respuesta = await request(app).get("/api/eventos");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: false });
+    expect(respuesta.body).toEqual({ eventos: [], pagina: SIN_PAGINAS, hayEventosProximos: false });
+  });
+});
+
+describe("GET /api/eventos: paginado (feature 013, US1)", () => {
+  // 13 próximos: p01…p12 de Lucía (uno por día) y uno de Martín al final por fecha, pero con el mejor
+  // puntaje (la reseña de su evento realizado). p04, p08 y p12 son de Teatro; p11 es "Noche de tango".
+  const proximos = Array.from({ length: 12 }, (_, i) => {
+    const numero = String(i + 1).padStart(2, "0");
+    return evento({
+      id: `evento-p${numero}`,
+      nombre: i === 10 ? "Noche de tango" : `Función ${numero}`,
+      categoriaId: i % 4 === 3 ? teatro.id : musica.id,
+      en: (i + 1) * DIA,
+    });
+  });
+  const deMartin = evento({ id: "evento-martin", organizadorId: "usuario-martin", en: 20 * DIA });
+  const pasadoDeMartin = evento({ id: "evento-martin-pasado", organizadorId: "usuario-martin", en: -DIA });
+  const POR_FECHA = [...proximos.map((e) => e.id), deMartin.id];
+
+  const appConMuchos = () =>
+    crearApp({
+      reloj,
+      repositorios: {
+        eventos: new EventoRepository([...proximos, deMartin, pasadoDeMartin]),
+        compras: new CompraRepository([]),
+        resenias: new ReseniaRepository([resenia(pasadoDeMartin.id, 5)]),
+      },
+    });
+  const catalogo = (query = "") => request(appConMuchos()).get(`/api/eventos${query}`);
+
+  it("sin pagina → los 10 primeros y los totales del catálogo", async () => {
+    const respuesta = await catalogo();
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(POR_FECHA.slice(0, 10));
+    expect(respuesta.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 13, totalPaginas: 2 });
+    expect(respuesta.body.hayEventosProximos).toBe(true);
+  });
+
+  it("?pagina=2 → los que siguen, en el orden de la lista completa (concatenar = la lista, SC-002)", async () => {
+    const primera = await catalogo("?pagina=1");
+    const segunda = await catalogo("?pagina=2");
+    expect(idsDelCatalogo(segunda)).toEqual(POR_FECHA.slice(10));
+    expect(segunda.body.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 13, totalPaginas: 2 });
+    expect([...idsDelCatalogo(primera), ...idsDelCatalogo(segunda)]).toEqual(POR_FECHA);
+  });
+
+  it("una página posterior a la última → la última, con su número real (FR-005)", async () => {
+    const respuesta = await catalogo("?pagina=9");
+    expect(respuesta.status).toBe(200);
+    expect(idsDelCatalogo(respuesta)).toEqual(POR_FECHA.slice(10));
+    expect(respuesta.body.pagina.numero).toBe(2);
+  });
+
+  it.each(["?pagina=0", "?pagina=abc"])("%s → 400 sobre query.pagina", async (query) => {
+    expect(detalles(await catalogo(query))).toEqual({
+      "query.pagina": "Debe ser un entero mayor o igual a 1.",
+    });
+  });
+
+  it("?tamano=50 se ignora: la página sigue siendo de 10 (FR-006)", async () => {
+    const respuesta = await catalogo("?tamano=50");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body.eventos).toHaveLength(10);
+    expect(respuesta.body.pagina.tamano).toBe(10);
+  });
+
+  it("orden=puntaje&sentido=desc: el evento del mejor organizador sale en la página 1 aunque su fecha lo ponga al final (US1-4)", async () => {
+    const respuesta = await catalogo("?orden=puntaje&sentido=desc");
+    expect(idsDelCatalogo(respuesta)[0]).toBe(deMartin.id);
+    expect(idsDelCatalogo(respuesta)).toHaveLength(10);
+  });
+
+  it("un texto sin coincidencias → la página 1 vacía y hayEventosProximos: true (FR-014)", async () => {
+    const respuesta = await catalogo("?texto=zzz&pagina=3");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).toEqual({ eventos: [], pagina: SIN_PAGINAS, hayEventosProximos: true });
+  });
+
+  it("la categoría y el texto se aplican antes de cortar: lo de la página 2 sin filtro aparece en la 1", async () => {
+    const teatros = await catalogo("?categoriaId=categoria-teatro");
+    expect(idsDelCatalogo(teatros)).toEqual(["evento-p04", "evento-p08", "evento-p12"]);
+    expect(teatros.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 3, totalPaginas: 1 });
+    const tango = await catalogo("?texto=tango");
+    expect(idsDelCatalogo(tango)).toEqual(["evento-p11"]);
+    expect(tango.body.pagina.totalElementos).toBe(1);
   });
 });
 
 describe("GET /api/eventos: texto y categoría (US3)", () => {
-  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+  // El catálogo entero (todas sus páginas, feature 013): las reglas de la 005 sobre la lista completa.
+  const catalogo = (query: string) => catalogoEntero(nuevaApp(), query);
 
   it.each(["texto=BASQUET", "texto=b%C3%A1squet", "texto=%20basquet%20"])(
     "%s → solo el Clásico",
@@ -120,12 +238,18 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
     ]);
   });
 
-  it.each(["categoriaId=categoria-stand-up", "texto=rock&categoriaId=categoria-deportes"])(
+  it("categoriaId=categoria-stand-up → el Micrófono abierto (Noche de risas ya se realizó)", async () => {
+    expect(idsDelCatalogo(await catalogo("categoriaId=categoria-stand-up"))).toEqual([
+      "evento-microfono-abierto",
+    ]);
+  });
+
+  it.each(["texto=rock&categoriaId=categoria-stand-up", "texto=rock&categoriaId=categoria-deportes"])(
     "%s → vacío con hayEventosProximos: true",
     async (query) => {
       const respuesta = await catalogo(query);
       expect(respuesta.status).toBe(200);
-      expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+      expect(respuesta.body).toEqual({ eventos: [], pagina: SIN_PAGINAS, hayEventosProximos: true });
     },
   );
 
@@ -147,7 +271,7 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
     });
     const respuesta = await catalogo(`texto=%20%20${"a".repeat(100)}%20%20`);
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual({ eventos: [], hayEventosProximos: true });
+    expect(respuesta.body).toEqual({ eventos: [], pagina: SIN_PAGINAS, hayEventosProximos: true });
   });
 
   it.each([
@@ -159,53 +283,57 @@ describe("GET /api/eventos: texto y categoría (US3)", () => {
 });
 
 describe("GET /api/eventos: orden (US4)", () => {
-  const catalogo = (query: string) => request(nuevaApp()).get(`/api/eventos?${query}`);
+  // El catálogo entero (todas sus páginas, feature 013): las reglas de la 005 sobre la lista completa.
+  const catalogo = (query: string) => catalogoEntero(nuevaApp(), query);
 
-  it("orden=precio → Maratón, Charla, Peña, Clásico, Noche de Rock, Hamlet, Festival", async () => {
-    expect(idsDelCatalogo(await catalogo("orden=precio"))).toEqual([
-      "evento-maraton-10k",
-      "evento-charla-ia-aplicada",
-      "evento-pena-en-la-rueda",
-      "evento-clasico-de-basquet",
-      "evento-noche-de-rock",
-      "evento-hamlet",
-      "evento-festival-sonidos-del-sur",
-    ]);
+  const POR_PRECIO = [
+    "evento-maraton-10k",
+    "evento-charla-ia-aplicada",
+    "evento-feria-del-libro-independiente",
+    "evento-microfono-abierto",
+    "evento-pena-en-la-rueda",
+    "evento-clasico-de-basquet",
+    "evento-match-de-impro",
+    "evento-feria-de-cerveza-artesanal",
+    "evento-noche-de-rock",
+    "evento-hamlet",
+    "evento-torneo-de-futbol-5",
+    "evento-festival-sonidos-del-sur",
+  ];
+
+  it("orden=precio → del gratis (la Maratón) al más caro (el Festival)", async () => {
+    expect(idsDelCatalogo(await catalogo("orden=precio"))).toEqual(POR_PRECIO);
   });
 
   it("orden=puntaje sin reseñas y sin orden → igual que por fecha", async () => {
-    const sinResenias = await request(appSinResenias()).get("/api/eventos?orden=puntaje");
+    const sinResenias = await catalogoEntero(appSinResenias(), "orden=puntaje");
     expect(idsDelCatalogo(sinResenias)).toEqual(PROXIMOS_POR_FECHA);
     expect(idsDelCatalogo(await catalogo("orden=fecha"))).toEqual(PROXIMOS_POR_FECHA);
   });
 
   it("sentido=desc invierte el criterio: orden=precio&sentido=desc → el más caro primero", async () => {
-    expect(idsDelCatalogo(await catalogo("orden=precio&sentido=desc"))).toEqual([
-      "evento-festival-sonidos-del-sur",
-      "evento-hamlet",
-      "evento-noche-de-rock",
-      "evento-clasico-de-basquet",
-      "evento-pena-en-la-rueda",
-      "evento-charla-ia-aplicada",
-      "evento-maraton-10k",
-    ]);
+    expect(idsDelCatalogo(await catalogo("orden=precio&sentido=desc"))).toEqual(POR_PRECIO.toReversed());
     expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=desc"))).toEqual(
       PROXIMOS_POR_FECHA.toReversed(),
     );
     expect(idsDelCatalogo(await catalogo("orden=fecha&sentido=asc"))).toEqual(PROXIMOS_POR_FECHA);
   });
 
-  it("orden=puntaje&sentido=desc con el seed: Martín (4,7) → Sofía (2,5) → Lucía sin reseñas (012, SC-005)", async () => {
-    const respuesta = await catalogo("orden=puntaje&sentido=desc");
-    expect(idsDelCatalogo(respuesta)).toEqual([
+  // Los próximos de cada organizador, por fecha (los desempates).
+  const DE_MARTIN = PROXIMOS_POR_FECHA.filter((id) =>
+    [
+      "evento-feria-del-libro-independiente",
       "evento-hamlet",
       "evento-charla-ia-aplicada",
-      "evento-clasico-de-basquet",
-      "evento-pena-en-la-rueda",
-      "evento-noche-de-rock",
-      "evento-festival-sonidos-del-sur",
-      "evento-maraton-10k",
-    ]);
+      "evento-microfono-abierto",
+    ].includes(id),
+  );
+  const DE_SOFIA = ["evento-clasico-de-basquet", "evento-match-de-impro", "evento-torneo-de-futbol-5"];
+  const DE_LUCIA = PROXIMOS_POR_FECHA.filter((id) => !DE_MARTIN.includes(id) && !DE_SOFIA.includes(id));
+
+  it("orden=puntaje&sentido=desc con el seed: Martín (4,7) → Sofía (2,5) → Lucía sin reseñas (012, SC-005)", async () => {
+    const respuesta = await catalogo("orden=puntaje&sentido=desc");
+    expect(idsDelCatalogo(respuesta)).toEqual([...DE_MARTIN, ...DE_SOFIA, ...DE_LUCIA]);
     expect(idsDelCatalogo(respuesta)).not.toEqual(PROXIMOS_POR_FECHA);
     expect(idsDelCatalogo(await catalogo("orden=puntaje"))).toEqual(idsDelCatalogo(respuesta));
     const organizadores = new Map(
@@ -222,18 +350,14 @@ describe("GET /api/eventos: orden (US4)", () => {
 
   it("orden=puntaje&sentido=asc con el seed: Sofía → Martín → los sin reseñas al final", async () => {
     expect(idsDelCatalogo(await catalogo("orden=puntaje&sentido=asc"))).toEqual([
-      "evento-clasico-de-basquet",
-      "evento-hamlet",
-      "evento-charla-ia-aplicada",
-      "evento-pena-en-la-rueda",
-      "evento-noche-de-rock",
-      "evento-festival-sonidos-del-sur",
-      "evento-maraton-10k",
+      ...DE_SOFIA,
+      ...DE_MARTIN,
+      ...DE_LUCIA,
     ]);
   });
 
   it("orden=puntaje&sentido=asc sin reseñas → igual que por fecha (sin puntaje siempre al final)", async () => {
-    const sinResenias = await request(appSinResenias()).get("/api/eventos?orden=puntaje&sentido=asc");
+    const sinResenias = await catalogoEntero(appSinResenias(), "orden=puntaje&sentido=asc");
     expect(idsDelCatalogo(sinResenias)).toEqual(PROXIMOS_POR_FECHA);
   });
 
@@ -259,16 +383,17 @@ describe("GET /api/eventos/mios", () => {
     esperarError(await request(nuevaApp()).get("/api/eventos/mios"), 401, "USUARIO_NO_IDENTIFICADO");
   });
 
-  it("Lucía ve la Peña, Noche de Rock, Festival y Maratón, en ese orden", async () => {
+  it("Lucía ve la Peña, Noche de Rock, la Feria de cerveza (013), Festival y Maratón, en ese orden", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
     expect(respuesta.status).toBe(200);
     expect(respuesta.body.map((e: { id: string }) => e.id)).toEqual([
       "evento-pena-en-la-rueda",
       "evento-noche-de-rock",
+      "evento-feria-de-cerveza-artesanal",
       "evento-festival-sonidos-del-sur",
       "evento-maraton-10k",
     ]);
-    expect(respuesta.body[2]).toEqual({
+    expect(respuesta.body[3]).toEqual({
       id: "evento-festival-sonidos-del-sur",
       nombre: "Festival Sonidos del Sur",
       categoria: { id: "categoria-festivales", nombre: "Festivales" },
@@ -280,10 +405,12 @@ describe("GET /api/eventos/mios", () => {
     });
   });
 
-  it("Sofía ve el Clásico de básquet y, al final, Noche de risas realizada", async () => {
+  it("Sofía ve el Clásico de básquet, el Match de impro y el Torneo (013) y, al final, Noche de risas realizada", async () => {
     const respuesta = await request(nuevaApp()).get("/api/eventos/mios").set("X-Usuario-Id", SOFIA);
     expect(respuesta.body.map((e: { id: string; realizado: boolean }) => [e.id, e.realizado])).toEqual([
       ["evento-clasico-de-basquet", false],
+      ["evento-match-de-impro", false],
+      ["evento-torneo-de-futbol-5", false],
       ["evento-noche-de-risas", true],
     ]);
   });
@@ -325,7 +452,7 @@ function crearEvento(app: ReturnType<typeof nuevaApp>, cuerpo: object, usuarioId
 }
 
 /** Los detalles del 400 como `campo → mensaje`. */
-function detalles(respuesta: request.Response): Record<string, string> {
+function detalles(respuesta: RespuestaDelCatalogo): Record<string, string> {
   expect(respuesta.status).toBe(400);
   expect(respuesta.body.error.codigo).toBe("ENTRADA_INVALIDA");
   return Object.fromEntries(
@@ -375,7 +502,7 @@ describe("POST /api/eventos", () => {
     const app = nuevaApp();
     esperarError(await crearEvento(app, cuerpoNuevo(), null), 401, "USUARIO_NO_IDENTIFICADO");
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
-    expect(mios.body).toHaveLength(4);
+    expect(mios.body).toHaveLength(5);
   });
 
   it("responde 400 con un detalle por campo", async () => {
@@ -580,6 +707,7 @@ describe("PUT /api/eventos/:eventoId", () => {
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
     expect(mios.body.map((e: { id: string }) => e.id)).toEqual([
       "evento-pena-en-la-rueda",
+      "evento-feria-de-cerveza-artesanal",
       "evento-festival-sonidos-del-sur",
       "evento-noche-de-rock",
       "evento-maraton-10k",
@@ -664,7 +792,7 @@ describe("DELETE /api/eventos/:eventoId", () => {
       "EVENTO_CON_COMPRAS",
     );
     const mios = await request(app).get("/api/eventos/mios").set("X-Usuario-Id", LUCIA);
-    expect(mios.body).toHaveLength(4);
+    expect(mios.body).toHaveLength(5);
   });
 });
 

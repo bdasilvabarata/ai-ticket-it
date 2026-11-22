@@ -1,4 +1,4 @@
-import { LIMITES_BUSQUEDA } from "@ai-ticket-it/shared";
+import { LIMITES_BUSQUEDA, type EventoCatalogoVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 
@@ -460,5 +460,190 @@ describe("Explorar: ordenar (US4)", () => {
     await act(() => router.back());
 
     expect(await screen.findByRole("radio", { name: "Precio" })).toBeChecked();
+  });
+});
+
+describe("Explorar: por páginas (feature 013, US1)", () => {
+  const PAGINA_2 = `${CATALOGO_INICIAL}&pagina=2`;
+  const PAGINA_3 = `${CATALOGO_INICIAL}&pagina=3`;
+  const BASQUET = "/eventos?texto=basquet&orden=fecha&sentido=asc";
+  const MUSICA = "/eventos?categoriaId=categoria-musica&orden=fecha&sentido=asc";
+  const POR_PRECIO = "/eventos?orden=precio&sentido=asc";
+  const FECHA_DESC = "/eventos?orden=fecha&sentido=desc";
+  const evento = (numero: number): EventoCatalogoVista => ({
+    ...clasicoEnCatalogo,
+    id: `evento-p${numero}`,
+    nombre: `Función ${numero}`,
+  });
+  const primeros10 = Array.from({ length: 10 }, (_, i) => evento(i + 1));
+  /** La página 1 de 12 eventos (10) y la 2 (los 2 restantes). */
+  const pagina1 = { status: 200, json: catalogo(primeros10, true, { totalElementos: 12 }) } as const;
+  const pagina2 = {
+    status: 200,
+    json: catalogo([maratonEnCatalogo, hamletEnCatalogo], true, { numero: 2, totalElementos: 12 }),
+  } as const;
+  const unaSola = { status: 200, json: catalogo([rockEnCatalogo, clasicoEnCatalogo]) } as const;
+
+  const boton = (numero: number) => screen.getByRole("button", { name: `Página ${numero}` });
+  const nombres = async () =>
+    (await tarjetas()).map((t) => (t.props.accessibilityLabel as string).split(",")[0]);
+  const buscador = () => screen.getByLabelText("Buscar eventos");
+
+  async function irALaPagina2(
+    respuestas: Record<string, ReadonlyArray<RespuestaFalsa | FuncionRespuesta>> = {},
+  ) {
+    const resultado = await abrirExplorar({
+      [CATALOGO_INICIAL]: [pagina1],
+      [PAGINA_2]: [pagina2],
+      ...respuestas,
+    });
+    await screen.findByText("Función 1");
+    await fireEvent.press(boton(2));
+    expect(await screen.findByText("Maratón Ciudad 10K")).toBeOnTheScreen();
+    return resultado;
+  }
+
+  it("con 12 eventos se ven las 10 tarjetas de la página 1 y el paginador con la 1 marcada", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [pagina1] });
+
+    expect(await nombres()).toEqual(primeros10.map((e) => e.nombre));
+    expect(boton(1)).toBeSelected();
+    expect(boton(2)).not.toBeSelected();
+    expect(screen.queryByRole("button", { name: "Página 3" })).toBeNull();
+  });
+
+  it("tocar Página 2 pide pagina=2, muestra el skeleton y después las 2 tarjetas, con la 2 marcada", async () => {
+    const { falso } = await abrirExplorar({ [CATALOGO_INICIAL]: [pagina1], [PAGINA_2]: [pagina2] });
+    await screen.findByText("Función 1");
+
+    await fireEvent.press(boton(2));
+
+    expect(falso.pedidosA(PAGINA_2)).toHaveLength(1);
+    expect(screen.getByLabelText("Cargando eventos")).toBeOnTheScreen();
+    expect(await nombres()).toEqual(["Maratón Ciudad 10K", "Hamlet"]);
+    expect(boton(2)).toBeSelected();
+    expect(boton(1)).not.toBeSelected();
+  });
+
+  it("mientras carga otra página no se ve el paginador: no se puede pedir otra encima (Edge Cases)", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [pagina1], [PAGINA_2]: ["colgar"] });
+    await screen.findByText("Función 1");
+
+    await fireEvent.press(boton(2));
+
+    expect(screen.getByLabelText("Cargando eventos")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Página 1" })).toBeNull();
+    expect(screen.queryByText("Función 1")).toBeNull();
+  });
+
+  it("marca la página que dice la respuesta, no la pedida (FR-005)", async () => {
+    await abrirExplorar({
+      [CATALOGO_INICIAL]: [{ status: 200, json: catalogo(primeros10, true, { totalElementos: 25 }) }],
+      // Pidió la 3, pero la lista se achicó: llega la 2, la última.
+      [PAGINA_3]: [pagina2],
+    });
+    await screen.findByText("Función 1");
+
+    await fireEvent.press(boton(3));
+
+    expect(await screen.findByText("Maratón Ciudad 10K")).toBeOnTheScreen();
+    expect(boton(2)).toBeSelected();
+    expect(screen.queryByRole("button", { name: "Página 3" })).toBeNull();
+  });
+
+  it("estando en la 2, escribir una búsqueda pide la página 1 de ese texto (FR-013)", async () => {
+    const { falso } = await irALaPagina2({ [BASQUET]: [unaSola] });
+
+    await fireEvent.changeText(buscador(), "basquet");
+    await avanzar(600);
+
+    expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
+    expect(falso.pedidosA(BASQUET)).toHaveLength(1);
+    expect(falso.pedidos.filter((p) => p.url.includes("texto=") && p.url.includes("pagina="))).toEqual([]);
+  });
+
+  it("estando en la 2, elegir una categoría pide la página 1 (FR-013)", async () => {
+    const { falso } = await irALaPagina2({
+      "/categorias": [{ status: 200, json: categorias }],
+      [MUSICA]: [unaSola],
+    });
+
+    await abrirCategorias();
+    await fireEvent.press(await screen.findByRole("radio", { name: "Música" }));
+
+    expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
+    expect(falso.pedidosA(MUSICA)).toHaveLength(1);
+  });
+
+  it.each([
+    ["cambiar el orden", "Precio", POR_PRECIO],
+    ["invertir el sentido", "Fecha", FECHA_DESC],
+  ])("estando en la 2, %s pide la página 1 (FR-013)", async (_caso, radio, ruta) => {
+    const { falso } = await irALaPagina2({ [ruta]: [unaSola] });
+
+    await fireEvent.press(screen.getByRole("radio", { name: radio }));
+
+    expect(await screen.findByText("Noche de Rock en el Club")).toBeOnTheScreen();
+    expect(falso.pedidosA(ruta)).toHaveLength(1);
+  });
+
+  it("al volver a la 1 después de un criterio nuevo, el paginador marca la 1", async () => {
+    await irALaPagina2({ [BASQUET]: [pagina1] });
+
+    await fireEvent.changeText(buscador(), "basquet");
+    await avanzar(600);
+
+    expect(await screen.findByText("Función 1")).toBeOnTheScreen();
+    expect(boton(1)).toBeSelected();
+  });
+
+  it("con 10 resultados o menos no hay paginador", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [unaSola] });
+    await screen.findByText("Noche de Rock en el Club");
+    expect(screen.queryByRole("button", { name: /^Página / })).toBeNull();
+  });
+
+  it.each([
+    [true, "Ningún evento coincide con tu búsqueda."],
+    [false, "Todavía no hay eventos próximos."],
+  ])("los vacíos no tienen paginador (hayEventosProximos: %s)", async (hay, mensaje) => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [{ status: 200, json: catalogo([], hay) }] });
+    expect(await screen.findByText(mensaje)).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Página / })).toBeNull();
+  });
+
+  it("el buscador conserva lo escrito al cambiar de página", async () => {
+    const BASQUET_2 = `${BASQUET}&pagina=2`;
+    await abrirExplorar({ [CATALOGO_INICIAL]: [unaSola], [BASQUET]: [pagina1], [BASQUET_2]: [pagina2] });
+    await screen.findByText("Noche de Rock en el Club");
+    await fireEvent.changeText(buscador(), "basquet");
+    await avanzar(600);
+    await screen.findByText("Función 1");
+
+    await fireEvent.press(boton(2));
+
+    expect(await screen.findByText("Maratón Ciudad 10K")).toBeOnTheScreen();
+    expect(buscador().props.value).toBe("basquet");
+  });
+
+  it("si la página 2 falla por conexión se ve el error y ninguna Página 2 queda marcada (Edge Cases)", async () => {
+    await abrirExplorar({ [CATALOGO_INICIAL]: [pagina1], [PAGINA_2]: ["rechazar"] });
+    await screen.findByText("Función 1");
+
+    await fireEvent.press(boton(2));
+
+    expect(await screen.findByText("Servidor no disponible")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Página 2", selected: true })).toBeNull();
+  });
+
+  it("estando en la 2, abrir un detalle y volver sigue en la 2 (la pestaña no se desmonta)", async () => {
+    await irALaPagina2({ "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }] });
+
+    await fireEvent.press(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / }));
+    await screen.findByRole("header", { name: "Maratón Ciudad 10K" });
+    await act(() => router.back());
+
+    expect(await screen.findByRole("button", { name: /^Maratón Ciudad 10K, / })).toBeOnTheScreen();
+    expect(boton(2)).toBeSelected();
   });
 });

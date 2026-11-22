@@ -888,7 +888,8 @@ describe("POST /api/compras/:compraId/cancelacion de una CONFIRMADA (feature 009
     expect(
       (comoDiego.body.tiposEntrada as { id: string; cupo: number }[]).find((t) => t.id === VIP)?.cupo,
     ).toBe(antes + 2);
-    const catalogo = await request(app).get("/api/eventos");
+    // Es el 11.º por fecha en el seed de la 013: en la página 2 del catálogo.
+    const catalogo = await request(app).get("/api/eventos?pagina=2");
     expect(catalogo.body.eventos).toContainEqual(
       expect.objectContaining({ id: "evento-festival-sonidos-del-sur", agotado: false }),
     );

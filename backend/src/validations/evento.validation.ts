@@ -11,6 +11,7 @@ import {
   fechaDeParedSchema,
   idSchema,
   obligatorio,
+  paginaSchema,
   textoObligatorio,
   textoOpcional,
 } from "./comunes";
@@ -109,5 +110,7 @@ export const consultaCatalogo = crearValidacion({
     orden: z.enum(ORDENES_CATALOGO, { error: MENSAJE_ORDEN }).default("fecha"),
     // Sin valor, el inicial del criterio (lo decide el dominio).
     sentido: z.enum(SENTIDOS_CATALOGO, { error: MENSAJE_SENTIDO }).optional(),
+    // Feature 013: la página pedida (por defecto, la 1). El tamaño no se recibe (FR-006).
+    pagina: paginaSchema,
   }),
 });

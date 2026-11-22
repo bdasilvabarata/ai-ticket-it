@@ -1,3 +1,5 @@
+import type { PaginaVista } from "./paginacion";
+
 /** Tipo de entrada de un evento, con su cupo **disponible**. */
 export interface TipoEntradaVista {
   id: string;
@@ -114,7 +116,13 @@ export interface EventoCatalogoVista extends EventoResumenVista {
 
 /** Respuesta de `GET /eventos`. */
 export interface CatalogoVista {
+  /** La página pedida del catálogo filtrado y ordenado (hasta 10; feature 013). */
   eventos: EventoCatalogoVista[];
-  /** Hay eventos no realizados, antes de aplicar texto y categoría (decide el vacío). */
+  /** La página entregada y los totales del catálogo filtrado (feature 013). */
+  pagina: PaginaVista;
+  /**
+   * Hay eventos no realizados, antes de aplicar texto y categoría (decide el vacío). Sin cambios en
+   * la 013: sobre todos los eventos próximos, antes del texto, la categoría y la página (FR-014).
+   */
   hayEventosProximos: boolean;
 }

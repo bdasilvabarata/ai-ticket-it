@@ -100,7 +100,7 @@
       "get": {
         "tags": ["Eventos"],
         "summary": "Catálogo de eventos próximos (público)",
-        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Sin paginación.",
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Paginado de a 10 (feature 013): se filtra y se ordena **todo** el catálogo antes de cortar la página.",
         "parameters": [
           {
             "name": "texto",
@@ -133,15 +133,16 @@
             "description": "Sentido del criterio principal: `asc` o `desc`. Sin valor, el inicial de cada criterio (`fecha` y `precio` ascendentes, `puntaje` descendente). Los desempates no se invierten y los organizadores sin puntaje van al final en los dos sentidos.",
             "schema": { "type": "string", "enum": ["asc", "desc"] },
             "example": "desc"
-          }
+          },
+          { "$ref": "#/components/parameters/Pagina" }
         ],
         "responses": {
           "200": {
-            "description": "El catálogo y si hay eventos próximos antes de aplicar los filtros",
+            "description": "La página pedida del catálogo filtrado y ordenado (hasta 10 eventos), sus totales y si hay eventos próximos antes de aplicar los filtros",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
           },
           "400": {
-            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, página que no es un entero ≥ 1, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },
@@ -2102,9 +2103,36 @@
         "required": true,
         "description": "Id del tipo de entrada; tiene que ser de **este** evento",
         "schema": { "type": "string", "example": "tipo-festival-sonidos-del-sur-backstage" }
+      },
+      "Pagina": {
+        "name": "pagina",
+        "in": "query",
+        "required": false,
+        "description": "Página pedida, desde 1 (feature 013). Las páginas son de 10 y el tamaño no se elige: un `tamano` en la query se ignora. Una página posterior a la última devuelve la última, con su número real en `pagina.numero`. Si no es un entero ≥ 1 (`0`, `-1`, `1.5`, `abc`, vacía o repetida), 400 sobre `query.pagina`.",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 },
+        "example": 2
       }
     },
     "schemas": {
+      "PaginaVista": {
+        "type": "object",
+        "required": ["numero", "tamano", "totalElementos", "totalPaginas"],
+        "description": "La página entregada de una lista paginada y los totales de la lista completa (con sus filtros).",
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "La página entregada: la pedida o, si no existe, la última. Con la lista vacía, 1."
+          },
+          "tamano": { "type": "integer", "enum": [10], "description": "Siempre 10." },
+          "totalElementos": { "type": "integer", "minimum": 0 },
+          "totalPaginas": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "`ceil(totalElementos / tamano)`; 0 con la lista vacía."
+          }
+        }
+      },
       "SaludVista": {
         "type": "object",
         "required": ["estado"],
@@ -2260,12 +2288,18 @@
       },
       "CatalogoVista": {
         "type": "object",
-        "required": ["eventos", "hayEventosProximos"],
+        "required": ["eventos", "pagina", "hayEventosProximos"],
         "properties": {
-          "eventos": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } },
+          "eventos": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "La página pedida del catálogo filtrado y ordenado.",
+            "items": { "$ref": "#/components/schemas/EventoCatalogoVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" },
           "hayEventosProximos": {
             "type": "boolean",
-            "description": "Hay eventos no realizados antes de aplicar texto y categoría: decide el vacío de la app."
+            "description": "Hay eventos no realizados antes de aplicar texto, categoría y página: decide el vacío de la app."
           }
         }
       },

@@ -74,6 +74,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   const lucia = "usuario-lucia";
   const martin = "usuario-martin";
   const sofia = "usuario-sofia";
+  const diego = "usuario-diego";
+  const valentina = "usuario-valentina";
   const proximo = new Date(Math.round((ahora.getTime() + 24 * HORA_MS) / HORA_MS) * HORA_MS);
   // La hora en punto más cercana a `ahora + 2 h` (feature 008, R12): su ventana de uso (4 h antes,
   // 12 h después) está abierta desde el arranque y durante al menos 12 horas, para la demo del ingreso.
@@ -198,6 +200,63 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { nombre: "Con cena", descripcion: "Mesa con cena criolla incluida.", precio: 15000, cupo: 38 },
       ],
     },
+    // Feature 013 (R11): cinco próximos más, de organizadores y categorías variados y sin compras,
+    // para que Explorar tenga 12 próximos sin filtros (2 páginas: 10 + 2).
+    {
+      slug: "feria-del-libro-independiente",
+      nombre: "Feria del libro independiente",
+      descripcion: "Editoriales chicas, lecturas y firmas de autores.",
+      categoriaId: categoriaId("Conferencias"),
+      fechaHora: fechaLocal(ahora, 3, 17),
+      multimedia: [imagen("feria-del-libro")],
+      organizadorId: martin,
+      tiposEntrada: [{ nombre: "General", descripcion: "Acceso a la feria.", precio: 3000, cupo: 400 }],
+    },
+    {
+      slug: "match-de-impro",
+      nombre: "Match de improvisación teatral",
+      descripcion: "Dos equipos improvisan escenas con las propuestas del público.",
+      categoriaId: categoriaId("Teatro"),
+      fechaHora: fechaLocal(ahora, 8, 21),
+      multimedia: [imagen("match-de-impro")],
+      organizadorId: sofia,
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 9000, cupo: 120 }],
+    },
+    {
+      slug: "torneo-de-futbol-5",
+      nombre: "Torneo de fútbol 5",
+      descripcion: "Un día de partidos entre equipos del barrio.",
+      categoriaId: categoriaId("Deportes"),
+      fechaHora: fechaLocal(ahora, 12, 10),
+      multimedia: [imagen("torneo-futbol-5")],
+      organizadorId: sofia,
+      tiposEntrada: [
+        { nombre: "Equipo", descripcion: "Inscripción de un equipo de 5.", precio: 40000, cupo: 16 },
+      ],
+    },
+    {
+      slug: "microfono-abierto",
+      nombre: "Stand-up: Micrófono abierto",
+      descripcion: "Comediantes nuevos prueban su material.",
+      categoriaId: categoriaId("Stand-up"),
+      fechaHora: fechaLocal(ahora, 20, 22),
+      multimedia: [imagen("microfono-abierto")],
+      organizadorId: martin,
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 5000, cupo: 60 }],
+    },
+    {
+      slug: "feria-de-cerveza-artesanal",
+      nombre: "Feria de cerveza artesanal",
+      descripcion: "Cervecerías de todo el país, música y comida.",
+      categoriaId: categoriaId("Festivales"),
+      fechaHora: fechaLocal(ahora, 25, 16),
+      multimedia: [imagen("cerveza-artesanal")],
+      organizadorId: lucia,
+      tiposEntrada: [
+        { nombre: "General", descripcion: "Acceso al predio.", precio: 10000, cupo: 800 },
+        { nombre: "Degustación", descripcion: "Vaso y cinco degustaciones.", precio: 22000, cupo: 150 },
+      ],
+    },
   ];
 
   const eventos = eventosSinIds.map(
@@ -217,7 +276,6 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   // venció sin pagarse (CANCELADA por el sistema; no devuelve cupo de nuevo). Ninguna PENDIENTE: la
   // demo no depende de la hora de arranque.
   const festival = "festival-sonidos-del-sur";
-  const diego = "usuario-diego";
   const porMartin = { tipo: "usuario", usuarioId: martin } as const;
   const masMinutos = (fecha: Date, minutos: number) => new Date(fecha.getTime() + minutos * 60 * 1000);
   const haceMartin = new Date(ahora.getTime() - 2 * 24 * HORA_MS);
@@ -330,7 +388,6 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   // después de pagarla y espera el reembolso; la de Valentina ya está reembolsada. Las dos liberaron
   // su cupo al cancelarse, así que Inscripción sigue en 1000.
   const maraton = "maraton-10k";
-  const valentina = "usuario-valentina";
   const porDiego = { tipo: "usuario", usuarioId: diego } as const;
   const porValentina = { tipo: "usuario", usuarioId: valentina } as const;
   const dias = (cantidad: number) => new Date(ahora.getTime() - cantidad * 24 * HORA_MS);

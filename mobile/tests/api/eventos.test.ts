@@ -86,6 +86,20 @@ describe("listarEventos (catálogo, R13)", () => {
     );
   });
 
+  it("agrega pagina al final solo si es distinta de 1 (feature 013)", async () => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { texto: "rock", pagina: 2 });
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos?texto=rock&orden=fecha&sentido=asc&pagina=2`);
+  });
+
+  it.each([1, undefined])("con pagina %s no manda pagina (la URL de la 005)", async (pagina) => {
+    const { cliente, falso } = armar({ status: 200, json: catalogo });
+
+    await listarEventos(cliente, { pagina });
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos?orden=fecha&sentido=asc`);
+  });
+
   it("manda el sentido pedido", async () => {
     const { cliente, falso } = armar({ status: 200, json: catalogo });
 

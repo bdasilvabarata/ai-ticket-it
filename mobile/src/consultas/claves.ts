@@ -6,6 +6,8 @@ export interface ClaveCatalogo {
   categoriaId: string | null;
   orden: OrdenCatalogo;
   sentido: SentidoCatalogo;
+  /** La página pedida, desde 1 (feature 013). */
+  pagina: number;
 }
 
 /**

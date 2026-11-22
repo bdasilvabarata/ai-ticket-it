@@ -14,6 +14,14 @@ const ahora = new Date("2026-11-03T15:30:00.000Z");
 const datos = crearDatosEjemplo(ahora);
 const { categorias, usuarios, eventos, compras } = datos;
 const tipos = eventos.flatMap((evento) => evento.tiposEntrada);
+/** Los próximos que suma la feature 013 (R11) para que el catálogo tenga 2 páginas. */
+const NUEVOS_DE_LA_013 = [
+  "evento-feria-del-libro-independiente",
+  "evento-match-de-impro",
+  "evento-torneo-de-futbol-5",
+  "evento-microfono-abierto",
+  "evento-feria-de-cerveza-artesanal",
+];
 
 function contarPorOrganizador(): Map<string, number> {
   const cuenta = new Map<string, number>();
@@ -29,12 +37,12 @@ describe("crearDatosEjemplo", () => {
     expect(categorias).toHaveLength(6);
   });
 
-  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 4, 3 y 2; Diego y Valentina ninguno", () => {
+  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 5, 5 y 4; Diego y Valentina ninguno", () => {
     expect(usuarios).toHaveLength(5);
     const cuenta = contarPorOrganizador();
-    expect(cuenta.get("usuario-lucia")).toBe(4);
-    expect(cuenta.get("usuario-martin")).toBe(3);
-    expect(cuenta.get("usuario-sofia")).toBe(2);
+    expect(cuenta.get("usuario-lucia")).toBe(5);
+    expect(cuenta.get("usuario-martin")).toBe(5);
+    expect(cuenta.get("usuario-sofia")).toBe(4);
     expect(cuenta.has("usuario-diego")).toBe(false);
     expect(cuenta.has("usuario-valentina")).toBe(false);
     const organizan = usuarios.filter((usuario) => cuenta.has(usuario.id));
@@ -42,8 +50,8 @@ describe("crearDatosEjemplo", () => {
     expect(usuarios.length - organizan.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("tiene 9 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
-    expect(eventos).toHaveLength(9);
+  it("tiene 14 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
+    expect(eventos).toHaveLength(14);
     expect(new Set(eventos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(2);
     expect(new Set(eventos.map((evento) => evento.categoriaId)).size).toBeGreaterThanOrEqual(2);
     for (const evento of eventos) expect(evento.tiposEntrada.length).toBeGreaterThanOrEqual(1);
@@ -86,10 +94,21 @@ describe("crearDatosEjemplo", () => {
     expect(eventos.find((e) => e.id === "evento-hamlet")?.estaAgotado()).toBe(true);
   });
 
-  it("tiene 7 eventos próximos y 2 realizados", () => {
+  it("tiene 12 eventos próximos (2 páginas del catálogo: 10 + 2, feature 013) y 2 realizados", () => {
     const realizados = eventos.filter((evento) => evento.estaRealizado(ahora));
     expect(realizados).toHaveLength(2);
-    expect(eventos.length - realizados.length).toBe(7);
+    expect(eventos.length - realizados.length).toBe(12);
+  });
+
+  it("los 5 próximos de la 013 no tienen compras y son de varios organizadores y categorías (R11)", () => {
+    const nuevos = eventos.filter((evento) => NUEVOS_DE_LA_013.includes(evento.id));
+    expect(nuevos).toHaveLength(5);
+    for (const evento of nuevos) {
+      expect(evento.estaRealizado(ahora)).toBe(false);
+      expect(compras.some((compra) => compra.eventoId === evento.id)).toBe(false);
+    }
+    expect(new Set(nuevos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(3);
+    expect(new Set(nuevos.map((evento) => evento.categoriaId)).size).toBe(5);
   });
 
   it("usa precios y cupos enteros no negativos", () => {
