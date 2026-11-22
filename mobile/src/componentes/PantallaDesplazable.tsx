@@ -1,5 +1,5 @@
 import { HeaderHeightContext } from "expo-router/react-navigation";
-import { useContext, useRef, type ReactNode } from "react";
+import { useContext, useEffect, useRef, type ReactNode } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -20,6 +20,11 @@ export interface PropsPantallaDesplazable {
    * contenido, desplaza hasta el final sin animación. Sin la prop, la pantalla abre arriba.
    */
   empezarAlFinal?: boolean;
+  /**
+   * Vuelve arriba sin animación cada vez que cambia este valor (feature 013: la página de una lista
+   * paginada), pero no al montar. Sin la prop, la pantalla no se desplaza sola.
+   */
+  volverArribaCon?: unknown;
 }
 
 /**
@@ -35,6 +40,7 @@ export function PantallaDesplazable({
   children,
   separacion = tema.espacio.amplio,
   empezarAlFinal = false,
+  volverArribaCon,
 }: PropsPantallaDesplazable) {
   const { bottom } = useSafeAreaInsets();
   // Fuera de un navegador (tests de componentes) no hay header: 0.
@@ -44,6 +50,12 @@ export function PantallaDesplazable({
   const alCambiarElContenido = empezarAlFinal
     ? () => scroll.current?.scrollToEnd({ animated: false })
     : undefined;
+  const valorAnterior = useRef(volverArribaCon);
+  useEffect(() => {
+    if (Object.is(valorAnterior.current, volverArribaCon)) return;
+    valorAnterior.current = volverArribaCon;
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [volverArribaCon]);
 
   return (
     <KeyboardAvoidingView

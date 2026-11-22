@@ -72,4 +72,57 @@ describe("PantallaDesplazable", () => {
 
     expect(scrollToEnd).not.toHaveBeenCalled();
   });
+
+  describe("«volverArribaCon» (feature 013)", () => {
+    const scrollTo = jest.spyOn(ScrollView.prototype, "scrollTo");
+    beforeEach(() => scrollTo.mockClear());
+
+    function Pantalla({ valor }: { valor: unknown }) {
+      return (
+        <SafeAreaProvider initialMetrics={metricas}>
+          <PantallaDesplazable volverArribaCon={valor}>
+            <Text>Lista</Text>
+          </PantallaDesplazable>
+        </SafeAreaProvider>
+      );
+    }
+
+    it("al montar no desplaza", async () => {
+      await render(<Pantalla valor={1} />);
+
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it("cuando cambia el valor vuelve arriba sin animación", async () => {
+      const { rerender } = await render(<Pantalla valor={1} />);
+
+      await rerender(<Pantalla valor={2} />);
+
+      expect(scrollTo).toHaveBeenCalledTimes(1);
+      expect(scrollTo).toHaveBeenCalledWith({ y: 0, animated: false });
+    });
+
+    it("con el mismo valor no vuelve a desplazar", async () => {
+      const { rerender } = await render(<Pantalla valor={2} />);
+
+      await rerender(<Pantalla valor={2} />);
+
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+
+    it("sin la prop, volver a dibujar no desplaza", async () => {
+      const contenido = (texto: string) => (
+        <SafeAreaProvider initialMetrics={metricas}>
+          <PantallaDesplazable>
+            <Text>{texto}</Text>
+          </PantallaDesplazable>
+        </SafeAreaProvider>
+      );
+      const { rerender } = await render(contenido("Uno"));
+
+      await rerender(contenido("Dos"));
+
+      expect(scrollTo).not.toHaveBeenCalled();
+    });
+  });
 });
