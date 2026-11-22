@@ -4,7 +4,15 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { Boton, EtiquetaEstadoCompra, hundido, tema } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
-import { textoAccionDePago, textoAvisoDeMiCompra, textoCantidad, textoTotal } from "../formato";
+import {
+  textoAccionDePago,
+  textoAvisoDeMiCompra,
+  textoCantidad,
+  textoReseniaPropia,
+  textoTotal,
+} from "../formato";
+import { BotonReseniar } from "./ReseniaDeLaCompra";
+import { ReseniaPropia } from "./ReseniaPropia";
 
 export interface PropsFilaMiCompra {
   compra: MiCompraVista;
@@ -19,11 +27,13 @@ export interface PropsFilaMiCompra {
 export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
   const tipo = compra.tipoEntrada.nombre;
   const aviso = textoAvisoDeMiCompra(compra);
+  const etiqueta = `Ver la compra de ${compra.cantidad} ${tipo} para ${compra.evento.nombre}`;
   return (
     <View style={estilos.contenedor}>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Ver la compra de ${compra.cantidad} ${tipo} para ${compra.evento.nombre}`}
+        // La reseña propia se lee con la fila (feature 012): va adentro de sus datos.
+        accessibilityLabel={compra.resenia ? `${etiqueta}. ${textoReseniaPropia(compra.resenia)}` : etiqueta}
         onPress={() => abrirCompra(compra.id)}
         style={({ pressed }) => [estilos.tarjeta, pressed ? hundido : estilos.sombra]}
       >
@@ -36,7 +46,10 @@ export function FilaMiCompra({ compra }: PropsFilaMiCompra) {
           <EtiquetaEstadoCompra estado={compra.estado} />
           {aviso !== null && <Text style={estilos.aviso}>{aviso}</Text>}
         </View>
+        {compra.resenia ? <ReseniaPropia resenia={compra.resenia} /> : null}
       </Pressable>
+      {/* Como "Pagar": hermano de los datos, para que TalkBack lo enfoque por separado (FR-012). */}
+      <BotonReseniar compra={compra} />
       {compra.estado === EstadoCompra.PENDIENTE && (
         <View style={estilos.acciones}>
           <Boton

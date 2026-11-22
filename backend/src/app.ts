@@ -72,6 +72,7 @@ export function crearApp({ repositorios = {}, reloj = relojDelSistema }: Opcione
     eventoService,
     tipoEntradaService,
     usuarioService,
+    reseniaService,
     cerrojo,
     reloj,
   });

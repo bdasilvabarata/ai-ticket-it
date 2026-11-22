@@ -3,6 +3,7 @@ import { Categoria, type DatosCategoria } from "../domain/categoria";
 import { Compra, Entrada, Mensaje } from "../domain/compra";
 import { Evento, TipoEntrada, type PropiedadesEvento, type PropiedadesTipoEntrada } from "../domain/evento";
 import { horaDeBuenosAires, instanteDesdeHoraDeBuenosAires } from "../domain/hora-buenos-aires";
+import { Resenia } from "../domain/resenia";
 import { Usuario, type DatosUsuario } from "../domain/usuario";
 
 export interface DatosEjemplo {
@@ -10,6 +11,7 @@ export interface DatosEjemplo {
   usuarios: Usuario[];
   eventos: Evento[];
   compras: Compra[];
+  resenias: Resenia[];
 }
 
 const HORA_MS = 60 * 60 * 1000;
@@ -154,7 +156,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       fechaHora: fechaLocal(ahora, -3, 22),
       multimedia: [imagen("noche-de-risas")],
       organizadorId: sofia,
-      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 12000, cupo: 80 }],
+      // El cupo ya descuenta las 2 compras utilizadas de abajo (feature 012): 80 − 2.
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 12000, cupo: 78 }],
     },
     {
       slug: "jazz-en-el-patio",
@@ -164,7 +167,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       fechaHora: fechaLocal(ahora, -10, 21),
       multimedia: [imagen("jazz-patio")],
       organizadorId: martin,
-      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 60 }],
+      // El cupo ya descuenta las 3 compras utilizadas de abajo (feature 012): 60 − 3.
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 57 }],
     },
     {
       slug: "maraton-10k",
@@ -372,10 +376,120 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     }),
   );
 
+  // Reseñas (feature 012, R10): compras UTILIZADA de una entrada en dos eventos ya realizados, cada
+  // una con su reseña posterior al uso. Martín (Jazz) queda en ≈ 4,7 con 3 reseñas y Sofía (Noche de
+  // risas) en 2,5 con 2; Lucía, sin reseñas. La de Martín en la Peña sigue sin reseña (la demo).
+  const eventoPorId = new Map(eventos.map((evento) => [evento.id, evento]));
+  const resenias: Resenia[] = [];
+  const asistencias: {
+    slugEvento: string;
+    autor: string;
+    codigo: string;
+    /** Minutos desde el inicio del evento hasta el uso (dentro de la ventana). */
+    usoMinutos: number;
+    /** Horas desde el inicio del evento hasta la reseña. */
+    reseniaHoras: number;
+    puntuacion: number;
+    comentario: string | null;
+  }[] = [
+    {
+      slugEvento: "jazz-en-el-patio",
+      autor: "lucia",
+      codigo: "JZPT1A01",
+      usoMinutos: -30,
+      reseniaHoras: 14,
+      puntuacion: 5,
+      comentario: "Una noche hermosa: el cuarteto sonó impecable y el patio estaba lindísimo.",
+    },
+    {
+      slugEvento: "jazz-en-el-patio",
+      autor: "diego",
+      codigo: "JZPT1D01",
+      usoMinutos: -20,
+      reseniaHoras: 2 * 24,
+      puntuacion: 4,
+      comentario: "Muy buena música. Hizo un poco de frío, pero valió la pena.",
+    },
+    {
+      slugEvento: "jazz-en-el-patio",
+      autor: "valentina",
+      codigo: "JZPT1V01",
+      usoMinutos: -10,
+      reseniaHoras: 5 * 24,
+      puntuacion: 5,
+      comentario: "Excelente organización, entramos rapidísimo.",
+    },
+    {
+      slugEvento: "noche-de-risas",
+      autor: "diego",
+      codigo: "NDRS1D01",
+      usoMinutos: -25,
+      reseniaHoras: 20,
+      puntuacion: 3,
+      comentario: "Algunos comediantes muy buenos, otros no tanto. Arrancó tarde.",
+    },
+    {
+      slugEvento: "noche-de-risas",
+      autor: "valentina",
+      codigo: "NDRS1V01",
+      usoMinutos: -15,
+      reseniaHoras: 2 * 24,
+      puntuacion: 2,
+      comentario: null,
+    },
+  ];
+  for (const asistencia of asistencias) {
+    const evento = eventoPorId.get(`evento-${asistencia.slugEvento}`);
+    const tipo = evento?.tiposEntrada[0];
+    if (evento === undefined || tipo === undefined) {
+      throw new Error(`Seed inconsistente: falta el evento ${asistencia.slugEvento} o su tipo`);
+    }
+    const comprador = `usuario-${asistencia.autor}`;
+    const porComprador = { tipo: "usuario", usuarioId: comprador } as const;
+    const alta = new Date(evento.fechaHora.getTime() - 5 * 24 * HORA_MS);
+    const uso = masMinutos(evento.fechaHora, asistencia.usoMinutos);
+    compras.push(
+      new Compra({
+        id: `compra-${asistencia.autor}-${asistencia.slugEvento}-general`,
+        compradorId: comprador,
+        eventoId: evento.id,
+        tipoEntradaId: tipo.id,
+        cantidad: 1,
+        total: tipo.precio,
+        historial: [
+          { estado: EstadoCompra.PENDIENTE, autor: porComprador, fechaHora: alta },
+          { estado: EstadoCompra.CONFIRMADA, autor: porComprador, fechaHora: masMinutos(alta, 5) },
+          {
+            estado: EstadoCompra.UTILIZADA,
+            autor: { tipo: "usuario", usuarioId: evento.organizadorId },
+            fechaHora: uso,
+          },
+        ],
+        entradas: [
+          new Entrada({
+            codigo: asistencia.codigo,
+            uso: { usuarioId: evento.organizadorId, fechaHora: uso },
+          }),
+        ],
+      }),
+    );
+    resenias.push(
+      new Resenia({
+        id: `resenia-${asistencia.autor}-${asistencia.slugEvento}`,
+        compradorId: comprador,
+        eventoId: evento.id,
+        puntuacion: asistencia.puntuacion,
+        comentario: asistencia.comentario,
+        creadaEn: new Date(evento.fechaHora.getTime() + asistencia.reseniaHoras * HORA_MS),
+      }),
+    );
+  }
+
   return {
     categorias: datosCategorias.map((datos) => new Categoria(datos)),
     usuarios: datosUsuarios.map((datos) => new Usuario(datos)),
     eventos,
     compras,
+    resenias,
   };
 }

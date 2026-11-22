@@ -5,6 +5,7 @@ import { Categoria } from "../../src/domain/categoria";
 import { esCodigoValido } from "../../src/domain/codigo-de-entrada";
 import { Compra } from "../../src/domain/compra";
 import { Evento, TipoEntrada } from "../../src/domain/evento";
+import { exigirQuePuedeReseniar, Resenia } from "../../src/domain/resenia";
 import { Usuario } from "../../src/domain/usuario";
 
 const HORA = 60 * 60 * 1000;
@@ -366,6 +367,95 @@ describe("crearDatosEjemplo", () => {
     it("la compra sigue CONFIRMADA y ninguna otra compra del seed tiene mensajes", () => {
       expect(vip.estado).toBe(EstadoCompra.CONFIRMADA);
       for (const otra of compras.filter((c) => c !== vip)) expect(otra.mensajes).toEqual([]);
+    });
+  });
+
+  describe("reseñas de Jazz en el Patio y de la Noche de risas (feature 012, R10)", () => {
+    const { resenias } = datos;
+    const porId = new Map(compras.map((c) => [c.id, c]));
+    const eventoPorId = new Map(eventos.map((e) => [e.id, e]));
+    const jazz = eventoPorId.get("evento-jazz-en-el-patio")!;
+    const risas = eventoPorId.get("evento-noche-de-risas")!;
+
+    it.each([
+      ["jazz-en-el-patio", "lucia"],
+      ["jazz-en-el-patio", "diego"],
+      ["jazz-en-el-patio", "valentina"],
+      ["noche-de-risas", "diego"],
+      ["noche-de-risas", "valentina"],
+    ])("%s: %s tiene una compra UTILIZADA de una entrada, usada dentro de la ventana", (evento, autor) => {
+      const compra = porId.get(`compra-${autor}-${evento}-general`)!;
+      const suEvento = eventoPorId.get(`evento-${evento}`)!;
+      expect(compra).toMatchObject({
+        compradorId: `usuario-${autor}`,
+        eventoId: suEvento.id,
+        tipoEntradaId: `tipo-${evento}-general`,
+        cantidad: 1,
+        total: suEvento.tiposEntrada[0]!.precio,
+        estado: EstadoCompra.UTILIZADA,
+      });
+      expect(compra.entradasUsadas).toBe(1);
+      const uso = compra.historial[compra.historial.length - 1]!;
+      expect(uso.autor).toEqual({ tipo: "usuario", usuarioId: suEvento.organizadorId });
+      const inicio = suEvento.fechaHora.getTime();
+      expect(uso.fechaHora.getTime()).toBeGreaterThanOrEqual(inicio - 4 * HORA);
+      expect(uso.fechaHora.getTime()).toBeLessThanOrEqual(inicio + 12 * HORA);
+      expect(compra.creadaEn.getTime()).toBeLessThan(inicio);
+    });
+
+    it("Jazz (Martín) tiene reseñas 5, 4 y 5; la Noche de risas (Sofía), 3 con comentario y 2 sin", () => {
+      expect(jazz.organizadorId).toBe("usuario-martin");
+      expect(risas.organizadorId).toBe("usuario-sofia");
+      expect(resenias.map((r) => [r.id, r.compradorId, r.eventoId, r.puntuacion])).toEqual([
+        ["resenia-lucia-jazz-en-el-patio", "usuario-lucia", jazz.id, 5],
+        ["resenia-diego-jazz-en-el-patio", "usuario-diego", jazz.id, 4],
+        ["resenia-valentina-jazz-en-el-patio", "usuario-valentina", jazz.id, 5],
+        ["resenia-diego-noche-de-risas", "usuario-diego", risas.id, 3],
+        ["resenia-valentina-noche-de-risas", "usuario-valentina", risas.id, 2],
+      ]);
+      expect(resenias.find((r) => r.id === "resenia-diego-noche-de-risas")?.comentario).not.toBeNull();
+      expect(resenias.find((r) => r.id === "resenia-valentina-noche-de-risas")?.comentario).toBeNull();
+      for (const resenia of resenias) expect(resenia).toBeInstanceOf(Resenia);
+    });
+
+    it("cada reseña cumple las reglas: compra UTILIZADA del autor, no organiza y una por autor y evento", () => {
+      const pares = resenias.map((r) => `${r.compradorId}|${r.eventoId}`);
+      expect(new Set(pares).size).toBe(pares.length);
+      for (const resenia of resenias) {
+        const evento = eventoPorId.get(resenia.eventoId)!;
+        const suyas = compras.filter(
+          (c) => c.eventoId === evento.id && c.compradorId === resenia.compradorId,
+        );
+        expect(() =>
+          exigirQuePuedeReseniar({ usuarioId: resenia.compradorId, evento, compras: suyas }),
+        ).not.toThrow();
+      }
+    });
+
+    it("cada reseña es posterior al uso y anterior al arranque, con fechas distintas", () => {
+      for (const resenia of resenias) {
+        // resenia-<autor>-<evento> ↔ compra-<autor>-<evento>-general
+        const compra = porId.get(`compra-${resenia.id.slice("resenia-".length)}-general`)!;
+        const uso = compra.historial[compra.historial.length - 1]!.fechaHora;
+        expect(resenia.creadaEn.getTime()).toBeGreaterThan(uso.getTime());
+        expect(resenia.creadaEn.getTime()).toBeLessThan(ahora.getTime());
+      }
+      const fechas = resenias.map((r) => r.creadaEn.getTime());
+      expect(new Set(fechas).size).toBe(fechas.length);
+    });
+
+    it("Lucía no tiene reseñas y la compra de Martín en la Peña sigue UTILIZADA, 1 de 3, sin reseña", () => {
+      const deLucia = new Set(eventos.filter((e) => e.organizadorId === "usuario-lucia").map((e) => e.id));
+      expect(resenias.filter((r) => deLucia.has(r.eventoId))).toEqual([]);
+      const pena = porId.get("compra-martin-pena-general")!;
+      expect(pena.estado).toBe(EstadoCompra.UTILIZADA);
+      expect(pena.entradasUsadas).toBe(1);
+      expect(resenias.some((r) => r.compradorId === "usuario-martin")).toBe(false);
+    });
+
+    it("los cupos descuentan las entradas nuevas: Jazz 60 − 3 y Noche de risas 80 − 2", () => {
+      expect(jazz.buscarTipoEntrada("tipo-jazz-en-el-patio-general")?.cupo).toBe(57);
+      expect(risas.buscarTipoEntrada("tipo-noche-de-risas-general")?.cupo).toBe(78);
     });
   });
 

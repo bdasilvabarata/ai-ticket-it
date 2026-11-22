@@ -1,4 +1,9 @@
-import type { CatalogoVista, EventoResumenVista, EventoVista } from "@ai-ticket-it/shared";
+import type {
+  CatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  ReseniasDelOrganizadorVista,
+} from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { EventoService } from "../services/evento.service";
@@ -26,6 +31,15 @@ export class EventoController {
   obtener = async (req: Request, res: Response<EventoVista>): Promise<void> => {
     const { eventoId } = eventoPorId.leer(req, "params");
     res.json(await this.eventoService.obtener(eventoId));
+  };
+
+  /** Público (feature 012): el organizador del evento con su puntaje y las reseñas de sus eventos. */
+  reseniasDelOrganizador = async (
+    req: Request,
+    res: Response<ReseniasDelOrganizadorVista>,
+  ): Promise<void> => {
+    const { eventoId } = eventoPorId.leer(req, "params");
+    res.json(await this.eventoService.reseniasDelOrganizador(eventoId));
   };
 
   actualizar = async (req: Request, res: Response<EventoVista>): Promise<void> => {

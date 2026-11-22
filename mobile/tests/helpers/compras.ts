@@ -9,6 +9,7 @@ import {
   type MiCompraVista,
   type MisComprasDelEventoVista,
   type ParteDeLaCompraVista,
+  type ReseniaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
@@ -63,7 +64,22 @@ export const compraPendiente: CompraVista = {
   reembolso: null,
   cancelable: true,
   motivoNoCancelable: null,
+  resenia: null,
+  puedeReseniar: false,
 };
+
+/** La reseña propia de Martín (feature 012): 4 de 5 con un comentario, salvo que se cambie. */
+export function reseniaDeEjemplo(cambios: Partial<ReseniaVista> = {}): ReseniaVista {
+  return {
+    id: "resenia-martin-maraton",
+    eventoId: maratonCompleta.id,
+    puntuacion: 4,
+    comentario: "Muy buena organización",
+    creadaEn: "2026-12-28T13:00:00.000Z",
+    creadaEnLocal: "2026-12-28T10:00",
+    ...cambios,
+  };
+}
 
 /** Los códigos de las 2 entradas de la compra de la Maratón, una vez pagada. */
 export const CODIGOS_DE_LA_MARATON = ["7K3MQ9TB", "4HXP2RVA"] as const;
@@ -243,6 +259,8 @@ export function miCompra(
     entradasUsadas,
     canceladaDesde,
     reembolso,
+    resenia,
+    puedeReseniar,
   } = base;
   return {
     id,
@@ -257,6 +275,8 @@ export function miCompra(
     entradasUsadas,
     canceladaDesde,
     reembolso,
+    resenia,
+    puedeReseniar,
     diasRestantes: null,
     canceladaPor: null,
     ...cambios,

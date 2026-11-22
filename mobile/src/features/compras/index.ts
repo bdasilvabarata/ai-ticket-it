@@ -6,3 +6,4 @@ export { DetalleEventoConCompras } from "./pantallas/DetalleEventoConCompras";
 export { MisCompras } from "./pantallas/MisCompras";
 export { MisEntradasDelEvento } from "./pantallas/MisEntradasDelEvento";
 export { RegistrarIngreso } from "./pantallas/RegistrarIngreso";
+export { ReseniarEvento } from "./pantallas/ReseniarEvento";

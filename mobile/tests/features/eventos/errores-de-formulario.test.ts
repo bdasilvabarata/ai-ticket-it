@@ -77,3 +77,32 @@ describe("errores de formulario (R13)", () => {
     expect(aNumeroParaEnviar(texto)).toBe(esperado);
   });
 });
+
+describe("el formulario de reseña (feature 012)", () => {
+  it("un 400 lleva body.puntuacion y body.comentario a sus campos", () => {
+    expect(
+      erroresDeFormulario(
+        invalida([
+          { campo: "body.puntuacion", mensaje: "Es obligatorio." },
+          { campo: "body.comentario", mensaje: "Debe tener como máximo 500 caracteres." },
+        ]),
+        "resenia",
+      ),
+    ).toEqual({
+      campos: { puntuacion: "Es obligatorio.", comentario: "Debe tener como máximo 500 caracteres." },
+      mensajeGeneral: null,
+    });
+  });
+
+  it.each(["RESENIA_REPETIDA", "SIN_COMPRA_UTILIZADA", "RESENIA_PROPIO_EVENTO"])(
+    "un 409 %s va en el mensaje general con el mensaje del servidor",
+    (codigo) => {
+      expect(
+        erroresDeFormulario(new ErrorDeApi(409, codigo, "Ya reseñaste este evento."), "resenia"),
+      ).toEqual({
+        campos: {},
+        mensajeGeneral: "Ya reseñaste este evento.",
+      });
+    },
+  );
+});

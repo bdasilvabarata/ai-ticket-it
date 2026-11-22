@@ -4,6 +4,7 @@ import type {
   DatosMensaje,
   EntradaDelEventoVista,
   MensajeVista,
+  ReseniaVista,
 } from "@ai-ticket-it/shared";
 import { useMutation, useQueryClient, type Query, type UseMutationResult } from "@tanstack/react-query";
 
@@ -15,6 +16,8 @@ import {
   ErrorDeApi,
   pagarCompra,
   registrarUsoDeEntrada,
+  reseniarEvento,
+  type CuerpoResenia,
 } from "../../api";
 import { claves } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
@@ -164,6 +167,39 @@ export function useConfirmarReembolso(
         queryClient.invalidateQueries({ queryKey: ["mis-compras-del-evento"] }),
         queryClient.invalidateQueries({ queryKey: ["chat-de-la-compra"] }),
       ]),
+  });
+}
+
+/** Lo que una reseña nueva cambia: la reseña propia en las compras y el puntaje del organizador. */
+const PREFIJOS_CON_RESENIAS = [
+  "compra",
+  "mis-compras",
+  "mis-compras-del-evento",
+  "evento",
+  "catalogo",
+  "resenias-del-organizador",
+] as const;
+
+/**
+ * Reseña el evento de una compra UTILIZADA (feature 012, R11), en nombre del usuario de la pantalla y
+ * sin reintentos. Con éxito invalida, por prefijo, lo que muestra la reseña propia (`["compra"]`,
+ * `["mis-compras"]`, `["mis-compras-del-evento"]`) y lo que muestra el puntaje del organizador
+ * (`["evento"]`, `["catalogo"]` y `["resenias-del-organizador"]`).
+ */
+export function useReseniarEvento(
+  usuarioId: string,
+  eventoId: string,
+): UseMutationResult<ReseniaVista, Error, CuerpoResenia> {
+  const cliente = useClienteApi();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (datos: CuerpoResenia) => reseniarEvento(cliente, eventoId, datos, { usuarioId }),
+    // Sin esperar las relecturas: la pantalla sale apenas responde el servidor (si esperara, la compra
+    // releída ya no es reseñable y el formulario se desmontaría antes de volver).
+    onSuccess: () => {
+      for (const prefijo of PREFIJOS_CON_RESENIAS)
+        void queryClient.invalidateQueries({ queryKey: [prefijo] });
+    },
   });
 }
 

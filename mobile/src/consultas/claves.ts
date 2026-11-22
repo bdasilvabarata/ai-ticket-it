@@ -47,6 +47,12 @@ export const claves = {
   chatDeLaCompra: (usuarioId: string, compraId: string) =>
     ["chat-de-la-compra", usuarioId, compraId] as const,
   /**
+   * "Reseñas del organizador" de un evento (feature 012). No comparte prefijo con `["evento"]`: la
+   * sección tiene sus propios estados y se invalida aparte.
+   */
+  reseniasDelOrganizador: (usuarioId: string, eventoId: string) =>
+    ["resenias-del-organizador", usuarioId, eventoId] as const,
+  /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.
    */

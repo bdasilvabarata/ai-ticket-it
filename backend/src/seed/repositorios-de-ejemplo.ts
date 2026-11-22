@@ -25,13 +25,13 @@ export interface Repositorios {
  * crea su propio estado: el servidor arranca con una y cada test puede pedir la suya.
  */
 export function crearRepositoriosDeEjemplo(ahora: Date = new Date()): Repositorios {
-  const { usuarios, categorias, eventos, compras } = crearDatosEjemplo(ahora);
+  const { usuarios, categorias, eventos, compras, resenias } = crearDatosEjemplo(ahora);
   return {
     usuarios: new UsuarioRepository(usuarios),
     categorias: new CategoriaRepository(categorias),
     eventos: new EventoRepository(eventos),
     compras: new CompraRepository(compras),
-    // Sin reseñas: todos los organizadores salen "sin puntaje" hasta la 012 (FR-010).
-    resenias: new ReseniaRepository([]),
+    // Feature 012 (R10): Martín y Sofía con reseñas; Lucía, sin puntaje.
+    resenias: new ReseniaRepository(resenias),
   };
 }

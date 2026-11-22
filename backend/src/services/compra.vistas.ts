@@ -8,6 +8,7 @@ import {
   type MiCompraVista,
   type ReembolsoVista,
   type ResumenTipoEntradaVista,
+  type ReseniaVista,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 import type { CambioEstadoCompra, Compra, Entrada } from "../domain/compra";
@@ -15,8 +16,10 @@ import type { ResumenDeTipo } from "../domain/compras-del-evento";
 import { diasRestantes } from "../domain/dias-restantes";
 import type { Evento } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
+import type { Resenia } from "../domain/resenia";
 import type { Usuario } from "../domain/usuario";
 import { estadoDeVentana, ventanaDeUso } from "../domain/ventana-de-uso";
+import { aReseniaVista } from "./resenia.vistas";
 
 // Vistas explícitas de compras (principio V): campos elegidos, nunca la entidad completa.
 
@@ -99,9 +102,25 @@ function estadoDeLaCompra(compra: Compra): {
   };
 }
 
+/**
+ * La reseña propia en una compra del comprador (feature 012, R6): `resenia` (la suya en ese evento)
+ * solo si la compra está UTILIZADA, y `puedeReseniar` si además todavía no reseñó. Lo decide el
+ * servidor en cada consulta; `resenia` es la del comprador en el evento de la compra, o `null`.
+ */
+export function reseniaDeLaCompra(
+  compra: Compra,
+  resenia: Resenia | null,
+): { resenia: ReseniaVista | null; puedeReseniar: boolean } {
+  const utilizada = compra.estado === EstadoCompra.UTILIZADA;
+  return {
+    resenia: utilizada && resenia ? aReseniaVista(resenia) : null,
+    puedeReseniar: utilizada && resenia === null,
+  };
+}
+
 type DatosComunes = Omit<
   CompraVista,
-  "compradorId" | "historial" | "entradas" | "cancelable" | "motivoNoCancelable"
+  "compradorId" | "historial" | "entradas" | "cancelable" | "motivoNoCancelable" | "resenia" | "puedeReseniar"
 >;
 
 /**
@@ -132,9 +151,15 @@ function datosComunes(compra: Compra, evento: Evento, ahora: Date): DatosComunes
 /**
  * La compra con su evento, su comprador y su historial (feature 006), más sus entradas con código
  * solo si está CONFIRMADA o UTILIZADA (feature 008, R11: es una vista para su comprador) y si se
- * puede cancelar en `ahora` (feature 009, R6).
+ * puede cancelar en `ahora` (feature 009, R6), y la reseña de su comprador a ese evento (feature 012;
+ * `null` donde la compra no puede estar UTILIZADA).
  */
-export function aCompraVista(compra: Compra, evento: Evento, ahora: Date): CompraVista {
+export function aCompraVista(
+  compra: Compra,
+  evento: Evento,
+  ahora: Date,
+  resenia: Resenia | null,
+): CompraVista {
   const { id, ...resto } = datosComunes(compra, evento, ahora);
   const conCodigos = compra.estado === EstadoCompra.CONFIRMADA || compra.estado === EstadoCompra.UTILIZADA;
   const motivoNoCancelable = compra.motivoNoCancelable(evento.fechaHora, ahora);
@@ -146,6 +171,7 @@ export function aCompraVista(compra: Compra, evento: Evento, ahora: Date): Compr
     entradas: conCodigos ? compra.entradas.map((entrada) => aEntradaVista(entrada, compra)) : [],
     cancelable: motivoNoCancelable === null,
     motivoNoCancelable,
+    ...reseniaDeLaCompra(compra, resenia),
   };
 }
 
@@ -154,12 +180,18 @@ export function aCompraVista(compra: Compra, evento: Evento, ahora: Date): Compr
  * la canceló (en CANCELADA o REEMBOLSADA: el sistema si venció sin pagarse, si no, su comprador) y
  * los días de calendario que faltan para el evento (solo si está CONFIRMADA; `null` si ya empezó).
  */
-export function aMiCompraVista(compra: Compra, evento: Evento, ahora: Date): MiCompraVista {
+export function aMiCompraVista(
+  compra: Compra,
+  evento: Evento,
+  ahora: Date,
+  resenia: Resenia | null,
+): MiCompraVista {
   const confirmada = compra.estado === EstadoCompra.CONFIRMADA;
   return {
     ...datosComunes(compra, evento, ahora),
     diasRestantes: confirmada ? diasRestantes(evento.fechaHora, ahora) : null,
     canceladaPor: canceladaPor(compra),
+    ...reseniaDeLaCompra(compra, resenia),
   };
 }
 

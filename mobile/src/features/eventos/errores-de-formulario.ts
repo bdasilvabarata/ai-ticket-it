@@ -19,7 +19,10 @@ const PREFIJO_CUERPO = "body.";
  * muestra junto a cada campo lo que respondió el servidor. `formulario` decide dónde va un nombre
  * de tipo repetido: arriba de la sección de tipos (evento) o debajo del nombre (tipo).
  */
-export function erroresDeFormulario(error: unknown, formulario: "evento" | "tipo"): ErroresDeFormulario {
+export function erroresDeFormulario(
+  error: unknown,
+  formulario: "evento" | "tipo" | "resenia",
+): ErroresDeFormulario {
   // Sin servidor no hay mensaje propio: lo muestra la franja, y lo cargado sigue en el formulario.
   if (error instanceof ServidorNoDisponibleError) return SIN_ERRORES;
   if (!(error instanceof ErrorDeApi)) return { campos: {}, mensajeGeneral: "Ocurrió un error inesperado." };

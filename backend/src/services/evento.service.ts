@@ -5,6 +5,7 @@ import type {
   EventoVista,
   OrdenCatalogo,
   OrganizadorVista,
+  ReseniasDelOrganizadorVista,
   SentidoCatalogo,
 } from "@ai-ticket-it/shared";
 import {
@@ -15,6 +16,7 @@ import {
   type DatosDeTipoEntrada,
 } from "../domain/evento";
 import { palabrasDeBusqueda } from "../domain/busqueda";
+import { calcularPuntaje } from "../domain/resenia";
 import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
@@ -23,6 +25,7 @@ import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
 import type { ReseniaService } from "./resenia.service";
+import { aReseniasDelOrganizadorVista, delLote } from "./resenia.vistas";
 import type { UsuarioService } from "./usuario.service";
 import type { VencimientoService } from "./vencimiento.service";
 
@@ -228,6 +231,29 @@ export class EventoService {
       throw new NoEncontradoError("EVENTO_NO_ENCONTRADO", "No existe el evento.");
     }
     return eventos;
+  }
+
+  /**
+   * "Reseñas del organizador" (feature 012, R7): el organizador del evento con su puntaje y las
+   * reseñas de **todos** sus eventos, de la más reciente a la más vieja. Lectura pública, sin cerrojo
+   * ni reloj, con cuatro lecturas fijas: el evento (404), los eventos del organizador, sus reseñas y
+   * los usuarios en lote (el organizador y los autores).
+   */
+  async reseniasDelOrganizador(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+    const { organizadorId } = await this.obtenerOFallar(eventoId);
+    const susEventos = await this.#eventos.listarPorOrganizador(organizadorId);
+    const resenias = await this.#reseniaService.listarDeEventos(susEventos);
+    const autores = resenias.map((resenia) => resenia.compradorId);
+    const usuarios = await this.#usuarioService.obtenerPorIds([...new Set([organizadorId, ...autores])]);
+    // El mismo cálculo y el mismo conjunto que `#organizadorVista` (FR-018), sin otra lectura.
+    const puntaje = calcularPuntaje(resenias.map((resenia) => resenia.puntuacion));
+    const organizador = aOrganizadorVista(delLote(usuarios, organizadorId, "el usuario"), puntaje);
+    return aReseniasDelOrganizadorVista(
+      organizador,
+      resenias,
+      usuarios,
+      new Map(susEventos.map((evento) => [evento.id, evento])),
+    );
   }
 
   /** Único lugar que busca un evento por id y lanza 404 si no existe. Lo usan los otros services. */

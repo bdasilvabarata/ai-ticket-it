@@ -32,10 +32,14 @@ describe("crearRepositoriosDeEjemplo", () => {
     ]);
   });
 
-  it("no carga reseñas: todos los organizadores salen sin puntaje", async () => {
+  it("carga las reseñas de ejemplo (feature 012, R10)", async () => {
     const { resenias } = crearRepositoriosDeEjemplo(ahora);
-    const ids = crearDatosEjemplo(ahora).eventos.map((e) => e.id);
-    expect(await resenias.listarPorEventos(ids)).toEqual([]);
+    const esperados = crearDatosEjemplo(ahora);
+    const ids = esperados.eventos.map((e) => e.id);
+    expect((await resenias.listarPorEventos(ids)).map((r) => r.id).toSorted()).toEqual(
+      esperados.resenias.map((r) => r.id).toSorted(),
+    );
+    expect(await resenias.listarPorComprador("usuario-martin")).toEqual([]);
   });
 
   it("es determinista: dos llamadas con el mismo instante dan los mismos datos", async () => {

@@ -10,11 +10,12 @@ import {
   type MotivoNoCancelable,
   type ParteDeLaCompraVista,
   type ResumenTipoEntradaVista,
+  type ReseniaVista,
   type RolEnLaCompra,
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
-import { textoFechaHora, textoPrecio } from "../eventos";
+import { textoFechaHora, textoPrecio, textoPuntuacion } from "../eventos";
 import { nombreCompleto } from "../usuarios";
 
 /** 0 → "Gratis"; 240000 → "$ 240.000". */
@@ -274,4 +275,19 @@ export function textoAutorDelMensaje(mensaje: MensajeVista, usuarioId: string): 
 export function etiquetaDelMensaje(mensaje: MensajeVista, usuarioId: string): string {
   const autor = mensaje.autor.id === usuarioId ? "Vos" : nombreCompleto(mensaje.autor);
   return `${autor}, ${mensaje.autor.rol}, ${textoFechaHora(mensaje.enviadoEnLocal)}: ${mensaje.texto}`;
+}
+
+/**
+ * Por qué "Reseñar evento" no muestra el formulario (feature 012), según lo que dice el servidor: ya
+ * la reseñó, o la compra no está UTILIZADA. Si puede reseñar, `null`.
+ */
+export function textoAvisoResenia(compra: CompraVista): string | null {
+  if (compra.resenia) return "Ya reseñaste este evento";
+  return compra.puedeReseniar ? null : "Solo podés reseñar un evento al que asististe.";
+}
+
+/** La reseña propia leída en la etiqueta de una fila de "Mis compras" (feature 012). */
+export function textoReseniaPropia(resenia: ReseniaVista): string {
+  const puntuacion = `Tu reseña: ${textoPuntuacion(resenia.puntuacion)}`;
+  return resenia.comentario ? `${puntuacion}. ${resenia.comentario}` : puntuacion;
 }

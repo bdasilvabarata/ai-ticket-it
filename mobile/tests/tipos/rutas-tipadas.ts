@@ -55,3 +55,12 @@ export const chatDeLaCompra: Href = {
 
 // @ts-expect-error el chat de la compra necesita su parámetro compraId
 export const chatSinCompra: Href = { pathname: "/compras/[compraId]/chat" };
+
+// Reseñar evento (feature 012): necesita el parámetro compraId.
+export const reseniarEvento: Href = {
+  pathname: "/compras/[compraId]/resenia",
+  params: { compraId: "compra-martin-pena-general" },
+};
+
+// @ts-expect-error reseñar el evento necesita el parámetro compraId de la compra
+export const reseniarSinCompra: Href = { pathname: "/compras/[compraId]/resenia" };

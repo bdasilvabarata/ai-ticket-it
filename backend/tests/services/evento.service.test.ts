@@ -3,10 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { Compra } from "../../src/domain/compra";
 import { ReglaDeNegocioError } from "../../src/domain/errores";
 import type { Evento } from "../../src/domain/evento";
+import { Resenia } from "../../src/domain/resenia";
 import { NoEncontradoError, ReferenciaInvalidaError, SinPermisoError } from "../../src/errors/index";
 import {
   AHORA,
   DIA,
+  HORA,
   compra,
   evento,
   musica,
@@ -781,5 +783,120 @@ describe("EventoService.leerDelOrganizador (feature 008, R6)", () => {
     expect((await repositorioEventos.buscarPorId("evento-a"))?.buscarTipoEntrada("tipo-a-vip")?.cupo).toBe(
       48,
     );
+  });
+});
+
+describe("EventoService.reseniasDelOrganizador (feature 012, R7)", () => {
+  const conAutor = (
+    id: string,
+    eventoId: string,
+    compradorId: string,
+    puntuacion: number,
+    haceHoras: number,
+  ) =>
+    new Resenia({
+      id,
+      compradorId,
+      eventoId,
+      puntuacion,
+      comentario: puntuacion === 5 ? "Excelente." : null,
+      creadaEn: new Date(AHORA.getTime() - haceHoras * HORA),
+    });
+  const eventosDeLucia = [
+    evento({ id: "evento-a", nombre: "Peña" }),
+    evento({ id: "evento-pasado", nombre: "Jazz", en: -3 * DIA }),
+  ];
+  const deMartin = evento({ id: "evento-de-martin", organizadorId: "usuario-martin" });
+  const resenias = [
+    conAutor("resenia-1", "evento-pasado", "usuario-diego", 4, 10),
+    conAutor("resenia-2", "evento-a", "usuario-sofia", 5, 2),
+    conAutor("resenia-3", "evento-pasado", "usuario-martin", 3, 10),
+    conAutor("resenia-otro", "evento-de-martin", "usuario-diego", 1, 1),
+  ];
+  const servicios = () => crearServicesDeEventos({ eventos: [...eventosDeLucia, deMartin], resenias });
+
+  it("evento inexistente → 404 EVENTO_NO_ENCONTRADO", async () => {
+    const { eventoService } = servicios();
+    await expect(eventoService.reseniasDelOrganizador("evento-x")).rejects.toMatchObject({
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+    await expect(eventoService.reseniasDelOrganizador("evento-x")).rejects.toBeInstanceOf(NoEncontradoError);
+  });
+
+  it("las de todos los eventos del organizador (también el que se mira), ordenadas, sin las de otros", async () => {
+    const { eventoService } = servicios();
+    const vista = await eventoService.reseniasDelOrganizador("evento-a");
+    expect(vista.resenias).toEqual([
+      {
+        id: "resenia-2",
+        puntuacion: 5,
+        comentario: "Excelente.",
+        autor: { nombre: "Sofía", apellido: "Castro" },
+        evento: { id: "evento-a", nombre: "Peña" },
+        creadaEn: new Date(AHORA.getTime() - 2 * HORA).toISOString(),
+        creadaEnLocal: expect.any(String),
+      },
+      expect.objectContaining({
+        id: "resenia-1",
+        autor: { nombre: "Diego", apellido: "Fernández" },
+        evento: { id: "evento-pasado", nombre: "Jazz" },
+        comentario: null,
+      }),
+      expect.objectContaining({ id: "resenia-3", autor: { nombre: "Martín", apellido: "Benítez" } }),
+    ]);
+  });
+
+  it("el organizador con el puntaje sin redondear, igual al del detalle (FR-018)", async () => {
+    const { eventoService } = servicios();
+    const vista = await eventoService.reseniasDelOrganizador("evento-pasado");
+    expect(vista.organizador).toEqual({
+      id: "usuario-lucia",
+      nombre: "Lucía",
+      apellido: "Álvarez",
+      puntaje: 4,
+      cantidadResenias: 3,
+    });
+    expect(vista.organizador.cantidadResenias).toBe(vista.resenias.length);
+    expect(vista.organizador).toEqual((await eventoService.obtener("evento-pasado")).organizador);
+  });
+
+  it("sin reseñas: puntaje null, cantidad 0 y la lista vacía", async () => {
+    const { eventoService } = crearServicesDeEventos({ eventos: [evento({ id: "evento-a" })] });
+    expect(await eventoService.reseniasDelOrganizador("evento-a")).toEqual({
+      organizador: {
+        id: "usuario-lucia",
+        nombre: "Lucía",
+        apellido: "Álvarez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+      resenias: [],
+    });
+  });
+
+  it.each([
+    ["sin reseñas", []],
+    ["con 3 reseñas", resenias],
+  ] as const)("%s: cuatro lecturas fijas, sin cerrojo ni guardar", async (_caso, lista) => {
+    const s = crearServicesDeEventos({ eventos: [...eventosDeLucia, deMartin], resenias: [...lista] });
+    const buscarPorId = vi.spyOn(s.repositorioEventos, "buscarPorId");
+    const listarPorOrganizador = vi.spyOn(s.repositorioEventos, "listarPorOrganizador");
+    const listarPorEventos = vi.spyOn(s.repositorioResenias, "listarPorEventos");
+    const usuariosEnLote = vi.spyOn(s.repositorioUsuarios, "listarPorIds");
+    const usuarioPorId = vi.spyOn(s.repositorioUsuarios, "buscarPorId");
+    const cerrojo = vi.spyOn(s.cerrojo, "ejecutar");
+    const guardarEvento = vi.spyOn(s.repositorioEventos, "guardar");
+    const guardarResenia = vi.spyOn(s.repositorioResenias, "guardar");
+    await s.eventoService.reseniasDelOrganizador("evento-a");
+    expect(buscarPorId).toHaveBeenCalledTimes(1);
+    expect(listarPorOrganizador).toHaveBeenCalledTimes(1);
+    expect(listarPorOrganizador).toHaveBeenCalledWith("usuario-lucia");
+    expect(listarPorEventos).toHaveBeenCalledTimes(1);
+    expect(usuariosEnLote).toHaveBeenCalledTimes(1);
+    expect(usuariosEnLote.mock.calls[0]?.[0]).toContain("usuario-lucia");
+    expect(usuarioPorId).not.toHaveBeenCalled();
+    expect(cerrojo).not.toHaveBeenCalled();
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(guardarResenia).not.toHaveBeenCalled();
   });
 });

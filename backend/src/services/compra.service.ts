@@ -10,6 +10,7 @@ import {
   type MensajeVista,
   type MiCompraVista,
   type MisComprasDelEventoVista,
+  type ReseniaVista,
 } from "@ai-ticket-it/shared";
 import { esCodigoValido, normalizarCodigo } from "../domain/codigo-de-entrada";
 import { Compra } from "../domain/compra";
@@ -17,6 +18,7 @@ import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-
 import type { Evento } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import { compararMisCompras } from "../domain/orden-mis-compras";
+import { exigirQuePuedeReseniar } from "../domain/resenia";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
 import type { Usuario } from "../domain/usuario";
@@ -34,6 +36,8 @@ import {
 } from "./compra.vistas";
 import type { EventoService } from "./evento.service";
 import { aChatDeLaCompraVista, aMensajeVista } from "./mensaje.vistas";
+import type { ReseniaService } from "./resenia.service";
+import { aReseniaVista } from "./resenia.vistas";
 import type { TipoEntradaService } from "./tipo-entrada.service";
 import type { UsuarioService } from "./usuario.service";
 
@@ -61,6 +65,7 @@ export interface DependenciasCompraService {
   eventoService: EventoService;
   tipoEntradaService: TipoEntradaService;
   usuarioService: UsuarioService;
+  reseniaService: ReseniaService;
   cerrojo: Cerrojo;
   reloj: Reloj;
 }
@@ -76,6 +81,7 @@ export class CompraService {
   readonly #eventoService: EventoService;
   readonly #tipoEntradaService: TipoEntradaService;
   readonly #usuarioService: UsuarioService;
+  readonly #reseniaService: ReseniaService;
   readonly #cerrojo: Cerrojo;
   readonly #reloj: Reloj;
 
@@ -84,6 +90,7 @@ export class CompraService {
     eventoService,
     tipoEntradaService,
     usuarioService,
+    reseniaService,
     cerrojo,
     reloj,
   }: DependenciasCompraService) {
@@ -91,6 +98,7 @@ export class CompraService {
     this.#eventoService = eventoService;
     this.#tipoEntradaService = tipoEntradaService;
     this.#usuarioService = usuarioService;
+    this.#reseniaService = reseniaService;
     this.#cerrojo = cerrojo;
     this.#reloj = reloj;
   }
@@ -143,7 +151,8 @@ export class CompraService {
         ahora,
       });
       await this.#compras.guardar(compra);
-      return aCompraVista(compra, descontado, ahora);
+      // Una compra nueva, pagada o cancelada nunca está UTILIZADA: sin reseña que mostrar (012, R6).
+      return aCompraVista(compra, descontado, ahora, null);
     });
   }
 
@@ -156,7 +165,8 @@ export class CompraService {
     const compra = await this.obtenerOFallar(compraId);
     exigirQueEsSuya(compra, usuarioId);
     const evento = await this.#eventoService.obtenerOFallar(compra.eventoId);
-    return aCompraVista(compra.alDia(ahora), evento, ahora);
+    const resenia = await this.#reseniaService.deCompradorEnEvento(compra.compradorId, compra.eventoId);
+    return aCompraVista(compra.alDia(ahora), evento, ahora, resenia);
   }
 
   /**
@@ -175,7 +185,7 @@ export class CompraService {
       exigirQueEsSuya(compra, usuarioId);
       const pagada = compra.pagar(usuarioId, ahora);
       await this.#compras.guardar(pagada);
-      return aCompraVista(pagada, evento, ahora);
+      return aCompraVista(pagada, evento, ahora, null);
     });
   }
 
@@ -200,7 +210,7 @@ export class CompraService {
         cancelada.tipoEntradaId,
         cancelada.cantidad,
       );
-      return aCompraVista(cancelada, devuelto, ahora);
+      return aCompraVista(cancelada, devuelto, ahora, null);
     });
   }
 
@@ -260,18 +270,20 @@ export class CompraService {
     );
     const vigentes = suyas.filter((compra) => compra.esVigente(ahora));
     const organiza = evento.esOrganizadoPor(usuarioId);
+    // Comprador y evento fijos: una sola lectura de reseñas para todas sus compras (feature 012, R6).
+    const resenia = await this.#reseniaService.deCompradorEnEvento(usuarioId, eventoId);
     return {
       pendientes: suyas
         .filter((compra) => compra.estado === EstadoCompra.PENDIENTE)
         .toSorted((a, b) => a.creadaEn.getTime() - b.creadaEn.getTime())
-        .map((compra) => aCompraVista(compra, evento, ahora)),
+        .map((compra) => aCompraVista(compra, evento, ahora, resenia)),
       // Las UTILIZADA también: "Ver mis entradas" muestra sus códigos (feature 008, R9).
       confirmadas: suyas
         .filter(
           (compra) => compra.estado === EstadoCompra.CONFIRMADA || compra.estado === EstadoCompra.UTILIZADA,
         )
         .toSorted((a, b) => b.creadaEn.getTime() - a.creadaEn.getTime())
-        .map((compra) => aCompraVista(compra, evento, ahora)),
+        .map((compra) => aCompraVista(compra, evento, ahora, resenia)),
       restantesPorTipo: evento.tiposEntrada.map((tipo) => ({
         tipoEntradaId: tipo.id,
         restantes: organiza ? 0 : entradasRestantes(tipo, vigentes),
@@ -282,14 +294,16 @@ export class CompraService {
   /**
    * "Mis compras" (feature 007): las del usuario como comprador, de todos los eventos y en todos
    * los estados, **al día** y en el orden de `compararMisCompras`. Lectura: un `ahora`, sin cerrojo
-   * y sin guardar nada (no materializa vencimientos). Dos lecturas por pedido, cualquiera sea la
-   * cantidad de compras: las compras y sus eventos en lote (sin compras, ninguna de eventos).
+   * y sin guardar nada (no materializa vencimientos). Tres lecturas por pedido, cualquiera sea la
+   * cantidad de compras: las compras, sus eventos en lote y las reseñas del usuario (feature 012; sin
+   * compras, ninguna más).
    */
   async misCompras(usuarioId: string): Promise<MiCompraVista[]> {
     const ahora = this.#reloj.ahora();
     const compras = (await this.#compras.listarPorComprador(usuarioId)).map((compra) => compra.alDia(ahora));
     if (compras.length === 0) return [];
     const eventos = await this.#eventoService.obtenerPorIds([...new Set(compras.map((c) => c.eventoId))]);
+    const resenias = await this.#reseniaService.deComprador(usuarioId);
     return compras
       .map((compra) => {
         // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
@@ -299,7 +313,7 @@ export class CompraService {
           creadaEn: compra.creadaEn,
           fechaHoraEvento: evento.fechaHora,
           eventoRealizado: evento.estaRealizado(ahora),
-          vista: aMiCompraVista(compra, evento, ahora),
+          vista: aMiCompraVista(compra, evento, ahora, resenias.get(compra.eventoId) ?? null),
         };
       })
       .toSorted(compararMisCompras)
@@ -373,6 +387,30 @@ export class CompraService {
       const autor = await this.#usuarioService.obtenerOFallar(usuarioId);
       const mensaje = conMensaje.mensajes.at(-1)!;
       return aMensajeVista(mensaje, conMensaje.mensajes.length, conMensaje, evento, autor);
+    });
+  }
+
+  /**
+   * Reseñar un evento (feature 012, R2, R3): bajo el cerrojo del evento, con el reloj leído adentro:
+   * 404 evento → 409 propio evento → 409 sin compra UTILIZADA → 409 repetida (la verifica y guarda
+   * `ReseniaService.registrar`, sin tomar el cerrojo). No materializa vencimientos ni guarda compras
+   * ni eventos: la compra y el cupo no cambian (FR-007).
+   */
+  async reseniar(
+    eventoId: string,
+    usuarioId: string,
+    datos: { puntuacion: number; comentario: string },
+  ): Promise<ReseniaVista> {
+    return this.#cerrojo.ejecutar(eventoId, async () => {
+      const ahora = this.#reloj.ahora();
+      const evento = await this.#eventoService.obtenerOFallar(eventoId);
+      const compras = await this.#compras.listarPorEventoYComprador(eventoId, usuarioId);
+      exigirQuePuedeReseniar({ usuarioId, evento, compras });
+      const resenia = await this.#reseniaService.registrar(
+        { eventoId, compradorId: usuarioId, puntuacion: datos.puntuacion, comentario: datos.comentario },
+        ahora,
+      );
+      return aReseniaVista(resenia);
     });
   }
 

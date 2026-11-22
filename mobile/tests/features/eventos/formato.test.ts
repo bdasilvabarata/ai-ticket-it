@@ -1,12 +1,17 @@
 import {
+  etiquetaDeResenia,
+  SIN_RESENIAS,
   textoCantidadTipos,
   textoCupo,
   textoFechaHora,
+  textoFechaResenia,
   textoPrecio,
   textoPrecioDesde,
   textoPuntaje,
+  textoPuntuacion,
   textoSentido,
 } from "../../../src/features/eventos/formato";
+import { reseniaDelOrganizadorDeEjemplo } from "../../helpers/eventos";
 
 describe("formato de eventos (R18, sin Intl)", () => {
   it("textoFechaHora arma día, fecha y hora de la hora de pared", () => {
@@ -73,5 +78,39 @@ describe("textoSentido", () => {
     ["puntaje", "asc", "Menor puntaje primero"],
   ] as const)("%s %s → %s", (orden, sentido, texto) => {
     expect(textoSentido(orden, sentido)).toBe(texto);
+  });
+});
+
+describe("textoPuntuacion (feature 012)", () => {
+  it.each([
+    [1, "Puntuación: 1 de 5"],
+    [4, "Puntuación: 4 de 5"],
+    [5, "Puntuación: 5 de 5"],
+  ])("%p → %p", (puntuacion, texto) => {
+    expect(textoPuntuacion(puntuacion)).toBe(texto);
+  });
+});
+
+describe("textos de las reseñas del organizador (feature 012)", () => {
+  it("textoFechaResenia muestra el día de la hora de pared, sin hora", () => {
+    expect(textoFechaResenia("2026-11-15T21:00")).toBe("dom 15 nov 2026");
+    // 23:30 de Buenos Aires ya es el día siguiente en UTC: no se convierte la zona.
+    expect(textoFechaResenia("2026-12-01T23:30")).toBe("mar 1 dic 2026");
+  });
+
+  it("etiquetaDeResenia junta autor, evento, día, puntuación y comentario", () => {
+    expect(etiquetaDeResenia(reseniaDelOrganizadorDeEjemplo())).toBe(
+      "Valentina Gómez, Jazz en el Patio, dom 15 nov 2026: Puntuación: 5 de 5. Excelente organización, entramos rapidísimo.",
+    );
+  });
+
+  it("etiquetaDeResenia sin comentario termina en la puntuación", () => {
+    expect(etiquetaDeResenia(reseniaDelOrganizadorDeEjemplo({ comentario: null, puntuacion: 2 }))).toBe(
+      "Valentina Gómez, Jazz en el Patio, dom 15 nov 2026: Puntuación: 2 de 5.",
+    );
+  });
+
+  it("SIN_RESENIAS", () => {
+    expect(SIN_RESENIAS).toBe("Todavía no tiene reseñas");
   });
 });

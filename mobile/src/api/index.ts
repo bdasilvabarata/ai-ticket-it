@@ -36,4 +36,5 @@ export {
   type CuerpoNuevoEvento,
   type CuerpoTipoEntrada,
 } from "./eventos";
+export { obtenerReseniasDelOrganizador, reseniarEvento, type CuerpoResenia } from "./resenias";
 export { listarUsuarios, obtenerUsuarioActual } from "./usuarios";

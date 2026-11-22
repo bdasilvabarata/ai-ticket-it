@@ -14,6 +14,7 @@ import {
   compraUtilizada,
   conRestantes,
   miCompra,
+  reseniaDeEjemplo,
 } from "../helpers/compras";
 import {
   CATALOGO_INICIAL,
@@ -635,5 +636,69 @@ describe("Mis compras: no se cancela desde la lista (feature 009, US3, FR-017)",
     expect(await filas()).toHaveLength(3);
     expect(screen.getByRole("button", { name: /^Pagar/ })).toBeOnTheScreen();
     expect(screen.queryByRole("button", { name: /Cancelar/ })).toBeNull();
+  });
+});
+
+describe("Mis compras: la reseña (feature 012, US1, FR-012)", () => {
+  const FILA_UTILIZADA = "Ver la compra de 2 Inscripción para Maratón Ciudad 10K";
+  const utilizadaReseniable = miCompra(compraUtilizada, { puedeReseniar: true });
+  const utilizadaReseniada = miCompra(compraUtilizada, { resenia: reseniaDeEjemplo() });
+
+  it("con puedeReseniar: «Reseñar evento» es hermano de la fila, no está adentro", async () => {
+    await abrirMisCompras([{ status: 200, json: [utilizadaReseniable] }]);
+
+    const fila = await screen.findByRole("button", { name: FILA_UTILIZADA });
+    expect(screen.getByRole("button", { name: "Reseñar evento" })).toBeOnTheScreen();
+    expect(within(fila).queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+  });
+
+  it("con su reseña: la reseña va en la etiqueta de la fila y no hay botón", async () => {
+    await abrirMisCompras([{ status: 200, json: [utilizadaReseniada] }]);
+
+    const fila = await screen.findByRole("button", {
+      name: `${FILA_UTILIZADA}. Tu reseña: Puntuación: 4 de 5. Muy buena organización`,
+    });
+    expect(within(fila).getByText("Muy buena organización")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+  });
+
+  it.each([
+    ["PENDIENTE", compraPendiente],
+    ["CONFIRMADA", compraConfirmada],
+    ["CANCELADA", compraCancelada],
+    ["REEMBOLSADA", compraReembolsada],
+  ])("%s: ni el botón ni la reseña", async (_estado, compra) => {
+    await abrirMisCompras([{ status: 200, json: [miCompra(compra)] }]);
+
+    await filas();
+    expect(screen.queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+    expect(screen.queryByText("Tu reseña")).toBeNull();
+  });
+
+  it("de punta a punta: Reseñar evento → 4 → Enviar vuelve a Mis compras, que se vuelve a pedir y muestra la reseña", async () => {
+    const resenia = reseniaDeEjemplo({ comentario: null });
+    const { falso } = await abrirMisCompras(
+      [
+        { status: 200, json: [utilizadaReseniable] },
+        { status: 200, json: [miCompra(compraUtilizada, { resenia })] },
+      ],
+      {
+        [`/eventos/${maratonCompleta.id}/resenias`]: [porMetodo({ POST: [{ status: 201, json: resenia }] })],
+        [`/compras/${compraUtilizada.id}`]: [
+          { status: 200, json: { ...compraUtilizada, puedeReseniar: true } },
+        ],
+      },
+    );
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Reseñar evento" }));
+    await fireEvent.press(await screen.findByRole("radio", { name: "4 de 5" }));
+    await fireEvent.press(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(
+      await screen.findByRole("button", { name: `${FILA_UTILIZADA}. Tu reseña: Puntuación: 4 de 5` }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+    // Se vuelve a pedir al volver (la invalidación y el refresco al enfocar la pestaña).
+    expect(falso.pedidosA(MIS_COMPRAS).filter((p) => p.metodo === "GET").length).toBeGreaterThanOrEqual(2);
   });
 });

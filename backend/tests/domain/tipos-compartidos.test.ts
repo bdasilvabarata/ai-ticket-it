@@ -4,6 +4,7 @@ import {
   LIMITES_COMPRA,
   LIMITES_EVENTO,
   LIMITES_MENSAJE,
+  LIMITES_RESENIA,
   LIMITES_TIPO_ENTRADA,
   ORDENES_CATALOGO,
   type OrdenCatalogo,
@@ -86,6 +87,14 @@ describe("tipos compartidos", () => {
   it("el texto de un mensaje del chat tiene como máximo 500 caracteres", () => {
     expect(LIMITES_MENSAJE.largoMaximo).toBe(500);
     expectTypeOf<DatosMensaje>().toEqualTypeOf<{ texto: string }>();
+  });
+
+  it("una reseña se puntúa de 1 a 5 y su comentario tiene como máximo 500 caracteres", () => {
+    expect(LIMITES_RESENIA).toEqual({
+      puntuacionMinima: 1,
+      puntuacionMaxima: 5,
+      comentarioLargoMaximo: 500,
+    });
   });
 
   it("DatosCompra no lleva precio ni total, y CompraVista trae el estado y el historial", () => {

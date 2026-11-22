@@ -5,6 +5,8 @@ import type {
   EventoResumenVista,
   EventoVista,
   OrganizadorVista,
+  ReseniaDelOrganizadorVista,
+  ReseniasDelOrganizadorVista,
 } from "@ai-ticket-it/shared";
 
 // Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
@@ -198,3 +200,26 @@ export const hamletCompleto: EventoVista = {
   ],
   organizador: { ...hamletEnCatalogo.organizador, puntaje: 4.5, cantidadResenias: 12 },
 };
+
+/** "Reseñas del organizador" (feature 012): por defecto, Lucía sin reseñas. */
+export function reseniasDelOrganizadorDeEjemplo(
+  cambios: Partial<ReseniasDelOrganizadorVista> = {},
+): ReseniasDelOrganizadorVista {
+  return { organizador: luciaOrganizadora, resenias: [], ...cambios };
+}
+
+/** Una reseña de la lista del organizador (feature 012): Valentina, 5 de 5, en Jazz en el Patio. */
+export function reseniaDelOrganizadorDeEjemplo(
+  cambios: Partial<ReseniaDelOrganizadorVista> = {},
+): ReseniaDelOrganizadorVista {
+  return {
+    id: "resenia-valentina-jazz-en-el-patio",
+    puntuacion: 5,
+    comentario: "Excelente organización, entramos rapidísimo.",
+    autor: { nombre: "Valentina", apellido: "Gómez" },
+    evento: { id: "evento-jazz-en-el-patio", nombre: "Jazz en el Patio" },
+    creadaEn: "2026-11-16T00:00:00.000Z",
+    creadaEnLocal: "2026-11-15T21:00",
+    ...cambios,
+  };
+}

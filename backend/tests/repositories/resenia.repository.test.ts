@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Resenia } from "../../src/domain/resenia";
 import { ReseniaRepository } from "../../src/repositories/resenia.repository";
 
-function resenia(id: string, eventoId: string, puntuacion = 4) {
-  return new Resenia({ id, compradorId: "usuario-diego", eventoId, puntuacion });
+function resenia(id: string, eventoId: string, compradorId = "usuario-diego", puntuacion = 4) {
+  return new Resenia({ id, compradorId, eventoId, puntuacion, comentario: null, creadaEn: new Date() });
 }
 
 describe("ReseniaRepository (en memoria)", () => {
@@ -30,5 +30,45 @@ describe("ReseniaRepository (en memoria)", () => {
     const segundo = new ReseniaRepository(iniciales);
     expect(await primero.listarPorEventos(["evento-b"])).toEqual([]);
     expect(await segundo.listarPorEventos(["evento-b"])).toEqual([r2]);
+  });
+
+  it("siguienteId da UUIDs distintos", () => {
+    const repositorio = new ReseniaRepository();
+    const a = repositorio.siguienteId();
+    const b = repositorio.siguienteId();
+    expect(a).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(a).not.toBe(b);
+  });
+
+  it("guardar agrega una nueva y reemplaza la del mismo id", async () => {
+    const repositorio = new ReseniaRepository([r1]);
+    await repositorio.guardar(r2);
+    const r1Nueva = resenia("r1", "evento-a", "usuario-diego", 2);
+    await repositorio.guardar(r1Nueva);
+    expect(await repositorio.listarPorEventos(["evento-a", "evento-b"])).toEqual([r1Nueva, r2]);
+  });
+
+  it("buscarPorEventoYComprador encuentra la del par exacto o da null", async () => {
+    const deMartin = resenia("r4", "evento-a", "usuario-martin");
+    const repositorio = new ReseniaRepository([r1, r2, deMartin]);
+    expect(await repositorio.buscarPorEventoYComprador("evento-a", "usuario-martin")).toBe(deMartin);
+    expect(await repositorio.buscarPorEventoYComprador("evento-a", "usuario-diego")).toBe(r1);
+    expect(await repositorio.buscarPorEventoYComprador("evento-b", "usuario-martin")).toBeNull();
+    expect(await repositorio.buscarPorEventoYComprador("evento-z", "usuario-diego")).toBeNull();
+  });
+
+  it("listarPorComprador trae las de todos los eventos de ese autor, o []", async () => {
+    const deMartin = resenia("r4", "evento-a", "usuario-martin");
+    const repositorio = new ReseniaRepository([r1, r2, deMartin]);
+    expect(await repositorio.listarPorComprador("usuario-diego")).toEqual([r1, r2]);
+    expect(await repositorio.listarPorComprador("usuario-sofia")).toEqual([]);
+  });
+
+  it("no expone su colección interna: modificar lo devuelto no cambia el repositorio", async () => {
+    const repositorio = new ReseniaRepository([r1]);
+    (await repositorio.listarPorComprador("usuario-diego")).push(r2);
+    (await repositorio.listarPorEventos(["evento-a", "evento-b"])).push(r3);
+    expect(await repositorio.listarPorComprador("usuario-diego")).toEqual([r1]);
+    expect("eliminarPorId" in repositorio).toBe(false);
   });
 });

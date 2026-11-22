@@ -209,5 +209,12 @@ let numeroResenia = 0;
 /** Una reseña de Diego a ese evento. */
 export function resenia(eventoId: string, puntuacion: number): Resenia {
   numeroResenia += 1;
-  return new Resenia({ id: `resenia-${numeroResenia}`, compradorId: diego.id, eventoId, puntuacion });
+  return new Resenia({
+    id: `resenia-${numeroResenia}`,
+    compradorId: diego.id,
+    eventoId,
+    puntuacion,
+    comentario: null,
+    creadaEn: AHORA,
+  });
 }

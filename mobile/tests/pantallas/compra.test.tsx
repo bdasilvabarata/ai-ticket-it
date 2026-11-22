@@ -16,6 +16,7 @@ import {
   compraReembolsada,
   compraUtilizada,
   conRestantes,
+  reseniaDeEjemplo,
 } from "../helpers/compras";
 import { CATALOGO_INICIAL, catalogo, errorApi, maratonCompleta, maratonEnCatalogo } from "../helpers/eventos";
 import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
@@ -748,5 +749,55 @@ describe("Tu compra: el acceso al chat (feature 011, US1)", () => {
       params: { compraId: "compra-nueva" },
     });
     push.mockRestore();
+  });
+});
+
+describe("Tu compra: la reseña (feature 012, US1)", () => {
+  const reseniable = { ...compraUtilizada, puedeReseniar: true };
+
+  it("con puedeReseniar: «Reseñar evento» después de las entradas, que abre Reseñar evento", async () => {
+    const resultado = await abrirCompra({ compra: [{ status: 200, json: reseniable }] });
+
+    const boton = await screen.findByRole("button", { name: "Reseñar evento" });
+    expect(screen.queryByText("Tu reseña")).toBeNull();
+    await fireEvent.press(boton);
+
+    await waitFor(() => expect(resultado.getPathname()).toBe(`${COMPRA}/resenia`));
+  });
+
+  it("con su reseña: «Tu reseña» con la puntuación y el comentario, sin el botón", async () => {
+    await abrirCompra({
+      compra: [{ status: 200, json: { ...compraUtilizada, resenia: reseniaDeEjemplo() } }],
+    });
+
+    expect(await screen.findByRole("header", { name: "Tu reseña" })).toBeOnTheScreen();
+    expect(screen.getByLabelText("Puntuación: 4 de 5")).toBeOnTheScreen();
+    expect(screen.getByText("Muy buena organización")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+  });
+
+  it("una reseña sin comentario no muestra texto de relleno", async () => {
+    await abrirCompra({
+      compra: [
+        { status: 200, json: { ...compraUtilizada, resenia: reseniaDeEjemplo({ comentario: null }) } },
+      ],
+    });
+
+    expect(await screen.findByRole("header", { name: "Tu reseña" })).toBeOnTheScreen();
+    expect(screen.queryByText("Muy buena organización")).toBeNull();
+    expect(screen.queryByText(/sin comentario/i)).toBeNull();
+  });
+
+  it.each([
+    ["PENDIENTE", compraPendiente],
+    ["CONFIRMADA", compraConfirmada],
+    ["CANCELADA", compraCancelada],
+    ["REEMBOLSADA", compraReembolsada],
+  ])("%s: ni el botón ni la reseña", async (_estado, compra) => {
+    await abrirCompra({ compra: [{ status: 200, json: compra }] });
+
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Reseñar evento" })).toBeNull();
+    expect(screen.queryByText("Tu reseña")).toBeNull();
   });
 });
