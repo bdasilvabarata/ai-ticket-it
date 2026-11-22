@@ -782,6 +782,20 @@
             ],
             "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 6\n}" }
           }
+        },
+        {
+          "name": "Reseñas del organizador (Hamlet, de Martín)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-hamlet/resenias-del-organizador" }
+          }
+        },
+        {
+          "name": "Reseñas del organizador sin reseñas (Noche de Rock, de Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-rock/resenias-del-organizador" }
+          }
         }
       ]
     }

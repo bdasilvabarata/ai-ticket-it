@@ -1068,6 +1068,75 @@
         }
       }
     },
+    "/eventos/{eventoId}/resenias-del-organizador": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "get": {
+        "tags": ["Reseñas"],
+        "summary": "Reseñas del organizador del evento (público)",
+        "description": "El organizador del evento con su puntaje y **todas** las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0) y coincide con el de `EventoVista.organizador` y la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 012).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El organizador con su puntaje y las reseñas",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ReseniasDelOrganizadorVista" },
+                "examples": {
+                  "conResenias": {
+                    "summary": "Martín (Hamlet, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-martin",
+                        "nombre": "Martín",
+                        "apellido": "Benítez",
+                        "puntaje": 4.666666666666667,
+                        "cantidadResenias": 3
+                      },
+                      "resenias": [
+                        {
+                          "id": "resenia-valentina-jazz-en-el-patio",
+                          "puntuacion": 5,
+                          "comentario": "Excelente organización, entramos rapidísimo.",
+                          "autor": { "nombre": "Valentina", "apellido": "Gómez" },
+                          "evento": { "id": "evento-jazz-en-el-patio", "nombre": "Jazz en el Patio" },
+                          "creadaEn": "2026-11-16T00:00:00.000Z",
+                          "creadaEnLocal": "2026-11-15T21:00"
+                        }
+                      ]
+                    }
+                  },
+                  "sinResenias": {
+                    "summary": "Lucía (Noche de Rock, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-lucia",
+                        "nombre": "Lucía",
+                        "apellido": "Álvarez",
+                        "puntaje": null,
+                        "cantidadResenias": 0
+                      },
+                      "resenias": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/compras": {
       "get": {
         "tags": ["Compras"],
@@ -2872,6 +2941,56 @@
             "maxLength": 500,
             "description": "Se recorta; ya recortado, de 1 a 500 caracteres. Los saltos de línea internos se conservan.",
             "example": "¿A qué hora abren las puertas?"
+          }
+        }
+      },
+      "ReseniaDelOrganizadorVista": {
+        "type": "object",
+        "description": "Una reseña en \"Reseñas del organizador\" (feature 012). Sin el id del autor, compras, códigos, totales ni estados.",
+        "required": ["id", "puntuacion", "comentario", "autor", "evento", "creadaEn", "creadaEnLocal"],
+        "properties": {
+          "id": { "type": "string", "example": "resenia-valentina-jazz-en-el-patio" },
+          "puntuacion": { "type": "integer", "minimum": 1, "maximum": 5, "example": 5 },
+          "comentario": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` si no se escribió nada.",
+            "example": "Excelente organización, entramos rapidísimo."
+          },
+          "autor": {
+            "type": "object",
+            "description": "Nombre y apellido del autor, sin su id.",
+            "required": ["nombre", "apellido"],
+            "properties": {
+              "nombre": { "type": "string", "example": "Valentina" },
+              "apellido": { "type": "string", "example": "Gómez" }
+            }
+          },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-jazz-en-el-patio" },
+              "nombre": { "type": "string", "example": "Jazz en el Patio" }
+            }
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "description": "Instante ISO UTC." },
+          "creadaEnLocal": {
+            "type": "string",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires.",
+            "example": "2026-11-15T21:00"
+          }
+        }
+      },
+      "ReseniasDelOrganizadorVista": {
+        "type": "object",
+        "description": "El organizador del evento con su puntaje y las reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012).",
+        "required": ["organizador", "resenias"],
+        "properties": {
+          "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
+          "resenias": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
           }
         }
       },

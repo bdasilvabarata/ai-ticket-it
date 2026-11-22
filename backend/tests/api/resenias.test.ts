@@ -205,3 +205,112 @@ describe("POST /api/eventos/:eventoId/resenias (US1)", () => {
     );
   });
 });
+
+describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
+  const delOrganizador = (app: App, eventoId: string, usuarioId?: string) => {
+    const pedido = request(app).get(`/api/eventos/${eventoId}/resenias-del-organizador`);
+    if (usuarioId !== undefined) pedido.set("X-Usuario-Id", usuarioId);
+    return pedido;
+  };
+
+  it("es público: 200 sin X-Usuario-Id y la misma respuesta con cualquier usuario", async () => {
+    const app = nuevaApp();
+    const sinUsuario = await delOrganizador(app, "evento-hamlet");
+    expect(sinUsuario.status).toBe(200);
+    for (const usuarioId of ["usuario-martin", "usuario-diego", "usuario-nadie"]) {
+      expect((await delOrganizador(app, "evento-hamlet", usuarioId)).body).toEqual(sinUsuario.body);
+    }
+  });
+
+  it("Hamlet (Martín): ≈ 4,67 con las 3 reseñas de Jazz, de la más reciente a la más vieja, sin id del autor", async () => {
+    const { body } = await delOrganizador(nuevaApp(), "evento-hamlet");
+    expect(body.organizador).toEqual({
+      id: "usuario-martin",
+      nombre: "Martín",
+      apellido: "Benítez",
+      puntaje: 14 / 3,
+      cantidadResenias: 3,
+    });
+    expect(body.resenias.map((r: { id: string; puntuacion: number }) => [r.id, r.puntuacion])).toEqual([
+      ["resenia-valentina-jazz-en-el-patio", 5],
+      ["resenia-diego-jazz-en-el-patio", 4],
+      ["resenia-lucia-jazz-en-el-patio", 5],
+    ]);
+    expect(body.resenias[0]).toEqual({
+      id: "resenia-valentina-jazz-en-el-patio",
+      puntuacion: 5,
+      comentario: expect.any(String),
+      autor: { nombre: "Valentina", apellido: "Gómez" },
+      evento: { id: "evento-jazz-en-el-patio", nombre: "Jazz en el Patio" },
+      creadaEn: expect.any(String),
+      creadaEnLocal: expect.stringMatching(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/),
+    });
+    const json = JSON.stringify(body);
+    expect(json).not.toContain("compradorId");
+    expect(json).not.toContain("usuario-valentina");
+    expect(json).not.toMatch(/JZPT/);
+  });
+
+  it("Noche de Rock (Lucía): puntaje null, 0 reseñas y la lista vacía", async () => {
+    const { status, body } = await delOrganizador(nuevaApp(), "evento-noche-de-rock");
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      organizador: {
+        id: "usuario-lucia",
+        nombre: "Lucía",
+        apellido: "Álvarez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+      resenias: [],
+    });
+  });
+
+  it("el puntaje coincide con el del detalle y con el de la tarjeta del catálogo (FR-018)", async () => {
+    const app = nuevaApp();
+    const { body } = await delOrganizador(app, "evento-hamlet");
+    const detalle = await request(app).get("/api/eventos/evento-hamlet");
+    expect(detalle.body.organizador).toEqual(body.organizador);
+    const catalogo = await request(app).get("/api/eventos");
+    const tarjeta = catalogo.body.eventos.find((e: { id: string }) => e.id === "evento-hamlet");
+    expect(tarjeta.organizador).toEqual(body.organizador);
+  });
+
+  it("400 sobre params.eventoId con un id inválido y 404 con uno inexistente", async () => {
+    const invalido = await delOrganizador(nuevaApp(), "NO_VALIDO");
+    expect(invalido.status).toBe(400);
+    expect(detallesDe(invalido.body, "params.eventoId")).toHaveLength(1);
+    const inexistente = await delOrganizador(nuevaApp(), "evento-no-existe");
+    expect(inexistente.status).toBe(404);
+    expect(inexistente.body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+
+  it("después de que Martín reseña la Peña, los eventos de Lucía pasan a 4 con 1 reseña, primera", async () => {
+    const app = nuevaApp();
+    const alta = await reseniar(app, "usuario-martin", DATOS);
+    const { body } = await delOrganizador(app, "evento-noche-de-rock");
+    expect(body.organizador).toMatchObject({ puntaje: 4, cantidadResenias: 1 });
+    expect(body.resenias).toEqual([
+      {
+        id: alta.body.id,
+        puntuacion: 4,
+        comentario: "Muy buena organización",
+        autor: { nombre: "Martín", apellido: "Benítez" },
+        evento: { id: PENA, nombre: "Peña en La Rueda" },
+        creadaEn: AHORA.toISOString(),
+        creadaEnLocal: "2026-11-10T12:00",
+      },
+    ]);
+  });
+
+  it("después de cada rechazo del alta, la respuesta no cambia", async () => {
+    const app = nuevaApp();
+    const antes = (await delOrganizador(app, "evento-noche-de-rock")).body;
+    await reseniar(app, null, DATOS);
+    await reseniar(app, "usuario-martin", { puntuacion: 6 });
+    await reseniar(app, "usuario-martin", DATOS, "/api/eventos/evento-no-existe/resenias");
+    await reseniar(app, "usuario-lucia", DATOS);
+    await reseniar(app, "usuario-sofia", DATOS);
+    expect((await delOrganizador(app, "evento-noche-de-rock")).body).toEqual(antes);
+  });
+});

@@ -423,8 +423,12 @@ describe("crearDatosEjemplo", () => {
       expect(new Set(pares).size).toBe(pares.length);
       for (const resenia of resenias) {
         const evento = eventoPorId.get(resenia.eventoId)!;
-        const suyas = compras.filter((c) => c.eventoId === evento.id && c.compradorId === resenia.compradorId);
-        expect(() => exigirQuePuedeReseniar({ usuarioId: resenia.compradorId, evento, compras: suyas })).not.toThrow();
+        const suyas = compras.filter(
+          (c) => c.eventoId === evento.id && c.compradorId === resenia.compradorId,
+        );
+        expect(() =>
+          exigirQuePuedeReseniar({ usuarioId: resenia.compradorId, evento, compras: suyas }),
+        ).not.toThrow();
       }
     });
 

@@ -71,6 +71,13 @@ export function crearEventosRouter(
   // Reseñas (feature 012): en nombre del usuario actual, con una compra UTILIZADA del evento (los 409
   // los decide el dominio). Sin PUT, PATCH ni DELETE: una reseña no se edita ni se borra.
   router.post("/:eventoId/resenias", requerirUsuario, reseniaNueva.middleware, controllers.compras.reseniar);
+  // Público, como el detalle (feature 012, R7): el organizador del evento con su puntaje y las
+  // reseñas de todos sus eventos. Un X-Usuario-Id, si llega, se ignora.
+  router.get(
+    "/:eventoId/resenias-del-organizador",
+    eventoPorId.middleware,
+    controller.reseniasDelOrganizador,
+  );
   router.use("/:eventoId/tipos-entrada", crearTiposEntradaRouter(controllers.tiposEntrada, requerirUsuario));
   router.use("/:eventoId/entradas", crearEntradasRouter(controllers.entradas, requerirUsuario));
   return router;

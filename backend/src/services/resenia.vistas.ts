@@ -45,7 +45,7 @@ export function aReseniaDelOrganizadorVista(
 }
 
 /** La entidad con esa clave del lote que pidió el service, o un error de programación. */
-function delLote<T>(lote: Map<string, T>, id: string, que: string): T {
+export function delLote<T>(lote: Map<string, T>, id: string, que: string): T {
   const valor = lote.get(id);
   if (valor === undefined) throw new Error(`Falta ${que} ${id} en el lote.`);
   return valor;
