@@ -20,3 +20,4 @@ export { MisEventos } from "./pantallas/MisEventos";
 export { TodasLasResenias } from "./pantallas/TodasLasResenias";
 export { useConfirmarDescarte } from "./useConfirmarDescarte";
 export { useEvento } from "./useEvento";
+export { useFavoritos, useIdsDeFavoritos } from "./useFavoritos";

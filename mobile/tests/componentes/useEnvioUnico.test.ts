@@ -1,5 +1,5 @@
 import { renderHook } from "@testing-library/react-native";
-import { useEnvioUnico } from "../../../src/features/compras/useEnvioUnico";
+import { useEnvioUnico } from "../../src/componentes/useEnvioUnico";
 
 describe("useEnvioUnico", () => {
   it("la primera llamada ejecuta el envío", async () => {

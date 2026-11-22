@@ -3,7 +3,14 @@ import { router, useLocalSearchParams } from "expo-router";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Boton, EtiquetaEstadoCompra, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import {
+  Boton,
+  EtiquetaEstadoCompra,
+  PantallaDesplazable,
+  SegunConsulta,
+  tema,
+  useEnvioUnico,
+} from "../../../componentes";
 import { AvisoDeFormulario } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { AvisoDeLaCompra, CompraNoEncontrada } from "../componentes/AvisoDeLaCompra";
@@ -22,7 +29,6 @@ import {
 } from "../formato";
 import { useCancelarCompra, usePagarCompra } from "../mutaciones";
 import { useCompra } from "../useCompra";
-import { useEnvioUnico } from "../useEnvioUnico";
 
 /**
  * "Tu compra" (contracts/app.md, "Tu compra"). Se dibuja **siempre** desde la compra que devuelve el

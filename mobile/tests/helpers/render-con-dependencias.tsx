@@ -25,14 +25,15 @@ const creadas: Dependencias[] = [];
 /**
  * Lo que pide la app sin que el test lo pida y responde vacío si no lo registra: el catálogo y las
  * categorías (Explorar), las compras del usuario en el evento (el detalle, feature 006, R19), todas
- * sus compras ("Mis compras", feature 007) y las reseñas del organizador (el detalle, feature 012),
- * sin ninguna.
+ * sus compras ("Mis compras", feature 007), las reseñas del organizador (el detalle, feature 012) y
+ * los favoritos del usuario (las estrellas, feature 014), sin ninguno.
  */
 function respuestaDeExplorar(url: string): RespuestaFalsa | null {
   if (/\/eventos\?/.test(url)) return { status: 200, json: catalogo([], false) };
   if (url.endsWith("/categorias")) return { status: 200, json: [] };
   if (/\/eventos\/[^/]+\/mis-compras$/.test(url)) return { status: 200, json: sinCompras };
   if (/\/api\/compras$/.test(url)) return { status: 200, json: [] };
+  if (/\/usuarios\/actual\/favoritos$/.test(url)) return { status: 200, json: [] };
   if (/\/eventos\/[^/]+\/resenias-del-organizador\/resumen$/.test(url)) {
     return { status: 200, json: reseniasDelOrganizadorDeEjemplo() };
   }

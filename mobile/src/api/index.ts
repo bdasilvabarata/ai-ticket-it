@@ -42,4 +42,10 @@ export {
   reseniarEvento,
   type CuerpoResenia,
 } from "./resenias";
-export { listarUsuarios, obtenerUsuarioActual } from "./usuarios";
+export {
+  desmarcarFavorito,
+  listarFavoritos,
+  listarUsuarios,
+  marcarFavorito,
+  obtenerUsuarioActual,
+} from "./usuarios";

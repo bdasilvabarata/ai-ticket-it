@@ -277,17 +277,17 @@ consulta de favoritos que usan las tres historias de la app.
 
 **⚠️ CRITICAL**: ninguna historia de la app empieza hasta cerrar esta fase.
 
-- [ ] T022 [P] Test en `mobile/tests/api/usuarios.test.ts` (con stubs en
+- [X] T022 [P] Test en `mobile/tests/api/usuarios.test.ts` (con stubs en
   `mobile/src/api/usuarios.ts`, exportados por `mobile/src/api/index.ts`):
   `listarFavoritos(cliente, usuarioId, { signal })` → `GET /usuarios/actual/favoritos` con
   `X-Usuario-Id` y el arreglo de la respuesta; `marcarFavorito(cliente, usuarioId, eventoId)` →
   `PUT /usuarios/actual/favoritos/<eventoId>` y `desmarcarFavorito(...)` → `DELETE`, los dos con
   `X-Usuario-Id`, sin cuerpo, resolviendo `undefined` ante el `204`. Implementar con
   `cliente.get/put/delete`; verde.
-- [ ] T023 [P] Test en `mobile/tests/consultas/claves.test.ts` y cambio en
+- [X] T023 [P] Test en `mobile/tests/consultas/claves.test.ts` y cambio en
   `mobile/src/consultas/claves.ts`: `claves.favoritos(usuarioId)` → `["favoritos", usuarioId]`, sin
   prefijo común con `catalogo`, `evento`, `misEventos` ni `misCompras`; verde.
-- [ ] T024 Mover `useEnvioUnico` y `useRefrescarAlFocalizar` de `mobile/src/features/compras/` a
+- [X] T024 Mover `useEnvioUnico` y `useRefrescarAlFocalizar` de `mobile/src/features/compras/` a
   `mobile/src/componentes/useEnvioUnico.ts` y `mobile/src/componentes/useRefrescarAlFocalizar.ts`,
   exportados por `mobile/src/componentes/index.ts`, **sin cambiar su comportamiento** (research R7);
   actualizar los imports de `mobile/src/features/compras/pantallas/{ChatDeLaCompra,Compra,
@@ -295,12 +295,12 @@ consulta de favoritos que usan las tres historias de la app.
   los archivos viejos y mover `mobile/tests/features/compras/useEnvioUnico.test.ts` a
   `mobile/tests/componentes/useEnvioUnico.test.ts`; verde ese test, `npm run lint -w mobile` (base
   sin imports de features) y los tests de pantalla de compras afectados.
-- [ ] T025 Helper de tests: `mobile/tests/helpers/render-con-dependencias.tsx` responde `[]` a
+- [X] T025 Helper de tests: `mobile/tests/helpers/render-con-dependencias.tsx` responde `[]` a
   `GET /usuarios/actual/favoritos` cuando el test no lo registra (como el catálogo y "Mis compras"),
   y `mobile/tests/helpers/eventos.ts` suma, si hace falta, un armador de `EventoCatalogoVista`
   realizado para los favoritos; verde la suite de `mobile/tests/pantallas/` (ninguna pantalla pide
   favoritos todavía, así que no cambia nada).
-- [ ] T026 Test en `mobile/tests/features/eventos/useFavoritos.test.tsx` (con stubs de
+- [X] T026 Test en `mobile/tests/features/eventos/useFavoritos.test.tsx` (con stubs de
   `useFavoritos()` y `useIdsDeFavoritos(): ReadonlySet<string>` en
   `mobile/src/features/eventos/useFavoritos.ts`, exportados por
   `mobile/src/features/eventos/index.ts`): `useFavoritos` pide con el usuario de la sesión y la clave

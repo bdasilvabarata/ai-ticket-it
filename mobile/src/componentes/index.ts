@@ -21,4 +21,6 @@ export { PantallaDesplazable, type PropsPantallaDesplazable } from "./PantallaDe
 export { SeccionPendiente } from "./SeccionPendiente";
 export { SegunConsulta, type ConsultaMostrable, type PropsSegunConsulta } from "./SegunConsulta";
 export { hundido, tema } from "./tema";
+export { useEnvioUnico } from "./useEnvioUnico";
 export { usePagina } from "./usePagina";
+export { useRefrescarAlFocalizar } from "./useRefrescarAlFocalizar";

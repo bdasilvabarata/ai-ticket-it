@@ -1,11 +1,16 @@
 import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
-import { ListaVacia, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import {
+  ListaVacia,
+  PantallaDesplazable,
+  SegunConsulta,
+  tema,
+  useRefrescarAlFocalizar,
+} from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { FilaMiCompra } from "../componentes/FilaMiCompra";
 import { useMisCompras } from "../useMisCompras";
-import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 import { useRefrescarAlVencer } from "../useRefrescarAlVencer";
 
 /**

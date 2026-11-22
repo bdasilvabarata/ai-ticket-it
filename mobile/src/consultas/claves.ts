@@ -67,6 +67,11 @@ export const claves = {
   paginaDeResenias: (usuarioId: string, eventoId: string, pagina: number) =>
     ["resenias-del-organizador", usuarioId, eventoId, "pagina", pagina] as const,
   /**
+   * Los favoritos del usuario (feature 014). Sin prefijo común con `catalogo`, `evento`, `misEventos`
+   * ni `misCompras`: marcar o desmarcar solo vuelve a pedir esta.
+   */
+  favoritos: (usuarioId: string) => ["favoritos", usuarioId] as const,
+  /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.
    */
