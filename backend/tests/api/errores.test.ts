@@ -15,6 +15,8 @@ function appConUsuariosQueFallan(error: unknown) {
     listar: () => Promise.reject(error),
     buscarPorId: () => Promise.reject(error),
     listarPorIds: () => Promise.reject(error),
+    listarPorFavorito: () => Promise.reject(error),
+    guardar: () => Promise.reject(error),
   };
   return crearApp({ repositorios: { usuarios } });
 }

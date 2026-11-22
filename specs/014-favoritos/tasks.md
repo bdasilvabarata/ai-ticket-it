@@ -94,7 +94,7 @@ las historias del backend.
 
 **⚠️ CRITICAL**: ninguna historia del backend empieza hasta cerrar esta fase.
 
-- [ ] T002 Test de `Usuario` en `backend/tests/domain/usuario.test.ts` (con stubs de
+- [X] T002 Test de `Usuario` en `backend/tests/domain/usuario.test.ts` (con stubs de
   `tieneFavorito(eventoId): boolean`, `marcarFavorito(eventoId): Usuario` y
   `desmarcarFavorito(eventoId): Usuario` en `backend/src/domain/usuario.ts`): `tieneFavorito`
   verdadero/falso; `marcarFavorito` agrega el id **al final** y devuelve un `Usuario` nuevo sin
@@ -102,16 +102,16 @@ las historias del backend.
   lo saca y devuelve uno nuevo; desmarcar uno que no está devuelve el mismo; el constructor con
   `favoritos` repetidos lanza `DatosInvalidosError` con un detalle sobre `favoritos`, "No puede
   repetir eventos."; `nombre`, `apellido` e `id` se conservan en las copias.
-- [ ] T003 Implementar en `backend/src/domain/usuario.ts` la invariante "sin repetir" (con
+- [X] T003 Implementar en `backend/src/domain/usuario.ts` la invariante "sin repetir" (con
   `Invariantes`, como `nombre` y `apellido`) y los tres métodos, inmutables; verde T002 y
   `test:afectados -w backend` (el seed y los tests que construyen usuarios siguen en verde).
-- [ ] T004 [P] Test y cambio de `ordenDeMisEventos(ahora)` en `backend/tests/domain/evento.test.ts`
+- [X] T004 [P] Test y cambio de `ordenDeMisEventos(ahora)` en `backend/tests/domain/evento.test.ts`
   y `backend/src/domain/evento.ts`: dos eventos a la misma `fechaHora` (próximos y realizados) se
   ordenan por nombre sin mayúsculas ni tildes (el mismo criterio que `porNombre` de
   `domain/orden-catalogo.ts`; reusarlo exportándolo o extrayendo el comparador, sin duplicarlo) y,
   con el mismo nombre, por `id`; los casos existentes (próximos ascendente, realizados descendente)
   siguen en verde (FR-009, research R6).
-- [ ] T005 [P] Test nuevo `backend/tests/repositories/usuario.repository.test.ts` (con stubs de
+- [X] T005 [P] Test nuevo `backend/tests/repositories/usuario.repository.test.ts` (con stubs de
   `guardar(usuario): Promise<void>` y `listarPorFavorito(eventoId): Promise<Usuario[]>` en
   `RepositorioUsuarios` de `backend/src/domain/repositorios.ts` y en
   `backend/src/repositories/usuario.repository.ts`): `guardar` da de alta y reemplaza la instancia
