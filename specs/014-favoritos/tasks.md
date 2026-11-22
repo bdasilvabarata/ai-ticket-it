@@ -321,7 +321,7 @@ consulta de favoritos que usan las tres historias de la app.
 `PUT`, queda llena y "Quitar de favoritos" tras releer), tocarla otra vez (sale el `DELETE`, queda
 vacía).
 
-- [ ] T027 [US1] Test en `mobile/tests/features/eventos/estrella-favorito.test.tsx` (con stubs de
+- [X] T027 [US1] Test en `mobile/tests/features/eventos/estrella-favorito.test.tsx` (con stubs de
   `EstrellaFavorito({ eventoId })` en `mobile/src/features/eventos/componentes/EstrellaFavorito.tsx`,
   que devuelve `null`, y `useCambiarFavorito(usuarioId, eventoId)` en
   `mobile/src/features/eventos/useCambiarFavorito.ts`): sin datos de favoritos no se dibuja; no
@@ -331,14 +331,14 @@ vacía).
   pedido (FR-016); con el pedido fallando, la estrella vuelve al estado releído y no se reintenta
   (FR-017, US1-6); tras el cambio solo se vuelve a pedir `GET /usuarios/actual/favoritos` (ni el
   catálogo ni el evento, FR-018).
-- [ ] T028 [US1] Implementar `useCambiarFavorito` (mutation `variables: { marcar: boolean }`,
+- [X] T028 [US1] Implementar `useCambiarFavorito` (mutation `variables: { marcar: boolean }`,
   `marcarFavorito`/`desmarcarFavorito` de `src/api`, sin reintentos, `onSettled` que **devuelve** la
   promesa de `invalidateQueries({ queryKey: claves.favoritos(usuarioId) })`) y `EstrellaFavorito`
   (`Pressable` con `accessibilityRole="button"`, `accessibilityLabel` según el estado,
   `accessibilityState={{ selected, busy, disabled }}`, Ionicons `star`/`star-outline` en
   `tema.colores.texto`, atenuada con la `opacidad` del tema mientras está en curso, área táctil
   mínima `tema.tamano`, envío con `useEnvioUnico` de `src/componentes`); verde T027.
-- [ ] T029 [US1] Test en `mobile/tests/pantallas/detalle-evento.test.tsx`: el detalle de un evento
+- [X] T029 [US1] Test en `mobile/tests/pantallas/detalle-evento.test.tsx`: el detalle de un evento
   ajeno muestra la estrella al lado del nombre; marcar registra el `PUT
   /usuarios/actual/favoritos/<id>` con `X-Usuario-Id` (con `crearFetchFalso`/`porRuta`) y, con los
   favoritos releídos, "Quitar de favoritos" seleccionada; desmarcar registra el `DELETE`; un

@@ -6,6 +6,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Boton, Ilustracion, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
 import { useSesion } from "../../sesion";
 import { nombreCompleto } from "../../usuarios";
+import { EstrellaFavorito } from "../componentes/EstrellaFavorito";
 import { FilaImagenes } from "../componentes/FilaImagenes";
 import { ListaTiposEntrada } from "../componentes/ListaTiposEntrada";
 import { MarcaRealizado } from "../componentes/MarcaRealizado";
@@ -89,9 +90,12 @@ function ContenidoDelDetalle({
           <Text style={estilos.aviso}>Este evento ya se realizó</Text>
         </View>
       ) : null}
-      <Text style={estilos.nombre} accessibilityRole="header">
-        {evento.nombre}
-      </Text>
+      <View style={estilos.encabezado}>
+        <Text style={estilos.nombre} accessibilityRole="header">
+          {evento.nombre}
+        </Text>
+        <EstrellaFavorito eventoId={evento.id} />
+      </View>
       <View style={estilos.datos}>
         <Text style={estilos.dato}>{evento.categoria.nombre}</Text>
         <Text style={estilos.dato}>{textoFechaHora(evento.fechaHoraLocal)}</Text>
@@ -122,7 +126,9 @@ function ContenidoDelDetalle({
 }
 
 const estilos = StyleSheet.create({
-  nombre: { ...tema.tipografia.titulo, color: tema.colores.texto },
+  // El nombre ocupa lo que deja la estrella y baja de línea si no entra: la estrella no lo tapa.
+  encabezado: { flexDirection: "row", alignItems: "flex-start", gap: tema.espacio.chico },
+  nombre: { ...tema.tipografia.titulo, color: tema.colores.texto, flex: 1 },
   datos: { gap: tema.espacio.minimo },
   dato: { ...tema.tipografia.cuerpo, color: tema.colores.textoSecundario },
   descripcion: { ...tema.tipografia.cuerpo, color: tema.colores.texto },

@@ -29,7 +29,7 @@ import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "
 import { espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
 import { esperarPestanas } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
-import { lucia, martin, todos } from "../helpers/usuarios";
+import { diego, lucia, martin, todos } from "../helpers/usuarios";
 
 type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
 
@@ -83,7 +83,10 @@ describe("Detalle del evento (US2)", () => {
     expect(screen.getByText("Inscripción")).toBeOnTheScreen();
     expect(screen.getByText("$ 30.000 · 1000 disponibles")).toBeOnTheScreen();
     expect(screen.getByText("Gratis · 200 disponibles")).toBeOnTheScreen();
-    expect(screen.queryByRole("button", { name: /Editar|Quitar|Agregar|Comprar/ })).toBeNull();
+    // La estrella de favoritos (feature 014) no es una acción sobre el evento ni sus tipos.
+    expect(
+      screen.queryByRole("button", { name: /^(?!.* favoritos$).*(Editar|Quitar|Agregar|Comprar)/ }),
+    ).toBeNull();
     expect(screen.queryByText("Este evento ya se realizó")).toBeNull();
   });
 
@@ -674,5 +677,74 @@ describe("Detalle del evento: reseñas del organizador (feature 012, US2)", () =
       expect(await screen.findByText("Todavía no tiene reseñas")).toBeOnTheScreen();
       expect(screen.queryByRole("button", { name: "Ver todas las reseñas" })).toBeNull();
     });
+  });
+});
+
+describe("La estrella de favoritos del detalle (feature 014, US1)", () => {
+  const FAVORITOS = "/usuarios/actual/favoritos";
+  const DE_LA_MARATON = `${FAVORITOS}/evento-maraton-10k`;
+  const conFavoritos = (favoritos: Lista, cambio: Lista = [{ status: 204, texto: "" }]) => {
+    const { listado, detalles } = conMaraton();
+    return { listado, detalles: { ...detalles, [FAVORITOS]: favoritos, [DE_LA_MARATON]: cambio } };
+  };
+
+  it("en un evento ajeno, marcar manda el PUT con el usuario y, releídos, queda Quitar de favoritos", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", {
+      ...conFavoritos([
+        { status: 200, json: [] },
+        { status: 200, json: [maratonEnCatalogo] },
+      ]),
+      usuario: diego,
+    });
+
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+    await fireEvent.press(await screen.findByRole("button", { name: "Agregar a favoritos" }));
+
+    expect(await screen.findByRole("button", { name: "Quitar de favoritos" })).toBeSelected();
+    const [pedido] = falso.pedidosA(DE_LA_MARATON);
+    expect(pedido.metodo).toBe("PUT");
+    expect(pedido.encabezados["X-Usuario-Id"]).toBe(diego.id);
+  });
+
+  it("desmarcar manda el DELETE y vuelve a Agregar a favoritos", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", {
+      ...conFavoritos([
+        { status: 200, json: [maratonEnCatalogo] },
+        { status: 200, json: [] },
+      ]),
+      usuario: diego,
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Quitar de favoritos" }));
+
+    expect(await screen.findByRole("button", { name: "Agregar a favoritos" })).not.toBeSelected();
+    expect(falso.pedidosA(DE_LA_MARATON).map((p) => p.metodo)).toEqual(["DELETE"]);
+  });
+
+  it("los favoritos son de cada usuario: con los de Lucía, el evento aparece sin marcar (US1-5)", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", conFavoritos([{ status: 200, json: [] }]));
+
+    expect(await screen.findByRole("button", { name: "Agregar a favoritos" })).not.toBeSelected();
+    expect(falso.pedidosA(FAVORITOS).every((p) => p.encabezados["X-Usuario-Id"] === lucia.id)).toBe(true);
+  });
+
+  it("el organizador también ve la estrella en el detalle de su evento", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conFavoritos([{ status: 200, json: [maratonEnCatalogo] }]));
+
+    expect(await screen.findByText("Sos el organizador de este evento")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Quitar de favoritos" })).toBeSelected();
+  });
+
+  it("con los favoritos fallando, el detalle se ve y la estrella no (FR-018b)", async () => {
+    const { falso } = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      conFavoritos([{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }]),
+    );
+
+    expect(await screen.findByText("Carrera de 10 km por las calles de la ciudad.")).toBeOnTheScreen();
+    await waitFor(() => expect(falso.pedidosA(FAVORITOS).length).toBeGreaterThan(0));
+    await act(() => jest.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /favoritos/ })).toBeNull();
   });
 });
