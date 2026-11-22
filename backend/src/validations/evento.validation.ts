@@ -11,6 +11,7 @@ import {
   fechaDeParedSchema,
   idSchema,
   obligatorio,
+  paginaSchema,
   textoObligatorio,
   textoOpcional,
 } from "./comunes";
@@ -77,6 +78,12 @@ export const eventoNuevo = crearValidacion({
 /** `GET` y `DELETE /eventos/:eventoId`. */
 export const eventoPorId = crearValidacion({ params: paramsEvento });
 
+/** `GET /eventos/:eventoId/resenias-del-organizador` (feature 013): la página pedida (por defecto, la 1). */
+export const consultaReseniasDelOrganizador = crearValidacion({
+  params: paramsEvento,
+  query: z.object({ pagina: paginaSchema }),
+});
+
 /** `PUT /eventos/:eventoId`: reemplaza los datos del evento; los tipos no se tocan. */
 export const eventoEditado = crearValidacion({
   params: paramsEvento,
@@ -109,5 +116,7 @@ export const consultaCatalogo = crearValidacion({
     orden: z.enum(ORDENES_CATALOGO, { error: MENSAJE_ORDEN }).default("fecha"),
     // Sin valor, el inicial del criterio (lo decide el dominio).
     sentido: z.enum(SENTIDOS_CATALOGO, { error: MENSAJE_SENTIDO }).optional(),
+    // Feature 013: la página pedida (por defecto, la 1). El tamaño no se recibe (FR-006).
+    pagina: paginaSchema,
   }),
 });

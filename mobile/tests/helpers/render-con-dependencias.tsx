@@ -4,7 +4,7 @@ import { renderRouter } from "expo-router/testing-library";
 import { crearDependencias, type Dependencias } from "../../src/composicion";
 import { LayoutRaiz } from "../../src/navegacion/LayoutRaiz";
 import { sinCompras } from "./compras";
-import { reseniasDelOrganizadorDeEjemplo } from "./eventos";
+import { catalogo, reseniasDelOrganizadorDeEjemplo } from "./eventos";
 import { crearFetchFalso, type FuncionRespuesta, type RespuestaFalsa, type Respuestas } from "./fetch-falso";
 import { CLAVE_RECORDADO } from "./usuarios";
 
@@ -29,11 +29,11 @@ const creadas: Dependencias[] = [];
  * sin ninguna.
  */
 function respuestaDeExplorar(url: string): RespuestaFalsa | null {
-  if (/\/eventos\?/.test(url)) return { status: 200, json: { eventos: [], hayEventosProximos: false } };
+  if (/\/eventos\?/.test(url)) return { status: 200, json: catalogo([], false) };
   if (url.endsWith("/categorias")) return { status: 200, json: [] };
   if (/\/eventos\/[^/]+\/mis-compras$/.test(url)) return { status: 200, json: sinCompras };
   if (/\/api\/compras$/.test(url)) return { status: 200, json: [] };
-  if (/\/eventos\/[^/]+\/resenias-del-organizador$/.test(url)) {
+  if (/\/eventos\/[^/]+\/resenias-del-organizador\/resumen$/.test(url)) {
     return { status: 200, json: reseniasDelOrganizadorDeEjemplo() };
   }
   return null;

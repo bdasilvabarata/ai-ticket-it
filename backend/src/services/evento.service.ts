@@ -1,12 +1,13 @@
-import type {
-  CatalogoVista,
-  EventoCatalogoVista,
-  EventoResumenVista,
-  EventoVista,
-  OrdenCatalogo,
-  OrganizadorVista,
-  ReseniasDelOrganizadorVista,
-  SentidoCatalogo,
+import {
+  LIMITES_PAGINACION,
+  type CatalogoVista,
+  type EventoResumenVista,
+  type EventoVista,
+  type OrdenCatalogo,
+  type OrganizadorVista,
+  type PaginaDeReseniasVista,
+  type ReseniasDelOrganizadorVista,
+  type SentidoCatalogo,
 } from "@ai-ticket-it/shared";
 import {
   Evento,
@@ -16,8 +17,9 @@ import {
   type DatosDeTipoEntrada,
 } from "../domain/evento";
 import { palabrasDeBusqueda } from "../domain/busqueda";
-import { calcularPuntaje } from "../domain/resenia";
+import { calcularPuntaje, type Resenia } from "../domain/resenia";
 import { ordenarCatalogo, type Ordenable } from "../domain/orden-catalogo";
+import { paginar } from "../domain/paginacion";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras, RepositorioEventos } from "../domain/repositorios";
 import { NoEncontradoError, SinPermisoError } from "../errors/index";
@@ -25,7 +27,7 @@ import type { CategoriaService } from "./categoria.service";
 import type { Cerrojo } from "./cerrojo-por-clave";
 import { aEventoCatalogoVista, aEventoResumenVista, aEventoVista, aOrganizadorVista } from "./evento.vistas";
 import type { ReseniaService } from "./resenia.service";
-import { aReseniasDelOrganizadorVista, delLote } from "./resenia.vistas";
+import { aPaginaDeReseniasVista, aReseniasDelOrganizadorVista, delLote } from "./resenia.vistas";
 import type { UsuarioService } from "./usuario.service";
 import type { VencimientoService } from "./vencimiento.service";
 
@@ -47,13 +49,15 @@ export interface ConsultaCatalogoValidada {
   orden: OrdenCatalogo;
   /** Sin valor: el inicial del criterio. */
   sentido?: SentidoCatalogo;
+  /** Página pedida, desde 1 (feature 013). La validación siempre la da; sin valor, la 1. */
+  pagina?: number;
 }
 
 /**
  * Lo que se ordena del catálogo: los datos de la entidad (`fechaHora` como `Date`, el puntaje sin
- * redondear) y su vista, que sale tal cual. Las vistas no se ordenan: no cumplen `Ordenable`.
+ * redondear) y el evento, del que se arma la vista recién después de cortar la página (013, R3).
  */
-type ElementoDelCatalogo = Ordenable & { vista: EventoCatalogoVista };
+type ElementoDelCatalogo = Ordenable & { evento: Evento };
 
 /** Datos ya validados de `POST /eventos`. */
 export type DatosNuevoEventoValidados = DatosDeEvento & { tiposEntrada: DatosDeTipoEntrada[] };
@@ -98,12 +102,13 @@ export class EventoService {
 
   /**
    * El catálogo de Explorar (UC-05): los eventos no realizados de todos los organizadores, filtrados
-   * por texto y categoría. Lectura: sin cerrojo y con un único `ahora` por pedido. Hace un número fijo
-   * de lecturas (sin N+1): la categoría pedida, los eventos y un lote por dueño (categorías,
-   * organizadores y sus puntajes).
+   * por texto y categoría, ordenados y cortados en la página pedida (feature 013, R3). Lectura: sin
+   * cerrojo y con un único `ahora` por pedido. Hace un número fijo de lecturas (sin N+1): la
+   * categoría pedida, los eventos, los puntajes de los organizadores de todos los coincidentes y,
+   * solo para la página, el cupo al día y un lote por dueño (categorías y organizadores).
    */
   async listar(consulta: ConsultaCatalogoValidada): Promise<CatalogoVista> {
-    const { texto, categoriaId, orden, sentido } = consulta;
+    const { texto, categoriaId, orden, sentido, pagina = 1 } = consulta;
     // Una referencia de la entrada (principio III): si no existe, 400 sobre query.categoriaId, antes
     // de leer los eventos. El error lo lanza el dueño de las categorías.
     if (categoriaId !== undefined) await this.#categoriaService.buscarReferenciada(categoriaId, "consulta");
@@ -117,34 +122,50 @@ export class EventoService {
       (evento) =>
         (categoriaId === undefined || evento.categoriaId === categoriaId) && evento.coincideCon(palabras),
     );
-    if (coincidentes.length === 0) return { eventos: [], hayEventosProximos };
-    // El cupo (y "Agotado") al día: cuenta las entradas de las compras pendientes vencidas (R3).
-    const filtrados = await this.#conCupoAlDia(coincidentes, ahora);
+    if (coincidentes.length === 0)
+      return { eventos: [], pagina: paginar([], pagina).pagina, hayEventosProximos };
 
-    const organizadorIds = new Set(filtrados.map((e) => e.organizadorId));
-    const [categorias, organizadores, puntajes] = await Promise.all([
-      this.#categoriaService.obtenerPorIds(filtrados.map((e) => e.categoriaId)),
-      this.#usuarioService.obtenerPorIds([...organizadorIds]),
-      // Todos sus eventos, próximos y realizados: solo se reseñan los realizados (R7).
-      this.#reseniaService.puntajesPorOrganizador(todos.filter((e) => organizadorIds.has(e.organizadorId))),
-    ]);
-    // `obtenerPorIds` y `puntajesPorOrganizador` garantizan que están todos (si falta uno, lanzan).
-    const elementos = filtrados.map((evento): ElementoDelCatalogo => {
-      const puntaje = puntajes.get(evento.organizadorId)!;
-      const organizador = aOrganizadorVista(organizadores.get(evento.organizadorId)!, puntaje);
-      return {
+    // Los puntajes de los organizadores de **todos** los coincidentes: hacen falta para ordenar
+    // (013, R3). Todos sus eventos, próximos y realizados: solo se reseñan los realizados (012, R7).
+    const organizadorIds = new Set(coincidentes.map((e) => e.organizadorId));
+    const puntajes = await this.#reseniaService.puntajesPorOrganizador(
+      todos.filter((e) => organizadorIds.has(e.organizadorId)),
+    );
+    // El orden usa la fecha, los precios y el puntaje, no el cupo: se ordena todo y se corta antes de
+    // calcular el cupo al día (013, R3). `puntajesPorOrganizador` garantiza que están todos.
+    const ordenados = ordenarCatalogo(
+      coincidentes.map((evento): ElementoDelCatalogo => ({
         id: evento.id,
         nombre: evento.nombre,
         fechaHora: evento.fechaHora,
         precioDesde: evento.precioDesde(),
-        puntaje: puntaje.promedio,
-        vista: aEventoCatalogoVista(evento, categorias.get(evento.categoriaId)!, organizador, ahora),
-      };
+        puntaje: puntajes.get(evento.organizadorId)!.promedio,
+        evento,
+      })),
+      orden,
+      sentido,
+    );
+    const { elementos, pagina: paginaVista } = paginar(ordenados, pagina);
+
+    // Solo para los eventos de la página: el cupo (y "Agotado") al día, que cuenta las entradas de las
+    // compras pendientes vencidas (006, R3), y las categorías y los organizadores en lote.
+    const enLaPagina = await this.#conCupoAlDia(
+      elementos.map((elemento) => elemento.evento),
+      ahora,
+    );
+    const [categorias, organizadores] = await Promise.all([
+      this.#categoriaService.obtenerPorIds(enLaPagina.map((e) => e.categoriaId)),
+      this.#usuarioService.obtenerPorIds([...new Set(enLaPagina.map((e) => e.organizadorId))]),
+    ]);
+    // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
+    const eventos = enLaPagina.map((evento) => {
+      const organizador = aOrganizadorVista(
+        organizadores.get(evento.organizadorId)!,
+        puntajes.get(evento.organizadorId)!,
+      );
+      return aEventoCatalogoVista(evento, categorias.get(evento.categoriaId)!, organizador, ahora);
     });
-    return {
-      eventos: ordenarCatalogo(elementos, orden, sentido).map((elemento) => elemento.vista),
-      hayEventosProximos,
-    };
+    return { eventos, pagina: paginaVista, hayEventosProximos };
   }
 
   /** Los eventos que organiza el usuario actual, en el orden de Mis eventos. */
@@ -234,23 +255,58 @@ export class EventoService {
   }
 
   /**
-   * "Reseñas del organizador" (feature 012, R7): el organizador del evento con su puntaje y las
-   * reseñas de **todos** sus eventos, de la más reciente a la más vieja. Lectura pública, sin cerrojo
-   * ni reloj, con cuatro lecturas fijas: el evento (404), los eventos del organizador, sus reseñas y
-   * los usuarios en lote (el organizador y los autores).
+   * "Reseñas del organizador" por páginas (feature 012, R7; feature 013, R5): el organizador del
+   * evento con el puntaje y la cantidad de **todas** sus reseñas y la página `pagina` de las de
+   * **todos** sus eventos, de la más reciente a la más vieja. Lectura pública, sin cerrojo ni reloj,
+   * con cuatro lecturas fijas: el evento (404), los eventos del organizador, sus reseñas y los
+   * usuarios en lote (el organizador y solo los autores de la página).
    */
-  async reseniasDelOrganizador(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+  async reseniasDelOrganizador(eventoId: string, pagina: number): Promise<PaginaDeReseniasVista> {
+    const { organizadorId, susEventos, resenias } = await this.#reseniasDelOrganizador(eventoId);
+    const { elementos, pagina: paginaVista } = paginar(resenias, pagina);
+    const vista = await this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, elementos);
+    return aPaginaDeReseniasVista(vista, paginaVista);
+  }
+
+  /**
+   * El resumen de "Reseñas del organizador" para el detalle (feature 013, R5): el organizador con el
+   * puntaje y la cantidad de **todas** sus reseñas y las `LIMITES_PAGINACION.reseniasEnElDetalle`
+   * más recientes. Las mismas lecturas fijas que la colección; los usuarios del lote son el
+   * organizador y solo los autores de las que se devuelven.
+   */
+  async resumenDeResenias(eventoId: string): Promise<ReseniasDelOrganizadorVista> {
+    const { organizadorId, susEventos, resenias } = await this.#reseniasDelOrganizador(eventoId);
+    const recientes = resenias.slice(0, LIMITES_PAGINACION.reseniasEnElDetalle);
+    return this.#aReseniasDelOrganizadorVista(organizadorId, susEventos, resenias, recientes);
+  }
+
+  /** Las lecturas de la 012: el evento (404), los eventos de su organizador y sus reseñas, ordenadas. */
+  async #reseniasDelOrganizador(
+    eventoId: string,
+  ): Promise<{ organizadorId: string; susEventos: Evento[]; resenias: Resenia[] }> {
     const { organizadorId } = await this.obtenerOFallar(eventoId);
     const susEventos = await this.#eventos.listarPorOrganizador(organizadorId);
     const resenias = await this.#reseniaService.listarDeEventos(susEventos);
-    const autores = resenias.map((resenia) => resenia.compradorId);
+    return { organizadorId, susEventos, resenias };
+  }
+
+  /**
+   * La vista con el puntaje de `todas` (el mismo cálculo y el mismo conjunto que `#organizadorVista`,
+   * FR-018) y las reseñas de `mostradas`, con **un** lote de usuarios: el organizador y sus autores.
+   */
+  async #aReseniasDelOrganizadorVista(
+    organizadorId: string,
+    susEventos: readonly Evento[],
+    todas: readonly Resenia[],
+    mostradas: readonly Resenia[],
+  ): Promise<ReseniasDelOrganizadorVista> {
+    const autores = mostradas.map((resenia) => resenia.compradorId);
     const usuarios = await this.#usuarioService.obtenerPorIds([...new Set([organizadorId, ...autores])]);
-    // El mismo cálculo y el mismo conjunto que `#organizadorVista` (FR-018), sin otra lectura.
-    const puntaje = calcularPuntaje(resenias.map((resenia) => resenia.puntuacion));
+    const puntaje = calcularPuntaje(todas.map((resenia) => resenia.puntuacion));
     const organizador = aOrganizadorVista(delLote(usuarios, organizadorId, "el usuario"), puntaje);
     return aReseniasDelOrganizadorVista(
       organizador,
-      resenias,
+      mostradas,
       usuarios,
       new Map(susEventos.map((evento) => [evento.id, evento])),
     );

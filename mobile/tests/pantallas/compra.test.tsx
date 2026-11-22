@@ -569,7 +569,7 @@ describe("Cancelar una confirmada: lo que se refresca después (feature 009, US5
       claves.evento(lucia.id, EVENTO_ID),
       claves.misComprasDelEvento(martin.id, EVENTO_ID),
       claves.misCompras(martin.id),
-      claves.catalogo({ texto: "maraton", categoriaId: null, orden: "fecha", sentido: "asc" }),
+      claves.catalogo({ texto: "maraton", categoriaId: null, orden: "fecha", sentido: "asc", pagina: 1 }),
     ];
     for (const clave of sembradas) queryClient.setQueryData(clave, { sembrada: true });
     return sembradas;

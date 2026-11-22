@@ -72,6 +72,23 @@ export function textoOpcional(maximo: number) {
   return z.string({ error: mensajeMaximo }).trim().max(maximo, mensajeMaximo).default("");
 }
 
+const MENSAJE_PAGINA = "Debe ser un entero mayor o igual a 1.";
+const DIGITOS = /^\d+$/;
+
+/**
+ * Número de página de una lista paginada, en la query (research R2): ausente → 1; un texto de
+ * dígitos sin signo que sea un entero seguro ≥ 1 → ese número; cualquier otra cosa (`0`, `-1`,
+ * `1.5`, `abc`, `""`, `1e1`, repetida) → 400 sobre `query.pagina`. Una regex y no
+ * `z.coerce.number()`, que acepta `""` y `"1e1"`.
+ */
+export const paginaSchema = z
+  .string({ error: MENSAJE_PAGINA })
+  .regex(DIGITOS, MENSAJE_PAGINA)
+  .transform(Number)
+  .refine((numero) => Number.isSafeInteger(numero) && numero >= 1, MENSAJE_PAGINA)
+  .optional()
+  .transform((numero) => numero ?? 1);
+
 /** Entero ≥ `minimo` (precio y cupo). */
 export function enteroDesde(minimo: number) {
   const mensaje = `Debe ser un entero mayor o igual a ${minimo}.`;

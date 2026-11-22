@@ -7,6 +7,7 @@ export type {
   CompradorVista,
   ComprasDelEventoVista,
   CompraVista,
+  ConsultaComprasDelEvento,
   DatosCompra,
   EntradaDelEventoVista,
   EntradaVista,
@@ -49,9 +50,12 @@ export type {
   ParteDeLaCompraVista,
   RolEnLaCompra,
 } from "./mensaje";
+export { LIMITES_PAGINACION } from "./paginacion";
+export type { PaginaVista } from "./paginacion";
 export { LIMITES_RESENIA } from "./resenia";
 export type {
   DatosResenia,
+  PaginaDeReseniasVista,
   ReseniaDelOrganizadorVista,
   ReseniasDelOrganizadorVista,
   ReseniaVista,

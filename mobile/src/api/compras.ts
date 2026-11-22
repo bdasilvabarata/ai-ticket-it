@@ -2,6 +2,7 @@ import type {
   ChatDeLaCompraVista,
   CompraDelEventoVista,
   ComprasDelEventoVista,
+  ConsultaComprasDelEvento,
   CompraVista,
   DatosCompra,
   DatosMensaje,
@@ -44,15 +45,24 @@ export function obtenerMisComprasDelEvento(
 }
 
 /**
- * `GET /eventos/:eventoId/compras` (feature 008): todas las compras del evento, al día, con la
- * ventana de uso y el resumen por tipo. Solo para su organizador (si no, 403).
+ * `GET /eventos/:eventoId/compras` (features 008 y 013): una página de las compras del evento, al
+ * día y filtradas por el servidor, con la ventana de uso y el resumen por tipo de todas. Solo para su
+ * organizador (si no, 403). Cada parámetro va solo si tiene valor: la página 1, "todas" y
+ * `sinResponder: false` piden la URL de la 008.
  */
 export function obtenerComprasDelEvento(
   cliente: ClienteApi,
   eventoId: string,
+  consulta: ConsultaComprasDelEvento,
   opciones: { signal?: AbortSignal } = {},
 ): Promise<ComprasDelEventoVista> {
-  return cliente.get<ComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/compras`, {
+  const { pagina = 1, estado, sinResponder } = consulta;
+  const parametros = new URLSearchParams();
+  if (pagina !== 1) parametros.append("pagina", String(pagina));
+  if (estado !== undefined) parametros.append("estado", estado);
+  if (sinResponder === true) parametros.append("sinResponder", "true");
+  const query = parametros.size > 0 ? `?${parametros.toString()}` : "";
+  return cliente.get<ComprasDelEventoVista>(`${rutaDelEvento(eventoId)}/compras${query}`, {
     signal: opciones.signal,
   });
 }

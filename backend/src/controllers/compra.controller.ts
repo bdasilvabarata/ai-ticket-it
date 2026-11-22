@@ -11,7 +11,13 @@ import type {
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { CompraService } from "../services/compra.service";
-import { compraNueva, compraPorId, comprasDelEvento, mensajeNuevo } from "../validations/compra.validation";
+import {
+  compraNueva,
+  compraPorId,
+  comprasDelEvento,
+  consultaComprasDelEvento,
+  mensajeNuevo,
+} from "../validations/compra.validation";
 import { reseniaNueva } from "../validations/resenia.validation";
 
 /** HTTP de las compras: lee la entrada ya validada y llama al service (sin reglas). */
@@ -30,10 +36,14 @@ export class CompraController {
     res.json(await this.compraService.misComprasDelEvento(eventoId, usuarioActual(req).id));
   };
 
-  /** `GET /eventos/:eventoId/compras` (feature 008): todas las compras del evento, para su organizador. */
+  /**
+   * `GET /eventos/:eventoId/compras` (features 008 y 013): una página de las compras del evento,
+   * filtradas, para su organizador.
+   */
   comprasDelEvento = async (req: Request, res: Response<ComprasDelEventoVista>): Promise<void> => {
-    const { eventoId } = comprasDelEvento.leer(req, "params");
-    res.json(await this.compraService.comprasDelEvento(eventoId, usuarioActual(req).id));
+    const { eventoId } = consultaComprasDelEvento.leer(req, "params");
+    const consulta = consultaComprasDelEvento.leer(req, "query");
+    res.json(await this.compraService.comprasDelEvento(eventoId, usuarioActual(req).id, consulta));
   };
 
   misCompras = async (req: Request, res: Response<MiCompraVista[]>): Promise<void> => {

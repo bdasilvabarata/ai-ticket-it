@@ -2,12 +2,19 @@ import type {
   CatalogoVista,
   EventoResumenVista,
   EventoVista,
+  PaginaDeReseniasVista,
   ReseniasDelOrganizadorVista,
 } from "@ai-ticket-it/shared";
 import type { Request, Response } from "express";
 import { usuarioActual } from "../middlewares/requerir-usuario";
 import type { EventoService } from "../services/evento.service";
-import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
+import {
+  consultaCatalogo,
+  consultaReseniasDelOrganizador,
+  eventoEditado,
+  eventoNuevo,
+  eventoPorId,
+} from "../validations/evento.validation";
 
 /** HTTP de eventos: lee la entrada ya validada, llama al service y arma la respuesta. */
 export class EventoController {
@@ -33,13 +40,17 @@ export class EventoController {
     res.json(await this.eventoService.obtener(eventoId));
   };
 
-  /** Público (feature 012): el organizador del evento con su puntaje y las reseñas de sus eventos. */
-  reseniasDelOrganizador = async (
-    req: Request,
-    res: Response<ReseniasDelOrganizadorVista>,
-  ): Promise<void> => {
+  /** Público (feature 012; paginado en la 013): el organizador con su puntaje y una página de reseñas. */
+  reseniasDelOrganizador = async (req: Request, res: Response<PaginaDeReseniasVista>): Promise<void> => {
+    const { eventoId } = consultaReseniasDelOrganizador.leer(req, "params");
+    const { pagina } = consultaReseniasDelOrganizador.leer(req, "query");
+    res.json(await this.eventoService.reseniasDelOrganizador(eventoId, pagina));
+  };
+
+  /** Público (feature 013, R5): el organizador con su puntaje y las 3 reseñas más recientes. */
+  resumenDeResenias = async (req: Request, res: Response<ReseniasDelOrganizadorVista>): Promise<void> => {
     const { eventoId } = eventoPorId.leer(req, "params");
-    res.json(await this.eventoService.reseniasDelOrganizador(eventoId));
+    res.json(await this.eventoService.resumenDeResenias(eventoId));
   };
 
   actualizar = async (req: Request, res: Response<EventoVista>): Promise<void> => {

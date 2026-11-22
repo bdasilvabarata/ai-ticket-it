@@ -74,6 +74,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   const lucia = "usuario-lucia";
   const martin = "usuario-martin";
   const sofia = "usuario-sofia";
+  const diego = "usuario-diego";
+  const valentina = "usuario-valentina";
   const proximo = new Date(Math.round((ahora.getTime() + 24 * HORA_MS) / HORA_MS) * HORA_MS);
   // La hora en punto más cercana a `ahora + 2 h` (feature 008, R12): su ventana de uso (4 h antes,
   // 12 h después) está abierta desde el arranque y durante al menos 12 horas, para la demo del ingreso.
@@ -113,7 +115,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       multimedia: [imagen("sonidos-del-sur"), imagen("sonidos-del-sur-escenario")],
       organizadorId: lucia,
       tiposEntrada: [
-        { nombre: "General", descripcion: "Acceso al predio.", precio: 45000, cupo: 500 },
+        // 500 − las 4 General confirmadas de la 013 (R11).
+        { nombre: "General", descripcion: "Acceso al predio.", precio: 45000, cupo: 496 },
         { nombre: "VIP", descripcion: "Sector preferencial con barra.", precio: 120000, cupo: 50 },
         {
           nombre: "Backstage",
@@ -170,6 +173,30 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       // El cupo ya descuenta las 3 compras utilizadas de abajo (feature 012): 60 − 3.
       tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 10000, cupo: 57 }],
     },
+    // Feature 013 (R11): dos realizados más de Martín, cada uno con 4 compras utilizadas y su reseña
+    // (abajo), para que "Ver todas las reseñas" tenga 2 páginas (11 reseñas: 10 + 1).
+    {
+      slug: "taller-de-escritura",
+      nombre: "Taller de escritura creativa",
+      descripcion: "Una tarde de consignas, lecturas y devoluciones.",
+      categoriaId: categoriaId("Conferencias"),
+      fechaHora: fechaLocal(ahora, -5, 18),
+      multimedia: [imagen("taller-escritura")],
+      organizadorId: martin,
+      // El cupo ya descuenta las 4 compras utilizadas de abajo: 30 − 4.
+      tiposEntrada: [{ nombre: "General", descripcion: "Materiales incluidos.", precio: 7000, cupo: 26 }],
+    },
+    {
+      slug: "tango-en-la-terraza",
+      nombre: "Tango en la terraza",
+      descripcion: "Orquesta típica y milonga al atardecer.",
+      categoriaId: categoriaId("Música"),
+      fechaHora: fechaLocal(ahora, -2, 19),
+      multimedia: [imagen("tango-terraza")],
+      organizadorId: martin,
+      // El cupo ya descuenta las 4 compras utilizadas de abajo: 100 − 4.
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 9000, cupo: 96 }],
+    },
     {
       slug: "maraton-10k",
       nombre: "Maratón Ciudad 10K",
@@ -198,6 +225,63 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
         { nombre: "Con cena", descripcion: "Mesa con cena criolla incluida.", precio: 15000, cupo: 38 },
       ],
     },
+    // Feature 013 (R11): cinco próximos más, de organizadores y categorías variados y sin compras,
+    // para que Explorar tenga 12 próximos sin filtros (2 páginas: 10 + 2).
+    {
+      slug: "feria-del-libro-independiente",
+      nombre: "Feria del libro independiente",
+      descripcion: "Editoriales chicas, lecturas y firmas de autores.",
+      categoriaId: categoriaId("Conferencias"),
+      fechaHora: fechaLocal(ahora, 3, 17),
+      multimedia: [imagen("feria-del-libro")],
+      organizadorId: martin,
+      tiposEntrada: [{ nombre: "General", descripcion: "Acceso a la feria.", precio: 3000, cupo: 400 }],
+    },
+    {
+      slug: "match-de-impro",
+      nombre: "Match de improvisación teatral",
+      descripcion: "Dos equipos improvisan escenas con las propuestas del público.",
+      categoriaId: categoriaId("Teatro"),
+      fechaHora: fechaLocal(ahora, 8, 21),
+      multimedia: [imagen("match-de-impro")],
+      organizadorId: sofia,
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 9000, cupo: 120 }],
+    },
+    {
+      slug: "torneo-de-futbol-5",
+      nombre: "Torneo de fútbol 5",
+      descripcion: "Un día de partidos entre equipos del barrio.",
+      categoriaId: categoriaId("Deportes"),
+      fechaHora: fechaLocal(ahora, 12, 10),
+      multimedia: [imagen("torneo-futbol-5")],
+      organizadorId: sofia,
+      tiposEntrada: [
+        { nombre: "Equipo", descripcion: "Inscripción de un equipo de 5.", precio: 40000, cupo: 16 },
+      ],
+    },
+    {
+      slug: "microfono-abierto",
+      nombre: "Stand-up: Micrófono abierto",
+      descripcion: "Comediantes nuevos prueban su material.",
+      categoriaId: categoriaId("Stand-up"),
+      fechaHora: fechaLocal(ahora, 20, 22),
+      multimedia: [imagen("microfono-abierto")],
+      organizadorId: martin,
+      tiposEntrada: [{ nombre: "General", descripcion: "Ubicación libre.", precio: 5000, cupo: 60 }],
+    },
+    {
+      slug: "feria-de-cerveza-artesanal",
+      nombre: "Feria de cerveza artesanal",
+      descripcion: "Cervecerías de todo el país, música y comida.",
+      categoriaId: categoriaId("Festivales"),
+      fechaHora: fechaLocal(ahora, 25, 16),
+      multimedia: [imagen("cerveza-artesanal")],
+      organizadorId: lucia,
+      tiposEntrada: [
+        { nombre: "General", descripcion: "Acceso al predio.", precio: 10000, cupo: 800 },
+        { nombre: "Degustación", descripcion: "Vaso y cinco degustaciones.", precio: 22000, cupo: 150 },
+      ],
+    },
   ];
 
   const eventos = eventosSinIds.map(
@@ -217,7 +301,6 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   // venció sin pagarse (CANCELADA por el sistema; no devuelve cupo de nuevo). Ninguna PENDIENTE: la
   // demo no depende de la hora de arranque.
   const festival = "festival-sonidos-del-sur";
-  const diego = "usuario-diego";
   const porMartin = { tipo: "usuario", usuarioId: martin } as const;
   const masMinutos = (fecha: Date, minutos: number) => new Date(fecha.getTime() + minutos * 60 * 1000);
   const haceMartin = new Date(ahora.getTime() - 2 * 24 * HORA_MS);
@@ -279,6 +362,83 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
     }),
   ];
 
+  // Feature 013 (R11): diez compras más de una General en el Festival, para que "Compras del evento"
+  // tenga 12 (2 páginas: 10 + 2). Confirmadas y canceladas (vencidas por el sistema o canceladas
+  // después de pagar, con el reembolso pendiente), ninguna PENDIENTE. Las confirmadas son de
+  // Valentina (3) y Diego (1): nadie pasa el tope y Sofía y Martín, que compran en las demos y en los
+  // tests, conservan sus entradas disponibles. La de Valentina más vieja (en la página 2) termina en
+  // un mensaje suyo sin responder. General descuenta las 4 confirmadas (500 − 4).
+  type FinalDeLaCompra = "confirmada" | "vencida" | "cancelada-despues-de-pagar";
+  const masDelFestival: [compradorId: string, horasAtras: number, final: FinalDeLaCompra][] = [
+    [valentina, 3, "confirmada"],
+    [diego, 6, "confirmada"],
+    [sofia, 10, "vencida"],
+    [valentina, 20, "confirmada"],
+    [martin, 30, "vencida"],
+    [diego, 36, "cancelada-despues-de-pagar"],
+    [valentina, 40, "confirmada"],
+    [sofia, 44, "cancelada-despues-de-pagar"],
+    [martin, 60, "cancelada-despues-de-pagar"],
+    [valentina, 120, "cancelada-despues-de-pagar"],
+  ];
+  masDelFestival.forEach(([compradorId, horasAtras, final], indice) => {
+    const numero = indice + 1;
+    const alta = new Date(ahora.getTime() - horasAtras * HORA_MS);
+    const porComprador = { tipo: "usuario", usuarioId: compradorId } as const;
+    const pendiente = { estado: EstadoCompra.PENDIENTE, autor: porComprador, fechaHora: alta };
+    const confirmacion = {
+      estado: EstadoCompra.CONFIRMADA,
+      autor: porComprador,
+      fechaHora: masMinutos(alta, 5),
+    };
+    const cancelacion = { usuarioId: compradorId, fechaHora: masMinutos(alta, 2 * 60) };
+    const historial =
+      final === "confirmada"
+        ? [pendiente, confirmacion]
+        : final === "vencida"
+          ? [
+              pendiente,
+              {
+                estado: EstadoCompra.CANCELADA,
+                autor: { tipo: "sistema" } as const,
+                fechaHora: masMinutos(alta, LIMITES_COMPRA.minutosParaPagar),
+              },
+            ]
+          : [
+              pendiente,
+              confirmacion,
+              { estado: EstadoCompra.CANCELADA, autor: porComprador, fechaHora: cancelacion.fechaHora },
+            ];
+    const codigo = `FSGN${String(numero).padStart(4, "0")}`;
+    compras.push(
+      new Compra({
+        id: `compra-${compradorId.replace("usuario-", "")}-festival-${numero}`,
+        compradorId,
+        eventoId: `evento-${festival}`,
+        tipoEntradaId: `tipo-${festival}-general`,
+        cantidad: 1,
+        total: 45000,
+        historial,
+        entradas: [
+          new Entrada({
+            codigo,
+            cancelacion: final === "cancelada-despues-de-pagar" ? cancelacion : null,
+          }),
+        ],
+        mensajes:
+          numero === masDelFestival.length
+            ? [
+                new Mensaje({
+                  autorId: compradorId,
+                  texto: "Hola, cancelé mi entrada. ¿Cuándo me devuelven el dinero?",
+                  enviadoEn: masMinutos(alta, 24 * 60),
+                }),
+              ]
+            : [],
+      }),
+    );
+  });
+
   // Compras sobre la Peña (feature 008, R12), con la ventana de uso abierta: Martín, 3 General
   // pagadas con 1 entrada ya usada (la compra UTILIZADA, "1 de 3"); Sofía, 2 Con cena pagadas sin
   // usar (sus códigos son los de la demo y de Postman).
@@ -330,7 +490,6 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   // después de pagarla y espera el reembolso; la de Valentina ya está reembolsada. Las dos liberaron
   // su cupo al cancelarse, así que Inscripción sigue en 1000.
   const maraton = "maraton-10k";
-  const valentina = "usuario-valentina";
   const porDiego = { tipo: "usuario", usuarioId: diego } as const;
   const porValentina = { tipo: "usuario", usuarioId: valentina } as const;
   const dias = (cantidad: number) => new Date(ahora.getTime() - cantidad * 24 * HORA_MS);
@@ -377,8 +536,9 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
   );
 
   // Reseñas (feature 012, R10): compras UTILIZADA de una entrada en dos eventos ya realizados, cada
-  // una con su reseña posterior al uso. Martín (Jazz) queda en ≈ 4,7 con 3 reseñas y Sofía (Noche de
-  // risas) en 2,5 con 2; Lucía, sin reseñas. La de Martín en la Peña sigue sin reseña (la demo).
+  // una con su reseña posterior al uso. Sofía (Noche de risas) queda en 2,5 con 2; Lucía, sin
+  // reseñas. La de Martín en la Peña sigue sin reseña (la demo). Desde la 013 (R11), Martín suma al
+  // Taller de escritura y al Tango (posteriores a las de Jazz): 11 reseñas, 52 / 11 ≈ 4,7.
   const eventoPorId = new Map(eventos.map((evento) => [evento.id, evento]));
   const resenias: Resenia[] = [];
   const asistencias: {
@@ -436,6 +596,78 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       reseniaHoras: 2 * 24,
       puntuacion: 2,
       comentario: null,
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "lucia",
+      codigo: "TXSC1A01",
+      usoMinutos: -30,
+      reseniaHoras: 6,
+      puntuacion: 5,
+      comentario: "Consignas muy disparadoras y un grupo hermoso.",
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "sofia",
+      codigo: "TXSC1S01",
+      usoMinutos: -25,
+      reseniaHoras: 20,
+      puntuacion: 5,
+      comentario: null,
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "diego",
+      codigo: "TXSC1D01",
+      usoMinutos: -20,
+      reseniaHoras: 30,
+      puntuacion: 5,
+      comentario: "Salí con tres cuentos empezados.",
+    },
+    {
+      slugEvento: "taller-de-escritura",
+      autor: "valentina",
+      codigo: "TXSC1V01",
+      usoMinutos: -10,
+      reseniaHoras: 48,
+      puntuacion: 4,
+      comentario: "Muy bueno, aunque se hizo corto.",
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "lucia",
+      codigo: "TNGT1A01",
+      usoMinutos: -40,
+      reseniaHoras: 3,
+      puntuacion: 5,
+      comentario: "La orquesta, la terraza y el atardecer: todo perfecto.",
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "sofia",
+      codigo: "TNGT1S01",
+      usoMinutos: -30,
+      reseniaHoras: 8,
+      puntuacion: 5,
+      comentario: null,
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "diego",
+      codigo: "TNGT1D01",
+      usoMinutos: -20,
+      reseniaHoras: 14,
+      puntuacion: 4,
+      comentario: null,
+    },
+    {
+      slugEvento: "tango-en-la-terraza",
+      autor: "valentina",
+      codigo: "TNGT1V01",
+      usoMinutos: -15,
+      reseniaHoras: 22,
+      puntuacion: 5,
+      comentario: "Ya quiero que repitan la milonga.",
     },
   ];
   for (const asistencia of asistencias) {

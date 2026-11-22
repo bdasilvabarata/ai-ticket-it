@@ -38,9 +38,11 @@ Se dibuja desde `useCompra(usuarioId, compraId)`, con `SegunConsulta`. Un 403/40
 
 - **Encabezado**: el nombre del evento.
 - **Si `compra.puedeReseniar`**, el formulario:
-  - `SelectorPuntuacion`: cinco botones en fila, `accessibilityRole="radio"`. Cada uno se etiqueta
-    "N de 5" y lleva `accessibilityState={{ checked }}`. Ninguno arranca elegido. El elegido se
-    distingue con algo más que el color (relleno y marca).
+  - `SelectorPuntuacion`: cinco estrellas en fila (sin caja de botón), de izquierda a derecha, cada
+    una `accessibilityRole="radio"` con el área táctil mínima, etiquetada "N de 5" y con
+    `accessibilityState={{ checked }}` (marcada solo la elegida). Ninguna arranca elegida. Elegir la
+    N pinta de amarillo (`resaltado`) las estrellas 1 a N; las demás quedan solo con el contorno.
+    Todas llevan el contorno oscuro, así la pintada se distingue también por la forma rellena.
   - `CampoDeTexto` "Comentario (opcional)", multilínea, con `maxLength` =
     `LIMITES_RESENIA.comentarioLargoMaximo`.
   - "Enviar" (`Boton` primario) con `useEnvioUnico`: un segundo toque no manda otro pedido.

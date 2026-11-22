@@ -58,3 +58,26 @@ export function resumenPorTipo(
     return resumen;
   });
 }
+
+/** Los criterios de la lista de "Compras del evento" (feature 013, R4); juntos se aplican con "y". */
+export interface FiltroDeComprasDelEvento {
+  /** Si viene, solo las compras en ese estado (al día: una pendiente vencida es CANCELADA). */
+  estado?: EstadoCompra;
+  /** Con `true`, solo las compras cuyo último mensaje es del comprador. */
+  sinResponder: boolean;
+}
+
+/**
+ * Las compras **al día** que cumplen el filtro, en el mismo orden en que llegan (feature 013,
+ * FR-017). No muta la lista recibida.
+ */
+export function filtrarComprasDelEvento(
+  compras: readonly Compra[],
+  filtro: FiltroDeComprasDelEvento,
+): Compra[] {
+  return compras.filter(
+    (compra) =>
+      (filtro.estado === undefined || compra.estado === filtro.estado) &&
+      (!filtro.sinResponder || compra.mensajeSinResponder),
+  );
+}

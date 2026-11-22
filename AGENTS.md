@@ -32,6 +32,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
   (`puntuacionMinima: 1`, `puntuacionMaxima: 5`, `comentarioLargoMaximo: 500`), `DatosResenia`,
   `ReseniaVista`, `ReseniaDelOrganizadorVista` (autor sin id) y `ReseniasDelOrganizadorVista`; y
   `CompraVista` (también `MiCompraVista`) suma `resenia: ReseniaVista | null` y `puedeReseniar`.
+  Desde la 013, `shared/src/paginacion.ts`: `LIMITES_PAGINACION` (`tamanoDePagina: 10`,
+  `reseniasEnElDetalle: 3`, fijos: los decide el servidor) y `PaginaVista` (`numero` —el entregado,
+  no el pedido—, `tamano`, `totalElementos` y `totalPaginas`, 0 con la lista vacía); `CatalogoVista`
+  y `ComprasDelEventoVista` suman `pagina` (esta, también `cantidadCompras`), `ConsultaCatalogo`
+  suma `pagina`, `ConsultaComprasDelEvento` (`pagina`, `estado`, `sinResponder`) es la query de
+  Compras del evento y `PaginaDeReseniasVista` es `ReseniasDelOrganizadorVista` más `pagina`.
 - `backend/src/` — Express en capas:
   `routes/ → controllers/ → services/ → repositories/ → domain/`, más `middlewares/`
   (usuario actual, logging, 404, registro y respuesta de errores), `validations/` (zod),
@@ -51,7 +57,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     desde la 012, "Jazz en el Patio" de Martín tiene compras `UTILIZADA` y reseñas 5, 4 y 5 de Lucía,
     Diego y Valentina (≈ 4,7) y "Stand-up: Noche de risas" de Sofía, de Diego y Valentina con 3 y 2
     —esta sin comentario— (2,5); `resenia-<autor>-<slug>`, cada una posterior al uso; Lucía no tiene
-    reseñas y `compra-martin-pena-general` sigue `UTILIZADA` "1 de 3" sin reseñar, para la demo);
+    reseñas y `compra-martin-pena-general` sigue `UTILIZADA` "1 de 3" sin reseñar, para la demo;
+    desde la 013, para probar las páginas: 12 eventos próximos —2 páginas del catálogo; los 5 nuevos
+    sin compras— y 4 realizados; el Festival con 12 compras —2 páginas—, ninguna `PENDIENTE`
+    (confirmadas y canceladas, vencidas o con el reembolso pendiente) y una fuera de la página 1 con
+    un mensaje sin responder; y dos realizados nuevos de Martín con 4 compras `UTILIZADA` cada uno,
+    así Martín tiene 11 reseñas —2 páginas, las 3 más recientes de la 013— que suman 52, ≈ 4,73);
     `crearApp()` los usa por defecto. Las entidades son inmutables: `guardar` reemplaza la
     instancia (las operaciones de `Evento` devuelven un `Evento` nuevo).
   - **Recursos**: `usuarios`, `categorias` (solo lectura), `eventos` y su router hijo
@@ -96,10 +107,36 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     `SIN_COMPRA_UTILIZADA` → 409 `RESENIA_REPETIDA`; bajo el cerrojo del evento, sin tocar la compra
     ni el cupo; **no hay** `PUT`, `PATCH` ni `DELETE`: una reseña no se edita ni se borra) y
     `GET /eventos/:eventoId/resenias-del-organizador` (en `EventoController`, **público**, sin
-    cerrojo ni reloj, cuatro lecturas fijas, `ReseniasDelOrganizadorVista`).
+    cerrojo ni reloj, cuatro lecturas fijas; desde la 013, **paginado**: `?pagina=N`,
+    `PaginaDeReseniasVista` con una página de 10, y el puntaje y la cantidad de **todas**), más, desde
+    la 013, `GET /eventos/:eventoId/resenias-del-organizador/resumen` (también público, las mismas
+    lecturas, `ReseniasDelOrganizadorVista` con las 3 más recientes y el puntaje de todas: la sección
+    del detalle).
+  - **Paginación** (feature 013): tres listas se entregan por páginas de
+    `LIMITES_PAGINACION.tamanoDePagina` (10, fijo: un `tamano`/`limite` en la query se descarta), el
+    catálogo, Compras del evento y las reseñas del organizador; cada respuesta **conserva** el nombre
+    de su lista (`eventos`, `compras`, `resenias`) y **suma** `pagina`. `domain/paginacion.ts`
+    (`paginar(elementos, numero)`, pura) corta una lista **ya filtrada y ordenada** por el service:
+    una página posterior a la última devuelve la última, con su número real, y la lista vacía, la
+    página 1 sin elementos. `validations/comunes.ts` suma `paginaSchema` (ausente → 1; solo dígitos,
+    entero seguro ≥ 1; `0`, `-1`, `1.5`, `abc`, `""`, `1e1` o repetida → 400 sobre `query.pagina`,
+    "Debe ser un entero mayor o igual a 1."). **Los repositorios no cambian**, y las tres siguen
+    siendo lecturas: sin cerrojo ni guardado. El catálogo ordena todos los coincidentes (con los
+    puntajes de sus organizadores) y recién **después de cortar** calcula el cupo al día y pide
+    categorías y organizadores, solo para la página; `hayEventosProximos` no cambia. En Compras del
+    evento (`consultaComprasDelEvento`: `?pagina`, `?estado` —uno de los cinco; si no, 400 "Debe ser
+    uno de los estados de una compra."— y `?sinResponder` —`true`/`false`; si no, 400 "Debe ser true
+    o false."—, juntos con "y"), `CompraService.comprasDelEvento(eventoId, usuarioId, { pagina,
+    estado, sinResponder })` filtra con `filtrarComprasDelEvento` (puro, en
+    `domain/compras-del-evento.ts`, sobre las compras al día) y pagina; la ventana, el resumen por
+    tipo, `comprasConMensajesSinResponder` y `cantidadCompras` son de **todas** (sin filtro ni
+    página), y los compradores se piden en lote solo para la página. `EventoService` separa
+    `reseniasDelOrganizador(eventoId, pagina)` y `resumenDeResenias(eventoId)`, que comparten las
+    lecturas y piden solo los autores de las reseñas que devuelven; `resenia.vistas.ts` suma
+    `aPaginaDeReseniasVista`. "Mis compras" (`GET /compras`) no se pagina.
   - **Eventos públicos** (feature 005): `GET /eventos` es el catálogo (público, `CatalogoVista`:
     los no realizados filtrados por `texto` y `categoriaId` y ordenados por `orden` y `sentido`, más
-    `hayEventosProximos`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae
+    `hayEventosProximos`; desde la 013, de a 10 con `?pagina` y `pagina`) y `GET /eventos/:eventoId` también es público. Toda `EventoVista` trae
     `organizador` (`OrganizadorVista` con `puntaje` sin redondear o `null` y `cantidadResenias`).
     Módulos puros del dominio: `domain/busqueda.ts` (`normalizarParaBuscar`, `palabrasDeBusqueda`:
     sin mayúsculas, acentos ni diéresis, ñ ≠ n) y `domain/orden-catalogo.ts` (`ordenarCatalogo`
@@ -203,9 +240,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     (una `listarPorEventos`, en orden). `CompraService.reseniar(eventoId, usuarioId, datos)` toma el
     cerrojo del evento, lee `ahora` adentro, `eventoService.obtenerOFallar` (404), las compras del
     comprador en el evento, `exigirQuePuedeReseniar` y `reseniaService.registrar`; **no** llama a
-    `obtenerAlDia` ni guarda compras ni eventos. `EventoService.reseniasDelOrganizador(eventoId)`:
-    evento, eventos del organizador, sus reseñas y **un** `usuarioService.obtenerPorIds` (organizador y
-    autores), con el puntaje calculado igual que en `OrganizadorVista`. `services/resenia.vistas.ts`
+    `obtenerAlDia` ni guarda compras ni eventos. `EventoService.reseniasDelOrganizador(eventoId,
+    pagina)` (desde la 013 paginado; el detalle usa `resumenDeResenias(eventoId)`, con las 3 más
+    recientes): evento, eventos del organizador, sus reseñas y **un** `usuarioService.obtenerPorIds`
+    (organizador y los autores de las reseñas devueltas), con el puntaje de **todas** calculado igual
+    que en `OrganizadorVista`. `services/resenia.vistas.ts`
     arma `aReseniaVista`, `aReseniaDelOrganizadorVista` y `aReseniasDelOrganizadorVista` (sin
     `compradorId`, compras, códigos ni estados), y `compra.vistas.ts` suma la pieza
     `reseniaDeLaCompra(compra, resenia)`: `resenia` solo en una `UTILIZADA`, `puedeReseniar =
@@ -279,7 +318,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     compras · Mis eventos · Perfil; `seleccionar-usuario` es el selector (pantalla completa sin
     usuario, modal desde Perfil) y `cargando`, la espera inicial. Las rutas de compra (feature 006)
     son `explorar/[eventoId]/index` (el detalle con las compras), `explorar/[eventoId]/comprar/[tipoEntradaId]`,
-    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento) y
+    `explorar/[eventoId]/mis-entradas` (sus compras confirmadas del evento), desde la 013
+    `explorar/[eventoId]/resenias` (`TodasLasResenias`, "Reseñas del organizador") y
     `compras/[compraId]/index` ("Tu compra"; desde la 011 en una carpeta, con el mismo `href`
     `/compras/[compraId]`, junto a `compras/[compraId]/chat`, "Chat de la compra", y desde la 012
     `compras/[compraId]/resenia`, "Reseñar evento"); la pestaña `(tabs)/mis-compras` re-exporta `MisCompras` (feature 007), y las del
@@ -306,7 +346,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `entradaDelEvento(usuarioId, eventoId, codigo)`; la 011, `chatDeLaCompra(usuarioId, compraId)`
       → `["chat-de-la-compra", usuarioId, compraId]`, sin prefijo común con `["compra"]`; la 012,
       `reseniasDelOrganizador(usuarioId, eventoId)` → `["resenias-del-organizador", usuarioId,
-      eventoId]`, sin prefijo común con `["evento"]`) y `cliente-api.tsx`
+      eventoId]`, sin prefijo común con `["evento"]`; la 013 suma la página a la consulta del
+      `catalogo`, un cuarto elemento opcional `{ filtro, pagina }` a `comprasDelEvento` (sin él, el
+      prefijo que invalidan las mutations) y `paginaDeResenias(usuarioId, eventoId, pagina)` →
+      `["resenias-del-organizador", usuarioId, eventoId, "pagina", pagina]`, bajo el mismo prefijo que
+      invalida una reseña nueva) y `cliente-api.tsx`
       (`ClienteApiProvider`, `useClienteApi()`), contrato que provee la sesión.
     - `src/conexion/` — contrato `EstadoConexion` + `ConexionProvider` + `useConexion()`; lo provee
       la sesión y lo leen la franja y `SegunConsulta`.
@@ -319,7 +363,14 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `ListaVacia` (con `accion` opcional), `SeccionPendiente`, `PantallaDesplazable` (scroll de las pantallas
       apiladas con header: margen sobre la barra de navegación del sistema y teclado que no tapa el
       campo; úsenla en vez de un `ScrollView` suelto; con `empezarAlFinal`, desde la 011, baja al
-      final cada vez que cambia el tamaño del contenido), `EtiquetaEstadoCompra` (el **único**
+      final cada vez que cambia el tamaño del contenido, y con `volverArribaCon`, desde la 013, vuelve
+      arriba sin animación cada vez que cambia ese valor —la página—, no al montar), `Paginador`
+      (feature 013: hasta 5 botones "Página N" de `botonesDelPaginador(totalPaginas, actual)` —todas
+      si son 5 o menos; si no, la 1, la última y la actual con sus vecinas, ampliadas hacia adentro—,
+      sin "…" ni anterior/siguiente; la actual, la de la **respuesta**, con sombra y Archivo Black y
+      `selected`; con una página o ninguna no se dibuja), `usePagina(criterio)` (la página, que vuelve
+      a la 1 en el mismo render cada vez que cambia el criterio: búsqueda, filtro, orden),
+      `EtiquetaEstadoCompra` (el **único**
       componente que muestra el estado de una compra, con su etiqueta y color), la franja, `Logo` y `CargandoInicio`
       (la ruta `cargando`); todo por `index.ts`. Los textos usan un estilo de `tema.tipografia`
       (`...tema.tipografia.cuerpo, color: …`): con fuentes propias el peso es la familia, nunca
@@ -356,7 +407,12 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       `ReseniasDelOrganizador` ("Reseñas del organizador": `textoPuntaje` igual al de la tarjeta y una
       `FilaResenia` por reseña, cada una un elemento accesible con `etiquetaDeResenia`; vacío
       `SIN_RESENIAS`, "Todavía no tiene reseñas", sin puntaje; su propio `SegunConsulta`, así un
-      error o la espera no tapan el resto del detalle) con `useReseniasDelOrganizador`; y
+      error o la espera no tapan el resto del detalle) con `useReseniasDelOrganizador` (desde la 013,
+      el `/resumen`: las 3 más recientes, con el puntaje y la cantidad de todas, y "Ver todas las
+      reseñas" si tiene más de 3, que abre `TodasLasResenias` en `explorar/[eventoId]/resenias`:
+      organizador, puntaje y de a 10 con el `Paginador`, `usePaginaDeResenias` y
+      `volverArribaCon`); Explorar suma el `Paginador` al pie de la lista y vuelve a la 1 con
+      `usePagina` al cambiar texto, categoría, orden o sentido; y
       `Puntuacion` (cinco estrellas de solo lectura, llenas por forma, leída con `textoPuntuacion`:
       "Puntuación: 4 de 5"). `index.ts` exporta además `Puntuacion`, `textoPuntuacion`,
       `MensajeDeCampo`, `useConfirmarDescarte`, `erroresDeFormulario` (con el formulario `"resenia"`:
@@ -381,8 +437,11 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
       el organizador, `ComprasDelEvento` (ventana de uso, `ResumenPorTipo` con "Agotado" y una
       `FilaCompraDelEvento` no tocable por compra; vacío "Todavía nadie compró entradas" sin tapar
       el resumen; desde las mejoras del organizador, `FiltroPorEstado`: chips radio "Todas" y los cinco
-      estados que filtran `vista.compras` en la app con `filtro-de-compras.ts`, sin tocar el resumen ni
-      el endpoint, con el vacío propio de cada filtro y sin chips si no hay compras; también el chip
+      estados; desde la 013 filtra **el servidor**, antes de paginar: `consultaDelFiltro` de
+      `filtro-de-compras.ts` arma la query, sin tocar el resumen; con el vacío propio de cada filtro
+      y sin chips si el evento no tiene compras (`cantidadCompras`); de a 10 con el `Paginador`,
+      `usePagina(filtro)` y `keepPreviousData`: mientras llega otra página o filtro, el resumen
+      anterior sigue y la lista dice "Cargando compras…"; también el chip
       "Sin responder", con la marca "Mensaje sin responder" en `FilaCompraDelEvento` y el contador
       sobre la lista, de `CompraDelEventoVista.mensajeSinResponder` y
       `ComprasDelEventoVista.comprasConMensajesSinResponder`, que el backend deriva con el getter
@@ -460,8 +519,8 @@ Desarrollo con IA (DDS UTN FRBA, 2C 2026).
     guarda (`@ts-expect-error` sobre una ruta inexistente).
   - `tests/` — Jest + React Native Testing Library, sin red: `helpers/` tiene
     `renderConDependencias` (la app real con `fetch` falso; si un test no registra lo que pide
-    Explorar al entrar —el catálogo y las categorías—, el detalle —`mis-compras` y, desde la 012,
-    `resenias-del-organizador`— o la pestaña "Mis compras" —`GET /compras`— responde vacío) y `crearFetchFalso`/`porRuta`
+    Explorar al entrar —el catálogo, desde la 013 con su `pagina` vacía, y las categorías—, el
+    detalle —`mis-compras` y, desde la 012, las reseñas del organizador, desde la 013 su `/resumen`— o la pestaña "Mis compras" —`GET /compras`— responde vacío) y `crearFetchFalso`/`porRuta`
     (registra método, encabezados y cuerpo). Tests por capa en `api/`, `componentes/`, `consultas/`,
     `conexion/` y `pantallas/`, y los de cada feature en `features/<dominio>/`.
 - `specs/NNN-slug/` — spec, plan, research, data-model, contracts y tasks de cada feature.

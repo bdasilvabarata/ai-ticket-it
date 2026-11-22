@@ -1,12 +1,12 @@
-import type { CompraDelEventoVista } from "@ai-ticket-it/shared";
+import type { ConsultaComprasDelEvento } from "@ai-ticket-it/shared";
 import { EstadoCompra } from "@ai-ticket-it/shared";
 
 import { textoEtiquetaEstado } from "../../componentes";
 
 /**
  * Qué compras se ven en "Compras del evento": todas, las de un estado (docs/mejoras-organizador.md,
- * grupo 3) o las que tienen un mensaje sin responder (grupo 4). Se filtra en la app, sobre la vista
- * que ya llega: el endpoint no cambia.
+ * grupo 3) o las que tienen un mensaje sin responder (grupo 4). Desde la 013 filtra el servidor,
+ * antes de paginar (`consultaDelFiltro`).
  */
 export type FiltroDeCompras = "todas" | "sin-responder" | EstadoCompra;
 
@@ -21,14 +21,16 @@ export const FILTROS_DE_COMPRAS: readonly FiltroDeCompras[] = [
   EstadoCompra.REEMBOLSADA,
 ];
 
-/** Las compras que deja ver el filtro, en el orden en que llegan. */
-export function filtrarCompras(
-  compras: readonly CompraDelEventoVista[],
+/**
+ * Lo que el filtro le pide al servidor (feature 013, FR-017): "todas" no manda nada; "sin-responder",
+ * `sinResponder: true`; un estado, ese `estado`.
+ */
+export function consultaDelFiltro(
   filtro: FiltroDeCompras,
-): CompraDelEventoVista[] {
-  if (filtro === "todas") return [...compras];
-  if (filtro === "sin-responder") return compras.filter((compra) => compra.mensajeSinResponder);
-  return compras.filter((compra) => compra.estado === filtro);
+): Pick<ConsultaComprasDelEvento, "estado" | "sinResponder"> {
+  if (filtro === "todas") return {};
+  if (filtro === "sin-responder") return { sinResponder: true };
+  return { estado: filtro };
 }
 
 /**

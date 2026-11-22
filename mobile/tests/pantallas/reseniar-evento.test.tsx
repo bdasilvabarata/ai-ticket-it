@@ -248,7 +248,7 @@ describe("después de reseñar, el puntaje se pone al día (feature 012, US3, SC
   jest.setTimeout(20_000);
 
   const FESTIVAL = `/eventos/${festivalCompleto.id}`;
-  const RESENIAS_FESTIVAL = `${FESTIVAL}/resenias-del-organizador`;
+  const RESENIAS_FESTIVAL = `${FESTIVAL}/resenias-del-organizador/resumen`;
   const SIN_RESENIAS_EN_TARJETA = "Organiza Lucía Álvarez · Sin reseñas";
   const CON_RESENIA_EN_TARJETA = "Organiza Lucía Álvarez · 4,0 · 1 reseña";
 

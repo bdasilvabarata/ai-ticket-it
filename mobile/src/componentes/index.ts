@@ -1,4 +1,5 @@
 export { Boton, type PropsBoton } from "./Boton";
+export { botonesDelPaginador } from "./botones-del-paginador";
 export { Cargando } from "./Cargando";
 export { CargandoInicio } from "./CargandoInicio";
 export {
@@ -15,7 +16,9 @@ export { Ilustracion, type PropsIlustracion } from "./Ilustracion";
 export { ListaVacia, type PropsListaVacia } from "./ListaVacia";
 export { Logo } from "./Logo";
 export { MensajeError, type PropsMensajeError } from "./MensajeError";
+export { Paginador, type PropsPaginador } from "./Paginador";
 export { PantallaDesplazable, type PropsPantallaDesplazable } from "./PantallaDesplazable";
 export { SeccionPendiente } from "./SeccionPendiente";
 export { SegunConsulta, type ConsultaMostrable, type PropsSegunConsulta } from "./SegunConsulta";
 export { hundido, tema } from "./tema";
+export { usePagina } from "./usePagina";

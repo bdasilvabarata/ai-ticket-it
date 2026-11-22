@@ -96,6 +96,7 @@ function Pila({ estado }: { estado: EstadoSesion }) {
           options={{ title: "Comprar entradas" }}
         />
         <Stack.Screen name="explorar/[eventoId]/mis-entradas" options={{ title: "Mis entradas" }} />
+        <Stack.Screen name="explorar/[eventoId]/resenias" options={{ title: "Reseñas del organizador" }} />
         <Stack.Screen name="compras/[compraId]/index" options={{ title: "Tu compra" }} />
         <Stack.Screen name="compras/[compraId]/chat" options={{ title: "Chat de la compra" }} />
         <Stack.Screen name="compras/[compraId]/resenia" options={{ title: "Reseñar evento" }} />

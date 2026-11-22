@@ -1190,7 +1190,8 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
 
     const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia");
 
-    expect(vista.compras).toHaveLength(30);
+    expect(vista.compras).toHaveLength(10);
+    expect(vista.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 30, totalPaginas: 3 });
     expect(buscarEvento).toHaveBeenCalledTimes(1);
     expect(pendientes).toHaveBeenCalledTimes(1);
     expect(porEvento).toHaveBeenCalledTimes(1);
@@ -1198,6 +1199,98 @@ describe("CompraService.comprasDelEvento (feature 008, US1)", () => {
     expect(guardarCompra).not.toHaveBeenCalled();
     expect(guardarEvento).not.toHaveBeenCalled();
     expect(ejecutar).not.toHaveBeenCalled();
+  });
+
+  describe("paginado y filtros (feature 013, US3, R4)", () => {
+    // 13 compras de 13 compradores distintos: comprador-00 es el de la más nueva.
+    const compradores = Array.from(
+      { length: 13 },
+      (_, i) =>
+        new Usuario({
+          id: `usuario-c${String(i).padStart(2, "0")}`,
+          nombre: `Nombre${i}`,
+          apellido: `Apellido${i}`,
+          favoritos: [],
+        }),
+    );
+    const armarPaginado = () => {
+      const compras = compradores.map((comprador, i) =>
+        de(
+          `compra-${String(i).padStart(2, "0")}`,
+          comprador.id,
+          "tipo-a-vip",
+          i % 2 === 0 ? EstadoCompra.CONFIRMADA : EstadoCompra.CANCELADA,
+          { creadaEn: hace(i + 30) },
+        ),
+      );
+      return crearServicesDeEventos({
+        eventos: [evento({ id: "evento-a", tiposEntrada: [vip] })],
+        compras,
+        usuarios: [lucia, ...compradores],
+      });
+    };
+
+    it("los compradores se piden en lote solo para la página (a lo sumo 10 ids); sin guardar ni cerrojo", async () => {
+      const { compraService, usuarioService, repositorioCompras, repositorioEventos, cerrojo } =
+        armarPaginado();
+      const usuarios = vi.spyOn(usuarioService, "obtenerPorIds");
+      const guardarCompra = vi.spyOn(repositorioCompras, "guardar");
+      const guardarEvento = vi.spyOn(repositorioEventos, "guardar");
+      const ejecutar = vi.spyOn(cerrojo, "ejecutar");
+
+      const segunda = await compraService.comprasDelEvento("evento-a", "usuario-lucia", {
+        pagina: 2,
+        sinResponder: false,
+      });
+
+      expect(segunda.compras.map((c) => c.comprador.id)).toEqual([
+        "usuario-c10",
+        "usuario-c11",
+        "usuario-c12",
+      ]);
+      expect(usuarios).toHaveBeenCalledTimes(1);
+      expect(usuarios.mock.calls[0]![0]).toEqual(["usuario-c10", "usuario-c11", "usuario-c12"]);
+      expect(guardarCompra).not.toHaveBeenCalled();
+      expect(guardarEvento).not.toHaveBeenCalled();
+      expect(ejecutar).not.toHaveBeenCalled();
+
+      await compraService.comprasDelEvento("evento-a", "usuario-lucia", { pagina: 1, sinResponder: false });
+      expect(usuarios.mock.calls[1]![0]).toHaveLength(10);
+    });
+
+    it("filtra antes de paginar y los totales son de todas", async () => {
+      const { compraService } = armarPaginado();
+      const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia", {
+        pagina: 1,
+        estado: EstadoCompra.CANCELADA,
+        sinResponder: false,
+      });
+      expect(vista.compras.map((c) => c.id)).toEqual([
+        "compra-01",
+        "compra-03",
+        "compra-05",
+        "compra-07",
+        "compra-09",
+        "compra-11",
+      ]);
+      expect(vista.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 6, totalPaginas: 1 });
+      expect(vista.cantidadCompras).toBe(13);
+      expect(vista.resumenPorTipo[0]).toMatchObject({ vendidas: 7 });
+    });
+
+    it("con la página vacía no se lee ningún comprador", async () => {
+      const { compraService, usuarioService } = armarPaginado();
+      const usuarios = vi.spyOn(usuarioService, "obtenerPorIds");
+      const vista = await compraService.comprasDelEvento("evento-a", "usuario-lucia", {
+        pagina: 1,
+        estado: EstadoCompra.PENDIENTE,
+        sinResponder: false,
+      });
+      expect(vista.compras).toEqual([]);
+      expect(vista.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 });
+      expect(vista.cantidadCompras).toBe(13);
+      expect(usuarios).not.toHaveBeenCalled();
+    });
   });
 
   describe("resumenPorTipo (US2)", () => {

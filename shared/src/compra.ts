@@ -1,4 +1,5 @@
 import type { EstadoCompra } from "./estado-compra";
+import type { PaginaVista } from "./paginacion";
 import type { ReseniaVista } from "./resenia";
 
 /** Límites de una compra: los usan la validación, el dominio y los textos de la app. */
@@ -197,13 +198,24 @@ export interface CompraDelEventoVista {
 /** Respuesta de `GET /eventos/:eventoId/compras` (solo el organizador). */
 export interface ComprasDelEventoVista {
   evento: { id: string; nombre: string; fechaHoraLocal: string; realizado: boolean };
+  /** De todas las compras: no depende de la página ni del filtro (feature 013, FR-016). */
   ventanaDeUso: VentanaDeUsoVista;
-  /** Todos los tipos, en el orden del evento. */
+  /** Todos los tipos, en el orden del evento, con todas las compras (FR-016). */
   resumenPorTipo: ResumenTipoEntradaVista[];
-  /** Todas, de la más nueva a la más vieja (desempate por id). */
+  /**
+   * La página pedida de las compras filtradas (feature 013, hasta 10), de la más nueva a la más
+   * vieja (desempate por id).
+   */
   compras: CompraDelEventoVista[];
-  /** Cuántas de `compras` tienen `mensajeSinResponder`. */
+  /**
+   * Cuántas compras del evento tienen `mensajeSinResponder`: de todas, no depende de la página ni
+   * del filtro (feature 013, FR-016).
+   */
   comprasConMensajesSinResponder: number;
+  /** Cuántas compras tiene el evento, sin filtro (decide los chips y el vacío, FR-017). */
+  cantidadCompras: number;
+  /** La página entregada de las compras filtradas; `totalElementos` es el de la lista filtrada. */
+  pagina: PaginaVista;
 }
 
 /** Respuesta de `GET /eventos/:eventoId/entradas/:codigo` y de `POST …/uso` (solo el organizador). */
@@ -217,4 +229,14 @@ export interface EntradaDelEventoVista extends EntradaVista {
     entradasUsadas: number;
   };
   ventanaDeUso: VentanaDeUsoVista;
+}
+
+/** Query de `GET /eventos/:eventoId/compras` (feature 013); el servidor filtra antes de paginar. */
+export interface ConsultaComprasDelEvento {
+  /** Página pedida, desde 1. Sin valor: la 1. */
+  pagina?: number;
+  /** Solo las compras en ese estado. Sin valor: todas. */
+  estado?: EstadoCompra;
+  /** Solo las que tienen un mensaje del comprador sin responder. Sin valor: `false`. */
+  sinResponder?: boolean;
 }

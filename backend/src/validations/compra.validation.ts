@@ -1,6 +1,6 @@
-import { LIMITES_COMPRA, LIMITES_MENSAJE } from "@ai-ticket-it/shared";
+import { EstadoCompra, LIMITES_COMPRA, LIMITES_MENSAJE } from "@ai-ticket-it/shared";
 import { z } from "zod";
-import { idSchema, obligatorio, textoObligatorio } from "./comunes";
+import { idSchema, obligatorio, paginaSchema, textoObligatorio } from "./comunes";
 import { crearValidacion } from "./validacion";
 
 // Forma de la entrada de las compras (contracts/api.md). Las reglas (tipo del evento, tope, cupo…)
@@ -26,8 +26,28 @@ const datosCompraSchema = z.object({
 /** `POST /eventos/:eventoId/compras`. */
 export const compraNueva = crearValidacion({ params: paramsEvento, body: datosCompraSchema });
 
-/** `GET /eventos/:eventoId/mis-compras` y `GET /eventos/:eventoId/compras` (feature 008): solo el id del evento. */
+/** `GET /eventos/:eventoId/mis-compras` (feature 006): solo el id del evento. */
 export const comprasDelEvento = crearValidacion({ params: paramsEvento });
+
+const MENSAJE_ESTADO = "Debe ser uno de los estados de una compra.";
+const MENSAJE_SIN_RESPONDER = "Debe ser true o false.";
+
+/**
+ * `GET /eventos/:eventoId/compras` (features 008 y 013, research R4): el id del evento y, en la
+ * query, la página, el estado (uno de los cinco) y `sinResponder` (`"true"` o `"false"`, por
+ * defecto `false`). Repetido o de otro valor → 400 sobre su campo.
+ */
+export const consultaComprasDelEvento = crearValidacion({
+  params: paramsEvento,
+  query: z.object({
+    pagina: paginaSchema,
+    estado: z.enum(EstadoCompra, { error: MENSAJE_ESTADO }).optional(),
+    sinResponder: z
+      .enum(["true", "false"], { error: MENSAJE_SIN_RESPONDER })
+      .optional()
+      .transform((valor) => valor === "true"),
+  }),
+});
 
 /** `GET /compras/:compraId`, `POST /compras/:compraId/pago` y `GET /compras/:compraId/mensajes`. */
 export const compraPorId = crearValidacion({ params: z.object({ compraId: idSchema }) });

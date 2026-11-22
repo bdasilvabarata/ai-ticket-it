@@ -6,7 +6,7 @@ import { diasRestantes } from "../../src/domain/dias-restantes";
 import { CompraRepository } from "../../src/repositories/compra.repository";
 import { EventoRepository } from "../../src/repositories/evento.repository";
 import { crearRepositoriosDeEjemplo } from "../../src/seed/repositorios-de-ejemplo";
-import { DIA, compra, evento, relojFijo, relojMovible, tipo } from "../helpers/eventos";
+import { DIA, SIN_PAGINAS, compra, evento, relojFijo, relojMovible, tipo } from "../helpers/eventos";
 
 const reloj = relojFijo(new Date("2026-11-10T15:00:00.000Z"));
 const nuevaApp = () => crearApp({ reloj });
@@ -501,6 +501,12 @@ describe("GET /api/eventos/:eventoId/mis-compras: confirmadas (corrección de la
   });
 });
 
+/** Sin las diez compras del Festival que suma el seed de la 013 (R11), que no cambian estas demos. */
+// Las compras que suma el seed de la 013: las diez del Festival (R11, US3) y las de los dos
+// realizados de Martín (US4).
+const sinLasDeLa013 = <T extends { id: string }>(vistas: T[]) =>
+  vistas.filter((c) => !/-festival-\d+$|-(taller-de-escritura|tango-en-la-terraza)-general$/.test(c.id));
+
 describe("GET /api/compras (feature 007)", () => {
   const listar = (app: App, usuarioId?: string, ruta = "/api/compras") => {
     const pedido = request(app).get(ruta);
@@ -520,7 +526,7 @@ describe("GET /api/compras (feature 007)", () => {
     const respuesta = await listar(nuevaApp(), "usuario-martin");
     expect(respuesta.status).toBe(200);
     // La Peña empieza antes que el Festival: va primero (fecha ascendente).
-    expect(respuesta.body.map((c: { id: string }) => c.id)).toEqual([
+    expect(sinLasDeLa013<{ id: string }>(respuesta.body).map((c) => c.id)).toEqual([
       "compra-martin-pena-general",
       "compra-martin-festival-vip",
     ]);
@@ -529,7 +535,7 @@ describe("GET /api/compras (feature 007)", () => {
       entradasUsadas: 1,
       diasRestantes: null,
     });
-    const vista = respuesta.body[1];
+    const vista = sinLasDeLa013<{ id: string }>(respuesta.body)[1];
     expect(vista).toMatchObject({
       id: "compra-martin-festival-vip",
       evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur", realizado: false },
@@ -581,7 +587,7 @@ describe("GET /api/compras (feature 007)", () => {
     expect(respuesta.status).toBe(200);
     // El Festival (+30 días) antes que el Maratón (+45 días): no realizados, por fecha ascendente;
     // después, los realizados por fecha descendente: la Noche de risas (−3 días) y Jazz (−10 días).
-    expect(respuesta.body).toEqual([
+    expect(sinLasDeLa013(respuesta.body)).toEqual([
       expect.objectContaining({
         id: "compra-diego-festival-general",
         estado: EstadoCompra.CANCELADA,
@@ -613,7 +619,7 @@ describe("GET /api/compras (feature 007)", () => {
   it("Lucía (organiza el Festival) → 200 con solo su compra de Jazz, ya reseñada (012)", async () => {
     const respuesta = await listar(nuevaApp(), "usuario-lucia");
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body).toEqual([
+    expect(sinLasDeLa013(respuesta.body as { id: string }[])).toEqual([
       expect.objectContaining({
         id: "compra-lucia-jazz-en-el-patio-general",
         resenia: expect.objectContaining({ puntuacion: 5 }),
@@ -636,7 +642,7 @@ describe("GET /api/compras (feature 007)", () => {
     const { body: pendiente } = await comprar(app, { tipoEntradaId: VIP, cantidad: 1 });
 
     const sinLaPena = (vistas: { id: string }[]) =>
-      vistas.filter((c) => c.id !== "compra-sofia-pena-con-cena");
+      sinLasDeLa013(vistas).filter((c) => c.id !== "compra-sofia-pena-con-cena");
     const antes = sinLaPena((await listar(app, "usuario-sofia")).body);
     expect(antes).toEqual([
       expect.objectContaining({
@@ -725,8 +731,11 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
         estado: "antes",
       },
       resumenPorTipo: expect.any(Array),
-      comprasConMensajesSinResponder: 1,
-      compras: [
+      // El seed de la 013 (R11): 12 compras; la de Valentina de la página 2 también espera respuesta.
+      comprasConMensajesSinResponder: 2,
+      cantidadCompras: 12,
+      pagina: { numero: 1, tamano: 10, totalElementos: 12, totalPaginas: 2 },
+      compras: expect.arrayContaining([
         expect.objectContaining({
           id: "compra-diego-festival-general",
           comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
@@ -744,8 +753,20 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
           canceladaPor: null,
           entradasUsadas: 0,
         }),
-      ],
+      ]),
     });
+    expect(respuesta.body.compras.map((c: { id: string }) => c.id)).toEqual([
+      "compra-valentina-festival-1",
+      "compra-diego-festival-2",
+      "compra-sofia-festival-3",
+      "compra-valentina-festival-4",
+      "compra-diego-festival-general",
+      "compra-martin-festival-5",
+      "compra-diego-festival-6",
+      "compra-valentina-festival-7",
+      "compra-sofia-festival-8",
+      "compra-martin-festival-vip",
+    ]);
     for (const fila of respuesta.body.compras) {
       expect(fila).not.toHaveProperty("entradas");
       expect(fila).not.toHaveProperty("historial");
@@ -780,7 +801,7 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
         tipoEntrada: { id: GENERAL, nombre: "General" },
         disponibles: await cupoDe(app, GENERAL),
         pendientes: 0,
-        vendidas: 0,
+        vendidas: 4, // las confirmadas de Valentina y Diego del seed de la 013
         usadas: 0,
       },
       {
@@ -816,7 +837,8 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
     const antes = (await comprasDelEvento(app, "usuario-lucia")).body;
     expect(fila(antes, "compra-martin-festival-vip")).toBe(true);
     expect(fila(antes, "compra-diego-festival-general")).toBe(false);
-    expect(antes.comprasConMensajesSinResponder).toBe(1);
+    // También cuenta la de Valentina, en la página 2 (seed de la 013).
+    expect(antes.comprasConMensajesSinResponder).toBe(2);
 
     const respuesta = await request(app)
       .post("/api/compras/compra-martin-festival-vip/mensajes")
@@ -826,16 +848,242 @@ describe("GET /api/eventos/:eventoId/compras (feature 008)", () => {
 
     const despues = (await comprasDelEvento(app, "usuario-lucia")).body;
     expect(fila(despues, "compra-martin-festival-vip")).toBe(false);
-    expect(despues.comprasConMensajesSinResponder).toBe(0);
+    expect(despues.comprasConMensajesSinResponder).toBe(1);
   });
 
-  it("query y cuerpo se ignoran", async () => {
+  it("una query desconocida y el cuerpo se ignoran", async () => {
     const respuesta = await request(nuevaApp())
-      .get(`${FESTIVAL}/compras?estado=PENDIENTE&orden=x`)
+      .get(`${FESTIVAL}/compras?orden=x&limite=1`)
       .set("X-Usuario-Id", "usuario-lucia")
       .send({ cualquiera: 1 });
     expect(respuesta.status).toBe(200);
-    expect(respuesta.body.compras).toHaveLength(2);
+    expect(respuesta.body.compras).toHaveLength(10);
+  });
+
+  it("el seed de la 013 (R11): como Lucía, 10 de las 12 compras del Festival y el contador cuenta la de la página 2", async () => {
+    const app = nuevaApp();
+    const primera = await comprasDelEvento(app, "usuario-lucia");
+    expect(primera.body.compras).toHaveLength(10);
+    expect(primera.body.cantidadCompras).toBe(12);
+    expect(primera.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 12, totalPaginas: 2 });
+
+    const segunda = (
+      await request(app).get(`${FESTIVAL}/compras?pagina=2`).set("X-Usuario-Id", "usuario-lucia")
+    ).body;
+    expect(
+      segunda.compras.map((c: { id: string; mensajeSinResponder: boolean }) => [c.id, c.mensajeSinResponder]),
+    ).toEqual([
+      ["compra-martin-festival-9", false],
+      ["compra-valentina-festival-10", true],
+    ]);
+    expect(primera.body.comprasConMensajesSinResponder).toBe(2);
+    expect(
+      primera.body.compras.filter((c: { mensajeSinResponder: boolean }) => c.mensajeSinResponder),
+    ).toHaveLength(1);
+
+    const canceladas = (
+      await request(app).get(`${FESTIVAL}/compras?estado=CANCELADA`).set("X-Usuario-Id", "usuario-lucia")
+    ).body;
+    expect(canceladas.pagina.totalElementos).toBe(7);
+    expect(canceladas.cantidadCompras).toBe(12);
+  });
+});
+
+describe("GET /api/eventos/:eventoId/compras: paginado y filtros (feature 013, US3)", () => {
+  // 13 compras de "evento-a" (de Lucía), de la más nueva (compra-00, hace 1 minuto, PENDIENTE) a la
+  // más vieja (compra-12, hace 12 horas). compra-03 (página 1) y compra-11 (página 2) terminan en un
+  // mensaje del comprador sin responder.
+  const ESTADOS = [
+    EstadoCompra.PENDIENTE,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CANCELADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CANCELADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.REEMBOLSADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CANCELADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.CANCELADA,
+  ];
+  const COMPRADORES = ["usuario-martin", "usuario-sofia", "usuario-diego", "usuario-valentina"];
+  const AHORA_DEL_TEST = reloj.ahora();
+  const hace = (minutos: number) => new Date(AHORA_DEL_TEST.getTime() - minutos * 60 * 1000);
+  const ids = ESTADOS.map((_, i) => `compra-${String(i).padStart(2, "0")}`);
+  const compras = ESTADOS.map((estado, i) => {
+    const compradorId = COMPRADORES[i % COMPRADORES.length]!;
+    const creadaEn = hace(i === 0 ? 1 : i * 60);
+    const base = compra("evento-a", "tipo-a-general", estado, { id: ids[i]!, compradorId, creadaEn });
+    return i === 3 || i === 11 ? base.enviarMensaje(compradorId, "¿A qué hora abren?", creadaEn) : base;
+  });
+  const appConMuchas = (relojDelTest = reloj) =>
+    crearApp({
+      reloj: relojDelTest,
+      repositorios: {
+        eventos: new EventoRepository([
+          evento({ id: "evento-a", tiposEntrada: [tipo({ id: "tipo-a-general", cupo: 100 })] }),
+        ]),
+        compras: new CompraRepository(compras),
+      },
+    });
+  const pedir = (query = "", usuarioId: string | null = "usuario-lucia", app = appConMuchas()) => {
+    const pedido = request(app).get(`/api/eventos/evento-a/compras${query}`);
+    return usuarioId === null ? pedido : pedido.set("X-Usuario-Id", usuarioId);
+  };
+  const idsDe = (respuesta: request.Response) =>
+    (respuesta.body.compras as { id: string }[]).map((c) => c.id);
+  const detalles = (respuesta: request.Response): Record<string, string> => {
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.error.codigo).toBe("ENTRADA_INVALIDA");
+    return Object.fromEntries(
+      (respuesta.body.error.detalles as { campo: string; mensaje: string }[]).map((d) => [
+        d.campo,
+        d.mensaje,
+      ]),
+    );
+  };
+  const totales = (respuesta: request.Response) => {
+    const { ventanaDeUso, resumenPorTipo, comprasConMensajesSinResponder, cantidadCompras } = respuesta.body;
+    return { ventanaDeUso, resumenPorTipo, comprasConMensajesSinResponder, cantidadCompras };
+  };
+
+  it("sin pagina → las 10 primeras en el orden de la 008 y los totales de la lista", async () => {
+    const respuesta = await pedir();
+    expect(respuesta.status).toBe(200);
+    expect(idsDe(respuesta)).toEqual(ids.slice(0, 10));
+    expect(respuesta.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 13, totalPaginas: 2 });
+    expect(respuesta.body.cantidadCompras).toBe(13);
+  });
+
+  it("?pagina=2 → las restantes; concatenar las páginas es la lista completa (SC-002)", async () => {
+    const app = appConMuchas();
+    const primera = await pedir("", "usuario-lucia", app);
+    const segunda = await pedir("?pagina=2", "usuario-lucia", app);
+    expect(idsDe(segunda)).toEqual(ids.slice(10));
+    expect(segunda.body.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 13, totalPaginas: 2 });
+    expect([...idsDe(primera), ...idsDe(segunda)]).toEqual(ids);
+  });
+
+  it("una página posterior a la última → la última, con su número real (FR-005)", async () => {
+    const respuesta = await pedir("?pagina=9");
+    expect(respuesta.status).toBe(200);
+    expect(idsDe(respuesta)).toEqual(ids.slice(10));
+    expect(respuesta.body.pagina.numero).toBe(2);
+  });
+
+  it("ventana, resumen, contador y cantidadCompras son de todas: iguales en cada página y con cada filtro (SC-006, FR-016)", async () => {
+    const app = appConMuchas();
+    const primera = await pedir("", "usuario-lucia", app);
+    expect(primera.body.comprasConMensajesSinResponder).toBe(2); // cuenta la de la página 2 (US3-3)
+    expect(primera.body.resumenPorTipo[0]).toMatchObject({ pendientes: 1, vendidas: 7 });
+    const consultas = [
+      "?pagina=2",
+      "?estado=CANCELADA",
+      "?sinResponder=true",
+      "?estado=PENDIENTE&sinResponder=true",
+    ];
+    for (const query of consultas) {
+      expect(totales(await pedir(query, "usuario-lucia", app))).toEqual(totales(primera));
+    }
+  });
+
+  it("?estado=CANCELADA → solo esas; pagina.totalElementos filtrado y cantidadCompras sin filtrar", async () => {
+    const respuesta = await pedir("?estado=CANCELADA");
+    expect(idsDe(respuesta)).toEqual(["compra-02", "compra-05", "compra-09", "compra-12"]);
+    expect(respuesta.body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 4, totalPaginas: 1 });
+    expect(respuesta.body.cantidadCompras).toBe(13);
+  });
+
+  it("?estado se compara con el estado al día: una pendiente vencida es CANCELADA", async () => {
+    const movible = relojMovible(AHORA_DEL_TEST);
+    const app = appConMuchas(movible);
+    movible.avanzar(15 * 60 * 1000);
+    expect(idsDe(await pedir("?estado=PENDIENTE", "usuario-lucia", app))).toEqual([]);
+    expect(idsDe(await pedir("?estado=CANCELADA", "usuario-lucia", app))).toEqual([
+      "compra-00",
+      "compra-02",
+      "compra-05",
+      "compra-09",
+      "compra-12",
+    ]);
+  });
+
+  it("?sinResponder=true → solo las del último mensaje del comprador; false → todas", async () => {
+    expect(idsDe(await pedir("?sinResponder=true"))).toEqual(["compra-03", "compra-11"]);
+    expect((await pedir("?sinResponder=false")).body.pagina.totalElementos).toBe(13);
+  });
+
+  it("estado y sinResponder juntos se aplican con 'y'", async () => {
+    expect(idsDe(await pedir("?estado=CONFIRMADA&sinResponder=true"))).toEqual(["compra-03", "compra-11"]);
+    const vacia = await pedir("?estado=CANCELADA&sinResponder=true");
+    expect(vacia.status).toBe(200);
+    expect(vacia.body.compras).toEqual([]);
+    expect(vacia.body.pagina).toEqual(SIN_PAGINAS);
+    expect(vacia.body.cantidadCompras).toBe(13);
+  });
+
+  it("?tamano=50 se ignora: la página sigue siendo de 10 (FR-006)", async () => {
+    const respuesta = await pedir("?tamano=50");
+    expect(respuesta.body.compras).toHaveLength(10);
+    expect(respuesta.body.pagina.tamano).toBe(10);
+  });
+
+  it("sin códigos de entradas ni historial en las filas (FR-019)", async () => {
+    for (const fila of (await pedir("?pagina=2")).body.compras) {
+      expect(fila).not.toHaveProperty("entradas");
+      expect(fila).not.toHaveProperty("historial");
+    }
+  });
+
+  it.each([
+    ["?pagina=0", { "query.pagina": "Debe ser un entero mayor o igual a 1." }],
+    ["?pagina=abc", { "query.pagina": "Debe ser un entero mayor o igual a 1." }],
+    ["?estado=VENCIDA", { "query.estado": "Debe ser uno de los estados de una compra." }],
+    ["?sinResponder=si", { "query.sinResponder": "Debe ser true o false." }],
+    [
+      "?pagina=-1&estado=pendiente&sinResponder=1",
+      {
+        "query.pagina": "Debe ser un entero mayor o igual a 1.",
+        "query.estado": "Debe ser uno de los estados de una compra.",
+        "query.sinResponder": "Debe ser true o false.",
+      },
+    ],
+  ])("%s → 400 ENTRADA_INVALIDA", async (query, esperado) => {
+    expect(detalles(await pedir(query))).toEqual(esperado);
+  });
+
+  it("orden de rechazos: 401 → 400 → 404 → 403", async () => {
+    const sinUsuario = await pedir("?estado=VENCIDA", null);
+    expect(sinUsuario.status).toBe(401);
+    expect(sinUsuario.body.error.codigo).toBe("USUARIO_NO_IDENTIFICADO");
+
+    const invalidos = await request(appConMuchas())
+      .get("/api/eventos/Evento_Mal/compras?estado=VENCIDA")
+      .set("X-Usuario-Id", "usuario-martin");
+    expect(detalles(invalidos)).toEqual({
+      "params.eventoId": "Debe ser un identificador válido.",
+      "query.estado": "Debe ser uno de los estados de una compra.",
+    });
+
+    const inexistente = await request(appConMuchas())
+      .get("/api/eventos/evento-inexistente/compras?estado=CANCELADA")
+      .set("X-Usuario-Id", "usuario-martin");
+    expect(inexistente.status).toBe(404);
+    expect(inexistente.body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+
+    const ajeno = await pedir("?estado=CANCELADA", "usuario-martin");
+    expect(ajeno.status).toBe(403);
+    expect(ajeno.body.error.codigo).toBe("SIN_PERMISO");
+  });
+
+  it("GET /eventos/:eventoId/mis-compras no acepta ni exige los parámetros nuevos (sigue igual)", async () => {
+    const respuesta = await request(appConMuchas())
+      .get("/api/eventos/evento-a/mis-compras?pagina=0&estado=VENCIDA&sinResponder=si")
+      .set("X-Usuario-Id", "usuario-martin");
+    expect(respuesta.status).toBe(200);
+    expect(respuesta.body).not.toHaveProperty("pagina");
   });
 });
 
@@ -888,7 +1136,8 @@ describe("POST /api/compras/:compraId/cancelacion de una CONFIRMADA (feature 009
     expect(
       (comoDiego.body.tiposEntrada as { id: string; cupo: number }[]).find((t) => t.id === VIP)?.cupo,
     ).toBe(antes + 2);
-    const catalogo = await request(app).get("/api/eventos");
+    // Es el 11.º por fecha en el seed de la 013: en la página 2 del catálogo.
+    const catalogo = await request(app).get("/api/eventos?pagina=2");
     expect(catalogo.body.eventos).toContainEqual(
       expect.objectContaining({ id: "evento-festival-sonidos-del-sur", agotado: false }),
     );

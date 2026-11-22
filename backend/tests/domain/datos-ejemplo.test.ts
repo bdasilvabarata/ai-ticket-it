@@ -9,11 +9,21 @@ import { exigirQuePuedeReseniar, Resenia } from "../../src/domain/resenia";
 import { Usuario } from "../../src/domain/usuario";
 
 const HORA = 60 * 60 * 1000;
+/** Las diez compras del Festival que suma la 013 (R11): `compra-<comprador>-festival-<n>`. */
+const DE_LA_013 = /-festival-\d+$/;
 const DIA = 24 * HORA;
 const ahora = new Date("2026-11-03T15:30:00.000Z");
 const datos = crearDatosEjemplo(ahora);
 const { categorias, usuarios, eventos, compras } = datos;
 const tipos = eventos.flatMap((evento) => evento.tiposEntrada);
+/** Los próximos que suma la feature 013 (R11) para que el catálogo tenga 2 páginas. */
+const NUEVOS_DE_LA_013 = [
+  "evento-feria-del-libro-independiente",
+  "evento-match-de-impro",
+  "evento-torneo-de-futbol-5",
+  "evento-microfono-abierto",
+  "evento-feria-de-cerveza-artesanal",
+];
 
 function contarPorOrganizador(): Map<string, number> {
   const cuenta = new Map<string, number>();
@@ -29,12 +39,12 @@ describe("crearDatosEjemplo", () => {
     expect(categorias).toHaveLength(6);
   });
 
-  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 4, 3 y 2; Diego y Valentina ninguno", () => {
+  it("tiene 5 usuarios: Lucía, Martín y Sofía organizan 5, 7 y 4; Diego y Valentina ninguno", () => {
     expect(usuarios).toHaveLength(5);
     const cuenta = contarPorOrganizador();
-    expect(cuenta.get("usuario-lucia")).toBe(4);
-    expect(cuenta.get("usuario-martin")).toBe(3);
-    expect(cuenta.get("usuario-sofia")).toBe(2);
+    expect(cuenta.get("usuario-lucia")).toBe(5);
+    expect(cuenta.get("usuario-martin")).toBe(7);
+    expect(cuenta.get("usuario-sofia")).toBe(4);
     expect(cuenta.has("usuario-diego")).toBe(false);
     expect(cuenta.has("usuario-valentina")).toBe(false);
     const organizan = usuarios.filter((usuario) => cuenta.has(usuario.id));
@@ -42,8 +52,8 @@ describe("crearDatosEjemplo", () => {
     expect(usuarios.length - organizan.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("tiene 9 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
-    expect(eventos).toHaveLength(9);
+  it("tiene 16 eventos de varios organizadores y categorías, cada uno con al menos un tipo", () => {
+    expect(eventos).toHaveLength(16);
     expect(new Set(eventos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(2);
     expect(new Set(eventos.map((evento) => evento.categoriaId)).size).toBeGreaterThanOrEqual(2);
     for (const evento of eventos) expect(evento.tiposEntrada.length).toBeGreaterThanOrEqual(1);
@@ -86,10 +96,21 @@ describe("crearDatosEjemplo", () => {
     expect(eventos.find((e) => e.id === "evento-hamlet")?.estaAgotado()).toBe(true);
   });
 
-  it("tiene 7 eventos próximos y 2 realizados", () => {
+  it("tiene 12 eventos próximos (2 páginas del catálogo: 10 + 2, feature 013) y 4 realizados", () => {
     const realizados = eventos.filter((evento) => evento.estaRealizado(ahora));
-    expect(realizados).toHaveLength(2);
-    expect(eventos.length - realizados.length).toBe(7);
+    expect(realizados).toHaveLength(4);
+    expect(eventos.length - realizados.length).toBe(12);
+  });
+
+  it("los 5 próximos de la 013 no tienen compras y son de varios organizadores y categorías (R11)", () => {
+    const nuevos = eventos.filter((evento) => NUEVOS_DE_LA_013.includes(evento.id));
+    expect(nuevos).toHaveLength(5);
+    for (const evento of nuevos) {
+      expect(evento.estaRealizado(ahora)).toBe(false);
+      expect(compras.some((compra) => compra.eventoId === evento.id)).toBe(false);
+    }
+    expect(new Set(nuevos.map((evento) => evento.organizadorId)).size).toBeGreaterThanOrEqual(3);
+    expect(new Set(nuevos.map((evento) => evento.categoriaId)).size).toBe(5);
   });
 
   it("usa precios y cupos enteros no negativos", () => {
@@ -145,7 +166,9 @@ describe("crearDatosEjemplo", () => {
   });
 
   it("tiene dos compras sobre el Festival (de Lucía y próximo): una confirmada y una cancelada", () => {
-    const delFestival = compras.filter((c) => c.eventoId === "evento-festival-sonidos-del-sur");
+    const delFestival = compras.filter(
+      (c) => c.eventoId === "evento-festival-sonidos-del-sur" && !DE_LA_013.test(c.id),
+    );
     expect(
       delFestival.map((c) => [c.id, c.compradorId, c.tipoEntradaId, c.cantidad, c.total, c.estado]),
     ).toEqual([
@@ -277,6 +300,69 @@ describe("crearDatosEjemplo", () => {
     expect(new Set(codigos).size).toBe(codigos.length);
   });
 
+  describe("las diez compras nuevas del Festival (feature 013, R11)", () => {
+    const delFestival = compras.filter((c) => c.eventoId === "evento-festival-sonidos-del-sur");
+    const nuevas = delFestival.filter((c) => DE_LA_013.test(c.id));
+    const festival = eventos.find((e) => e.id === "evento-festival-sonidos-del-sur")!;
+
+    it("el Festival tiene 12 compras (2 páginas: 10 + 2), ninguna PENDIENTE", () => {
+      expect(delFestival).toHaveLength(12);
+      expect(delFestival.filter((c) => c.estado === EstadoCompra.PENDIENTE)).toEqual([]);
+    });
+
+    it("son de una General, de Diego, Sofía, Valentina y Martín, confirmadas o canceladas", () => {
+      expect(nuevas).toHaveLength(10);
+      for (const compra of nuevas) {
+        expect(compra.id).toMatch(/^compra-(diego|sofia|valentina|martin)-festival-\d+$/);
+        expect(compra.id).toContain(compra.compradorId.replace("usuario-", ""));
+        expect([compra.tipoEntradaId, compra.cantidad, compra.total]).toEqual([
+          "tipo-festival-sonidos-del-sur-general",
+          1,
+          45000,
+        ]);
+      }
+      expect(new Set(nuevas.map((c) => c.compradorId))).toEqual(
+        new Set(["usuario-diego", "usuario-sofia", "usuario-valentina", "usuario-martin"]),
+      );
+      expect(new Set(nuevas.map((c) => c.estado))).toEqual(
+        new Set([EstadoCompra.CONFIRMADA, EstadoCompra.CANCELADA]),
+      );
+    });
+
+    it("hay canceladas vencidas por el sistema y canceladas después de pagar, con el reembolso pendiente", () => {
+      const canceladas = nuevas.filter((c) => c.estado === EstadoCompra.CANCELADA);
+      expect(
+        canceladas.some((c) => c.historial.at(-1)?.autor.tipo === "sistema" && c.reembolso === null),
+      ).toBe(true);
+      expect(canceladas.some((c) => c.reembolso === "pendiente")).toBe(true);
+    });
+
+    it("nadie pasa el tope de 4 entradas pagas vigentes en el Festival", () => {
+      const vigentes = new Map<string, number>();
+      for (const compra of delFestival.filter((c) => c.esVigente(ahora))) {
+        vigentes.set(compra.compradorId, (vigentes.get(compra.compradorId) ?? 0) + compra.cantidad);
+      }
+      for (const cantidad of vigentes.values()) expect(cantidad).toBeLessThanOrEqual(4);
+    });
+
+    it("General descuenta las confirmadas: 500 − 4", () => {
+      const confirmadas = nuevas.filter((c) => c.estado === EstadoCompra.CONFIRMADA);
+      expect(confirmadas).toHaveLength(4);
+      expect(festival.buscarTipoEntrada("tipo-festival-sonidos-del-sur-general")?.cupo).toBe(500 - 4);
+    });
+
+    it("una de las que quedan fuera de la página 1 termina en un mensaje del comprador, posterior al alta y anterior al arranque", () => {
+      const porCreacion = delFestival.toSorted((a, b) => b.creadaEn.getTime() - a.creadaEn.getTime());
+      const conMensaje = nuevas.filter((c) => c.mensajes.length > 0);
+      expect(conMensaje.map((c) => c.id)).toEqual(["compra-valentina-festival-10"]);
+      expect(porCreacion.slice(10).map((c) => c.id)).toContain("compra-valentina-festival-10");
+      const [compra] = conMensaje;
+      expect(compra!.mensajeSinResponder).toBe(true);
+      expect(compra!.mensajes[0]!.enviadoEn.getTime()).toBeGreaterThan(compra!.creadaEn.getTime());
+      expect(compra!.mensajes[0]!.enviadoEn.getTime()).toBeLessThan(ahora.getTime());
+    });
+  });
+
   it("ninguna compra queda PENDIENTE y los cupos del Festival siguen VIP 50 y Backstage 3", () => {
     expect(compras.filter((c) => c.estado === EstadoCompra.PENDIENTE)).toEqual([]);
     const festival = eventos.find((e) => e.id === "evento-festival-sonidos-del-sur");
@@ -366,7 +452,10 @@ describe("crearDatosEjemplo", () => {
 
     it("la compra sigue CONFIRMADA y ninguna otra compra del seed tiene mensajes", () => {
       expect(vip.estado).toBe(EstadoCompra.CONFIRMADA);
-      for (const otra of compras.filter((c) => c !== vip)) expect(otra.mensajes).toEqual([]);
+      // Salvo la de Valentina que suma la 013 (R11), con el mensaje sin responder de la página 2.
+      for (const otra of compras.filter((c) => c !== vip && c.id !== "compra-valentina-festival-10")) {
+        expect(otra.mensajes).toEqual([]);
+      }
     });
   });
 
@@ -383,6 +472,9 @@ describe("crearDatosEjemplo", () => {
       ["jazz-en-el-patio", "valentina"],
       ["noche-de-risas", "diego"],
       ["noche-de-risas", "valentina"],
+      ...["taller-de-escritura", "tango-en-la-terraza"].flatMap((evento) =>
+        ["lucia", "sofia", "diego", "valentina"].map((autor) => [evento, autor]),
+      ),
     ])("%s: %s tiene una compra UTILIZADA de una entrada, usada dentro de la ventana", (evento, autor) => {
       const compra = porId.get(`compra-${autor}-${evento}-general`)!;
       const suEvento = eventoPorId.get(`evento-${evento}`)!;
@@ -412,6 +504,7 @@ describe("crearDatosEjemplo", () => {
         ["resenia-valentina-jazz-en-el-patio", "usuario-valentina", jazz.id, 5],
         ["resenia-diego-noche-de-risas", "usuario-diego", risas.id, 3],
         ["resenia-valentina-noche-de-risas", "usuario-valentina", risas.id, 2],
+        ...resenias.slice(5).map((r) => [r.id, r.compradorId, r.eventoId, r.puntuacion]),
       ]);
       expect(resenias.find((r) => r.id === "resenia-diego-noche-de-risas")?.comentario).not.toBeNull();
       expect(resenias.find((r) => r.id === "resenia-valentina-noche-de-risas")?.comentario).toBeNull();
@@ -451,6 +544,40 @@ describe("crearDatosEjemplo", () => {
       expect(pena.estado).toBe(EstadoCompra.UTILIZADA);
       expect(pena.entradasUsadas).toBe(1);
       expect(resenias.some((r) => r.compradorId === "usuario-martin")).toBe(false);
+    });
+
+    describe("los dos realizados de Martín de la 013 (R11)", () => {
+      const NUEVOS = ["evento-taller-de-escritura", "evento-tango-en-la-terraza"];
+      const deMartin = new Set(eventos.filter((e) => e.organizadorId === "usuario-martin").map((e) => e.id));
+      const suyas = resenias.filter((r) => deMartin.has(r.eventoId));
+
+      it("son de Martín, realizados y fuera del catálogo, con 4 compras UTILIZADA cada uno", () => {
+        for (const id of NUEVOS) {
+          const evento = eventoPorId.get(id)!;
+          expect(evento.organizadorId).toBe("usuario-martin");
+          expect(evento.estaRealizado(ahora)).toBe(true);
+          const delEvento = compras.filter((c) => c.eventoId === id);
+          expect(delEvento).toHaveLength(4);
+          for (const compra of delEvento) expect(compra.estado).toBe(EstadoCompra.UTILIZADA);
+          expect(evento.tiposEntrada[0]!.cupo).toBe(id === NUEVOS[0] ? 30 - 4 : 100 - 4);
+        }
+      });
+
+      it("Martín tiene 11 reseñas que suman 52 (≈ 4,7), algunas sin comentario", () => {
+        expect(suyas).toHaveLength(11);
+        expect(suyas.reduce((suma, r) => suma + r.puntuacion, 0)).toBe(52);
+        const nuevas = suyas.filter((r) => NUEVOS.includes(r.eventoId));
+        expect(nuevas.map((r) => r.puntuacion)).toEqual([5, 5, 5, 4, 5, 5, 4, 5]);
+        expect(nuevas.some((r) => r.comentario === null)).toBe(true);
+        expect(nuevas.some((r) => r.comentario !== null)).toBe(true);
+      });
+
+      it("las 8 nuevas son posteriores a las de Jazz (las 3 más recientes de Martín son de la 013)", () => {
+        const deJazz = suyas.filter((r) => r.eventoId === jazz.id).map((r) => r.creadaEn.getTime());
+        for (const resenia of suyas.filter((r) => NUEVOS.includes(r.eventoId))) {
+          expect(resenia.creadaEn.getTime()).toBeGreaterThan(Math.max(...deJazz));
+        }
+      });
     });
 
     it("los cupos descuentan las entradas nuevas: Jazz 60 − 3 y Noche de risas 80 − 2", () => {

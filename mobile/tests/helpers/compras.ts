@@ -13,7 +13,7 @@ import {
   type VentanaDeUsoVista,
 } from "@ai-ticket-it/shared";
 
-import { festivalCompleto, maratonCompleta } from "./eventos";
+import { festivalCompleto, maratonCompleta, paginaDe } from "./eventos";
 
 // Datos de compras para los tests de la feature 006.
 
@@ -372,6 +372,8 @@ export function comprasDelFestival(
     resumenPorTipo: [],
     compras,
     comprasConMensajesSinResponder: compras.filter((compra) => compra.mensajeSinResponder).length,
+    cantidadCompras: compras.length,
+    pagina: paginaDe(compras.length),
     ...cambios,
   };
 }

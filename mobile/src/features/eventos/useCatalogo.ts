@@ -6,7 +6,8 @@ import { claves, type ClaveCatalogo } from "../../consultas/claves";
 import { useClienteApi } from "../../consultas/cliente-api";
 
 /**
- * El catálogo de Explorar para esa consulta (la clave no lleva usuario: es el mismo para todos).
+ * El catálogo de Explorar para esa consulta y página (la clave no lleva usuario: es el mismo para
+ * todos). Una página nueva es una consulta nueva (feature 013, R8).
  * Sin `placeholderData`: con una consulta nueva no hay datos y se ve el skeleton, nunca los
  * resultados del criterio anterior (FR-007).
  */
@@ -22,6 +23,7 @@ export function useCatalogo(consulta: ClaveCatalogo) {
           categoriaId: consulta.categoriaId ?? undefined,
           orden: consulta.orden,
           sentido: consulta.sentido,
+          pagina: consulta.pagina,
         },
         { signal },
       ),

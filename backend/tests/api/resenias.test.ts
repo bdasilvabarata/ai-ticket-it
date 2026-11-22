@@ -222,21 +222,26 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
     }
   });
 
-  it("Hamlet (Martín): ≈ 4,67 con las 3 reseñas de Jazz, de la más reciente a la más vieja, sin id del autor", async () => {
+  it("Hamlet (Martín): ≈ 4,7 con sus 11 reseñas (013), de la más reciente a la más vieja, sin id del autor", async () => {
     const { body } = await delOrganizador(nuevaApp(), "evento-hamlet");
     expect(body.organizador).toEqual({
       id: "usuario-martin",
       nombre: "Martín",
       apellido: "Benítez",
-      puntaje: 14 / 3,
-      cantidadResenias: 3,
+      puntaje: 52 / 11,
+      cantidadResenias: 11,
     });
-    expect(body.resenias.map((r: { id: string; puntuacion: number }) => [r.id, r.puntuacion])).toEqual([
+    // Las de Jazz (012) son las más viejas: después de las 8 de los realizados de la 013. La página
+    // 1 trae 10 y la más vieja queda en la 2.
+    expect(body.resenias).toHaveLength(10);
+    expect(
+      body.resenias.slice(-2).map((r: { id: string; puntuacion: number }) => [r.id, r.puntuacion]),
+    ).toEqual([
       ["resenia-valentina-jazz-en-el-patio", 5],
       ["resenia-diego-jazz-en-el-patio", 4],
-      ["resenia-lucia-jazz-en-el-patio", 5],
     ]);
-    expect(body.resenias[0]).toEqual({
+    const deJazz = body.resenias.find((r: { id: string }) => r.id === "resenia-valentina-jazz-en-el-patio");
+    expect(deJazz).toEqual({
       id: "resenia-valentina-jazz-en-el-patio",
       puntuacion: 5,
       comentario: expect.any(String),
@@ -263,6 +268,7 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
         cantidadResenias: 0,
       },
       resenias: [],
+      pagina: { numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 },
     });
   });
 
@@ -312,5 +318,206 @@ describe("GET /api/eventos/:eventoId/resenias-del-organizador (US2)", () => {
     await reseniar(app, "usuario-lucia", DATOS);
     await reseniar(app, "usuario-sofia", DATOS);
     expect((await delOrganizador(app, "evento-noche-de-rock")).body).toEqual(antes);
+  });
+});
+
+describe("GET /api/eventos/:eventoId/resenias-del-organizador?pagina= (feature 013, US5)", () => {
+  const RUTA = "/api/eventos/evento-jazz-en-el-patio/resenias-del-organizador";
+  const pagina = (app: App, consulta = "", usuarioId?: string) => {
+    const pedido = request(app).get(`${RUTA}${consulta}`);
+    if (usuarioId !== undefined) pedido.set("X-Usuario-Id", usuarioId);
+    return pedido;
+  };
+  const ids = (body: { resenias: { id: string }[] }) => body.resenias.map((r) => r.id);
+
+  it("Martín (11): la página 1 trae 10 y la página con los totales de todas", async () => {
+    const { status, body } = await pagina(nuevaApp());
+    expect(status).toBe(200);
+    expect(body.resenias).toHaveLength(10);
+    expect(body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    expect(body.organizador.cantidadResenias).toBe(body.pagina.totalElementos);
+    expect(Object.keys(body).sort()).toEqual(["organizador", "pagina", "resenias"]);
+  });
+
+  it("?pagina=2 trae la más vieja; concatenadas, el orden de la 012 sin repetir (SC-002)", async () => {
+    const app = nuevaApp();
+    const primera = (await pagina(app)).body;
+    const segunda = (await pagina(app, "?pagina=2")).body;
+    expect(ids(segunda)).toEqual(["resenia-lucia-jazz-en-el-patio"]);
+    expect(segunda.pagina).toEqual({ numero: 2, tamano: 10, totalElementos: 11, totalPaginas: 2 });
+    const todas = [...primera.resenias, ...segunda.resenias];
+    expect(new Set(ids({ resenias: todas })).size).toBe(11);
+    const fechas = todas.map((r: { creadaEn: string }) => r.creadaEn);
+    expect(fechas).toEqual([...fechas].sort().reverse());
+  });
+
+  it("?pagina=9 devuelve la última con su número real", async () => {
+    const { status, body } = await pagina(nuevaApp(), "?pagina=9");
+    expect(status).toBe(200);
+    expect(body.pagina.numero).toBe(2);
+    expect(ids(body)).toEqual(["resenia-lucia-jazz-en-el-patio"]);
+  });
+
+  it("el organizador es igual en las dos páginas, en el resumen y en el detalle (SC-005)", async () => {
+    const app = nuevaApp();
+    const primera = (await pagina(app)).body;
+    const segunda = (await pagina(app, "?pagina=2")).body;
+    const resumen = (await request(app).get(`${RUTA}/resumen`)).body;
+    const detalle = (await request(app).get("/api/eventos/evento-jazz-en-el-patio")).body;
+    expect(segunda.organizador).toEqual(primera.organizador);
+    expect(resumen.organizador).toEqual(primera.organizador);
+    expect(detalle.organizador).toEqual(primera.organizador);
+  });
+
+  it.each(["0", "-1", "1.5", "abc", ""])("?pagina=%s → 400 sobre query.pagina", async (valor) => {
+    const { status, body } = await pagina(nuevaApp(), `?pagina=${valor}`);
+    expect(status).toBe(400);
+    expect(body.error.codigo).toBe("ENTRADA_INVALIDA");
+    expect(detallesDe(body, "query.pagina")).toEqual([
+      { campo: "query.pagina", mensaje: "Debe ser un entero mayor o igual a 1." },
+    ]);
+  });
+
+  it("un tamaño en la consulta se ignora: siguen siendo 10", async () => {
+    const { body } = await pagina(nuevaApp(), "?tamano=50&limite=50");
+    expect(body.resenias).toHaveLength(10);
+    expect(body.pagina.tamano).toBe(10);
+  });
+
+  it("sin reseñas (Lucía): la lista vacía, numero 1 y 0 páginas", async () => {
+    const { body } = await request(nuevaApp()).get(
+      "/api/eventos/evento-noche-de-rock/resenias-del-organizador?pagina=4",
+    );
+    expect(body.resenias).toEqual([]);
+    expect(body.pagina).toEqual({ numero: 1, tamano: 10, totalElementos: 0, totalPaginas: 0 });
+  });
+
+  it("es público: la misma página sin X-Usuario-Id y con cualquier usuario", async () => {
+    const app = nuevaApp();
+    const sinUsuario = (await pagina(app, "?pagina=2")).body;
+    for (const usuarioId of ["usuario-martin", "usuario-diego", "usuario-nadie"]) {
+      expect((await pagina(app, "?pagina=2", usuarioId)).body).toEqual(sinUsuario);
+    }
+  });
+
+  it("404 EVENTO_NO_ENCONTRADO con un evento inexistente, también con página", async () => {
+    const { status, body } = await request(nuevaApp()).get(
+      "/api/eventos/evento-no-existe/resenias-del-organizador?pagina=2",
+    );
+    expect(status).toBe(404);
+    expect(body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+
+  it("sin el id del autor en ninguna página", async () => {
+    const app = nuevaApp();
+    for (const consulta of ["", "?pagina=2"]) {
+      const json = JSON.stringify((await pagina(app, consulta)).body);
+      expect(json).not.toContain("compradorId");
+      expect(json).not.toMatch(/usuario-(lucia|diego|sofia|valentina)/);
+    }
+  });
+});
+
+describe("GET /api/eventos/:eventoId/resenias-del-organizador/resumen (feature 013, US4)", () => {
+  const RUTA = (eventoId: string) => `/api/eventos/${eventoId}/resenias-del-organizador/resumen`;
+  const resumen = (app: App, eventoId: string, usuarioId?: string) => {
+    const pedido = request(app).get(RUTA(eventoId));
+    if (usuarioId !== undefined) pedido.set("X-Usuario-Id", usuarioId);
+    return pedido;
+  };
+
+  it("con más de 3 (Martín, 11): las 3 más recientes y el organizador con el puntaje y la cantidad de todas", async () => {
+    const { status, body } = await resumen(nuevaApp(), "evento-jazz-en-el-patio");
+    expect(status).toBe(200);
+    expect(body.organizador).toEqual({
+      id: "usuario-martin",
+      nombre: "Martín",
+      apellido: "Benítez",
+      puntaje: 52 / 11,
+      cantidadResenias: 11,
+    });
+    // Las del Tango (los realizados de la 013 son los más recientes).
+    expect(body.resenias.map((r: { id: string }) => r.id)).toEqual([
+      "resenia-valentina-tango-en-la-terraza",
+      "resenia-diego-tango-en-la-terraza",
+      "resenia-sofia-tango-en-la-terraza",
+    ]);
+    expect(Object.keys(body).sort()).toEqual(["organizador", "resenias"]);
+  });
+
+  it("son las 3 primeras de la colección, con el mismo organizador", async () => {
+    const app = nuevaApp();
+    const { body } = await resumen(app, "evento-hamlet");
+    const coleccion = await request(app).get("/api/eventos/evento-hamlet/resenias-del-organizador");
+    expect(body.resenias).toEqual(coleccion.body.resenias.slice(0, 3));
+    expect(body.organizador).toEqual(coleccion.body.organizador);
+  });
+
+  it("el organizador es igual al del detalle y al de la tarjeta del catálogo (SC-005)", async () => {
+    const app = nuevaApp();
+    const { body } = await resumen(app, "evento-hamlet");
+    expect((await request(app).get("/api/eventos/evento-hamlet")).body.organizador).toEqual(body.organizador);
+    const catalogo = await request(app).get("/api/eventos?texto=hamlet");
+    const tarjeta = catalogo.body.eventos.find((e: { id: string }) => e.id === "evento-hamlet");
+    expect(tarjeta.organizador).toEqual(body.organizador);
+  });
+
+  it("con 3 o menos (Sofía, 2): todas, igual que la colección", async () => {
+    const app = nuevaApp();
+    const { body } = await resumen(app, "evento-noche-de-risas");
+    expect(body.resenias).toHaveLength(2);
+    expect(body.organizador).toMatchObject({ puntaje: 2.5, cantidadResenias: 2 });
+    const coleccion = await request(app).get("/api/eventos/evento-noche-de-risas/resenias-del-organizador");
+    expect(body.resenias).toEqual(coleccion.body.resenias);
+    expect(body.organizador).toEqual(coleccion.body.organizador);
+  });
+
+  it("sin reseñas: la lista vacía, puntaje null y cantidad 0", async () => {
+    const { status, body } = await resumen(nuevaApp(), "evento-noche-de-rock");
+    expect(status).toBe(200);
+    expect(body).toEqual({
+      organizador: {
+        id: "usuario-lucia",
+        nombre: "Lucía",
+        apellido: "Álvarez",
+        puntaje: null,
+        cantidadResenias: 0,
+      },
+      resenias: [],
+    });
+  });
+
+  it("es público: 200 sin X-Usuario-Id y la misma respuesta con cualquier usuario", async () => {
+    const app = nuevaApp();
+    const sinUsuario = await resumen(app, "evento-hamlet");
+    expect(sinUsuario.status).toBe(200);
+    for (const usuarioId of ["usuario-martin", "usuario-diego", "usuario-nadie"]) {
+      expect((await resumen(app, "evento-hamlet", usuarioId)).body).toEqual(sinUsuario.body);
+    }
+  });
+
+  it("400 sobre params.eventoId con un id inválido y 404 con uno inexistente", async () => {
+    const invalido = await resumen(nuevaApp(), "NO_VALIDO");
+    expect(invalido.status).toBe(400);
+    expect(detallesDe(invalido.body, "params.eventoId")).toHaveLength(1);
+    const inexistente = await resumen(nuevaApp(), "evento-no-existe");
+    expect(inexistente.status).toBe(404);
+    expect(inexistente.body.error.codigo).toBe("EVENTO_NO_ENCONTRADO");
+  });
+
+  it("sin el id del autor, compras ni códigos", async () => {
+    const json = JSON.stringify((await resumen(nuevaApp(), "evento-hamlet")).body);
+    expect(json).not.toContain("compradorId");
+    expect(json).not.toContain("usuario-valentina");
+    expect(json).not.toContain("usuario-sofia");
+    expect(json).not.toMatch(/compra-|JZPT/);
+  });
+
+  it("después de reseñar, la nueva aparece primera y la cantidad suma una (US4-4)", async () => {
+    const app = nuevaApp();
+    const alta = await reseniar(app, "usuario-martin", DATOS);
+    const { body } = await resumen(app, "evento-noche-de-rock");
+    expect(body.organizador).toMatchObject({ puntaje: 4, cantidadResenias: 1 });
+    expect(body.resenias.map((r: { id: string }) => r.id)).toEqual([alta.body.id]);
   });
 });

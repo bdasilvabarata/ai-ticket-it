@@ -1,4 +1,9 @@
-import type { DatosResenia, ReseniasDelOrganizadorVista, ReseniaVista } from "@ai-ticket-it/shared";
+import type {
+  DatosResenia,
+  PaginaDeReseniasVista,
+  ReseniasDelOrganizadorVista,
+  ReseniaVista,
+} from "@ai-ticket-it/shared";
 
 import type { ClienteApi } from "./cliente";
 
@@ -29,15 +34,35 @@ export function reseniarEvento(
 }
 
 /**
- * `GET /eventos/:eventoId/resenias-del-organizador` (feature 012): el organizador del evento con su
- * puntaje y las reseñas de todos sus eventos. Público en el servidor.
+ * `GET /eventos/:eventoId/resenias-del-organizador/resumen` (feature 013, R5): el organizador del
+ * evento con el puntaje y la cantidad de todas sus reseñas y las 3 más recientes (la sección del
+ * detalle). Público en el servidor.
  */
-export function obtenerReseniasDelOrganizador(
+export function obtenerResumenDeResenias(
   cliente: ClienteApi,
   eventoId: string,
   opciones: { signal?: AbortSignal } = {},
 ): Promise<ReseniasDelOrganizadorVista> {
-  return cliente.get<ReseniasDelOrganizadorVista>(`${rutaDelEvento(eventoId)}/resenias-del-organizador`, {
-    signal: opciones.signal,
-  });
+  return cliente.get<ReseniasDelOrganizadorVista>(
+    `${rutaDelEvento(eventoId)}/resenias-del-organizador/resumen`,
+    { signal: opciones.signal },
+  );
+}
+
+/**
+ * `GET /eventos/:eventoId/resenias-del-organizador?pagina=N` (features 012 y 013): el organizador con
+ * el puntaje y la cantidad de todas sus reseñas y una página de 10. `pagina` va solo si no es la 1.
+ * Público en el servidor.
+ */
+export function obtenerReseniasDelOrganizador(
+  cliente: ClienteApi,
+  eventoId: string,
+  pagina: number,
+  opciones: { signal?: AbortSignal } = {},
+): Promise<PaginaDeReseniasVista> {
+  const consulta = pagina === 1 ? "" : `?pagina=${pagina}`;
+  return cliente.get<PaginaDeReseniasVista>(
+    `${rutaDelEvento(eventoId)}/resenias-del-organizador${consulta}`,
+    { signal: opciones.signal },
+  );
 }

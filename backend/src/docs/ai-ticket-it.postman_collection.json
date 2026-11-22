@@ -69,6 +69,10 @@
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos" } }
         },
         {
+          "name": "Explorar — página 2",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?pagina=2" } }
+        },
+        {
           "name": "Buscar texto=basquet (sin tildes)",
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?texto=basquet" } }
         },
@@ -555,6 +559,38 @@
           }
         },
         {
+          "name": "Compras del Festival — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?pagina=2" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — canceladas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=CANCELADA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — sin responder",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?sinResponder=true" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "estado=VENCIDA → 400 ENTRADA_INVALIDA (query.estado)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=VENCIDA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
           "name": "Listar compras (otro usuario, 403)",
           "request": {
             "method": "GET",
@@ -784,10 +820,24 @@
           }
         },
         {
-          "name": "Reseñas del organizador (Hamlet, de Martín)",
+          "name": "Reseñas del organizador (Hamlet, de Martín; página 1)",
           "request": {
             "method": "GET",
             "url": { "raw": "{{baseUrl}}/eventos/evento-hamlet/resenias-del-organizador" }
+          }
+        },
+        {
+          "name": "Reseñas de Martín — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador?pagina=2" }
+          }
+        },
+        {
+          "name": "Reseñas de Martín — resumen",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador/resumen" }
           }
         },
         {

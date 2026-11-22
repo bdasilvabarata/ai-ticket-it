@@ -6,6 +6,8 @@ export interface ClaveCatalogo {
   categoriaId: string | null;
   orden: OrdenCatalogo;
   sentido: SentidoCatalogo;
+  /** La página pedida, desde 1 (feature 013). */
+  pagina: number;
 }
 
 /**
@@ -30,8 +32,14 @@ export const claves = {
    * Todas las compras de un evento, leídas por su organizador (feature 008). No comparte prefijo con
    * `mis-compras-del-evento`.
    */
-  comprasDelEvento: (usuarioId: string, eventoId: string) =>
-    ["compras-del-evento", usuarioId, eventoId] as const,
+  comprasDelEvento: (
+    usuarioId: string,
+    eventoId: string,
+    filtroYPagina?: { filtro: string; pagina: number },
+  ) =>
+    filtroYPagina === undefined
+      ? (["compras-del-evento", usuarioId, eventoId] as const)
+      : (["compras-del-evento", usuarioId, eventoId, filtroYPagina] as const),
   /**
    * Una entrada de un evento buscada por su organizador (feature 008), con el código normalizado
    * (mayúsculas, sin espacios ni guiones).
@@ -52,6 +60,12 @@ export const claves = {
    */
   reseniasDelOrganizador: (usuarioId: string, eventoId: string) =>
     ["resenias-del-organizador", usuarioId, eventoId] as const,
+  /**
+   * Una página de "Reseñas del organizador" (feature 013, US5): la clave del resumen más la página, así
+   * el prefijo `["resenias-del-organizador"]` que invalida la reseña nueva alcanza todas.
+   */
+  paginaDeResenias: (usuarioId: string, eventoId: string, pagina: number) =>
+    ["resenias-del-organizador", usuarioId, eventoId, "pagina", pagina] as const,
   /**
    * Excepción a "el usuario en la posición 1": el catálogo es el mismo para todos (feature 005, edge
    * case "Usuario cambiado"). El prefijo `["catalogo"]` invalida todas sus consultas a la vez.

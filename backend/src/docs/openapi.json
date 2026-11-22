@@ -100,7 +100,7 @@
       "get": {
         "tags": ["Eventos"],
         "summary": "Catálogo de eventos próximos (público)",
-        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Sin paginación.",
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Paginado de a 10 (feature 013): se filtra y se ordena **todo** el catálogo antes de cortar la página.",
         "parameters": [
           {
             "name": "texto",
@@ -133,15 +133,16 @@
             "description": "Sentido del criterio principal: `asc` o `desc`. Sin valor, el inicial de cada criterio (`fecha` y `precio` ascendentes, `puntaje` descendente). Los desempates no se invierten y los organizadores sin puntaje van al final en los dos sentidos.",
             "schema": { "type": "string", "enum": ["asc", "desc"] },
             "example": "desc"
-          }
+          },
+          { "$ref": "#/components/parameters/Pagina" }
         ],
         "responses": {
           "200": {
-            "description": "El catálogo y si hay eventos próximos antes de aplicar los filtros",
+            "description": "La página pedida del catálogo filtrado y ordenado (hasta 10 eventos), sus totales y si hay eventos próximos antes de aplicar los filtros",
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
           },
           "400": {
-            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, página que no es un entero ≥ 1, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },
@@ -602,8 +603,30 @@
       "get": {
         "tags": ["Compras del evento"],
         "summary": "Compras del evento",
-        "description": "Solo el organizador: todas las compras del evento, de todos los compradores y en todos los estados, al día (una PENDIENTE vencida sale CANCELADA por el sistema), con la ventana de uso y el resumen por tipo. También con el evento realizado. Lectura: no guarda nada. Query y cuerpo se ignoran.",
+        "description": "Solo el organizador: las compras del evento, de todos los compradores, al día (una PENDIENTE vencida sale CANCELADA por el sistema), de a 10 y de la más nueva a la más vieja (feature 013). `estado` y `sinResponder` filtran antes de paginar (juntos, con 'y'). La ventana de uso, el resumen por tipo, `comprasConMensajesSinResponder` y `cantidadCompras` son de todas: no cambian con la página ni con el filtro. Una página posterior a la última devuelve la última. También con el evento realizado. Lectura: no guarda nada. Otros parámetros y el cuerpo se ignoran.",
         "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Pagina" },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "description": "Solo las compras en ese estado, al día. Otro valor → 400 sobre `query.estado` (\"Debe ser uno de los estados de una compra.\").",
+            "schema": {
+              "type": "string",
+              "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+            },
+            "example": "CANCELADA"
+          },
+          {
+            "name": "sinResponder",
+            "in": "query",
+            "required": false,
+            "description": "Con `true`, solo las compras cuyo último mensaje es del comprador. Por defecto `false`. Otro valor → 400 sobre `query.sinResponder` (\"Debe ser true o false.\").",
+            "schema": { "type": "string", "enum": ["true", "false"], "default": "false" },
+            "example": "true"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Las compras del evento",
@@ -617,6 +640,18 @@
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorApi" },
                 "examples": {
+                  "estadoInvalido": {
+                    "summary": "estado que no es de una compra",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "query.estado", "mensaje": "Debe ser uno de los estados de una compra." }
+                        ]
+                      }
+                    }
+                  },
                   "eventoMalFormado": {
                     "summary": "eventoId mal formado",
                     "value": {
@@ -1069,38 +1104,183 @@
       }
     },
     "/eventos/{eventoId}/resenias-del-organizador": {
-      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        },
+        {
+          "$ref": "#/components/parameters/Pagina"
+        }
+      ],
       "get": {
         "tags": ["Reseñas"],
-        "summary": "Reseñas del organizador del evento (público)",
-        "description": "El organizador del evento con su puntaje y **todas** las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0) y coincide con el de `EventoVista.organizador` y la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 012).",
+        "summary": "Reseñas del organizador del evento, por páginas (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas y una página (de a 10) de las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). `organizador.cantidadResenias` es igual a `pagina.totalElementos` y el `organizador` es el mismo en todas las páginas, en `/resumen`, en `EventoVista.organizador` y en la tarjeta del catálogo. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0). No expone el id del autor, compras, códigos, totales ni estados (features 012 y 013).",
         "security": [],
         "responses": {
           "200": {
-            "description": "El organizador con su puntaje y las reseñas",
+            "description": "El organizador con su puntaje y una página de reseñas",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ReseniasDelOrganizadorVista" },
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeReseniasVista"
+                },
                 "examples": {
-                  "conResenias": {
-                    "summary": "Martín (Hamlet, en el seed)",
+                  "paginaDos": {
+                    "summary": "Martín (Jazz en el Patio, en el seed), página 2: la más vieja de las 11",
                     "value": {
                       "organizador": {
                         "id": "usuario-martin",
                         "nombre": "Martín",
                         "apellido": "Benítez",
-                        "puntaje": 4.666666666666667,
-                        "cantidadResenias": 3
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
                       },
                       "resenias": [
                         {
-                          "id": "resenia-valentina-jazz-en-el-patio",
+                          "id": "resenia-lucia-jazz-en-el-patio",
                           "puntuacion": 5,
-                          "comentario": "Excelente organización, entramos rapidísimo.",
-                          "autor": { "nombre": "Valentina", "apellido": "Gómez" },
-                          "evento": { "id": "evento-jazz-en-el-patio", "nombre": "Jazz en el Patio" },
-                          "creadaEn": "2026-11-16T00:00:00.000Z",
-                          "creadaEnLocal": "2026-11-15T21:00"
+                          "comentario": "Una noche hermosa: el cuarteto sonó impecable y el patio estaba lindísimo.",
+                          "autor": {
+                            "nombre": "Lucía",
+                            "apellido": "Álvarez"
+                          },
+                          "evento": {
+                            "id": "evento-jazz-en-el-patio",
+                            "nombre": "Jazz en el Patio"
+                          },
+                          "creadaEn": "2026-11-13T14:00:00.000Z",
+                          "creadaEnLocal": "2026-11-13T11:00"
+                        }
+                      ],
+                      "pagina": {
+                        "numero": 2,
+                        "tamano": 10,
+                        "totalElementos": 11,
+                        "totalPaginas": 2
+                      }
+                    }
+                  },
+                  "sinResenias": {
+                    "summary": "Lucía (Noche de Rock, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-lucia",
+                        "nombre": "Lucía",
+                        "apellido": "Álvarez",
+                        "puntaje": null,
+                        "cantidadResenias": 0
+                      },
+                      "resenias": [],
+                      "pagina": {
+                        "numero": 1,
+                        "tamano": 10,
+                        "totalElementos": 0,
+                        "totalPaginas": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/resenias-del-organizador/resumen": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        }
+      ],
+      "get": {
+        "tags": ["Reseñas"],
+        "summary": "Resumen de las reseñas del organizador para el detalle (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas (de **todos** sus eventos) y las **3** más recientes (`LIMITES_PAGINACION.reseniasEnElDetalle`; todas si tiene 3 o menos), con `creadaEn` descendente → `id`. Es la sección \"Reseñas del organizador\" del detalle: la app muestra \"Ver todas las reseñas\" si `cantidadResenias` es mayor que 3. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `organizador` es igual al de la colección, al de `EventoVista.organizador` y al de la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 013).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El organizador con su puntaje y las 3 reseñas más recientes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReseniasDelOrganizadorVista"
+                },
+                "examples": {
+                  "conResenias": {
+                    "summary": "Martín (Jazz en el Patio, en el seed): 11 reseñas, se ven las 3 del Tango",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-martin",
+                        "nombre": "Martín",
+                        "apellido": "Benítez",
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
+                      },
+                      "resenias": [
+                        {
+                          "id": "resenia-valentina-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": "Ya quiero que repitan la milonga.",
+                          "autor": {
+                            "nombre": "Valentina",
+                            "apellido": "Gómez"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T20:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T17:00"
+                        },
+                        {
+                          "id": "resenia-diego-tango-en-la-terraza",
+                          "puntuacion": 4,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Diego",
+                            "apellido": "Fernández"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T12:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T09:00"
+                        },
+                        {
+                          "id": "resenia-sofia-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Sofía",
+                            "apellido": "Castro"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T06:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T03:00"
                         }
                       ]
                     }
@@ -1122,14 +1302,21 @@
               }
             }
           },
-          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
           "404": {
             "description": "No existe el evento",
             "content": {
               "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
                 "example": {
-                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
                 }
               }
             }
@@ -2102,9 +2289,36 @@
         "required": true,
         "description": "Id del tipo de entrada; tiene que ser de **este** evento",
         "schema": { "type": "string", "example": "tipo-festival-sonidos-del-sur-backstage" }
+      },
+      "Pagina": {
+        "name": "pagina",
+        "in": "query",
+        "required": false,
+        "description": "Página pedida, desde 1 (feature 013). Las páginas son de 10 y el tamaño no se elige: un `tamano` en la query se ignora. Una página posterior a la última devuelve la última, con su número real en `pagina.numero`. Si no es un entero ≥ 1 (`0`, `-1`, `1.5`, `abc`, vacía o repetida), 400 sobre `query.pagina`.",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 },
+        "example": 2
       }
     },
     "schemas": {
+      "PaginaVista": {
+        "type": "object",
+        "required": ["numero", "tamano", "totalElementos", "totalPaginas"],
+        "description": "La página entregada de una lista paginada y los totales de la lista completa (con sus filtros).",
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "La página entregada: la pedida o, si no existe, la última. Con la lista vacía, 1."
+          },
+          "tamano": { "type": "integer", "enum": [10], "description": "Siempre 10." },
+          "totalElementos": { "type": "integer", "minimum": 0 },
+          "totalPaginas": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "`ceil(totalElementos / tamano)`; 0 con la lista vacía."
+          }
+        }
+      },
       "SaludVista": {
         "type": "object",
         "required": ["estado"],
@@ -2260,12 +2474,18 @@
       },
       "CatalogoVista": {
         "type": "object",
-        "required": ["eventos", "hayEventosProximos"],
+        "required": ["eventos", "pagina", "hayEventosProximos"],
         "properties": {
-          "eventos": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } },
+          "eventos": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "La página pedida del catálogo filtrado y ordenado.",
+            "items": { "$ref": "#/components/schemas/EventoCatalogoVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" },
           "hayEventosProximos": {
             "type": "boolean",
-            "description": "Hay eventos no realizados antes de aplicar texto y categoría: decide el vacío de la app."
+            "description": "Hay eventos no realizados antes de aplicar texto, categoría y página: decide el vacío de la app."
           }
         }
       },
@@ -2818,8 +3038,16 @@
       },
       "ComprasDelEventoVista": {
         "type": "object",
-        "description": "Todas las compras de un evento, al día, para su organizador.",
-        "required": ["evento", "ventanaDeUso", "resumenPorTipo", "compras", "comprasConMensajesSinResponder"],
+        "description": "Las compras de un evento, al día, para su organizador: la página pedida de las filtradas y los totales de todas (feature 013).",
+        "required": [
+          "evento",
+          "ventanaDeUso",
+          "resumenPorTipo",
+          "compras",
+          "comprasConMensajesSinResponder",
+          "cantidadCompras",
+          "pagina"
+        ],
         "properties": {
           "evento": {
             "type": "object",
@@ -2838,20 +3066,28 @@
           "ventanaDeUso": { "$ref": "#/components/schemas/VentanaDeUsoVista" },
           "resumenPorTipo": {
             "type": "array",
-            "description": "Uno por tipo, en el orden del evento.",
+            "description": "Uno por tipo, en el orden del evento, con todas las compras: no depende de la página ni del filtro.",
             "items": { "$ref": "#/components/schemas/ResumenTipoEntradaVista" }
           },
           "compras": {
             "type": "array",
-            "description": "De la más nueva a la más vieja (desempate por id).",
+            "maxItems": 10,
+            "description": "La página pedida de las compras filtradas, de la más nueva a la más vieja (desempate por id). Sin códigos de entradas.",
             "items": { "$ref": "#/components/schemas/CompraDelEventoVista" }
           },
           "comprasConMensajesSinResponder": {
             "type": "integer",
             "minimum": 0,
             "example": 1,
-            "description": "Cuántas de las compras tienen mensajeSinResponder."
-          }
+            "description": "Cuántas compras del evento tienen mensajeSinResponder: de todas, no depende de la página ni del filtro."
+          },
+          "cantidadCompras": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 12,
+            "description": "Cuántas compras tiene el evento, sin filtro (la app decide los chips y el vacío)."
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" }
         }
       },
       "EntradaVista": {
@@ -2984,7 +3220,7 @@
       },
       "ReseniasDelOrganizadorVista": {
         "type": "object",
-        "description": "El organizador del evento con su puntaje y las reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012).",
+        "description": "El organizador del evento con su puntaje y reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012). Es la respuesta de `/resumen`, con las 3 más recientes (feature 013).",
         "required": ["organizador", "resenias"],
         "properties": {
           "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
@@ -2992,6 +3228,20 @@
             "type": "array",
             "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
           }
+        }
+      },
+      "PaginaDeReseniasVista": {
+        "type": "object",
+        "description": "Una página de \"Reseñas del organizador\" (feature 013): el organizador con el puntaje y la cantidad de todas, las reseñas de la página y la página con los totales.",
+        "required": ["organizador", "resenias", "pagina"],
+        "properties": {
+          "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
+          "resenias": {
+            "type": "array",
+            "maxItems": 10,
+            "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" }
         }
       },
       "RolEnLaCompra": {

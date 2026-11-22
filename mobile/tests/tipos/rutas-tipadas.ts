@@ -64,3 +64,9 @@ export const reseniarEvento: Href = {
 
 // @ts-expect-error reseñar el evento necesita el parámetro compraId de la compra
 export const reseniarSinCompra: Href = { pathname: "/compras/[compraId]/resenia" };
+
+// "Ver todas las reseñas" del organizador (feature 013, US5): necesita el evento.
+export const todasLasResenias: Href = {
+  pathname: "/explorar/[eventoId]/resenias",
+  params: { eventoId: "evento-jazz-en-el-patio" },
+};

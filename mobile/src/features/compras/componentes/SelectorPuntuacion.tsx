@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { LIMITES_RESENIA } from "@ai-ticket-it/shared";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
-import { hundido, tema } from "../../../componentes";
+import { tema } from "../../../componentes";
 import { MensajeDeCampo } from "../../eventos";
 
 const PUNTUACIONES = Array.from(
@@ -11,9 +11,12 @@ const PUNTUACIONES = Array.from(
 );
 
 /**
- * La puntuación de una reseña, de 1 a 5 (feature 012, contracts/app.md): cinco botones `radio` en
- * fila, "N de 5", sin ninguno elegido al empezar. El elegido se distingue por el relleno **y** por la
- * estrella llena (no solo por el color). Debajo, el error de `body.puntuacion` del servidor.
+ * La puntuación de una reseña, de 1 a 5 (feature 012, contracts/app.md): cinco estrellas en fila, de
+ * izquierda a derecha, sin ninguna elegida al empezar. Tocar la N pinta de amarillo las estrellas 1 a
+ * N; las demás quedan solo con el contorno. Cada estrella es un `radio` "N de 5" (marcado solo el
+ * elegido), con el área táctil mínima aunque se dibuje sin caja. El contorno oscuro va siempre, así la
+ * pintada se distingue por la forma rellena y no solo por el color. Debajo, el error de
+ * `body.puntuacion` del servidor.
  */
 export function SelectorPuntuacion({
   valor,
@@ -27,30 +30,36 @@ export function SelectorPuntuacion({
   return (
     <View style={estilos.selector}>
       <Text style={estilos.etiqueta}>Puntuación</Text>
-      <View accessibilityRole="radiogroup" accessibilityLabel="Puntuación" style={estilos.opciones}>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Puntuación" style={estilos.estrellas}>
         {PUNTUACIONES.map((puntuacion) => {
-          const elegida = puntuacion === valor;
+          const pintada = valor !== null && puntuacion <= valor;
           return (
             <Pressable
               key={puntuacion}
               accessibilityRole="radio"
               accessibilityLabel={`${puntuacion} de ${LIMITES_RESENIA.puntuacionMaxima}`}
-              accessibilityState={{ checked: elegida }}
+              accessibilityState={{ checked: puntuacion === valor }}
               onPress={() => alElegir(puntuacion)}
-              style={({ pressed }) => [
-                estilos.opcion,
-                elegida && estilos.elegida,
-                pressed ? hundido : estilos.conSombra,
-              ]}
+              hitSlop={tema.espacio.minimo}
+              style={({ pressed }) => [estilos.estrella, pressed && estilos.presionada]}
             >
+              {pintada && (
+                <Ionicons
+                  name="star"
+                  size={tema.tamano.iconoGrande}
+                  color={tema.colores.resaltado}
+                  style={estilos.relleno}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no"
+                />
+              )}
               <Ionicons
-                name={elegida ? "star" : "star-outline"}
-                size={tema.tamano.icono}
+                name="star-outline"
+                size={tema.tamano.iconoGrande}
                 color={tema.colores.texto}
                 accessibilityElementsHidden
                 importantForAccessibility="no"
               />
-              <Text style={estilos.numero}>{puntuacion}</Text>
             </Pressable>
           );
         })}
@@ -63,23 +72,14 @@ export function SelectorPuntuacion({
 const estilos = StyleSheet.create({
   selector: { gap: tema.espacio.chico },
   etiqueta: { ...tema.tipografia.etiqueta, color: tema.colores.texto },
-  // Cinco botones que se reparten el ancho: entran en 360 px sin scroll horizontal.
-  opciones: { flexDirection: "row", gap: tema.espacio.chico },
-  opcion: {
-    flex: 1,
+  estrellas: { flexDirection: "row", gap: tema.espacio.chico },
+  estrella: {
     minHeight: tema.tamano.tactil,
     minWidth: tema.tamano.tactil,
     alignItems: "center",
     justifyContent: "center",
-    gap: tema.espacio.minimo,
-    paddingVertical: tema.espacio.chico,
-    borderRadius: tema.radio.normal,
-    borderWidth: tema.grosor.normal,
-    borderColor: tema.colores.borde,
-    backgroundColor: tema.colores.superficie,
   },
-  conSombra: { boxShadow: tema.sombra.nivel1 },
-  // El amarillo siempre con `texto` encima.
-  elegida: { backgroundColor: tema.colores.resaltado },
-  numero: { ...tema.tipografia.etiqueta, color: tema.colores.texto },
+  presionada: { opacity: tema.opacidadApagado },
+  // El relleno amarillo queda debajo del contorno, centrado en la misma caja.
+  relleno: { position: "absolute" },
 });

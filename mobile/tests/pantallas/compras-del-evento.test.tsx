@@ -1,4 +1,4 @@
-import { EstadoCompra } from "@ai-ticket-it/shared";
+import { EstadoCompra, type CompraDelEventoVista } from "@ai-ticket-it/shared";
 import { router } from "expo-router";
 import { act, fireEvent, screen, waitFor, within } from "expo-router/testing-library";
 
@@ -19,6 +19,7 @@ import {
   nocheDeRisas,
   nocheDeRisasCompleta,
   nocheDeRock,
+  paginaDe,
 } from "../helpers/eventos";
 import { porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
 import { alertasCon, escribir, espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
@@ -772,6 +773,10 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
     { resumenPorTipo: resumen },
   );
   const chip = (nombre: string) => screen.getByRole("radio", { name: nombre });
+  /** Lo que responde el servidor con un filtro (feature 013): las filtradas y los totales de todas. */
+  const filtradas = (compras: CompraDelEventoVista[]) => [
+    { status: 200, json: comprasDelFestival(compras, { resumenPorTipo: resumen, cantidadCompras: 5 }) },
+  ];
 
   it("un grupo de chips con Todas elegido, Sin responder y los cinco estados, en orden", async () => {
     await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
@@ -796,14 +801,16 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
   });
 
   it("elegir un estado deja solo sus compras y no toca la disponibilidad por tipo", async () => {
-    const resultado = await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }], {
+      [`${RUTA}?estado=CANCELADA`]: filtradas([diegoVencida, diegoCancelada]),
+    });
     await screen.findByLabelText(FILA_SOFIA);
 
     await fireEvent.press(chip("Cancelada"));
 
     expect(chip("Cancelada")).toBeChecked();
     expect(chip("Todas")).not.toBeChecked();
-    expect(screen.getByLabelText(FILA_DIEGO_VENCIDA)).toBeOnTheScreen();
+    expect(await screen.findByLabelText(FILA_DIEGO_VENCIDA)).toBeOnTheScreen();
     expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
     expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
     expect(screen.queryByLabelText(FILA_MARTIN)).toBeNull();
@@ -811,35 +818,40 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
     expect(
       screen.getByLabelText("General: 117 disponibles · 0 pendientes · 3 vendidas · 1 usada"),
     ).toBeOnTheScreen();
-    // Filtra en la app: no vuelve a pedir la lista.
-    expect(pedidosDeLaLista(resultado)).toHaveLength(1);
+    // Filtra el servidor (feature 013): pide la página 1 con el estado.
+    expect(resultado.falso.pedidos.filter((p) => p.url.endsWith(`${RUTA}?estado=CANCELADA`))).toHaveLength(1);
   });
 
   it("Utilizada tiene su chip: Confirmada no muestra las utilizadas", async () => {
-    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }], {
+      [`${RUTA}?estado=CONFIRMADA`]: filtradas([martinConfirmada]),
+      [`${RUTA}?estado=UTILIZADA`]: filtradas([martinUtilizada]),
+    });
     await screen.findByLabelText(FILA_SOFIA);
 
     await fireEvent.press(chip("Confirmada"));
-    expect(screen.getByLabelText(FILA_MARTIN)).toBeOnTheScreen();
+    expect(await screen.findByLabelText(FILA_MARTIN)).toBeOnTheScreen();
     expect(screen.queryByLabelText(FILA_MARTIN_UTILIZADA)).toBeNull();
 
     await fireEvent.press(chip("Utilizada"));
-    expect(screen.getByLabelText(FILA_MARTIN_UTILIZADA)).toBeOnTheScreen();
+    expect(await screen.findByLabelText(FILA_MARTIN_UTILIZADA)).toBeOnTheScreen();
     expect(screen.queryByLabelText(FILA_MARTIN)).toBeNull();
   });
 
   it("sin compras del estado elegido, su propio vacío; Todas vuelve a mostrarlas", async () => {
-    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }]);
+    await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }], {
+      [`${RUTA}?estado=REEMBOLSADA`]: filtradas([]),
+    });
     await screen.findByLabelText(FILA_SOFIA);
 
     await fireEvent.press(chip("Reembolsada"));
-    expect(screen.getByText("No hay compras reembolsadas")).toBeOnTheScreen();
+    expect(await screen.findByText("No hay compras reembolsadas")).toBeOnTheScreen();
     expect(screen.queryByText("Todavía nadie compró entradas")).toBeNull();
     expect(screen.getByLabelText("Filtrar compras")).toBeOnTheScreen();
 
     await fireEvent.press(chip("Todas"));
+    expect(await screen.findByLabelText(FILA_SOFIA)).toBeOnTheScreen();
     expect(screen.queryByText("No hay compras reembolsadas")).toBeNull();
-    expect(screen.getByLabelText(FILA_SOFIA)).toBeOnTheScreen();
     expect(screen.getByLabelText(FILA_DIEGO_CANCELADA)).toBeOnTheScreen();
   });
 
@@ -850,17 +862,19 @@ describe("Compras del evento: filtro por estado (mejoras del organizador, grupo 
   });
 
   it("el filtro elegido se mantiene al releer la lista al volver a la pantalla", async () => {
-    const resultado = await abrirComprasDelFestival([
-      { status: 200, json: todasLasCompras },
-      { status: 200, json: todasLasCompras },
-    ]);
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: todasLasCompras }], {
+      [`${RUTA}?estado=CANCELADA`]: filtradas([diegoVencida, diegoCancelada]),
+    });
+    const conElFiltro = () =>
+      resultado.falso.pedidos.filter((p) => p.url.endsWith(`${RUTA}?estado=CANCELADA`));
     await screen.findByLabelText(FILA_SOFIA);
     await fireEvent.press(chip("Cancelada"));
+    await screen.findByLabelText(FILA_DIEGO_CANCELADA);
 
     await fireEvent.press(screen.getByRole("button", { name: "Registrar ingreso" }));
     await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-festival/ingreso"));
     await act(() => router.back());
-    await waitFor(() => expect(pedidosDeLaLista(resultado)).toHaveLength(2));
+    await waitFor(() => expect(conElFiltro()).toHaveLength(2));
 
     expect(chip("Cancelada")).toBeChecked();
     expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
@@ -897,22 +911,227 @@ describe("Compras del evento: mensajes sin responder (mejoras del organizador, g
   });
 
   it("el chip Sin responder deja solo esas compras; sin ninguna, su propio vacío", async () => {
-    await abrirComprasDelFestival([
-      { status: 200, json: comprasDelFestival([sofiaPendiente, martinSinResponder]) },
-    ]);
+    await abrirComprasDelFestival(
+      [{ status: 200, json: comprasDelFestival([sofiaPendiente, martinSinResponder]) }],
+      {
+        [`${RUTA}?sinResponder=true`]: [
+          { status: 200, json: comprasDelFestival([martinSinResponder], { cantidadCompras: 2 }) },
+        ],
+      },
+    );
     expect(await screen.findByText("1 compra con un mensaje sin responder")).toBeOnTheScreen();
 
     await fireEvent.press(chip("Sin responder"));
     expect(chip("Sin responder")).toBeChecked();
-    expect(screen.getByLabelText(FILA_MARTIN_SIN_RESPONDER)).toBeOnTheScreen();
+    expect(await screen.findByLabelText(FILA_MARTIN_SIN_RESPONDER)).toBeOnTheScreen();
     expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
   });
 
   it("con compras pero ninguna sin responder, el chip muestra «No hay mensajes sin responder»", async () => {
-    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([sofiaPendiente]) }]);
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([sofiaPendiente]) }], {
+      [`${RUTA}?sinResponder=true`]: [{ status: 200, json: comprasDelFestival([], { cantidadCompras: 1 }) }],
+    });
     await screen.findByLabelText(FILA_SOFIA);
     await fireEvent.press(chip("Sin responder"));
-    expect(screen.getByText("No hay mensajes sin responder")).toBeOnTheScreen();
+    expect(await screen.findByText("No hay mensajes sin responder")).toBeOnTheScreen();
     expect(screen.queryByLabelText(FILA_SOFIA)).toBeNull();
+  });
+});
+
+describe("Compras del evento por páginas (feature 013, US3)", () => {
+  /** `cantidad` compras confirmadas de Martín, `compra-<prefijo>-NN`. */
+  const varias = (cantidad: number, prefijo = "p", desde = 1) =>
+    Array.from({ length: cantidad }, (_, i) => {
+      const numero = String(desde + i).padStart(2, "0");
+      return compraDelEvento({ id: `compra-${prefijo}-${numero}`, creadaEnLocal: `2026-11-17T10:${numero}` });
+    });
+  const filasVisibles = () => screen.queryAllByLabelText(/^Martín Benítez, General/);
+  const resumen = [
+    {
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      disponibles: 100,
+      pendientes: 0,
+      vendidas: 12,
+      usadas: 0,
+    },
+  ];
+  const RESUMEN = "General: 100 disponibles · 0 pendientes · 12 vendidas · 0 usadas";
+  const CONTADOR = "1 compra con un mensaje sin responder";
+  const totales = { resumenPorTipo: resumen, cantidadCompras: 12, comprasConMensajesSinResponder: 1 };
+  const pagina1 = comprasDelFestival(varias(10), { ...totales, pagina: paginaDe(12) });
+  const pagina2 = comprasDelFestival(varias(2, "p", 11), { ...totales, pagina: paginaDe(12, { numero: 2 }) });
+  const boton = (nombre: string) => screen.getByRole("button", { name: nombre });
+  const chip = (nombre: string) => screen.getByRole("radio", { name: nombre });
+  const pedidosALaLista = (resultado: Awaited<ReturnType<typeof abrirComprasDelFestival>>) =>
+    resultado.falso.pedidos
+      .filter((p) => p.metodo === "GET" && p.url.includes(RUTA))
+      .map((p) => p.url.slice(p.url.indexOf(RUTA)));
+
+  it("con 12 compras, 10 filas y el paginador con la página 1 marcada", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: pagina1 }]);
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    expect(boton("Página 1")).toBeSelected();
+    expect(boton("Página 2")).not.toBeSelected();
+  });
+
+  it("mientras llega otra página, «Cargando compras…» en lugar de las filas y del paginador, sin tapar el resto (R8)", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: pagina1 }], { [`${RUTA}?pagina=2`]: ["colgar"] });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+
+    await fireEvent.press(boton("Página 2"));
+
+    expect(await screen.findByText("Cargando compras…")).toBeOnTheScreen();
+    expect(filasVisibles()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: /^Página/ })).toBeNull();
+    expect(screen.getByRole("header", { name: festivalCompleto.nombre })).toBeOnTheScreen();
+    expect(screen.getByLabelText(RESUMEN)).toBeOnTheScreen();
+    expect(screen.getByText(CONTADOR)).toBeOnTheScreen();
+    expect(screen.getByLabelText("Filtrar compras")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Registrar ingreso" })).toBeOnTheScreen();
+  });
+
+  it("«Página 2» pide ?pagina=2 y muestra sus filas con la 2 marcada", async () => {
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: pagina1 }], {
+      [`${RUTA}?pagina=2`]: [{ status: 200, json: pagina2 }],
+    });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+
+    await fireEvent.press(boton("Página 2"));
+
+    await waitFor(() => expect(filasVisibles()).toHaveLength(2));
+    expect(screen.queryByText("Cargando compras…")).toBeNull();
+    expect(boton("Página 2")).toBeSelected();
+    expect(pedidosALaLista(resultado)).toEqual([RUTA, `${RUTA}?pagina=2`]);
+  });
+
+  it("un chip estando en la 2 pide la página 1 con su filtro; «Todas» no manda parámetros", async () => {
+    const canceladas = comprasDelFestival([diegoVencida], { ...totales, pagina: paginaDe(1) });
+    const sinResponder = comprasDelFestival([compraDelEvento({ mensajeSinResponder: true })], {
+      ...totales,
+      pagina: paginaDe(1),
+    });
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: pagina1 }], {
+      [`${RUTA}?pagina=2`]: [{ status: 200, json: pagina2 }],
+      [`${RUTA}?estado=CANCELADA`]: [{ status: 200, json: canceladas }],
+      [`${RUTA}?sinResponder=true`]: [{ status: 200, json: sinResponder }],
+    });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    await fireEvent.press(boton("Página 2"));
+    await waitFor(() => expect(filasVisibles()).toHaveLength(2));
+
+    await fireEvent.press(chip("Cancelada"));
+    expect(
+      await screen.findByLabelText(
+        "Diego Fernández, General, 1 entrada, $ 45.000, Cancelada, Venció sin pagarse",
+      ),
+    ).toBeOnTheScreen();
+    expect(filasVisibles()).toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "Página 1" })).toBeNull();
+
+    await fireEvent.press(chip("Sin responder"));
+    await waitFor(() => expect(filasVisibles()).toHaveLength(1));
+
+    await fireEvent.press(chip("Todas"));
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    expect(boton("Página 1")).toBeSelected();
+
+    expect(pedidosALaLista(resultado).slice(0, 4)).toEqual([
+      RUTA,
+      `${RUTA}?pagina=2`,
+      `${RUTA}?estado=CANCELADA`,
+      `${RUTA}?sinResponder=true`,
+    ]);
+  });
+
+  it("un filtro sin resultados muestra su vacío con los chips y sin paginador", async () => {
+    const vacia = comprasDelFestival([], { ...totales, pagina: paginaDe(0) });
+    await abrirComprasDelFestival([{ status: 200, json: pagina1 }], {
+      [`${RUTA}?estado=REEMBOLSADA`]: [{ status: 200, json: vacia }],
+    });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+
+    await fireEvent.press(chip("Reembolsada"));
+
+    expect(await screen.findByText("No hay compras reembolsadas")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Filtrar compras")).toBeOnTheScreen();
+    expect(screen.queryByText("Todavía nadie compró entradas")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Página/ })).toBeNull();
+  });
+
+  it("con cantidadCompras 0 no hay chips y se ve «Todavía nadie compró entradas», sin paginador", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival([]) }]);
+    expect(await screen.findByText("Todavía nadie compró entradas")).toBeOnTheScreen();
+    expect(screen.queryByLabelText("Filtrar compras")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Página/ })).toBeNull();
+  });
+
+  it("los chips dependen de cantidadCompras, no de las filas de la página", async () => {
+    await abrirComprasDelFestival([
+      { status: 200, json: comprasDelFestival([], { cantidadCompras: 3, pagina: paginaDe(0) }) },
+    ]);
+    expect(await screen.findByLabelText("Filtrar compras")).toBeOnTheScreen();
+  });
+
+  it("con 10 compras o menos no hay paginador", async () => {
+    await abrirComprasDelFestival([{ status: 200, json: comprasDelFestival(varias(10)) }]);
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    expect(screen.queryByRole("button", { name: /^Página/ })).toBeNull();
+  });
+
+  it("después de «Confirmar reembolso» en la 3 de las canceladas se vuelve a pedir esa página y filtro; si ya no existe, se marca la última", async () => {
+    const alertas = espiarAlertas();
+    const canceladas = (compras: CompraDelEventoVista[], numero: number, total: number) =>
+      comprasDelFestival(compras, { ...totales, pagina: paginaDe(total, { numero }) });
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: pagina1 }], {
+      [`${RUTA}?estado=CANCELADA`]: [{ status: 200, json: canceladas(varias(10), 1, 21) }],
+      [`${RUTA}?pagina=3&estado=CANCELADA`]: [
+        { status: 200, json: canceladas([diegoConReembolsoPendiente], 3, 21) },
+        { status: 200, json: canceladas(varias(10, "p", 11), 2, 20) },
+      ],
+      "/compras/compra-diego-vip/reembolso": [{ status: 200, json: diegoReembolsada }],
+    });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    await fireEvent.press(chip("Cancelada"));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Página 3" })).toBeOnTheScreen());
+    await fireEvent.press(boton("Página 3"));
+    await fireEvent.press(await screen.findByRole("button", { name: "Confirmar reembolso" }));
+    await tocarEnAlerta(alertas, "¿Confirmar el reembolso a Diego Fernández?", "Confirmar reembolso");
+
+    await waitFor(() => expect(boton("Página 2")).toBeSelected());
+    expect(screen.queryByRole("button", { name: "Página 3" })).toBeNull();
+    expect(chip("Cancelada")).toBeChecked();
+    expect(pedidosALaLista(resultado).slice(-2)).toEqual([
+      `${RUTA}?pagina=3&estado=CANCELADA`,
+      `${RUTA}?pagina=3&estado=CANCELADA`,
+    ]);
+  });
+
+  it("al volver de «Registrar ingreso» se pide la página y el filtro en los que estaba (US3-4)", async () => {
+    const canceladas = comprasDelFestival(varias(10), { ...totales, pagina: paginaDe(12) });
+    const segunda = comprasDelFestival(varias(2, "p", 11), {
+      ...totales,
+      pagina: paginaDe(12, { numero: 2 }),
+    });
+    const resultado = await abrirComprasDelFestival([{ status: 200, json: pagina1 }], {
+      [`${RUTA}?estado=CANCELADA`]: [{ status: 200, json: canceladas }],
+      [`${RUTA}?pagina=2&estado=CANCELADA`]: [{ status: 200, json: segunda }],
+    });
+    await waitFor(() => expect(filasVisibles()).toHaveLength(10));
+    await fireEvent.press(chip("Cancelada"));
+    await waitFor(() => expect(boton("Página 1")).toBeSelected());
+    await fireEvent.press(boton("Página 2"));
+    await waitFor(() => expect(filasVisibles()).toHaveLength(2));
+
+    await fireEvent.press(screen.getByRole("button", { name: "Registrar ingreso" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/eventos/evento-festival/ingreso"));
+    await act(() => router.back());
+
+    await waitFor(() =>
+      expect(
+        pedidosALaLista(resultado).filter((u) => u === `${RUTA}?pagina=2&estado=CANCELADA`),
+      ).toHaveLength(2),
+    );
+    expect(boton("Página 2")).toBeSelected();
+    expect(chip("Cancelada")).toBeChecked();
   });
 });
