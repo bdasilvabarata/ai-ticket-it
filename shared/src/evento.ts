@@ -89,6 +89,8 @@ export interface ConsultaCatalogo {
   orden?: OrdenCatalogo;
   /** Sin valor: `SENTIDO_INICIAL[orden]`. */
   sentido?: SentidoCatalogo;
+  /** Página pedida, desde 1 (feature 013). Sin valor: la 1. */
+  pagina?: number;
 }
 
 /** Organizador de un evento con su puntaje (las reseñas de todos sus eventos). */

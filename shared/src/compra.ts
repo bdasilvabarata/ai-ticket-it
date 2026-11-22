@@ -218,3 +218,13 @@ export interface EntradaDelEventoVista extends EntradaVista {
   };
   ventanaDeUso: VentanaDeUsoVista;
 }
+
+/** Query de `GET /eventos/:eventoId/compras` (feature 013); el servidor filtra antes de paginar. */
+export interface ConsultaComprasDelEvento {
+  /** Página pedida, desde 1. Sin valor: la 1. */
+  pagina?: number;
+  /** Solo las compras en ese estado. Sin valor: todas. */
+  estado?: EstadoCompra;
+  /** Solo las que tienen un mensaje del comprador sin responder. Sin valor: `false`. */
+  sinResponder?: boolean;
+}

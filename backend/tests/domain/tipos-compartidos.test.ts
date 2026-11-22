@@ -4,6 +4,7 @@ import {
   LIMITES_COMPRA,
   LIMITES_EVENTO,
   LIMITES_MENSAJE,
+  LIMITES_PAGINACION,
   LIMITES_RESENIA,
   LIMITES_TIPO_ENTRADA,
   ORDENES_CATALOGO,
@@ -82,6 +83,10 @@ describe("tipos compartidos", () => {
       entradasPorTipoGratis: 1,
       minutosParaPagar: 15,
     });
+  });
+
+  it("las páginas son de 10 y el detalle muestra 3 reseñas", () => {
+    expect(LIMITES_PAGINACION).toEqual({ tamanoDePagina: 10, reseniasEnElDetalle: 3 });
   });
 
   it("el texto de un mensaje del chat tiene como máximo 500 caracteres", () => {

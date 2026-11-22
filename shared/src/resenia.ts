@@ -1,4 +1,5 @@
 import type { OrganizadorVista } from "./evento";
+import type { PaginaVista } from "./paginacion";
 
 /** Límites de una reseña (feature 012): los usan la validación y el dominio. */
 export const LIMITES_RESENIA = {
@@ -47,10 +48,21 @@ export interface ReseniaDelOrganizadorVista {
   creadaEnLocal: string;
 }
 
-/** Respuesta de `GET /eventos/:eventoId/resenias-del-organizador` (pública). */
+/**
+ * Respuesta de `GET /eventos/:eventoId/resenias-del-organizador/resumen` (pública): la forma de la
+ * 012, con las 3 más recientes.
+ */
 export interface ReseniasDelOrganizadorVista {
   /** El organizador del evento con su puntaje (el mismo de la tarjeta y del detalle). */
   organizador: OrganizadorVista;
-  /** Las reseñas de todos sus eventos, de la más reciente a la más vieja. */
+  /** Hasta `LIMITES_PAGINACION.reseniasEnElDetalle`, de la más reciente a la más vieja. */
   resenias: ReseniaDelOrganizadorVista[];
+}
+
+/**
+ * Respuesta de `GET /eventos/:eventoId/resenias-del-organizador?pagina=N` (pública, feature 013):
+ * una página de las reseñas de todos los eventos del organizador.
+ */
+export interface PaginaDeReseniasVista extends ReseniasDelOrganizadorVista {
+  pagina: PaginaVista;
 }
