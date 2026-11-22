@@ -1,7 +1,11 @@
 import { EstadoCompra } from "@ai-ticket-it/shared";
 import { describe, expect, it } from "vitest";
 import { Compra, Entrada } from "../../src/domain/compra";
-import { compararComprasDelEvento, resumenPorTipo } from "../../src/domain/compras-del-evento";
+import {
+  compararComprasDelEvento,
+  filtrarComprasDelEvento,
+  resumenPorTipo,
+} from "../../src/domain/compras-del-evento";
 import { AHORA, codigosDePrueba, compra, historialHasta, tipo } from "../helpers/eventos";
 
 const MINUTO = 60 * 1000;
@@ -117,5 +121,73 @@ describe("resumenPorTipo", () => {
     const [deGeneral, deVip] = resumenPorTipo([general, vip], compras);
     expect(deGeneral).toMatchObject({ pendientes: 1, vendidas: 0 });
     expect(deVip).toMatchObject({ pendientes: 4, vendidas: 2 });
+  });
+});
+
+describe("filtrarComprasDelEvento", () => {
+  const estados = [
+    EstadoCompra.PENDIENTE,
+    EstadoCompra.CONFIRMADA,
+    EstadoCompra.UTILIZADA,
+    EstadoCompra.CANCELADA,
+    EstadoCompra.REEMBOLSADA,
+  ];
+  const porEstado = estados.map((estado) =>
+    compra("evento-a", "tipo-a-general", estado, { id: `compra-${estado.toLowerCase()}` }),
+  );
+  const DESPUES = new Date(AHORA.getTime() + 60 * MINUTO);
+  /** La confirmada, con un mensaje del comprador sin responder. */
+  const sinResponder = porEstado[1]!.enviarMensaje("usuario-martin", "¿Hay estacionamiento?", DESPUES);
+  /** La cancelada, con la conversación respondida por el organizador. */
+  const respondida = porEstado[3]!
+    .enviarMensaje("usuario-martin", "¿Me devuelven?", DESPUES)
+    .enviarMensaje("usuario-lucia", "Sí, en estos días.", DESPUES);
+  /** La utilizada, con un mensaje del comprador sin responder. */
+  const usadaSinResponder = porEstado[2]!.enviarMensaje("usuario-martin", "Gracias", DESPUES);
+  const lista = [porEstado[0]!, sinResponder, usadaSinResponder, respondida, porEstado[4]!];
+  const ids = (compras: readonly Compra[]) => compras.map((c) => c.id);
+
+  it("sin filtro devuelve todas, en el mismo orden", () => {
+    expect(ids(filtrarComprasDelEvento(lista, { sinResponder: false }))).toEqual(ids(lista));
+  });
+
+  it.each(estados)("con estado %s, solo las compras en ese estado", (estado) => {
+    const filtradas = filtrarComprasDelEvento(lista, { estado, sinResponder: false });
+    expect(filtradas).toHaveLength(1);
+    expect(filtradas[0]!.estado).toBe(estado);
+  });
+
+  it("compara el estado de la compra recibida: una pendiente vencida al día es CANCELADA", () => {
+    const vencida = compra("evento-a", "tipo-a-general", EstadoCompra.PENDIENTE, {
+      id: "compra-vencida",
+    }).alDia(new Date(AHORA.getTime() + 16 * MINUTO));
+    expect(
+      ids(filtrarComprasDelEvento([vencida], { estado: EstadoCompra.CANCELADA, sinResponder: false })),
+    ).toEqual(["compra-vencida"]);
+    expect(
+      filtrarComprasDelEvento([vencida], { estado: EstadoCompra.PENDIENTE, sinResponder: false }),
+    ).toEqual([]);
+  });
+
+  it("con sinResponder, solo las del último mensaje del comprador", () => {
+    expect(ids(filtrarComprasDelEvento(lista, { sinResponder: true }))).toEqual([
+      sinResponder.id,
+      usadaSinResponder.id,
+    ]);
+  });
+
+  it("los dos juntos se aplican con 'y'", () => {
+    expect(
+      ids(filtrarComprasDelEvento(lista, { estado: EstadoCompra.UTILIZADA, sinResponder: true })),
+    ).toEqual([usadaSinResponder.id]);
+    expect(filtrarComprasDelEvento(lista, { estado: EstadoCompra.CANCELADA, sinResponder: true })).toEqual(
+      [],
+    );
+  });
+
+  it("no muta la lista recibida", () => {
+    const copia = [...lista];
+    filtrarComprasDelEvento(lista, { estado: EstadoCompra.CONFIRMADA, sinResponder: true });
+    expect(lista).toEqual(copia);
   });
 });

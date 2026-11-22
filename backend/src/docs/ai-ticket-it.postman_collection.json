@@ -559,6 +559,38 @@
           }
         },
         {
+          "name": "Compras del Festival — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?pagina=2" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — canceladas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=CANCELADA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — sin responder",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?sinResponder=true" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "estado=VENCIDA → 400 ENTRADA_INVALIDA (query.estado)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=VENCIDA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
           "name": "Listar compras (otro usuario, 403)",
           "request": {
             "method": "GET",

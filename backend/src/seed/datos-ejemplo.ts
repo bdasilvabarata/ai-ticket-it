@@ -115,7 +115,8 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       multimedia: [imagen("sonidos-del-sur"), imagen("sonidos-del-sur-escenario")],
       organizadorId: lucia,
       tiposEntrada: [
-        { nombre: "General", descripcion: "Acceso al predio.", precio: 45000, cupo: 500 },
+        // 500 − las 4 General confirmadas de la 013 (R11).
+        { nombre: "General", descripcion: "Acceso al predio.", precio: 45000, cupo: 496 },
         { nombre: "VIP", descripcion: "Sector preferencial con barra.", precio: 120000, cupo: 50 },
         {
           nombre: "Backstage",
@@ -336,6 +337,83 @@ export function crearDatosEjemplo(ahora: Date): DatosEjemplo {
       entradas: [new Entrada({ codigo: "FSGD1E60" })],
     }),
   ];
+
+  // Feature 013 (R11): diez compras más de una General en el Festival, para que "Compras del evento"
+  // tenga 12 (2 páginas: 10 + 2). Confirmadas y canceladas (vencidas por el sistema o canceladas
+  // después de pagar, con el reembolso pendiente), ninguna PENDIENTE. Las confirmadas son de
+  // Valentina (3) y Diego (1): nadie pasa el tope y Sofía y Martín, que compran en las demos y en los
+  // tests, conservan sus entradas disponibles. La de Valentina más vieja (en la página 2) termina en
+  // un mensaje suyo sin responder. General descuenta las 4 confirmadas (500 − 4).
+  type FinalDeLaCompra = "confirmada" | "vencida" | "cancelada-despues-de-pagar";
+  const masDelFestival: [compradorId: string, horasAtras: number, final: FinalDeLaCompra][] = [
+    [valentina, 3, "confirmada"],
+    [diego, 6, "confirmada"],
+    [sofia, 10, "vencida"],
+    [valentina, 20, "confirmada"],
+    [martin, 30, "vencida"],
+    [diego, 36, "cancelada-despues-de-pagar"],
+    [valentina, 40, "confirmada"],
+    [sofia, 44, "cancelada-despues-de-pagar"],
+    [martin, 60, "cancelada-despues-de-pagar"],
+    [valentina, 120, "cancelada-despues-de-pagar"],
+  ];
+  masDelFestival.forEach(([compradorId, horasAtras, final], indice) => {
+    const numero = indice + 1;
+    const alta = new Date(ahora.getTime() - horasAtras * HORA_MS);
+    const porComprador = { tipo: "usuario", usuarioId: compradorId } as const;
+    const pendiente = { estado: EstadoCompra.PENDIENTE, autor: porComprador, fechaHora: alta };
+    const confirmacion = {
+      estado: EstadoCompra.CONFIRMADA,
+      autor: porComprador,
+      fechaHora: masMinutos(alta, 5),
+    };
+    const cancelacion = { usuarioId: compradorId, fechaHora: masMinutos(alta, 2 * 60) };
+    const historial =
+      final === "confirmada"
+        ? [pendiente, confirmacion]
+        : final === "vencida"
+          ? [
+              pendiente,
+              {
+                estado: EstadoCompra.CANCELADA,
+                autor: { tipo: "sistema" } as const,
+                fechaHora: masMinutos(alta, LIMITES_COMPRA.minutosParaPagar),
+              },
+            ]
+          : [
+              pendiente,
+              confirmacion,
+              { estado: EstadoCompra.CANCELADA, autor: porComprador, fechaHora: cancelacion.fechaHora },
+            ];
+    const codigo = `FSGN${String(numero).padStart(4, "0")}`;
+    compras.push(
+      new Compra({
+        id: `compra-${compradorId.replace("usuario-", "")}-festival-${numero}`,
+        compradorId,
+        eventoId: `evento-${festival}`,
+        tipoEntradaId: `tipo-${festival}-general`,
+        cantidad: 1,
+        total: 45000,
+        historial,
+        entradas: [
+          new Entrada({
+            codigo,
+            cancelacion: final === "cancelada-despues-de-pagar" ? cancelacion : null,
+          }),
+        ],
+        mensajes:
+          numero === masDelFestival.length
+            ? [
+                new Mensaje({
+                  autorId: compradorId,
+                  texto: "Hola, cancelé mi entrada. ¿Cuándo me devuelven el dinero?",
+                  enviadoEn: masMinutos(alta, 24 * 60),
+                }),
+              ]
+            : [],
+      }),
+    );
+  });
 
   // Compras sobre la Peña (feature 008, R12), con la ventana de uso abierta: Martín, 3 General
   // pagadas con 1 entrada ya usada (la compra UTILIZADA, "1 de 3"); Sofía, 2 Con cena pagadas sin

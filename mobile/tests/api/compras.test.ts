@@ -1,3 +1,5 @@
+import { EstadoCompra } from "@ai-ticket-it/shared";
+
 import {
   comprarEntradas,
   crearClienteApi,
@@ -129,7 +131,7 @@ describe("obtenerComprasDelEvento (feature 008)", () => {
     const vista = { evento: { id: "evento a/b" }, ventanaDeUso: {}, resumenPorTipo: [], compras: [] };
     const { cliente, falso } = armar({ status: 200, json: vista });
 
-    await expect(obtenerComprasDelEvento(cliente, "evento a/b")).resolves.toEqual(vista);
+    await expect(obtenerComprasDelEvento(cliente, "evento a/b", {})).resolves.toEqual(vista);
     expect(falso.pedidos[0]).toMatchObject({ url: `${URL}/eventos/evento%20a%2Fb/compras`, metodo: "GET" });
     expect(falso.pedidos[0].cuerpo).toBeUndefined();
     expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-actual");
@@ -139,8 +141,25 @@ describe("obtenerComprasDelEvento (feature 008)", () => {
     const { cliente } = armar({ status: 200, json: {} });
     const get = jest.spyOn(cliente, "get");
     const controlador = new AbortController();
-    await obtenerComprasDelEvento(cliente, "evento-festival", { signal: controlador.signal });
+    await obtenerComprasDelEvento(cliente, "evento-festival", {}, { signal: controlador.signal });
     expect(get).toHaveBeenCalledWith("/eventos/evento-festival/compras", { signal: controlador.signal });
+  });
+
+  it.each([
+    [{}, ""],
+    [{ pagina: 1 }, ""],
+    [{ pagina: 2 }, "?pagina=2"],
+    [{ estado: EstadoCompra.CANCELADA }, "?estado=CANCELADA"],
+    [{ sinResponder: true }, "?sinResponder=true"],
+    [{ sinResponder: false }, ""],
+    [
+      { pagina: 3, estado: EstadoCompra.CONFIRMADA, sinResponder: true },
+      "?pagina=3&estado=CONFIRMADA&sinResponder=true",
+    ],
+  ])("con %j agrega solo los parámetros con valor (feature 013): «%s»", async (consulta, query) => {
+    const { cliente, falso } = armar({ status: 200, json: {} });
+    await obtenerComprasDelEvento(cliente, "evento-festival", consulta);
+    expect(falso.pedidos[0].url).toBe(`${URL}/eventos/evento-festival/compras${query}`);
   });
 
   it("un 403 llega como ErrorDeApi con su código", async () => {
@@ -150,7 +169,7 @@ describe("obtenerComprasDelEvento (feature 008)", () => {
         error: { codigo: "SIN_PERMISO", mensaje: "Solo el organizador del evento puede ver sus compras." },
       },
     });
-    const error = await obtenerComprasDelEvento(cliente, "evento-festival").catch((e: unknown) => e);
+    const error = await obtenerComprasDelEvento(cliente, "evento-festival", {}).catch((e: unknown) => e);
     expect(error).toBeInstanceOf(ErrorDeApi);
     expect(error).toMatchObject({ status: 403, codigo: "SIN_PERMISO" });
   });

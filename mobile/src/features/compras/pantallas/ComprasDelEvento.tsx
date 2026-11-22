@@ -4,19 +4,14 @@ import { useState } from "react";
 import { Alert, StyleSheet, Text, View } from "react-native";
 
 import { ErrorDeApi, ServidorNoDisponibleError } from "../../../api";
-import { Boton, PantallaDesplazable, SegunConsulta, tema } from "../../../componentes";
+import { Boton, Paginador, PantallaDesplazable, SegunConsulta, tema, usePagina } from "../../../componentes";
 import { textoFechaHora } from "../../eventos";
 import { useSesion } from "../../sesion";
 import { FilaCompraDelEvento } from "../componentes/FilaCompraDelEvento";
 import { FiltroPorEstado } from "../componentes/FiltroPorEstado";
 import { ResumenPorTipo } from "../componentes/ResumenPorTipo";
 import { useSalirSiNoExisteElEvento } from "../evento-inexistente";
-import {
-  filtrarCompras,
-  SIN_COMPRAS,
-  textoSinComprasDelFiltro,
-  type FiltroDeCompras,
-} from "../filtro-de-compras";
+import { SIN_COMPRAS, textoSinComprasDelFiltro, type FiltroDeCompras } from "../filtro-de-compras";
 import { textoComprasSinResponder, textoConfirmarReembolso, textoVentanaDeUso } from "../formato";
 import { useConfirmarReembolso } from "../mutaciones";
 import { useComprasDelEvento } from "../useComprasDelEvento";
@@ -24,24 +19,34 @@ import { useEnvioUnico } from "../useEnvioUnico";
 import { useRefrescarAlFocalizar } from "../useRefrescarAlFocalizar";
 
 /**
- * "Compras del evento" (feature 008, UC-02): todas las compras de un evento propio, al día, con la
- * ventana de uso y la disponibilidad por tipo. Solo se llega desde un evento del organizador ("Ver compras"); el permiso lo
- * decide el servidor.
+ * "Compras del evento" (feature 008, UC-02): las compras de un evento propio, al día, con la ventana
+ * de uso y la disponibilidad por tipo; desde la 013, de a 10 y filtradas por el servidor. Solo se
+ * llega desde un evento del organizador ("Ver compras"); el permiso lo decide el servidor.
  */
 export function ComprasDelEvento() {
   const { eventoId } = useLocalSearchParams<{ eventoId: string }>();
   const { estado } = useSesion();
   if (estado.fase !== "con-usuario") return null; // el guard ya no muestra esta ruta
-  return <ListaDeComprasDelEvento usuarioId={estado.usuarioId} eventoId={eventoId} />;
+  // La `key`: con otro usuario la lista arranca de cero, sin la respuesta anterior como placeholder.
+  return (
+    <ListaDeComprasDelEvento
+      key={`${estado.usuarioId}/${eventoId}`}
+      usuarioId={estado.usuarioId}
+      eventoId={eventoId}
+    />
+  );
 }
 
 function ListaDeComprasDelEvento({ usuarioId, eventoId }: { usuarioId: string; eventoId: string }) {
-  const consulta = useComprasDelEvento(usuarioId, eventoId);
-  // Al volver (de "Registrar ingreso" u otra pantalla) refleja compras, usos y vencimientos (FR-023).
+  // Acá y no en `Contenido`: el filtro y la página sobreviven a las relecturas de la lista.
+  const [filtro, setFiltro] = useState<FiltroDeCompras>("todas");
+  // Cambiar el filtro vuelve a la página 1 (feature 013, FR-017, research R7).
+  const [pagina, cambiarPagina] = usePagina(filtro);
+  const consulta = useComprasDelEvento(usuarioId, eventoId, filtro, pagina);
+  // Al volver (de "Registrar ingreso" u otra pantalla) refleja compras, usos y vencimientos (FR-023),
+  // en la misma página y con el mismo filtro (FR-018).
   useRefrescarAlFocalizar(consulta.refetch);
   useSalirSiNoExisteElEvento(consulta.error);
-  // Acá y no en `Contenido`: el filtro elegido sobrevive a las relecturas de la lista.
-  const [filtro, setFiltro] = useState<FiltroDeCompras>("todas");
   return (
     <View style={estilos.pantalla}>
       {/*
@@ -50,7 +55,15 @@ function ListaDeComprasDelEvento({ usuarioId, eventoId }: { usuarioId: string; e
       */}
       <SegunConsulta consulta={consulta} mensajeVacio={SIN_COMPRAS}>
         {(vista) => (
-          <Contenido usuarioId={usuarioId} vista={vista} filtro={filtro} alCambiarFiltro={setFiltro} />
+          <Contenido
+            usuarioId={usuarioId}
+            vista={vista}
+            filtro={filtro}
+            alCambiarFiltro={setFiltro}
+            pagina={pagina}
+            alCambiarPagina={cambiarPagina}
+            cargandoLista={consulta.isPlaceholderData}
+          />
         )}
       </SegunConsulta>
     </View>
@@ -62,9 +75,25 @@ interface PropsContenido {
   vista: ComprasDelEventoVista;
   filtro: FiltroDeCompras;
   alCambiarFiltro: (filtro: FiltroDeCompras) => void;
+  /** La página pedida: al cambiar, la pantalla vuelve arriba (research R9). */
+  pagina: number;
+  alCambiarPagina: (numero: number) => void;
+  /**
+   * La vista es la de la página o el filtro anterior mientras llega la nueva (research R8): el
+   * resumen sigue a la vista y, en lugar de las filas y del paginador, "Cargando compras…".
+   */
+  cargandoLista: boolean;
 }
 
-function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido) {
+function Contenido({
+  usuarioId,
+  vista,
+  filtro,
+  alCambiarFiltro,
+  pagina,
+  alCambiarPagina,
+  cargandoLista,
+}: PropsContenido) {
   // Una sola mutation para todas las filas (feature 009): la fila en curso y su error salen de ella.
   const reembolso = useConfirmarReembolso(usuarioId, vista.evento.id);
   // Marca sincrónica: una segunda confirmación antes de que se vuelva a dibujar no manda otro pedido.
@@ -83,13 +112,13 @@ function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido
       ],
     );
   const deEstaFila = (compra: CompraDelEventoVista) => reembolso.variables === compra.id;
-  // El filtro solo toca la lista: el resumen por tipo sigue contando todas las compras.
-  const compras = filtrarCompras(vista.compras, filtro);
+  // La página ya llega filtrada (feature 013): el resumen por tipo sigue contando todas las compras.
+  const { compras } = vista;
   // El contador va acá y no en el hub, que solo lee el evento (docs/mejoras-organizador.md, grupo 4).
   const sinResponder = textoComprasSinResponder(vista.comprasConMensajesSinResponder);
 
   return (
-    <PantallaDesplazable separacion={tema.espacio.normal}>
+    <PantallaDesplazable separacion={tema.espacio.normal} volverArribaCon={pagina}>
       <View style={estilos.datos}>
         <Text style={estilos.nombre} accessibilityRole="header">
           {vista.evento.nombre}
@@ -110,24 +139,32 @@ function Contenido({ usuarioId, vista, filtro, alCambiarFiltro }: PropsContenido
           Compras
         </Text>
         {sinResponder !== null && <Text style={estilos.ventana}>{sinResponder}</Text>}
-        {/* Sin ninguna compra no hay nada que filtrar. */}
-        {vista.compras.length === 0 ? (
+        {/* Sin ninguna compra en el evento no hay nada que filtrar (no si solo el filtro la vació). */}
+        {vista.cantidadCompras === 0 ? (
           <Text style={estilos.dato}>{SIN_COMPRAS}</Text>
         ) : (
           <FiltroPorEstado filtro={filtro} alCambiar={alCambiarFiltro} />
         )}
-        {vista.compras.length > 0 && compras.length === 0 && (
-          <Text style={estilos.dato}>{textoSinComprasDelFiltro(filtro)}</Text>
+        {/* Nunca las filas de la página anterior: mientras llega la nueva, solo el aviso. */}
+        {cargandoLista ? (
+          <Text style={estilos.dato}>Cargando compras…</Text>
+        ) : (
+          <>
+            {vista.cantidadCompras > 0 && compras.length === 0 && (
+              <Text style={estilos.dato}>{textoSinComprasDelFiltro(filtro)}</Text>
+            )}
+            {compras.map((compra) => (
+              <FilaCompraDelEvento
+                key={compra.id}
+                compra={compra}
+                alConfirmarReembolso={confirmar}
+                enCurso={reembolso.isPending && deEstaFila(compra)}
+                error={deEstaFila(compra) ? error : null}
+              />
+            ))}
+            <Paginador pagina={vista.pagina} alCambiar={alCambiarPagina} />
+          </>
         )}
-        {compras.map((compra) => (
-          <FilaCompraDelEvento
-            key={compra.id}
-            compra={compra}
-            alConfirmarReembolso={confirmar}
-            enCurso={reembolso.isPending && deEstaFila(compra)}
-            error={deEstaFila(compra) ? error : null}
-          />
-        ))}
       </View>
     </PantallaDesplazable>
   );

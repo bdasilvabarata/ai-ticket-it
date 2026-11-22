@@ -14,10 +14,16 @@ import {
 } from "@ai-ticket-it/shared";
 import { esCodigoValido, normalizarCodigo } from "../domain/codigo-de-entrada";
 import { Compra } from "../domain/compra";
-import { compararComprasDelEvento, resumenPorTipo } from "../domain/compras-del-evento";
+import {
+  compararComprasDelEvento,
+  filtrarComprasDelEvento,
+  resumenPorTipo,
+  type FiltroDeComprasDelEvento,
+} from "../domain/compras-del-evento";
 import type { Evento } from "../domain/evento";
 import { horaDeBuenosAires } from "../domain/hora-buenos-aires";
 import { compararMisCompras } from "../domain/orden-mis-compras";
+import { paginar } from "../domain/paginacion";
 import { exigirQuePuedeReseniar } from "../domain/resenia";
 import type { Reloj } from "../domain/reloj";
 import type { RepositorioCompras } from "../domain/repositorios";
@@ -321,21 +327,31 @@ export class CompraService {
   }
 
   /**
-   * "Compras del evento" (feature 008, R6): todas las compras del evento, de todos los compradores y
-   * en todos los estados, **al día**, solo para su organizador (404 → 403). Lectura: un `ahora`, sin
-   * cerrojo y sin guardar. Lecturas fijas (FR-002): el evento, sus pendientes (cupo al día), sus
-   * compras y los compradores en lote (sin compras, ninguna de usuarios).
+   * "Compras del evento" (feature 008, R6; paginada en la 013, R4): las compras del evento, de todos
+   * los compradores, **al día**, solo para su organizador (404 → 403). La ventana, el resumen por
+   * tipo, el contador de mensajes sin responder y `cantidadCompras` son de **todas**; la lista es la
+   * página pedida de las que cumplen el filtro. Lectura: un `ahora`, sin cerrojo y sin guardar.
+   * Lecturas fijas (FR-002): el evento, sus pendientes (cupo al día), sus compras y los compradores
+   * de la página en lote (con la página vacía, ninguna de usuarios).
    */
-  async comprasDelEvento(eventoId: string, usuarioId: string): Promise<ComprasDelEventoVista> {
+  async comprasDelEvento(
+    eventoId: string,
+    usuarioId: string,
+    { pagina, ...filtro }: FiltroDeComprasDelEvento & { pagina: number } = { pagina: 1, sinResponder: false },
+  ): Promise<ComprasDelEventoVista> {
     const ahora = this.#reloj.ahora();
     const evento = await this.#eventoService.leerDelOrganizador(eventoId, usuarioId, ahora);
     const compras = (await this.#compras.listarPorEvento(eventoId))
       .map((compra) => compra.alDia(ahora))
       .toSorted(compararComprasDelEvento);
+    const { elementos: deLaPagina, pagina: paginaVista } = paginar(
+      filtrarComprasDelEvento(compras, filtro),
+      pagina,
+    );
     const compradores =
-      compras.length === 0
+      deLaPagina.length === 0
         ? new Map<string, Usuario>()
-        : await this.#usuarioService.obtenerPorIds([...new Set(compras.map((c) => c.compradorId))]);
+        : await this.#usuarioService.obtenerPorIds([...new Set(deLaPagina.map((c) => c.compradorId))]);
     return {
       evento: {
         id: evento.id,
@@ -347,10 +363,12 @@ export class CompraService {
       // El evento ya llega con el cupo al día y las compras, al día: sin guardar nada (R7).
       resumenPorTipo: resumenPorTipo(evento.tiposEntrada, compras).map(aResumenTipoEntradaVista),
       // `obtenerPorIds` garantiza que están todos (si falta uno, lanza).
-      compras: compras.map((compra) =>
+      compras: deLaPagina.map((compra) =>
         aCompraDelEventoVista(compra, compradores.get(compra.compradorId)!, evento),
       ),
       comprasConMensajesSinResponder: compras.filter((compra) => compra.mensajeSinResponder).length,
+      cantidadCompras: compras.length,
+      pagina: paginaVista,
     };
   }
 

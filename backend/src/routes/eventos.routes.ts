@@ -3,7 +3,7 @@ import type { CompraController } from "../controllers/compra.controller";
 import type { EntradaController } from "../controllers/entrada.controller";
 import type { EventoController } from "../controllers/evento.controller";
 import type { TipoEntradaController } from "../controllers/tipo-entrada.controller";
-import { compraNueva, comprasDelEvento } from "../validations/compra.validation";
+import { compraNueva, comprasDelEvento, consultaComprasDelEvento } from "../validations/compra.validation";
 import { entradaPorCodigo } from "../validations/entrada.validation";
 import { consultaCatalogo, eventoEditado, eventoNuevo, eventoPorId } from "../validations/evento.validation";
 import { reseniaNueva } from "../validations/resenia.validation";
@@ -55,11 +55,12 @@ export function crearEventosRouter(
   router.delete("/:eventoId", requerirUsuario, eventoPorId.middleware, controller.eliminar);
   // Compras (feature 006): en nombre del usuario actual.
   router.post("/:eventoId/compras", requerirUsuario, compraNueva.middleware, controllers.compras.crear);
-  // Compras del evento (feature 008): solo su organizador (el 403 lo decide el service).
+  // Compras del evento (features 008 y 013): solo su organizador (el 403 lo decide el service),
+  // paginadas y filtradas por estado y mensajes sin responder.
   router.get(
     "/:eventoId/compras",
     requerirUsuario,
-    comprasDelEvento.middleware,
+    consultaComprasDelEvento.middleware,
     controllers.compras.comprasDelEvento,
   );
   router.get(

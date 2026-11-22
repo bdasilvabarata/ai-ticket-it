@@ -61,4 +61,16 @@ describe("usePagina", () => {
     await rerender({ criterio: "b" });
     expect(result.current[0]).toBe(2);
   });
+
+  it("volver a un criterio anterior empieza en la 1, no en la página que tenía (FR-017)", async () => {
+    const { result, rerender } = await renderHook<Resultado, Props>(({ criterio }) => usePagina(criterio), {
+      initialProps: { criterio: "a" },
+    });
+    await act(() => result.current[1](2));
+
+    await rerender({ criterio: "b" });
+    await rerender({ criterio: "a" });
+
+    expect(result.current[0]).toBe(1);
+  });
 });

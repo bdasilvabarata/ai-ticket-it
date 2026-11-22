@@ -639,7 +639,7 @@ describe("GET /api/eventos/:eventoId", () => {
       nombre: "General",
       descripcion: "Acceso al predio.",
       precio: 45000,
-      cupo: 500,
+      cupo: 496, // 500 − las 4 General confirmadas del seed de la 013
     });
   });
 
