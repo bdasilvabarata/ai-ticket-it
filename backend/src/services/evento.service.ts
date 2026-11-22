@@ -241,6 +241,22 @@ export class EventoService {
   }
 
   /**
+   * Marca el evento como favorito del usuario (feature 014, research R3): 404 si no existe (el
+   * dueño del evento lo verifica) y la escritura la hace `UsuarioService`, bajo el cerrojo del
+   * usuario. No toma el cerrojo del evento ni toca el evento, su cupo ni sus compras (FR-007).
+   */
+  async marcarFavorito(eventoId: string, usuarioId: string): Promise<void> {
+    await this.obtenerOFallar(eventoId);
+    await this.#usuarioService.marcarFavorito(usuarioId, eventoId);
+  }
+
+  /** Desmarca el evento de los favoritos del usuario; 404 si el evento no existe (FR-004). */
+  async desmarcarFavorito(eventoId: string, usuarioId: string): Promise<void> {
+    await this.obtenerOFallar(eventoId);
+    await this.#usuarioService.desmarcarFavorito(usuarioId, eventoId);
+  }
+
+  /**
    * Búsqueda en lote para otro service (feature 007, `CompraService.misCompras`): un `Map` por id en
    * una sola lectura, sin tomar el cerrojo ni guardar nada. Los eventos se devuelven como están
    * guardados (sin cupo al día: quien los usa no muestra cupo). Si falta alguno, 404 como

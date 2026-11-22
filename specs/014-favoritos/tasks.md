@@ -132,7 +132,7 @@ rechazos 401 → 400 → 404, bajo el cerrojo con la clave `usuario:<id>` y sin 
 favoritos (204), comprobar en el repositorio de usuarios que lo tiene una vez, repetir (204, sigue
 una vez), desmarcar dos veces (204 y 204) y comprobar los rechazos.
 
-- [ ] T006 [US1] Test de `UsuarioService` en `backend/tests/services/usuario.service.test.ts` (ya
+- [X] T006 [US1] Test de `UsuarioService` en `backend/tests/services/usuario.service.test.ts` (ya
   existe: se suman casos y sus construcciones actuales, líneas 34 y 112, reciben el cerrojo) (con
   stubs de `marcarFavorito(usuarioId, eventoId): Promise<void>` y `desmarcarFavorito(usuarioId,
   eventoId): Promise<void>` en `backend/src/services/usuario.service.ts`, y el constructor que pasa
@@ -145,11 +145,11 @@ una vez), desmarcar dos veces (204 y 204) y comprobar los rechazos.
   corre dentro de `cerrojo.ejecutar("usuario:<id>", …)` (la clave exacta, espiada) y relee el usuario adentro (espía del cerrojo);
   dos `marcarFavorito` concurrentes del mismo usuario sobre eventos distintos (`Promise.all`, con un
   repositorio cuyo `buscarPorId` cede el turno) conservan los dos.
-- [ ] T007 [US1] Implementar `marcarFavorito` / `desmarcarFavorito` en
+- [X] T007 [US1] Implementar `marcarFavorito` / `desmarcarFavorito` en
   `backend/src/services/usuario.service.ts`: bajo `this.#cerrojo.ejecutar(this.#claveDe(usuarioId), …)` (`usuario:<id>`),
   `obtenerOFallar`, `usuario.marcarFavorito/desmarcarFavorito` y `guardar` solo si devolvió otro
   objeto. `UsuarioService` no sabe si el evento existe; verde T006.
-- [ ] T008 [US1] Test de `EventoService` en `backend/tests/services/evento.service.test.ts` (con
+- [X] T008 [US1] Test de `EventoService` en `backend/tests/services/evento.service.test.ts` (con
   stubs de `marcarFavorito(eventoId, usuarioId): Promise<void>` y `desmarcarFavorito(eventoId,
   usuarioId): Promise<void>` en `backend/src/services/evento.service.ts`): un evento inexistente →
   `EVENTO_NO_ENCONTRADO` y `usuarioService.marcarFavorito/desmarcarFavorito` no se llaman (los
@@ -157,10 +157,10 @@ una vez), desmarcar dos veces (204 y 204) y comprobar los rechazos.
   `(usuarioId, eventoId)`; vale para un evento **propio** y uno **realizado** (FR-001); **no** toma
   el cerrojo de eventos (espía de `cerrojo.ejecutar` sin llamadas) ni guarda eventos ni compras
   (FR-007).
-- [ ] T009 [US1] Implementar los dos casos de uso en `backend/src/services/evento.service.ts`:
+- [X] T009 [US1] Implementar los dos casos de uso en `backend/src/services/evento.service.ts`:
   `this.obtenerOFallar(eventoId)` y después `this.#usuarioService.marcarFavorito/desmarcarFavorito`;
   verde T008.
-- [ ] T010 [US1] Test de API nuevo `backend/tests/api/favoritos.test.ts` para `PUT` y `DELETE`
+- [X] T010 [US1] Test de API nuevo `backend/tests/api/favoritos.test.ts` para `PUT` y `DELETE`
   (con stubs de `marcarFavorito` y `desmarcarFavorito` en
   `backend/src/controllers/evento.controller.ts`, las rutas
   `router.put("/actual/favoritos/:eventoId", requerirUsuario, eventoPorId.middleware, …)` y
@@ -173,10 +173,10 @@ una vez), desmarcar dos veces (204 y 204) y comprobar los rechazos.
   en `favoritos` (leído del repositorio pasado a `crearApp({ repositorios })`); `DELETE` dos veces →
   `204`, `204`; marcar un evento propio y uno realizado → 204; lo que marca Diego no aparece en
   Lucía (FR-006); el evento (cupo y tipos) queda igual tras marcar.
-- [ ] T011 [US1] Implementar `EventoController.marcarFavorito` / `desmarcarFavorito` en
+- [X] T011 [US1] Implementar `EventoController.marcarFavorito` / `desmarcarFavorito` en
   `backend/src/controllers/evento.controller.ts` (usuario actual de `res.locals`, `eventoId` de
   `params`, `res.status(204).end()`, sin reglas) y dejar las rutas definitivas; verde T010.
-- [ ] T012 [US1] Documentar `PUT` y `DELETE /usuarios/actual/favoritos/{eventoId}` en
+- [X] T012 [US1] Documentar `PUT` y `DELETE /usuarios/actual/favoritos/{eventoId}` en
   `backend/src/docs/openapi.json` con el tag nuevo `Favoritos` (seguridad `X-Usuario-Id`, `204`,
   `400`, `401`, `404`, sin `409`); verde `backend/tests/api/docs.test.ts` (cobertura de rutas).
 

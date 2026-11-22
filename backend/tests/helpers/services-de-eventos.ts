@@ -52,7 +52,11 @@ export function crearServicesDeEventos({
   const repositorioUsuarios = new UsuarioRepository(usuarios);
   const repositorioResenias = new ReseniaRepository(resenias);
   const categoriaService = new CategoriaService({ categorias: repositorioCategorias });
-  const usuarioService = new UsuarioService({ usuarios: repositorioUsuarios, eventos: repositorioEventos });
+  const usuarioService = new UsuarioService({
+    usuarios: repositorioUsuarios,
+    eventos: repositorioEventos,
+    cerrojo,
+  });
   const reseniaService = new ReseniaService({ resenias: repositorioResenias });
   const vencimientoService = new VencimientoService({ compras: repositorioCompras });
   const eventoService = new EventoService({

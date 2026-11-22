@@ -10,6 +10,7 @@ import {
   DIA,
   HORA,
   compra,
+  diego,
   evento,
   musica,
   relojFijo,
@@ -204,6 +205,72 @@ describe("EventoService.eliminar", () => {
       codigo: "EVENTO_CON_COMPRAS",
     });
     expect((await repositorioEventos.listar()).map((e) => e.id)).toEqual(["evento-a", "evento-pasado"]);
+  });
+});
+
+describe("EventoService.marcarFavorito / desmarcarFavorito (feature 014, R3)", () => {
+  function crearConEspias(eventos: Evento[]) {
+    const services = crearServicesDeEventos({ eventos });
+    return {
+      ...services,
+      marcar: vi.spyOn(services.usuarioService, "marcarFavorito"),
+      desmarcar: vi.spyOn(services.usuarioService, "desmarcarFavorito"),
+      cerrojo: vi.spyOn(services.cerrojo, "ejecutar"),
+      guardarEvento: vi.spyOn(services.repositorioEventos, "guardar"),
+      guardarCompra: vi.spyOn(services.repositorioCompras, "guardar"),
+    };
+  }
+
+  it("un evento inexistente lanza 404 EVENTO_NO_ENCONTRADO y no le pide nada a UsuarioService", async () => {
+    const { eventoService, marcar, desmarcar, repositorioUsuarios } = crearConEspias([]);
+    await expect(eventoService.marcarFavorito("evento-x", "usuario-diego")).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+    await expect(eventoService.desmarcarFavorito("evento-x", "usuario-diego")).rejects.toMatchObject({
+      codigo: "EVENTO_NO_ENCONTRADO",
+    });
+    expect(marcar).not.toHaveBeenCalled();
+    expect(desmarcar).not.toHaveBeenCalled();
+    expect((await repositorioUsuarios.buscarPorId("usuario-diego"))?.favoritos).toEqual(diego.favoritos);
+  });
+
+  it("con un evento existente delega en UsuarioService con (usuarioId, eventoId)", async () => {
+    const { eventoService, marcar, desmarcar, repositorioUsuarios } = crearConEspias([
+      evento({ id: "evento-a" }),
+    ]);
+    await eventoService.marcarFavorito("evento-a", "usuario-diego");
+    expect(marcar).toHaveBeenCalledWith("usuario-diego", "evento-a");
+    expect((await repositorioUsuarios.buscarPorId("usuario-diego"))?.tieneFavorito("evento-a")).toBe(true);
+    await eventoService.desmarcarFavorito("evento-a", "usuario-diego");
+    expect(desmarcar).toHaveBeenCalledWith("usuario-diego", "evento-a");
+    expect((await repositorioUsuarios.buscarPorId("usuario-diego"))?.tieneFavorito("evento-a")).toBe(false);
+  });
+
+  it("vale para un evento propio y uno realizado (FR-001)", async () => {
+    const { eventoService, repositorioUsuarios } = crearConEspias([
+      evento({ id: "evento-propio", organizadorId: "usuario-lucia" }),
+      evento({ id: "evento-pasado", en: -DIA }),
+    ]);
+    await eventoService.marcarFavorito("evento-propio", "usuario-lucia");
+    await eventoService.marcarFavorito("evento-pasado", "usuario-lucia");
+    const favoritos = (await repositorioUsuarios.buscarPorId("usuario-lucia"))?.favoritos ?? [];
+    expect(favoritos).toEqual(expect.arrayContaining(["evento-propio", "evento-pasado"]));
+  });
+
+  it("no toma el cerrojo del evento ni guarda eventos ni compras (FR-007)", async () => {
+    const { eventoService, cerrojo, guardarEvento, guardarCompra } = crearConEspias([
+      evento({ id: "evento-a" }),
+    ]);
+    await eventoService.marcarFavorito("evento-a", "usuario-diego");
+    await eventoService.desmarcarFavorito("evento-a", "usuario-diego");
+    // El único cerrojo es el del usuario (lo toma UsuarioService), nunca la clave del evento.
+    expect(cerrojo.mock.calls.map(([clave]) => clave)).toEqual([
+      "usuario:usuario-diego",
+      "usuario:usuario-diego",
+    ]);
+    expect(guardarEvento).not.toHaveBeenCalled();
+    expect(guardarCompra).not.toHaveBeenCalled();
   });
 });
 

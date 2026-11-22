@@ -14,7 +14,8 @@
     { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
     { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" },
     { "name": "Compras del evento", "description": "Las compras de un evento, para su organizador (UC-02)" },
-    { "name": "Reseñas", "description": "Reseñas de eventos (UC-09, UC-10)" }
+    { "name": "Reseñas", "description": "Reseñas de eventos (UC-09, UC-10)" },
+    { "name": "Favoritos", "description": "Eventos favoritos del usuario actual (feature 014)" }
   ],
   "paths": {
     "/salud": {
@@ -62,6 +63,54 @@
             "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsuarioVista" } } }
           },
           "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
+    "/usuarios/actual/favoritos/{eventoId}": {
+      "put": {
+        "tags": ["Favoritos"],
+        "summary": "Marcar un evento como favorito",
+        "description": "Idempotente: si ya era favorito, también 204 y no cambia nada. Sin cuerpo (si llega uno, se ignora). Orden de rechazos: 401 → 400 `params.eventoId` → 404 evento. Sin 403 ni 409: vale para cualquier evento existente, propio, ajeno, próximo o realizado. No toca el evento, sus tipos, su cupo ni sus compras.",
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+        "responses": {
+          "204": { "description": "Marcado (o ya lo estaba), sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "404": {
+            "description": "No existe el evento (los favoritos no cambian)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Favoritos"],
+        "summary": "Desmarcar un evento favorito",
+        "description": "Idempotente: si no era favorito, también 204. Orden de rechazos: 401 → 400 `params.eventoId` → 404 evento. Sin 403 ni 409: vale para cualquier evento existente, propio, ajeno, próximo o realizado. No toca el evento, sus tipos, su cupo ni sus compras.",
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+        "responses": {
+          "204": { "description": "Desmarcado (o no lo estaba), sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "404": {
+            "description": "No existe el evento (los favoritos no cambian)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
         }
       }
     },
