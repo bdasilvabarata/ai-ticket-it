@@ -19,3 +19,10 @@ export class Categoria {
     this.descripcion = descripcion;
   }
 }
+
+const comparador = new Intl.Collator("es", { sensitivity: "base" });
+
+/** Orden del catálogo: por nombre, sin distinguir mayúsculas ni tildes. */
+export function compararPorNombre(a: Pick<Categoria, "nombre">, b: Pick<Categoria, "nombre">): number {
+  return comparador.compare(a.nombre, b.nombre);
+}

@@ -1,6 +1,7 @@
-import { act, screen } from "expo-router/testing-library";
+import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
 
 import { porRuta, type RespuestaFalsa } from "../helpers/fetch-falso";
+import { tituloDelHeader } from "../helpers/formulario";
 import { esperarPestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { lucia, todos } from "../helpers/usuarios";
@@ -38,5 +39,28 @@ describe("Perfil (US3)", () => {
     expect(await screen.findByText("Lucía Álvarez")).toBeOnTheScreen();
     expect(screen.queryByText("Usuario usuario-lucia")).toBeNull();
     expect(screen.queryByText("No se pudieron cargar los datos del usuario.")).toBeNull();
+  });
+});
+
+describe("Perfil: Mis favoritos (feature 014, US2)", () => {
+  it("tiene Mis favoritos encima de Cambiar usuario", async () => {
+    await abrirPerfil([ok]);
+    await screen.findByText("Lucía Álvarez");
+
+    const botones = screen.getAllByRole("button");
+    const favoritos = botones.indexOf(screen.getByRole("button", { name: "Mis favoritos" }));
+    const cambiar = botones.indexOf(screen.getByRole("button", { name: "Cambiar usuario" }));
+    expect(favoritos).toBeGreaterThanOrEqual(0);
+    expect(favoritos).toBeLessThan(cambiar);
+  });
+
+  it("Mis favoritos abre /favoritos, apilada, y la barra inferior no cambia", async () => {
+    const resultado = await abrirPerfil([ok]);
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Mis favoritos" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/favoritos"));
+    expect(tituloDelHeader()).toBe("Mis favoritos");
+    expect(await screen.findByText("Todavía no tenés favoritos")).toBeOnTheScreen();
   });
 });

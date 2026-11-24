@@ -1,5 +1,1 @@
-import { SeccionPendiente } from "../../src/componentes";
-
-export default function Explorar() {
-  return <SeccionPendiente nombre="Explorar" />;
-}
+export { Explorar as default } from "../../src/features/eventos";

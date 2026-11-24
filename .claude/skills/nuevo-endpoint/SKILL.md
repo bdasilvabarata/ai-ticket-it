@@ -21,8 +21,9 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 - `backend/src/services/` — clase con el caso de uso: permisos, orquestación, errores de `errors/`. Recibe
   **interfaces** de repositorio (`domain/repositorios.ts`) por constructor.
 - `backend/src/repositories/` — repositorio **en memoria** (`Map` privado) que implementa la interfaz; recibe y
-  devuelve entidades de dominio y nunca expone el `Map`. Si la operación verifica y modifica (cupo, estado),
-  hacelo sin `await` en el medio (constitución, "Cupo atómico").
+  devuelve entidades de dominio y nunca expone el `Map`. Si la operación verifica y modifica un evento, sus
+  tipos o sus compras (cupo, estado), el service la corre bajo `cerrojo.ejecutar(eventoId, …)`, relee
+  adentro y recién después guarda (constitución, "Operaciones atómicas por evento"; ver AGENTS.md).
 - `backend/src/domain/` — clases con comportamiento e invariantes (`hayCupoPara`, transiciones de estado,
   días restantes...). Sin IO y sin `errors/`: lanzá `DatosInvalidosError` (→ 400) o
   `ReglaDeNegocioError("CODIGO", "mensaje")` (→ 409) de `domain/errores.ts`.
@@ -34,9 +35,17 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
 ## Nombres (convención de AGENTS.md)
 - Repository: `listar`, `buscarPorId` (null si no existe), `buscarPor<Criterio>`, `contarPor<Criterio>`,
   `guardar`, `eliminarPorId`.
-- Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `#obtenerOFallar(id)`.
+- Service: `listar`, `obtener` (404), `crear`, `actualizar`, `eliminar`; un único `obtenerOFallar(id)`
+  por entidad, en **su** service: si otro service necesita la entidad, se la pide a ese (no repite la
+  búsqueda ni el 404). Una referencia de la entrada (ej.: `categoriaId`) se valida con
+  `buscarReferenciada` del service dueño. Si necesitás varias entidades de otro agregado, pedilas en
+  lote al dueño (`obtenerPorIds(ids)` → `Map` por id, sobre `listarPorIds` del repositorio): nada de
+  una lectura por elemento ni de armar el cruce en tu service. Sin ciclos entre services. Los ids
+  nuevos salen de `repositorio.siguienteId()`.
+- Errores de `errors/` sin status: si agregás uno, sumalo a la tabla de `statusDe`
+  (`middlewares/traducir-error.ts`); un test verifica que ninguno quede en 500.
 - Si agregás un método al repository, agregá su test en `tests/repositories/`.
-- Ids: `crypto.randomUUID()` para lo que se crea; ids legibles `<tipo>-<slug>` solo en los datos de ejemplo.
+- Ids: `crypto.randomUUID()` en el `siguienteId()` del repositorio para lo que se crea; ids legibles `<tipo>-<slug>` solo en los datos de ejemplo.
   Validá ids con `idSchema` (`validations/comunes.ts`).
 
 ## Contrato (principio V)
@@ -47,7 +56,8 @@ description: Checklist para crear o modificar un endpoint del backend de AI Tick
   dominio o el service.
 
 ## Invariantes que no se negocian
-- Cupo nunca negativo, con actualización atómica (verificar y descontar sin `await` en el medio).
+- Cupo nunca negativo, con actualización atómica (verificar y descontar bajo el cerrojo del evento, o en un
+  mismo tramo síncrono).
 - Total calculado en el servidor.
 - Transiciones de estado solo las de la constitución, con `CambioEstadoCompra`.
 

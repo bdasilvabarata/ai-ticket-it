@@ -1,7 +1,14 @@
-import type { UsuarioVista } from "@ai-ticket-it/shared";
+import type { EventoCatalogoVista, UsuarioVista } from "@ai-ticket-it/shared";
 
-import { crearClienteApi, listarUsuarios, obtenerUsuarioActual } from "../../src/api";
-import { crearFetchFalso } from "../helpers/fetch-falso";
+import {
+  crearClienteApi,
+  desmarcarFavorito,
+  listarFavoritos,
+  listarUsuarios,
+  marcarFavorito,
+  obtenerUsuarioActual,
+} from "../../src/api";
+import { crearFetchFalso, type RespuestaFalsa } from "../helpers/fetch-falso";
 
 const lucia: UsuarioVista = {
   id: "usuario-lucia",
@@ -16,8 +23,8 @@ const diego: UsuarioVista = {
   cantidadEventosOrganizados: 0,
 };
 
-function armar(json: unknown) {
-  const falso = crearFetchFalso([{ status: 200, json }]);
+function armar(json: unknown, respuesta: RespuestaFalsa = { status: 200, json }) {
+  const falso = crearFetchFalso([respuesta]);
   const cliente = crearClienteApi({
     fetch: falso.fetch,
     urlBase: "http://servidor:3000/api",
@@ -56,5 +63,57 @@ describe("funciones de usuarios", () => {
       signal: controlador.signal,
       usuarioId: "usuario-lucia",
     });
+  });
+});
+
+describe("funciones de favoritos (feature 014)", () => {
+  const favorito = { id: "evento-noche-de-rock", nombre: "Noche de rock" } as EventoCatalogoVista;
+  const sinContenido: RespuestaFalsa = { status: 204, texto: "" };
+
+  it("listarFavoritos pide GET /usuarios/actual/favoritos con X-Usuario-Id y devuelve el arreglo", async () => {
+    const { cliente, falso } = armar([favorito]);
+
+    await expect(listarFavoritos(cliente, "usuario-diego")).resolves.toEqual([favorito]);
+    expect(falso.pedidos[0].metodo).toBe("GET");
+    expect(falso.pedidos[0].url).toBe("http://servidor:3000/api/usuarios/actual/favoritos");
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-diego");
+  });
+
+  it("listarFavoritos pasa el signal al cliente", async () => {
+    const { cliente } = armar([]);
+    const get = jest.spyOn(cliente, "get");
+    const controlador = new AbortController();
+
+    await listarFavoritos(cliente, "usuario-diego", { signal: controlador.signal });
+    expect(get).toHaveBeenCalledWith("/usuarios/actual/favoritos", {
+      signal: controlador.signal,
+      usuarioId: "usuario-diego",
+    });
+  });
+
+  it("marcarFavorito pide PUT /usuarios/actual/favoritos/<eventoId> sin cuerpo y resuelve undefined ante el 204", async () => {
+    const { cliente, falso } = armar(undefined, sinContenido);
+
+    await expect(marcarFavorito(cliente, "usuario-diego", "evento-noche-de-rock")).resolves.toBeUndefined();
+    expect(falso.pedidos[0].metodo).toBe("PUT");
+    expect(falso.pedidos[0].url).toBe(
+      "http://servidor:3000/api/usuarios/actual/favoritos/evento-noche-de-rock",
+    );
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-diego");
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
+  });
+
+  it("desmarcarFavorito pide DELETE /usuarios/actual/favoritos/<eventoId> sin cuerpo y resuelve undefined ante el 204", async () => {
+    const { cliente, falso } = armar(undefined, sinContenido);
+
+    await expect(
+      desmarcarFavorito(cliente, "usuario-diego", "evento-noche-de-rock"),
+    ).resolves.toBeUndefined();
+    expect(falso.pedidos[0].metodo).toBe("DELETE");
+    expect(falso.pedidos[0].url).toBe(
+      "http://servidor:3000/api/usuarios/actual/favoritos/evento-noche-de-rock",
+    );
+    expect(falso.pedidos[0].encabezados["X-Usuario-Id"]).toBe("usuario-diego");
+    expect(falso.pedidos[0].cuerpo).toBeUndefined();
   });
 });

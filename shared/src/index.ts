@@ -1,4 +1,64 @@
+export type { CategoriaVista } from "./categoria";
+export { LIMITES_COMPRA } from "./compra";
+export type {
+  AutorCambioEstadoVista,
+  CambioEstadoCompraVista,
+  CompraDelEventoVista,
+  CompradorVista,
+  ComprasDelEventoVista,
+  CompraVista,
+  ConsultaComprasDelEvento,
+  DatosCompra,
+  EntradaDelEventoVista,
+  EntradaVista,
+  MiCompraVista,
+  MisComprasDelEventoVista,
+  MotivoNoCancelable,
+  ReembolsoVista,
+  ResumenTipoEntradaVista,
+  VentanaDeUsoVista,
+} from "./compra";
 export { EstadoCompra } from "./estado-compra";
 export type { DetalleError, ErrorApi } from "./errores";
+export {
+  LIMITES_BUSQUEDA,
+  LIMITES_EVENTO,
+  LIMITES_TIPO_ENTRADA,
+  ORDENES_CATALOGO,
+  SENTIDO_INICIAL,
+  SENTIDOS_CATALOGO,
+} from "./evento";
+export type {
+  CatalogoVista,
+  ConsultaCatalogo,
+  DatosEvento,
+  DatosNuevoEvento,
+  DatosTipoEntrada,
+  EventoCatalogoVista,
+  EventoResumenVista,
+  EventoVista,
+  OrdenCatalogo,
+  SentidoCatalogo,
+  OrganizadorVista,
+  TipoEntradaVista,
+} from "./evento";
+export { LIMITES_MENSAJE } from "./mensaje";
+export type {
+  ChatDeLaCompraVista,
+  DatosMensaje,
+  MensajeVista,
+  ParteDeLaCompraVista,
+  RolEnLaCompra,
+} from "./mensaje";
+export { LIMITES_PAGINACION } from "./paginacion";
+export type { PaginaVista } from "./paginacion";
+export { LIMITES_RESENIA } from "./resenia";
+export type {
+  DatosResenia,
+  PaginaDeReseniasVista,
+  ReseniaDelOrganizadorVista,
+  ReseniasDelOrganizadorVista,
+  ReseniaVista,
+} from "./resenia";
 export type { SaludVista } from "./salud";
 export type { UsuarioVista } from "./usuario";

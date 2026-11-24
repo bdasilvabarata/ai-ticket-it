@@ -8,7 +8,14 @@
   "servers": [{ "url": "/api", "description": "Mismo servidor que sirve esta documentación" }],
   "tags": [
     { "name": "Salud", "description": "Estado del servicio" },
-    { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" }
+    { "name": "Usuarios", "description": "Usuarios precargados (selector de la app)" },
+    { "name": "Categorías", "description": "Catálogo de categorías de eventos" },
+    { "name": "Eventos", "description": "Eventos del organizador (UC-04)" },
+    { "name": "Tipos de entrada", "description": "Tipos de entrada de un evento, de a uno (UC-04)" },
+    { "name": "Compras", "description": "Comprar entradas de un tipo y seguir sus compras (UC-06)" },
+    { "name": "Compras del evento", "description": "Las compras de un evento, para su organizador (UC-02)" },
+    { "name": "Reseñas", "description": "Reseñas de eventos (UC-09, UC-10)" },
+    { "name": "Favoritos", "description": "Eventos favoritos del usuario actual (feature 014)" }
   ],
   "paths": {
     "/salud": {
@@ -59,6 +66,73 @@
         }
       }
     },
+    "/usuarios/actual/favoritos": {
+      "get": {
+        "tags": ["Favoritos"],
+        "summary": "Mis favoritos",
+        "description": "Los eventos favoritos del usuario actual, como tarjetas del catálogo (la misma vista que `GET /eventos`: organizador, puntaje, `precioDesde` y `agotado` con el cupo al día). Primero los no realizados por `fechaHora` ascendente y después los realizados por `fechaHora` descendente; desempate nombre → id. Sin páginas: llega entera, `[]` sin favoritos. Un favorito cuyo evento ya no existe no aparece. Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Los favoritos, en orden",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EventoCatalogoVista" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
+    "/usuarios/actual/favoritos/{eventoId}": {
+      "put": {
+        "tags": ["Favoritos"],
+        "summary": "Marcar un evento como favorito",
+        "description": "Idempotente: si ya era favorito, también 204 y no cambia nada. Sin cuerpo (si llega uno, se ignora). Orden de rechazos: 401 → 400 `params.eventoId` → 404 evento. Sin 403 ni 409: vale para cualquier evento existente, propio, ajeno, próximo o realizado. No toca el evento, sus tipos, su cupo ni sus compras.",
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+        "responses": {
+          "204": { "description": "Marcado (o ya lo estaba), sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "404": {
+            "description": "No existe el evento (los favoritos no cambian)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Favoritos"],
+        "summary": "Desmarcar un evento favorito",
+        "description": "Idempotente: si no era favorito, también 204. Orden de rechazos: 401 → 400 `params.eventoId` → 404 evento. Sin 403 ni 409: vale para cualquier evento existente, propio, ajeno, próximo o realizado. No toca el evento, sus tipos, su cupo ni sus compras.",
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+        "responses": {
+          "204": { "description": "Desmarcado (o no lo estaba), sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "404": {
+            "description": "No existe el evento (los favoritos no cambian)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/usuarios/{id}": {
       "get": {
         "tags": ["Usuarios"],
@@ -71,6 +145,2177 @@
           },
           "400": { "$ref": "#/components/responses/EntradaInvalida" },
           "404": { "$ref": "#/components/responses/NoEncontrado" }
+        }
+      }
+    },
+    "/categorias": {
+      "get": {
+        "tags": ["Categorías"],
+        "summary": "Catálogo de categorías, por nombre (público)",
+        "responses": {
+          "200": {
+            "description": "Las categorías",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/CategoriaVista" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos": {
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Catálogo de eventos próximos (público)",
+        "description": "Los eventos no realizados de todos los organizadores (agotados incluidos), con un único instante por pedido. Un `X-Usuario-Id` inválido se ignora. Texto y categoría se combinan. Paginado de a 10 (feature 013): se filtra y se ordena **todo** el catálogo antes de cortar la página.",
+        "parameters": [
+          {
+            "name": "texto",
+            "in": "query",
+            "required": false,
+            "description": "Palabras separadas por espacios: cada una tiene que estar en el nombre o en la descripción, sin distinguir mayúsculas, acentos ni diéresis (la ñ es distinta de la n). Hasta 100 caracteres después de recortar.",
+            "schema": { "type": "string", "maxLength": 100 },
+            "example": "basquet"
+          },
+          {
+            "name": "categoriaId",
+            "in": "query",
+            "required": false,
+            "description": "Una categoría del catálogo (igualdad exacta). Vacío = sin filtro; si no existe, 400 sobre `query.categoriaId`.",
+            "schema": { "type": "string" },
+            "example": "categoria-musica"
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "description": "`fecha` ascendente · `precio` (\"desde\") ascendente · `puntaje` del organizador descendente, sin puntaje al final. Desempates: fecha → nombre (sin mayúsculas ni tildes) → id. Se aplica sobre lo filtrado.",
+            "schema": { "type": "string", "enum": ["fecha", "precio", "puntaje"], "default": "fecha" },
+            "example": "precio"
+          },
+          {
+            "name": "sentido",
+            "in": "query",
+            "required": false,
+            "description": "Sentido del criterio principal: `asc` o `desc`. Sin valor, el inicial de cada criterio (`fecha` y `precio` ascendentes, `puntaje` descendente). Los desempates no se invierten y los organizadores sin puntaje van al final en los dos sentidos.",
+            "schema": { "type": "string", "enum": ["asc", "desc"] },
+            "example": "desc"
+          },
+          { "$ref": "#/components/parameters/Pagina" }
+        ],
+        "responses": {
+          "200": {
+            "description": "La página pedida del catálogo filtrado y ordenado (hasta 10 eventos), sus totales y si hay eventos próximos antes de aplicar los filtros",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CatalogoVista" } } }
+          },
+          "400": {
+            "description": "Texto de más de 100 caracteres, orden o sentido desconocido, página que no es un entero ≥ 1, parámetro repetido o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [{ "campo": "query.categoriaId", "mensaje": "No existe la categoría." }]
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Eventos"],
+        "summary": "Crear un evento con sus tipos de entrada (requiere usuario)",
+        "description": "El organizador es siempre el usuario actual: un `organizadorId` en el cuerpo se ignora. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosNuevoEvento" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "El evento creado, con UUIDs nuevos",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": {
+            "description": "Forma inválida o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      {
+                        "campo": "body.fechaHora",
+                        "mensaje": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."
+                      },
+                      {
+                        "campo": "body.tiposEntrada.1.precio",
+                        "mensaje": "Debe ser un entero mayor o igual a 0."
+                      },
+                      { "campo": "body.categoriaId", "mensaje": "No existe la categoría." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "409": {
+            "description": "Fecha no futura o nombres de tipo repetidos",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "FECHA_NO_FUTURA": {
+                    "value": {
+                      "error": {
+                        "codigo": "FECHA_NO_FUTURA",
+                        "mensaje": "La fecha y hora del evento deben ser futuras."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/mios": {
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Eventos del usuario actual (requiere usuario)",
+        "description": "Primero los próximos por fecha ascendente; después los realizados, del más reciente al más antiguo.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Sus eventos (o `[]`)",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/EventoResumenVista" } }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" }
+        }
+      }
+    },
+    "/eventos/{eventoId}": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "get": {
+        "tags": ["Eventos"],
+        "summary": "Un evento con sus tipos de entrada (público)",
+        "responses": {
+          "200": {
+            "description": "El evento",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": ["Eventos"],
+        "summary": "Editar los datos de un evento (organizador)",
+        "description": "Reemplaza nombre, descripción, categoría, fecha y multimedia; no toca los tipos. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosEvento" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "El evento editado",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EventoVista" } } }
+          },
+          "400": {
+            "description": "Forma inválida o categoría inexistente (`ENTRADA_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      {
+                        "campo": "body.fechaHora",
+                        "mensaje": "Debe ser una fecha y hora válidas (AAAA-MM-DDTHH:mm)."
+                      },
+                      {
+                        "campo": "body.tiposEntrada.1.precio",
+                        "mensaje": "Debe ser un entero mayor o igual a 0."
+                      },
+                      { "campo": "body.categoriaId", "mensaje": "No existe la categoría." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o fecha no futura",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "FECHA_NO_FUTURA": {
+                    "value": {
+                      "error": {
+                        "codigo": "FECHA_NO_FUTURA",
+                        "mensaje": "La fecha y hora del evento deben ser futuras."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Eventos"],
+        "summary": "Eliminar un evento (organizador)",
+        "description": "Solo si no se realizó y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029). Al eliminarse, el evento sale de los favoritos de todos los usuarios (feature 014).",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "204": { "description": "Eliminado, sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o con compras",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "EVENTO_CON_COMPRAS": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_CON_COMPRAS",
+                        "mensaje": "El evento tiene compras: no se puede eliminar."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/compras": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Comprar entradas de un tipo",
+        "description": "Registra una compra PENDIENTE (vence a los 15 minutos) con total `precio × cantidad` calculado por el servidor y descuenta el cupo, bajo el cerrojo del evento. Orden: 401 → 400 de forma → 404 evento → 400 `body.tipoEntradaId` → 409 `EVENTO_REALIZADO` → 409 `COMPRA_PROPIO_EVENTO` → 409 `TOPE_POR_PERSONA` → 409 `CUPO_INSUFICIENTE`. Tope: 4 entradas de tipos pagos por evento y 1 por tipo gratis, contando sus compras vigentes.",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosCompra" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "La compra registrada (PENDIENTE)",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "cantidadInvalida": {
+                    "summary": "cantidad 0, negativa, decimal, texto o mayor que 4",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.cantidad", "mensaje": "Debe ser un entero entre 1 y 4." }
+                        ]
+                      }
+                    }
+                  },
+                  "cantidadFaltante": {
+                    "summary": "Sin cantidad",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.cantidad", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "tipoFaltante": {
+                    "summary": "Sin tipoEntradaId",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.tipoEntradaId", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "tipoMalFormado": {
+                    "summary": "tipoEntradaId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.tipoEntradaId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  },
+                  "tipoDeOtroEvento": {
+                    "summary": "Tipo inexistente o de otro evento (tipo-hamlet-platea sobre el Festival)",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.tipoEntradaId",
+                            "mensaje": "No existe el tipo de entrada en este evento."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No se puede comprar (`EVENTO_REALIZADO`, `COMPRA_PROPIO_EVENTO`, `TOPE_POR_PERSONA`, `CUPO_INSUFICIENTE`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "summary": "El evento ya empezó (Noche de risas)",
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se pueden comprar entradas."
+                      }
+                    }
+                  },
+                  "COMPRA_PROPIO_EVENTO": {
+                    "summary": "La organizadora compra en su evento",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_PROPIO_EVENTO",
+                        "mensaje": "No podés comprar entradas de un evento que organizás."
+                      }
+                    }
+                  },
+                  "TOPE_POR_PERSONA": {
+                    "summary": "Martín (2 VIP confirmadas) pide 3 General",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Podés comprar 2 entradas más de tipos pagos de este evento."
+                      }
+                    }
+                  },
+                  "TOPE_PAGAS_COMPLETO": {
+                    "summary": "Ya tiene 4 entradas de tipos pagos",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Ya tenés el máximo de 4 entradas de tipos pagos de este evento."
+                      }
+                    }
+                  },
+                  "TOPE_GRATIS": {
+                    "summary": "Segunda entrada de un tipo gratis",
+                    "value": {
+                      "error": {
+                        "codigo": "TOPE_POR_PERSONA",
+                        "mensaje": "Ya tenés tu entrada gratis de «Carrera kids»."
+                      }
+                    }
+                  },
+                  "CUPO_INSUFICIENTE": {
+                    "summary": "Pide más de las que quedan",
+                    "value": {
+                      "error": { "codigo": "CUPO_INSUFICIENTE", "mensaje": "Quedan 3 entradas de «VIP»." }
+                    }
+                  },
+                  "CUPO_UNA": {
+                    "summary": "Queda una sola",
+                    "value": {
+                      "error": { "codigo": "CUPO_INSUFICIENTE", "mensaje": "Queda 1 entrada de «VIP»." }
+                    }
+                  },
+                  "AGOTADO": {
+                    "summary": "Tipo agotado",
+                    "value": {
+                      "error": {
+                        "codigo": "CUPO_INSUFICIENTE",
+                        "mensaje": "No quedan entradas de «Backstage»."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": ["Compras del evento"],
+        "summary": "Compras del evento",
+        "description": "Solo el organizador: las compras del evento, de todos los compradores, al día (una PENDIENTE vencida sale CANCELADA por el sistema), de a 10 y de la más nueva a la más vieja (feature 013). `estado` y `sinResponder` filtran antes de paginar (juntos, con 'y'). La ventana de uso, el resumen por tipo, `comprasConMensajesSinResponder` y `cantidadCompras` son de todas: no cambian con la página ni con el filtro. Una página posterior a la última devuelve la última. También con el evento realizado. Lectura: no guarda nada. Otros parámetros y el cuerpo se ignoran.",
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/Pagina" },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "description": "Solo las compras en ese estado, al día. Otro valor → 400 sobre `query.estado` (\"Debe ser uno de los estados de una compra.\").",
+            "schema": {
+              "type": "string",
+              "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+            },
+            "example": "CANCELADA"
+          },
+          {
+            "name": "sinResponder",
+            "in": "query",
+            "required": false,
+            "description": "Con `true`, solo las compras cuyo último mensaje es del comprador. Por defecto `false`. Otro valor → 400 sobre `query.sinResponder` (\"Debe ser true o false.\").",
+            "schema": { "type": "string", "enum": ["true", "false"], "default": "false" },
+            "example": "true"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Las compras del evento",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/ComprasDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "estadoInvalido": {
+                    "summary": "estado que no es de una compra",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "query.estado", "mensaje": "Debe ser uno de los estados de una compra." }
+                        ]
+                      }
+                    }
+                  },
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador del evento puede ver sus compras."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/mis-compras": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Mis compras del evento",
+        "description": "Del usuario actual: sus compras pendientes no vencidas de ese evento y cuántas entradas más puede comprar de cada tipo según su tope (el cupo está en el evento). Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Sus pendientes y restantes por tipo",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/MisComprasDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "eventoMalFormado": {
+                    "summary": "eventoId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.eventoId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/entradas/{codigo}": {
+      "get": {
+        "tags": ["Compras del evento"],
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/EventoId" },
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "description": "El código de la entrada, como lo ingresa el organizador: se normaliza (mayúsculas, sin espacios ni guiones). Hasta 32 caracteres.",
+            "schema": { "type": "string", "maxLength": 32, "example": "prcs-2b01" }
+          }
+        ],
+        "summary": "Buscar una entrada por su código",
+        "description": "Solo el organizador: la entrada de ese evento con ese código, con su compra al día y la ventana de uso. Que no se pueda usar no es un error: la respuesta trae su estado y el de la ventana. Lectura: no guarda nada. Orden de chequeos: 401 → 400 → 404 evento → 403 → 404 entrada.",
+        "responses": {
+          "200": {
+            "description": "La entrada",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EntradaDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      { "campo": "params.codigo", "mensaje": "Debe ser un texto de 1 a 32 caracteres." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador del evento puede ver sus compras."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento (`EVENTO_NO_ENCONTRADO`) o no hay una entrada con ese código en este evento (`ENTRADA_NO_ENCONTRADA`: inexistente o de otro evento)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "evento": {
+                    "summary": "Evento inexistente",
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "entrada": {
+                    "summary": "Entrada inexistente o de otro evento",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_NO_ENCONTRADA",
+                        "mensaje": "No hay ninguna entrada con ese código en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/entradas/{codigo}/uso": {
+      "post": {
+        "tags": ["Compras del evento"],
+        "security": [{ "usuarioSimulado": [] }],
+        "parameters": [
+          { "$ref": "#/components/parameters/EventoId" },
+          {
+            "name": "codigo",
+            "in": "path",
+            "required": true,
+            "description": "El código de la entrada, como lo ingresa el organizador: se normaliza (mayúsculas, sin espacios ni guiones). Hasta 32 caracteres.",
+            "schema": { "type": "string", "maxLength": 32, "example": "prcs-2b01" }
+          }
+        ],
+        "summary": "Registrar el uso de una entrada",
+        "description": "Solo el organizador, dentro de la ventana de uso (desde 4 h antes del inicio hasta 12 h después, inclusive) y bajo el cerrojo del evento: la entrada pasa a UTILIZADA y, si es la primera de la compra, también la compra. El cupo no cambia. Sin cuerpo (si llega uno, se ignora). Orden de chequeos: 401 → 400 → 404 evento → 403 → 404 entrada → 409 FUERA_DE_HORARIO_DE_USO → 409 TRANSICION_INVALIDA.",
+        "responses": {
+          "200": {
+            "description": "La entrada, ya UTILIZADA",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/EntradaDelEventoVista" } }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "ENTRADA_INVALIDA",
+                    "mensaje": "Los datos enviados no son válidos.",
+                    "detalles": [
+                      { "campo": "params.codigo", "mensaje": "Debe ser un texto de 1 a 32 caracteres." }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": {
+            "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador puede modificar este evento."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento (`EVENTO_NO_ENCONTRADO`) o no hay una entrada con ese código en este evento (`ENTRADA_NO_ENCONTRADA`: inexistente o de otro evento)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "evento": {
+                    "summary": "Evento inexistente",
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "entrada": {
+                    "summary": "Entrada inexistente o de otro evento",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_NO_ENCONTRADA",
+                        "mensaje": "No hay ninguna entrada con ese código en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Fuera de la ventana de uso (`FUERA_DE_HORARIO_DE_USO`) o la entrada no está CONFIRMADA (`TRANSICION_INVALIDA`, con el mensaje según su estado)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "fueraDeHorario": {
+                    "summary": "Fuera de la ventana",
+                    "value": {
+                      "error": {
+                        "codigo": "FUERA_DE_HORARIO_DE_USO",
+                        "mensaje": "El ingreso se registra desde el 18/11 17:00 hasta el 19/11 09:00."
+                      }
+                    }
+                  },
+                  "yaUtilizada": {
+                    "summary": "Ya utilizada",
+                    "value": {
+                      "error": { "codigo": "TRANSICION_INVALIDA", "mensaje": "Esta entrada ya se utilizó." }
+                    }
+                  },
+                  "sinPagar": {
+                    "summary": "Compra PENDIENTE",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada todavía no se pagó."
+                      }
+                    }
+                  },
+                  "cancelada": {
+                    "summary": "Compra CANCELADA (también una pendiente vencida)",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada está cancelada."
+                      }
+                    }
+                  },
+                  "reembolsada": {
+                    "summary": "Compra REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra de esta entrada fue reembolsada."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/resenias": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Reseñas"],
+        "summary": "Reseñar un evento al que se asistió (comprador con una compra UTILIZADA)",
+        "description": "Registra la reseña del usuario de `X-Usuario-Id` (feature 012): una por comprador y evento, que no se edita ni se borra (no hay `PUT`, `PATCH` ni `DELETE`). Hace falta una compra UTILIZADA del evento (una \"1 de 3\" alcanza); no importa si el evento ya se realizó. La fecha es la del reloj del servidor y el comentario se recorta. Corre bajo el cerrojo del evento y no cambia la compra ni el cupo. Orden de los rechazos: 401 → 400 → 404 → 409 `RESENIA_PROPIO_EVENTO` → 409 `SIN_COMPRA_UTILIZADA` → 409 `RESENIA_REPETIDA`.",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DatosResenia" },
+              "example": { "puntuacion": 4, "comentario": "Muy buena organización" }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "La reseña creada",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ReseniaVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "puntuacionFaltante": {
+                    "summary": "puntuacion faltante",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [{ "campo": "body.puntuacion", "mensaje": "Es obligatorio." }]
+                      }
+                    }
+                  },
+                  "puntuacionFueraDeRango": {
+                    "summary": "puntuacion no entera o fuera de 1 a 5",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.puntuacion", "mensaje": "Debe ser un entero de 1 a 5." }
+                        ]
+                      }
+                    }
+                  },
+                  "comentarioLargo": {
+                    "summary": "comentario de más de 500 caracteres",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "body.comentario", "mensaje": "Debe tener como máximo 500 caracteres." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Regla de las reseñas: el organizador (`RESENIA_PROPIO_EVENTO`), sin compra UTILIZADA (`SIN_COMPRA_UTILIZADA`) o ya reseñado (`RESENIA_REPETIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "propioEvento": {
+                    "value": {
+                      "error": {
+                        "codigo": "RESENIA_PROPIO_EVENTO",
+                        "mensaje": "No podés reseñar un evento que organizás."
+                      }
+                    }
+                  },
+                  "sinCompraUtilizada": {
+                    "value": {
+                      "error": {
+                        "codigo": "SIN_COMPRA_UTILIZADA",
+                        "mensaje": "Solo podés reseñar un evento al que asististe (con una compra utilizada)."
+                      }
+                    }
+                  },
+                  "repetida": {
+                    "value": {
+                      "error": { "codigo": "RESENIA_REPETIDA", "mensaje": "Ya reseñaste este evento." }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/resenias-del-organizador": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        },
+        {
+          "$ref": "#/components/parameters/Pagina"
+        }
+      ],
+      "get": {
+        "tags": ["Reseñas"],
+        "summary": "Reseñas del organizador del evento, por páginas (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas y una página (de a 10) de las reseñas de **todos** sus eventos (próximos y realizados, también el que se mira), de la más reciente a la más vieja (`creadaEn` descendente → `id`). `organizador.cantidadResenias` es igual a `pagina.totalElementos` y el `organizador` es el mismo en todas las páginas, en `/resumen`, en `EventoVista.organizador` y en la tarjeta del catálogo. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `puntaje` va sin redondear (`null` sin reseñas, nunca 0). No expone el id del autor, compras, códigos, totales ni estados (features 012 y 013).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El organizador con su puntaje y una página de reseñas",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PaginaDeReseniasVista"
+                },
+                "examples": {
+                  "paginaDos": {
+                    "summary": "Martín (Jazz en el Patio, en el seed), página 2: la más vieja de las 11",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-martin",
+                        "nombre": "Martín",
+                        "apellido": "Benítez",
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
+                      },
+                      "resenias": [
+                        {
+                          "id": "resenia-lucia-jazz-en-el-patio",
+                          "puntuacion": 5,
+                          "comentario": "Una noche hermosa: el cuarteto sonó impecable y el patio estaba lindísimo.",
+                          "autor": {
+                            "nombre": "Lucía",
+                            "apellido": "Álvarez"
+                          },
+                          "evento": {
+                            "id": "evento-jazz-en-el-patio",
+                            "nombre": "Jazz en el Patio"
+                          },
+                          "creadaEn": "2026-11-13T14:00:00.000Z",
+                          "creadaEnLocal": "2026-11-13T11:00"
+                        }
+                      ],
+                      "pagina": {
+                        "numero": 2,
+                        "tamano": 10,
+                        "totalElementos": 11,
+                        "totalPaginas": 2
+                      }
+                    }
+                  },
+                  "sinResenias": {
+                    "summary": "Lucía (Noche de Rock, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-lucia",
+                        "nombre": "Lucía",
+                        "apellido": "Álvarez",
+                        "puntaje": null,
+                        "cantidadResenias": 0
+                      },
+                      "resenias": [],
+                      "pagina": {
+                        "numero": 1,
+                        "tamano": 10,
+                        "totalElementos": 0,
+                        "totalPaginas": 0
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/resenias-del-organizador/resumen": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/EventoId"
+        }
+      ],
+      "get": {
+        "tags": ["Reseñas"],
+        "summary": "Resumen de las reseñas del organizador para el detalle (público)",
+        "description": "El organizador del evento con el puntaje y la cantidad de **todas** sus reseñas (de **todos** sus eventos) y las **3** más recientes (`LIMITES_PAGINACION.reseniasEnElDetalle`; todas si tiene 3 o menos), con `creadaEn` descendente → `id`. Es la sección \"Reseñas del organizador\" del detalle: la app muestra \"Ver todas las reseñas\" si `cantidadResenias` es mayor que 3. Público: no exige `X-Usuario-Id` y, si llega, se ignora. Lectura sin cerrojo. El `organizador` es igual al de la colección, al de `EventoVista.organizador` y al de la tarjeta del catálogo. No expone el id del autor, compras, códigos, totales ni estados (feature 013).",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "El organizador con su puntaje y las 3 reseñas más recientes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReseniasDelOrganizadorVista"
+                },
+                "examples": {
+                  "conResenias": {
+                    "summary": "Martín (Jazz en el Patio, en el seed): 11 reseñas, se ven las 3 del Tango",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-martin",
+                        "nombre": "Martín",
+                        "apellido": "Benítez",
+                        "puntaje": 4.7272727272727275,
+                        "cantidadResenias": 11
+                      },
+                      "resenias": [
+                        {
+                          "id": "resenia-valentina-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": "Ya quiero que repitan la milonga.",
+                          "autor": {
+                            "nombre": "Valentina",
+                            "apellido": "Gómez"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T20:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T17:00"
+                        },
+                        {
+                          "id": "resenia-diego-tango-en-la-terraza",
+                          "puntuacion": 4,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Diego",
+                            "apellido": "Fernández"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T12:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T09:00"
+                        },
+                        {
+                          "id": "resenia-sofia-tango-en-la-terraza",
+                          "puntuacion": 5,
+                          "comentario": null,
+                          "autor": {
+                            "nombre": "Sofía",
+                            "apellido": "Castro"
+                          },
+                          "evento": {
+                            "id": "evento-tango-en-la-terraza",
+                            "nombre": "Tango en la terraza"
+                          },
+                          "creadaEn": "2026-11-21T06:00:00.000Z",
+                          "creadaEnLocal": "2026-11-21T03:00"
+                        }
+                      ]
+                    }
+                  },
+                  "sinResenias": {
+                    "summary": "Lucía (Noche de Rock, en el seed)",
+                    "value": {
+                      "organizador": {
+                        "id": "usuario-lucia",
+                        "nombre": "Lucía",
+                        "apellido": "Álvarez",
+                        "puntaje": null,
+                        "cantidadResenias": 0
+                      },
+                      "resenias": []
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/EntradaInvalida"
+          },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "EVENTO_NO_ENCONTRADO",
+                    "mensaje": "No existe el evento."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras": {
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Mis compras",
+        "description": "Las compras del usuario actual como comprador, de todos los eventos y en todos los estados, al día: una PENDIENTE cuyos 15 minutos pasaron sale CANCELADA con `canceladaPor: \"sistema\"`. Lectura: no guarda nada (no materializa vencimientos ni devuelve cupo). Sin filtros ni paginación: una query se ignora. Orden: primero las de eventos no realizados por fecha del evento ascendente, después las de realizados por fecha descendente; con la misma fecha, la comprada más recientemente primero y después por id.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "Sus compras, al día y ordenadas (posiblemente ninguna)",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/MiCompraVista" } }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Ver una compra",
+        "description": "La compra con su estado al día: una PENDIENTE vencida se ve CANCELADA, con un último cambio del sistema fechado en el vencimiento, aunque todavía no se haya guardado así. Solo la ve su comprador. Lectura: no guarda nada.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra, al día",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/pago": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Pagar una compra (pago simulado)",
+        "description": "Sin cuerpo (si viene uno, se ignora). Bajo el cerrojo del evento de la compra: vence las pendientes vencidas del evento, verifica que el usuario sea el comprador y pasa la compra de PENDIENTE a CONFIRMADA. A los 15 minutos exactos del alta ya venció. Que el evento haya empezado no impide pagar. No es idempotente: pagar dos veces da 409 TRANSICION_INVALIDA.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra CONFIRMADA, con `venceEn: null` y el historial [PENDIENTE, CONFIRMADA]",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`) o no está pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "yaPagada": {
+                    "summary": "Ya está CONFIRMADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra no está pendiente de pago."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/cancelacion": {
+      "parameters": [{ "$ref": "#/components/parameters/CompraId" }],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Cancelar una compra (pendiente o confirmada)",
+        "description": "Sin cuerpo (si viene uno, se ignora). Bajo el cerrojo del evento de la compra (con el reloj leído adentro) vence las pendientes vencidas del evento, verifica que el usuario sea el comprador y cancela la compra entera. Una PENDIENTE pasa a CANCELADA como en la 006, también con el evento empezado. Una CONFIRMADA sin entradas usadas, antes del inicio del evento (feature 009), pasa a CANCELADA por su comprador, cada entrada queda CANCELADA y, si es paga, queda con el reembolso pendiente hasta que lo confirme el organizador. En los dos casos las entradas vuelven al cupo (se guarda primero la compra y después el evento). Orden de los rechazos: 401 → 400 → 404 → 403 → 409 COMPRA_VENCIDA → 409 EVENTO_REALIZADO (solo CONFIRMADA) → 409 TRANSICION_INVALIDA.",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "200": {
+            "description": "La compra CANCELADA (con `canceladaDesde`, `reembolso`, `entradas: []` y `cancelable: false`) y el historial terminado en el CANCELADA del comprador",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CompraVista" } } }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          { "campo": "params.compraId", "mensaje": "Debe ser un identificador válido." }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es quien hizo la compra (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo quien hizo la compra puede verla o pagarla."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "COMPRA_NO_ENCONTRADA", "mensaje": "No existe la compra." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra venció (`COMPRA_VENCIDA`), el evento ya empezó (`EVENTO_REALIZADO`, solo una CONFIRMADA) o no se puede cancelar en su estado (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "vencida": {
+                    "summary": "Pasaron 15 minutos sin pagarla (ya se canceló sola)",
+                    "value": {
+                      "error": {
+                        "codigo": "COMPRA_VENCIDA",
+                        "mensaje": "La compra venció: pasaron 15 minutos sin pagarla."
+                      }
+                    }
+                  },
+                  "eventoEmpezado": {
+                    "summary": "CONFIRMADA y el evento ya empezó (a la hora exacta, inclusive)",
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya empezó: ya no se puede cancelar la compra."
+                      }
+                    }
+                  },
+                  "entradaUsada": {
+                    "summary": "UTILIZADA (empiece o no el evento)",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "Ya se usó una entrada de esta compra: no se puede cancelar."
+                      }
+                    }
+                  },
+                  "yaCancelada": {
+                    "summary": "Ya está CANCELADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra ya está cancelada."
+                      }
+                    }
+                  },
+                  "yaReembolsada": {
+                    "summary": "Ya está REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "La compra ya fue reembolsada."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/mensajes": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "get": {
+        "tags": ["Compras"],
+        "summary": "Chat de la compra (comprador u organizador)",
+        "description": "La conversación entre el comprador y el organizador del evento (feature 011), del mensaje más viejo al más nuevo, con el encabezado de la compra y su estado al día (una PENDIENTE vencida se ve CANCELADA). Vale en cualquier estado y con el evento realizado: no hay 409. Es una lectura: no toma el cerrojo ni guarda nada. Nunca trae códigos de entradas, historial, total ni `compradorId`. Orden de los rechazos: 401 → 400 → 404 → 403.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El chat visto por el usuario actual (`otraParte` es la otra de las dos partes)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatDeLaCompraVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es su comprador ni el organizador de su evento (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Enviar un mensaje en el chat de la compra (comprador u organizador)",
+        "description": "Suma un mensaje al final de la conversación (feature 011). El autor es el usuario de `X-Usuario-Id` y la fecha, la del reloj del servidor; las claves desconocidas del cuerpo se descartan. El texto se recorta y tiene que tener entre 1 y 500 caracteres. Vale en cualquier estado y con el evento realizado: no hay 409. Bajo el cerrojo del evento de la compra (con el reloj leído adentro): verifica que el usuario sea una de las dos partes, vence las pendientes vencidas del evento (con su cupo) y guarda la compra con el mensaje una vez. El mensaje no cambia el estado, el historial, las entradas, el total ni el cupo. Orden de los rechazos: 401 → 400 → 404 → 403.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DatosMensaje"
+              },
+              "example": {
+                "texto": "¿A qué hora abren las puertas?"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El mensaje creado",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MensajeVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "textoVacio": {
+                    "summary": "texto faltante, vacío o de solo espacios",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.texto",
+                            "mensaje": "Es obligatorio."
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "textoLargo": {
+                    "summary": "texto de más de 500 caracteres",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "body.texto",
+                            "mensaje": "Debe tener como máximo 500 caracteres."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No es su comprador ni el organizador de su evento (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el comprador y el organizador del evento pueden ver y escribir en el chat de esta compra."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/compras/{compraId}/reembolso": {
+      "parameters": [
+        {
+          "$ref": "#/components/parameters/CompraId"
+        }
+      ],
+      "post": {
+        "tags": ["Compras"],
+        "summary": "Confirmar el reembolso de una compra cancelada (organizador)",
+        "description": "Sin cuerpo (si viene uno, se ignora). El organizador del evento confirma que devolvió la plata de una compra CANCELADA después de confirmada y paga (feature 009): pasa a REEMBOLSADA (autor el organizador, hora del servidor). No cambia el cupo ni las entradas, y no tiene plazo (también con el evento realizado). Bajo el cerrojo del evento de la compra (con el reloj leído adentro): verifica que el usuario organice el evento, vence las pendientes vencidas del evento, relee la compra y la guarda una vez. Orden de los rechazos: 401 → 400 → 404 → 403 → 409 TRANSICION_INVALIDA.",
+        "security": [
+          {
+            "usuarioSimulado": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La compra REEMBOLSADA como la ve el organizador (`reembolso.estado: \"confirmado\"`, sin códigos de entrada)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompraDelEventoVista"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Entrada inválida (`ENTRADA_INVALIDA`, `JSON_INVALIDO`); detalle por campo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "compraMalFormada": {
+                    "summary": "compraId mal formado",
+                    "value": {
+                      "error": {
+                        "codigo": "ENTRADA_INVALIDA",
+                        "mensaje": "Los datos enviados no son válidos.",
+                        "detalles": [
+                          {
+                            "campo": "params.compraId",
+                            "mensaje": "Debe ser un identificador válido."
+                          }
+                        ]
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sin usuario válido en `X-Usuario-Id` (`USUARIO_NO_IDENTIFICADO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "USUARIO_NO_IDENTIFICADO",
+                    "mensaje": "Tenés que indicar un usuario válido."
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "No organiza el evento de la compra, también su comprador (`SIN_PERMISO`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "SIN_PERMISO",
+                    "mensaje": "Solo el organizador puede modificar este evento."
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No existe la compra",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "example": {
+                  "error": {
+                    "codigo": "COMPRA_NO_ENCONTRADA",
+                    "mensaje": "No existe la compra."
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "La compra no tiene un reembolso pendiente (`TRANSICION_INVALIDA`)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorApi"
+                },
+                "examples": {
+                  "yaConfirmado": {
+                    "summary": "Ya está REEMBOLSADA",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "El reembolso de esta compra ya se confirmó."
+                      }
+                    }
+                  },
+                  "sinReembolsoPendiente": {
+                    "summary": "Pendiente, confirmada, utilizada, cancelada sin pagar o vencida, o gratis",
+                    "value": {
+                      "error": {
+                        "codigo": "TRANSICION_INVALIDA",
+                        "mensaje": "Esta compra no tiene un reembolso pendiente."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/tipos-entrada": {
+      "parameters": [{ "$ref": "#/components/parameters/EventoId" }],
+      "post": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Agregar un tipo de entrada (organizador)",
+        "description": "El cupo inicial es ≥ 1. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosTipoEntrada" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "El tipo creado",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TipoEntradaVista" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "example": {
+                  "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o nombre repetido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/eventos/{eventoId}/tipos-entrada/{tipoEntradaId}": {
+      "parameters": [
+        { "$ref": "#/components/parameters/EventoId" },
+        { "$ref": "#/components/parameters/TipoEntradaId" }
+      ],
+      "put": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Editar un tipo de entrada (organizador)",
+        "description": "El cupo es el **disponible** (≥ 0). Conservar el propio nombre se acepta. Cambiar el precio no modifica el total de ninguna compra. Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DatosTipoEntrada" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "El tipo editado",
+            "content": {
+              "application/json": { "schema": { "$ref": "#/components/schemas/TipoEntradaVista" } }
+            }
+          },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento, o el tipo no es de este evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_NO_ENCONTRADO": {
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "TIPO_ENTRADA_NO_ENCONTRADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_NO_ENCONTRADO",
+                        "mensaje": "No existe el tipo de entrada en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado o nombre repetido",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "NOMBRE_TIPO_ENTRADA_REPETIDO": {
+                    "value": {
+                      "error": {
+                        "codigo": "NOMBRE_TIPO_ENTRADA_REPETIDO",
+                        "mensaje": "Ya hay un tipo de entrada con ese nombre en el evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Tipos de entrada"],
+        "summary": "Quitar un tipo de entrada (organizador)",
+        "description": "Solo si no es el último y no tiene compras (en ningún estado). Orden de los chequeos: 401 → 400 de forma → 404 evento → 403 → 404 tipo → 400 categoría → 409 `EVENTO_REALIZADO` → otros 409. Dos escrituras simultáneas sobre el mismo evento se procesan de a una (FR-029).",
+        "security": [{ "usuarioSimulado": [] }],
+        "responses": {
+          "204": { "description": "Quitado, sin cuerpo" },
+          "400": { "$ref": "#/components/responses/EntradaInvalida" },
+          "401": { "$ref": "#/components/responses/UsuarioNoIdentificado" },
+          "403": { "$ref": "#/components/responses/SinPermiso" },
+          "404": {
+            "description": "No existe el evento, o el tipo no es de este evento",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_NO_ENCONTRADO": {
+                    "value": {
+                      "error": { "codigo": "EVENTO_NO_ENCONTRADO", "mensaje": "No existe el evento." }
+                    }
+                  },
+                  "TIPO_ENTRADA_NO_ENCONTRADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_NO_ENCONTRADO",
+                        "mensaje": "No existe el tipo de entrada en este evento."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Evento realizado, último tipo o tipo con compras",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorApi" },
+                "examples": {
+                  "EVENTO_REALIZADO": {
+                    "value": {
+                      "error": {
+                        "codigo": "EVENTO_REALIZADO",
+                        "mensaje": "El evento ya se realizó: no se puede modificar."
+                      }
+                    }
+                  },
+                  "ULTIMO_TIPO_ENTRADA": {
+                    "value": {
+                      "error": {
+                        "codigo": "ULTIMO_TIPO_ENTRADA",
+                        "mensaje": "El evento debe conservar al menos un tipo de entrada."
+                      }
+                    }
+                  },
+                  "TIPO_ENTRADA_CON_COMPRAS": {
+                    "value": {
+                      "error": {
+                        "codigo": "TIPO_ENTRADA_CON_COMPRAS",
+                        "mensaje": "El tipo de entrada tiene compras: no se puede quitar."
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -91,15 +2336,61 @@
         "required": true,
         "description": "UUID (lo que crean los usuarios) o id legible `<tipo>-<slug>` (datos de ejemplo)",
         "schema": { "type": "string", "example": "usuario-lucia" }
+      },
+      "EventoId": {
+        "name": "eventoId",
+        "in": "path",
+        "required": true,
+        "description": "UUID (lo que crean los usuarios) o id legible `evento-<slug>` (datos de ejemplo)",
+        "schema": { "type": "string", "example": "evento-festival-sonidos-del-sur" }
+      },
+      "CompraId": {
+        "name": "compraId",
+        "in": "path",
+        "required": true,
+        "description": "UUID (las compras nuevas) o id legible `compra-<slug>` (datos de ejemplo)",
+        "schema": { "type": "string", "example": "compra-martin-festival-vip" }
+      },
+      "TipoEntradaId": {
+        "name": "tipoEntradaId",
+        "in": "path",
+        "required": true,
+        "description": "Id del tipo de entrada; tiene que ser de **este** evento",
+        "schema": { "type": "string", "example": "tipo-festival-sonidos-del-sur-backstage" }
+      },
+      "Pagina": {
+        "name": "pagina",
+        "in": "query",
+        "required": false,
+        "description": "Página pedida, desde 1 (feature 013). Las páginas son de 10 y el tamaño no se elige: un `tamano` en la query se ignora. Una página posterior a la última devuelve la última, con su número real en `pagina.numero`. Si no es un entero ≥ 1 (`0`, `-1`, `1.5`, `abc`, vacía o repetida), 400 sobre `query.pagina`.",
+        "schema": { "type": "integer", "minimum": 1, "default": 1 },
+        "example": 2
       }
     },
     "schemas": {
+      "PaginaVista": {
+        "type": "object",
+        "required": ["numero", "tamano", "totalElementos", "totalPaginas"],
+        "description": "La página entregada de una lista paginada y los totales de la lista completa (con sus filtros).",
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "La página entregada: la pedida o, si no existe, la última. Con la lista vacía, 1."
+          },
+          "tamano": { "type": "integer", "enum": [10], "description": "Siempre 10." },
+          "totalElementos": { "type": "integer", "minimum": 0 },
+          "totalPaginas": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "`ceil(totalElementos / tamano)`; 0 con la lista vacía."
+          }
+        }
+      },
       "SaludVista": {
         "type": "object",
         "required": ["estado"],
-        "properties": {
-          "estado": { "type": "string", "enum": ["ok"] }
-        }
+        "properties": { "estado": { "type": "string", "enum": ["ok"] } }
       },
       "UsuarioVista": {
         "type": "object",
@@ -140,6 +2431,1062 @@
             }
           }
         }
+      },
+      "CategoriaVista": {
+        "type": "object",
+        "required": ["id", "nombre", "descripcion"],
+        "properties": {
+          "id": { "type": "string", "example": "categoria-conferencias" },
+          "nombre": { "type": "string", "example": "Conferencias" },
+          "descripcion": { "type": "string", "example": "Charlas, congresos y talleres." }
+        }
+      },
+      "TipoEntradaVista": {
+        "type": "object",
+        "required": ["id", "nombre", "descripcion", "precio", "cupo"],
+        "properties": {
+          "id": { "type": "string", "example": "tipo-festival-sonidos-del-sur-general" },
+          "nombre": { "type": "string", "example": "General" },
+          "descripcion": { "type": "string", "example": "Acceso al predio." },
+          "precio": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros; 0 = gratis",
+            "example": 45000
+          },
+          "cupo": { "type": "integer", "minimum": 0, "description": "Cupo **disponible**", "example": 500 }
+        }
+      },
+      "EventoResumenVista": {
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "categoria",
+          "fechaHora",
+          "fechaHoraLocal",
+          "organizadorId",
+          "realizado",
+          "cantidadTiposEntrada"
+        ],
+        "properties": {
+          "id": { "type": "string", "example": "evento-noche-de-rock" },
+          "nombre": { "type": "string", "example": "Noche de Rock en el Club" },
+          "categoria": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": {
+              "id": { "type": "string", "example": "categoria-musica" },
+              "nombre": { "type": "string", "example": "Música" }
+            }
+          },
+          "fechaHora": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante ISO UTC",
+            "example": "2026-11-11T23:00:00.000Z"
+          },
+          "fechaHoraLocal": {
+            "type": "string",
+            "description": "`YYYY-MM-DDTHH:mm`, hora de pared de Buenos Aires: lo que muestra la app",
+            "example": "2026-11-11T20:00"
+          },
+          "organizadorId": { "type": "string", "example": "usuario-lucia" },
+          "realizado": {
+            "type": "boolean",
+            "description": "El reloj del servidor llegó a `fechaHora` (inclusive); se calcula al consultar"
+          },
+          "cantidadTiposEntrada": { "type": "integer", "minimum": 1, "example": 1 }
+        }
+      },
+      "OrganizadorVista": {
+        "type": "object",
+        "description": "Organizador con el puntaje de las reseñas de todos sus eventos (próximos y realizados).",
+        "required": ["id", "nombre", "apellido", "puntaje", "cantidadResenias"],
+        "properties": {
+          "id": { "type": "string", "example": "usuario-martin" },
+          "nombre": { "type": "string", "example": "Martín" },
+          "apellido": { "type": "string", "example": "Benítez" },
+          "puntaje": {
+            "type": "number",
+            "nullable": true,
+            "description": "Promedio sin redondear de las puntuaciones; `null` sin reseñas (nunca 0).",
+            "example": null
+          },
+          "cantidadResenias": { "type": "integer", "minimum": 0, "example": 0 }
+        }
+      },
+      "EventoCatalogoVista": {
+        "description": "Evento en Explorar.",
+        "allOf": [
+          { "$ref": "#/components/schemas/EventoResumenVista" },
+          {
+            "type": "object",
+            "required": ["precioDesde", "agotado", "organizador"],
+            "properties": {
+              "precioDesde": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "Menor precio de todos sus tipos, con o sin cupo; 0 = gratis.",
+                "example": 8000
+              },
+              "agotado": {
+                "type": "boolean",
+                "description": "Todos sus tipos con cupo 0.",
+                "example": false
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
+            }
+          }
+        ]
+      },
+      "CatalogoVista": {
+        "type": "object",
+        "required": ["eventos", "pagina", "hayEventosProximos"],
+        "properties": {
+          "eventos": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "La página pedida del catálogo filtrado y ordenado.",
+            "items": { "$ref": "#/components/schemas/EventoCatalogoVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" },
+          "hayEventosProximos": {
+            "type": "boolean",
+            "description": "Hay eventos no realizados antes de aplicar texto, categoría y página: decide el vacío de la app."
+          }
+        }
+      },
+      "EventoVista": {
+        "allOf": [
+          { "$ref": "#/components/schemas/EventoResumenVista" },
+          {
+            "type": "object",
+            "required": ["descripcion", "multimedia", "tiposEntrada", "organizador"],
+            "properties": {
+              "descripcion": {
+                "type": "string",
+                "example": "Un día entero de música con artistas de todo el país."
+              },
+              "multimedia": {
+                "type": "array",
+                "items": { "type": "string", "format": "uri" },
+                "example": ["https://picsum.photos/seed/sonidos-del-sur/800/450"]
+              },
+              "tiposEntrada": {
+                "type": "array",
+                "description": "En el orden en que se agregaron",
+                "items": { "$ref": "#/components/schemas/TipoEntradaVista" }
+              },
+              "organizador": { "$ref": "#/components/schemas/OrganizadorVista" }
+            }
+          }
+        ]
+      },
+      "DatosCompra": {
+        "type": "object",
+        "required": ["tipoEntradaId", "cantidad"],
+        "description": "Nunca lleva precio ni total: el total lo calcula el servidor. Las claves desconocidas se ignoran.",
+        "properties": {
+          "tipoEntradaId": { "type": "string", "example": "tipo-festival-sonidos-del-sur-vip" },
+          "cantidad": { "type": "integer", "minimum": 1, "maximum": 4, "example": 2 }
+        }
+      },
+      "CambioEstadoCompraVista": {
+        "type": "object",
+        "required": ["estado", "autor", "fechaHora", "fechaHoraLocal"],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "autor": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["tipo", "usuarioId"],
+                "properties": {
+                  "tipo": { "type": "string", "enum": ["usuario"] },
+                  "usuarioId": { "type": "string" }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["tipo"],
+                "properties": { "tipo": { "type": "string", "enum": ["sistema"] } }
+              }
+            ]
+          },
+          "fechaHora": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+          "fechaHoraLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          }
+        }
+      },
+      "MotivoNoCancelable": {
+        "type": "string",
+        "enum": ["evento-empezado", "entrada-usada", "cancelada", "reembolsada"],
+        "description": "Por qué una compra no se puede cancelar (lo decide el servidor al consultar; feature 009)."
+      },
+      "ReembolsoVista": {
+        "type": "object",
+        "description": "El reembolso de una compra cancelada después de confirmada y paga (feature 009).",
+        "required": ["estado", "monto"],
+        "properties": {
+          "estado": {
+            "type": "string",
+            "enum": ["pendiente", "confirmado"],
+            "description": "`pendiente` hasta que el organizador lo confirma; `confirmado` en una REEMBOLSADA."
+          },
+          "monto": {
+            "type": "integer",
+            "minimum": 1,
+            "example": 240000,
+            "description": "Pesos enteros: el total fijado al comprar."
+          }
+        }
+      },
+      "CompraVista": {
+        "type": "object",
+        "required": [
+          "id",
+          "compradorId",
+          "evento",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "venceEn",
+          "venceEnLocal",
+          "historial",
+          "entradas",
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso",
+          "cancelable",
+          "motivoNoCancelable",
+          "resenia",
+          "puedeReseniar"
+        ],
+        "properties": {
+          "resenia": {
+            "allOf": [{ "$ref": "#/components/schemas/ReseniaVista" }],
+            "nullable": true,
+            "description": "La reseña de su comprador a este evento, solo si la compra está UTILIZADA; si no, null (feature 012). Dos compras UTILIZADA del mismo evento muestran la misma."
+          },
+          "puedeReseniar": {
+            "type": "boolean",
+            "description": "UTILIZADA y sin reseña de ese comprador y evento (feature 012). Lo decide el servidor en cada consulta."
+          },
+          "id": { "type": "string", "format": "uuid" },
+          "compradorId": { "type": "string", "example": "usuario-sofia" },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHora", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-festival-sonidos-del-sur" },
+              "nombre": { "type": "string", "example": "Festival Sonidos del Sur" },
+              "fechaHora": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-12T15:20",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": { "type": "boolean" }
+            }
+          },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "VIP" } }
+          },
+          "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "historial": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CambioEstadoCompraVista" },
+            "description": "Cronológico; el primero es PENDIENTE"
+          },
+          "entradas": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/EntradaVista" },
+            "description": "Sus entradas con código (feature 008): solo en CONFIRMADA o UTILIZADA; si no, []. Solo la ve su comprador."
+          },
+          "entradasUsadas": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0,
+            "description": "Cuántas de sus entradas se usaron (feature 008)"
+          },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          },
+          "cancelable": {
+            "type": "boolean",
+            "description": "Si su comprador la puede cancelar ahora (al día con el reloj del servidor; feature 009)."
+          },
+          "motivoNoCancelable": {
+            "allOf": [{ "$ref": "#/components/schemas/MotivoNoCancelable" }],
+            "nullable": true,
+            "description": "Por qué no se puede cancelar, o null si se puede (al día con el reloj del servidor; feature 009)."
+          }
+        }
+      },
+      "MisComprasDelEventoVista": {
+        "type": "object",
+        "required": ["pendientes", "confirmadas", "restantesPorTipo"],
+        "properties": {
+          "pendientes": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CompraVista" },
+            "description": "Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva"
+          },
+          "confirmadas": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/CompraVista" },
+            "description": "Sus compras CONFIRMADA de ese evento (sus entradas), de la más nueva a la más vieja"
+          },
+          "restantesPorTipo": {
+            "type": "array",
+            "description": "Cuántas entradas más puede comprar de cada tipo según su tope (0 en todos si es el organizador)",
+            "items": {
+              "type": "object",
+              "required": ["tipoEntradaId", "restantes"],
+              "properties": {
+                "tipoEntradaId": { "type": "string" },
+                "restantes": { "type": "integer", "minimum": 0 }
+              }
+            }
+          }
+        }
+      },
+      "MiCompraVista": {
+        "type": "object",
+        "description": "Una fila de \"Mis compras\": la compra al día con su evento y su tipo actuales, sin comprador ni historial.",
+        "required": [
+          "id",
+          "evento",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "venceEn",
+          "venceEnLocal",
+          "diasRestantes",
+          "canceladaPor",
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso",
+          "resenia",
+          "puedeReseniar"
+        ],
+        "properties": {
+          "resenia": {
+            "allOf": [{ "$ref": "#/components/schemas/ReseniaVista" }],
+            "nullable": true,
+            "description": "La reseña de su comprador a este evento, solo si la compra está UTILIZADA; si no, null (feature 012). Dos compras UTILIZADA del mismo evento muestran la misma."
+          },
+          "puedeReseniar": {
+            "type": "boolean",
+            "description": "UTILIZADA y sin reseña de ese comprador y evento (feature 012). Lo decide el servidor en cada consulta."
+          },
+          "id": { "type": "string", "example": "compra-martin-festival-vip" },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHora", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-festival-sonidos-del-sur" },
+              "nombre": { "type": "string", "example": "Festival Sonidos del Sur" },
+              "fechaHora": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-12T15:20",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": { "type": "boolean" }
+            }
+          },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "VIP" } }
+          },
+          "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "example": "2026-11-12T18:20:00.000Z" },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-12T18:20:00.000Z",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-12T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "diasRestantes": {
+            "type": "integer",
+            "minimum": 0,
+            "nullable": true,
+            "example": 30,
+            "description": "Días de calendario (hora de Buenos Aires) hasta el evento: fecha de pared del evento − la de hoy. Solo en CONFIRMADA de un evento no realizado; si no, null."
+          },
+          "canceladaPor": {
+            "type": "string",
+            "enum": ["sistema", "usuario"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA (\"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador); si no, null."
+          },
+          "entradasUsadas": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 0,
+            "description": "Cuántas de sus entradas se usaron (feature 008)"
+          },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          }
+        }
+      },
+      "DatosTipoEntrada": {
+        "type": "object",
+        "required": ["nombre", "precio", "cupo"],
+        "properties": {
+          "nombre": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "description": "Se recorta; único en el evento sin distinguir mayúsculas ni tildes",
+            "example": "Platea"
+          },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 300,
+            "default": "",
+            "example": "Butacas numeradas."
+          },
+          "precio": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros; 0 = gratis",
+            "example": 0
+          },
+          "cupo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Al crear el tipo, ≥ 1. Al editarlo es el cupo **disponible**, ≥ 0 (0 = agotado)",
+            "example": 100
+          }
+        }
+      },
+      "DatosEvento": {
+        "type": "object",
+        "required": ["nombre", "categoriaId", "fechaHora"],
+        "properties": {
+          "nombre": { "type": "string", "minLength": 1, "maxLength": 100, "example": "Noche de Tango" },
+          "descripcion": {
+            "type": "string",
+            "maxLength": 2000,
+            "default": "",
+            "example": "Milonga con orquesta en vivo."
+          },
+          "categoriaId": { "type": "string", "example": "categoria-musica" },
+          "fechaHora": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}$",
+            "description": "Fecha y hora de pared **en Buenos Aires**, sin zona. Tiene que ser futura según el reloj del servidor (si no, 409 `FECHA_NO_FUTURA`)",
+            "example": "2026-12-01T20:00"
+          },
+          "multimedia": {
+            "type": "array",
+            "maxItems": 5,
+            "default": [],
+            "items": { "type": "string", "format": "uri", "description": "URL http o https" },
+            "example": ["https://example.com/tango.jpg"]
+          }
+        }
+      },
+      "DatosNuevoEvento": {
+        "allOf": [
+          { "$ref": "#/components/schemas/DatosEvento" },
+          {
+            "type": "object",
+            "required": ["tiposEntrada"],
+            "properties": {
+              "tiposEntrada": {
+                "type": "array",
+                "minItems": 1,
+                "items": { "$ref": "#/components/schemas/DatosTipoEntrada" }
+              }
+            }
+          }
+        ]
+      },
+      "CompradorVista": {
+        "type": "object",
+        "description": "Quien hizo la compra (feature 008).",
+        "required": ["id", "nombre", "apellido"],
+        "properties": {
+          "id": { "type": "string", "example": "usuario-martin" },
+          "nombre": { "type": "string", "example": "Martín" },
+          "apellido": { "type": "string", "example": "Benítez" }
+        }
+      },
+      "VentanaDeUsoVista": {
+        "type": "object",
+        "description": "Cuándo se pueden registrar ingresos: desde 4 h antes del inicio hasta 12 h después, ambos extremos inclusive. `estado` según el reloj del servidor al responder.",
+        "required": ["desde", "hasta", "desdeLocal", "hastaLocal", "estado"],
+        "properties": {
+          "desde": { "type": "string", "format": "date-time", "example": "2026-11-18T20:00:00.000Z" },
+          "hasta": { "type": "string", "format": "date-time", "example": "2026-11-19T12:00:00.000Z" },
+          "desdeLocal": {
+            "type": "string",
+            "example": "2026-11-18T17:00",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "hastaLocal": {
+            "type": "string",
+            "example": "2026-11-19T09:00",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "estado": { "type": "string", "enum": ["antes", "abierta", "despues"] }
+        }
+      },
+      "ResumenTipoEntradaVista": {
+        "type": "object",
+        "description": "Cómo viene la venta de un tipo: `disponibles` es el cupo al día; `pendientes`, las entradas de compras PENDIENTE no vencidas; `vendidas`, las de CONFIRMADA y UTILIZADA; `usadas`, las entradas UTILIZADA (subconjunto de vendidas).",
+        "required": ["tipoEntrada", "disponibles", "pendientes", "vendidas", "usadas"],
+        "properties": {
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "General" } }
+          },
+          "disponibles": { "type": "integer", "minimum": 0, "example": 117 },
+          "pendientes": { "type": "integer", "minimum": 0, "example": 0 },
+          "vendidas": { "type": "integer", "minimum": 0, "example": 3 },
+          "usadas": { "type": "integer", "minimum": 0, "example": 1 }
+        }
+      },
+      "CompraDelEventoVista": {
+        "type": "object",
+        "description": "Una fila de \"Compras del evento\": la compra al día con su comprador, sin códigos de entrada ni historial.",
+        "required": [
+          "id",
+          "comprador",
+          "tipoEntrada",
+          "cantidad",
+          "total",
+          "estado",
+          "creadaEn",
+          "creadaEnLocal",
+          "venceEn",
+          "venceEnLocal",
+          "canceladaPor",
+          "entradasUsadas",
+          "canceladaDesde",
+          "reembolso",
+          "mensajeSinResponder"
+        ],
+        "properties": {
+          "id": { "type": "string", "example": "compra-martin-festival-vip" },
+          "comprador": { "$ref": "#/components/schemas/CompradorVista" },
+          "tipoEntrada": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": { "id": { "type": "string" }, "nombre": { "type": "string", "example": "General" } }
+          },
+          "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+          "total": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Pesos enteros fijados al comprar; 0 = gratis",
+            "example": 240000
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "example": "2026-11-18T18:20:00.000Z" },
+          "creadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T15:20",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+          },
+          "venceEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Hasta cuándo se puede pagar; null si no está PENDIENTE"
+          },
+          "venceEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T15:35",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "canceladaPor": {
+            "type": "string",
+            "enum": ["sistema", "usuario"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA (\"sistema\" si venció sin pagarse, \"usuario\" si la canceló su comprador); si no, null."
+          },
+          "entradasUsadas": { "type": "integer", "minimum": 0, "example": 0 },
+          "canceladaDesde": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA"],
+            "nullable": true,
+            "description": "Solo en CANCELADA o REEMBOLSADA: desde qué estado se canceló; si no, null (feature 009)."
+          },
+          "reembolso": {
+            "allOf": [{ "$ref": "#/components/schemas/ReembolsoVista" }],
+            "nullable": true,
+            "description": "Solo en una CANCELADA o REEMBOLSADA después de confirmada y paga; si no, null (feature 009)."
+          },
+          "mensajeSinResponder": {
+            "type": "boolean",
+            "description": "El último mensaje del chat de la compra es de su comprador: el organizador todavía no le contestó. Sin mensajes, false."
+          }
+        }
+      },
+      "ComprasDelEventoVista": {
+        "type": "object",
+        "description": "Las compras de un evento, al día, para su organizador: la página pedida de las filtradas y los totales de todas (feature 013).",
+        "required": [
+          "evento",
+          "ventanaDeUso",
+          "resumenPorTipo",
+          "compras",
+          "comprasConMensajesSinResponder",
+          "cantidadCompras",
+          "pagina"
+        ],
+        "properties": {
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre", "fechaHoraLocal", "realizado"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-festival-sonidos-del-sur" },
+              "nombre": { "type": "string", "example": "Festival Sonidos del Sur" },
+              "fechaHoraLocal": {
+                "type": "string",
+                "example": "2026-11-22T19:00",
+                "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires"
+              },
+              "realizado": { "type": "boolean" }
+            }
+          },
+          "ventanaDeUso": { "$ref": "#/components/schemas/VentanaDeUsoVista" },
+          "resumenPorTipo": {
+            "type": "array",
+            "description": "Uno por tipo, en el orden del evento, con todas las compras: no depende de la página ni del filtro.",
+            "items": { "$ref": "#/components/schemas/ResumenTipoEntradaVista" }
+          },
+          "compras": {
+            "type": "array",
+            "maxItems": 10,
+            "description": "La página pedida de las compras filtradas, de la más nueva a la más vieja (desempate por id). Sin códigos de entradas.",
+            "items": { "$ref": "#/components/schemas/CompraDelEventoVista" }
+          },
+          "comprasConMensajesSinResponder": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 1,
+            "description": "Cuántas compras del evento tienen mensajeSinResponder: de todas, no depende de la página ni del filtro."
+          },
+          "cantidadCompras": {
+            "type": "integer",
+            "minimum": 0,
+            "example": 12,
+            "description": "Cuántas compras tiene el evento, sin filtro (la app decide los chips y el vacío)."
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" }
+        }
+      },
+      "EntradaVista": {
+        "type": "object",
+        "description": "Una entrada de una compra (feature 008): una por unidad comprada.",
+        "required": ["codigo", "estado", "usadaEn", "usadaEnLocal"],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "7K3MQ9TB",
+            "description": "Canónico: 8 caracteres de 0-9 y A-Z sin I, L, O ni U (la app lo muestra 7K3M-Q9TB)"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"],
+            "description": "Igual al de la compra hasta que se confirma; después, CONFIRMADA o UTILIZADA"
+          },
+          "usadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-18T23:15:00.000Z",
+            "description": "Cuándo se registró su uso; null si no se usó"
+          },
+          "usadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T20:15",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          }
+        }
+      },
+      "DatosResenia": {
+        "type": "object",
+        "description": "Cuerpo de `POST /eventos/{eventoId}/resenias` (feature 012): la puntuación y un comentario opcional. El autor, el evento y la fecha los pone el servidor; las claves desconocidas se descartan.",
+        "required": ["puntuacion"],
+        "properties": {
+          "puntuacion": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5,
+            "description": "Entero de 1 a 5.",
+            "example": 4
+          },
+          "comentario": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "Opcional. Se recorta; vacío o de solo espacios queda sin comentario (`null`). Hasta 500 caracteres después de recortar.",
+            "example": "Muy buena organización"
+          }
+        }
+      },
+      "ReseniaVista": {
+        "type": "object",
+        "description": "La reseña propia (feature 012): en la compra (`CompraVista.resenia`) y en la respuesta del alta.",
+        "required": ["id", "eventoId", "puntuacion", "comentario", "creadaEn", "creadaEnLocal"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "eventoId": { "type": "string", "example": "evento-pena-en-la-rueda" },
+          "puntuacion": { "type": "integer", "minimum": 1, "maximum": 5, "example": 4 },
+          "comentario": {
+            "type": "string",
+            "nullable": true,
+            "description": "Ya recortado; `null` si no se escribió nada.",
+            "example": "Muy buena organización"
+          },
+          "creadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante ISO UTC (reloj del servidor)."
+          },
+          "creadaEnLocal": {
+            "type": "string",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires.",
+            "example": "2026-11-21T22:30"
+          }
+        }
+      },
+      "DatosMensaje": {
+        "type": "object",
+        "description": "Cuerpo de `POST /compras/{compraId}/mensajes`: solo el texto (autor y fecha los pone el servidor).",
+        "required": ["texto"],
+        "properties": {
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Se recorta; ya recortado, de 1 a 500 caracteres. Los saltos de línea internos se conservan.",
+            "example": "¿A qué hora abren las puertas?"
+          }
+        }
+      },
+      "ReseniaDelOrganizadorVista": {
+        "type": "object",
+        "description": "Una reseña en \"Reseñas del organizador\" (feature 012). Sin el id del autor, compras, códigos, totales ni estados.",
+        "required": ["id", "puntuacion", "comentario", "autor", "evento", "creadaEn", "creadaEnLocal"],
+        "properties": {
+          "id": { "type": "string", "example": "resenia-valentina-jazz-en-el-patio" },
+          "puntuacion": { "type": "integer", "minimum": 1, "maximum": 5, "example": 5 },
+          "comentario": {
+            "type": "string",
+            "nullable": true,
+            "description": "`null` si no se escribió nada.",
+            "example": "Excelente organización, entramos rapidísimo."
+          },
+          "autor": {
+            "type": "object",
+            "description": "Nombre y apellido del autor, sin su id.",
+            "required": ["nombre", "apellido"],
+            "properties": {
+              "nombre": { "type": "string", "example": "Valentina" },
+              "apellido": { "type": "string", "example": "Gómez" }
+            }
+          },
+          "evento": {
+            "type": "object",
+            "required": ["id", "nombre"],
+            "properties": {
+              "id": { "type": "string", "example": "evento-jazz-en-el-patio" },
+              "nombre": { "type": "string", "example": "Jazz en el Patio" }
+            }
+          },
+          "creadaEn": { "type": "string", "format": "date-time", "description": "Instante ISO UTC." },
+          "creadaEnLocal": {
+            "type": "string",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires.",
+            "example": "2026-11-15T21:00"
+          }
+        }
+      },
+      "ReseniasDelOrganizadorVista": {
+        "type": "object",
+        "description": "El organizador del evento con su puntaje y reseñas de todos sus eventos, de la más reciente a la más vieja (feature 012). Es la respuesta de `/resumen`, con las 3 más recientes (feature 013).",
+        "required": ["organizador", "resenias"],
+        "properties": {
+          "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
+          "resenias": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
+          }
+        }
+      },
+      "PaginaDeReseniasVista": {
+        "type": "object",
+        "description": "Una página de \"Reseñas del organizador\" (feature 013): el organizador con el puntaje y la cantidad de todas, las reseñas de la página y la página con los totales.",
+        "required": ["organizador", "resenias", "pagina"],
+        "properties": {
+          "organizador": { "$ref": "#/components/schemas/OrganizadorVista" },
+          "resenias": {
+            "type": "array",
+            "maxItems": 10,
+            "items": { "$ref": "#/components/schemas/ReseniaDelOrganizadorVista" }
+          },
+          "pagina": { "$ref": "#/components/schemas/PaginaVista" }
+        }
+      },
+      "RolEnLaCompra": {
+        "type": "string",
+        "enum": ["comprador", "organizador"],
+        "description": "El rol de un usuario en una compra: su comprador o el organizador de su evento."
+      },
+      "ParteDeLaCompraVista": {
+        "type": "object",
+        "description": "Una de las dos partes del chat de una compra.",
+        "required": ["id", "nombre", "apellido", "rol"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usuario-lucia"
+          },
+          "nombre": {
+            "type": "string",
+            "example": "Lucía"
+          },
+          "apellido": {
+            "type": "string",
+            "example": "Álvarez"
+          },
+          "rol": {
+            "$ref": "#/components/schemas/RolEnLaCompra"
+          }
+        }
+      },
+      "MensajeVista": {
+        "type": "object",
+        "description": "Un mensaje del chat, en orden de envío.",
+        "required": ["numero", "autor", "texto", "enviadoEn", "enviadoEnLocal"],
+        "properties": {
+          "numero": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Su posición en la conversación, desde 1.",
+            "example": 4
+          },
+          "autor": {
+            "$ref": "#/components/schemas/ParteDeLaCompraVista"
+          },
+          "texto": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "example": "¿A qué hora abren las puertas?"
+          },
+          "enviadoEn": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante UTC (reloj del servidor)."
+          },
+          "enviadoEnLocal": {
+            "type": "string",
+            "description": "`YYYY-MM-DDTHH:mm`, hora de Buenos Aires.",
+            "example": "2026-11-20T14:35"
+          }
+        }
+      },
+      "ChatDeLaCompraVista": {
+        "type": "object",
+        "description": "El chat de una compra: el encabezado (sin códigos de entrada, historial ni total), la otra parte y los mensajes.",
+        "required": ["compra", "otraParte", "mensajes"],
+        "properties": {
+          "compra": {
+            "type": "object",
+            "required": ["id", "evento", "tipoEntrada", "cantidad", "estado"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "compra-martin-festival-vip"
+              },
+              "evento": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "evento-festival-sonidos-del-sur"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "Festival Sonidos del Sur"
+                  }
+                }
+              },
+              "tipoEntrada": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "example": "tipo-festival-sonidos-del-sur-vip"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "example": "VIP"
+                  }
+                }
+              },
+              "cantidad": {
+                "type": "integer",
+                "minimum": 1,
+                "example": 2
+              },
+              "estado": {
+                "type": "string",
+                "enum": ["PENDIENTE", "CONFIRMADA", "CANCELADA", "UTILIZADA", "REEMBOLSADA"],
+                "description": "Al día con el reloj del servidor."
+              }
+            }
+          },
+          "otraParte": {
+            "$ref": "#/components/schemas/ParteDeLaCompraVista"
+          },
+          "mensajes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MensajeVista"
+            }
+          }
+        }
+      },
+      "EntradaDelEventoVista": {
+        "type": "object",
+        "description": "Una entrada buscada por el organizador: la entrada, su compra (con el comprador) y la ventana de uso. Sin los códigos de las otras entradas.",
+        "required": ["codigo", "estado", "usadaEn", "usadaEnLocal", "compra", "ventanaDeUso"],
+        "properties": {
+          "codigo": {
+            "type": "string",
+            "example": "7K3MQ9TB",
+            "description": "Canónico: 8 caracteres de 0-9 y A-Z sin I, L, O ni U (la app lo muestra 7K3M-Q9TB)"
+          },
+          "estado": {
+            "type": "string",
+            "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"],
+            "description": "Igual al de la compra hasta que se confirma; después, CONFIRMADA o UTILIZADA"
+          },
+          "usadaEn": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "example": "2026-11-18T23:15:00.000Z",
+            "description": "Cuándo se registró su uso; null si no se usó"
+          },
+          "usadaEnLocal": {
+            "type": "string",
+            "example": "2026-11-18T20:15",
+            "description": "\"YYYY-MM-DDTHH:mm\", hora de Buenos Aires",
+            "nullable": true
+          },
+          "compra": {
+            "type": "object",
+            "required": ["id", "comprador", "tipoEntrada", "cantidad", "estado", "entradasUsadas"],
+            "properties": {
+              "id": { "type": "string", "example": "compra-sofia-pena-con-cena" },
+              "comprador": { "$ref": "#/components/schemas/CompradorVista" },
+              "tipoEntrada": {
+                "type": "object",
+                "required": ["id", "nombre"],
+                "properties": {
+                  "id": { "type": "string" },
+                  "nombre": { "type": "string", "example": "Con cena" }
+                }
+              },
+              "cantidad": { "type": "integer", "minimum": 1, "example": 2 },
+              "estado": {
+                "type": "string",
+                "enum": ["PENDIENTE", "CONFIRMADA", "UTILIZADA", "CANCELADA", "REEMBOLSADA"]
+              },
+              "entradasUsadas": { "type": "integer", "minimum": 0, "example": 1 }
+            }
+          },
+          "ventanaDeUso": { "$ref": "#/components/schemas/VentanaDeUsoVista" }
+        }
       }
     },
     "responses": {
@@ -178,6 +3525,20 @@
           "application/json": {
             "schema": { "$ref": "#/components/schemas/ErrorApi" },
             "example": { "error": { "codigo": "USUARIO_NO_ENCONTRADO", "mensaje": "No existe el usuario." } }
+          }
+        }
+      },
+      "SinPermiso": {
+        "description": "El usuario actual no es el organizador (`SIN_PERMISO`)",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorApi" },
+            "example": {
+              "error": {
+                "codigo": "SIN_PERMISO",
+                "mensaje": "Solo el organizador puede modificar este evento."
+              }
+            }
           }
         }
       }

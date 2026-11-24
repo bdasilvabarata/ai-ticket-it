@@ -1,12 +1,13 @@
 {
   "info": {
     "name": "AI Ticket It API",
-    "description": "Pedidos de ejemplo, incluidos los casos de error. Variables: `baseUrl` (cambiala por la dirección `Red` para probar desde otro dispositivo) y `usuarioId` (Lucía Álvarez). La especificación completa está en {{baseUrl}}/docs.",
+    "description": "Pedidos de ejemplo, incluidos los casos de error. Variables: `baseUrl` (cambiala por la dirección `Red` para probar desde otro dispositivo), `usuarioId` (Lucía Álvarez) y `compraId` (la última compra de \"Sofía compra 2 VIP del Festival\" la guarda sola). La especificación completa está en {{baseUrl}}/docs.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
     { "key": "baseUrl", "value": "http://localhost:3000/api" },
-    { "key": "usuarioId", "value": "usuario-lucia" }
+    { "key": "usuarioId", "value": "usuario-lucia" },
+    { "key": "compraId", "value": "compra-martin-festival-vip" }
   ],
   "item": [
     {
@@ -48,6 +49,832 @@
         {
           "name": "Usuario actual sin encabezado → 401 USUARIO_NO_IDENTIFICADO",
           "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/usuarios/actual" } }
+        }
+      ]
+    },
+    {
+      "name": "Favoritos",
+      "item": [
+        {
+          "name": "Mis favoritos (Diego: próximos y después realizados)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos" }
+          }
+        },
+        {
+          "name": "Marcar la Noche de Rock como favorito (Diego) → 204, también si ya lo era",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos/evento-noche-de-rock" }
+          }
+        },
+        {
+          "name": "Desmarcar la Noche de Rock (Diego) → 204, también si no lo era",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }],
+            "url": { "raw": "{{baseUrl}}/usuarios/actual/favoritos/evento-noche-de-rock" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categorías",
+      "item": [
+        {
+          "name": "Catálogo (por nombre)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/categorias" } }
+        }
+      ]
+    },
+    {
+      "name": "Explorar eventos",
+      "item": [
+        {
+          "name": "Catálogo sin filtros (público)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos" } }
+        },
+        {
+          "name": "Explorar — página 2",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?pagina=2" } }
+        },
+        {
+          "name": "Buscar texto=basquet (sin tildes)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?texto=basquet" } }
+        },
+        {
+          "name": "Filtrar categoriaId=categoria-musica",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?categoriaId=categoria-musica" } }
+        },
+        {
+          "name": "Ordenar orden=precio (los gratis primero)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio" } }
+        },
+        {
+          "name": "Ordenar orden=precio&sentido=desc (el más caro primero)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=precio&sentido=desc" } }
+        },
+        {
+          "name": "Ordenar orden=puntaje (sin puntaje al final)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=puntaje" } }
+        },
+        {
+          "name": "orden=nombre → 400 ENTRADA_INVALIDA (query.orden)",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos?orden=nombre" } }
+        },
+        {
+          "name": "Categoría inexistente → 400 ENTRADA_INVALIDA (query.categoriaId)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos?categoriaId=categoria-inexistente" }
+          }
+        },
+        {
+          "name": "Texto de 101 caracteres → 400 ENTRADA_INVALIDA (query.texto)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/eventos?texto=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eventos",
+      "item": [
+        {
+          "name": "Mis eventos (Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/mios" },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        },
+        {
+          "name": "Mis eventos sin encabezado → 401 USUARIO_NO_IDENTIFICADO",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos/mios" } }
+        },
+        {
+          "name": "Un evento (público)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur" }
+          }
+        },
+        {
+          "name": "Un evento inexistente → 404 EVENTO_NO_ENCONTRADO",
+          "request": { "method": "GET", "url": { "raw": "{{baseUrl}}/eventos/evento-inexistente" } }
+        },
+        {
+          "name": "Crear (fecha en hora de Buenos Aires)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Tango\",\n  \"descripcion\": \"Milonga con orquesta en vivo.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-12-01T20:00\",\n  \"multimedia\": [\n    \"https://example.com/tango.jpg\"\n  ],\n  \"tiposEntrada\": [\n    {\n      \"nombre\": \"General\",\n      \"precio\": 15000,\n      \"cupo\": 200\n    },\n    {\n      \"nombre\": \"VIP\",\n      \"descripcion\": \"Mesa preferencial.\",\n      \"precio\": 60000,\n      \"cupo\": 30\n    }\n  ]\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Crear con datos inválidos → 400 ENTRADA_INVALIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Tango\",\n  \"descripcion\": \"Milonga con orquesta en vivo.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-02-30T20:00\",\n  \"multimedia\": [\n    \"https://example.com/tango.jpg\"\n  ],\n  \"tiposEntrada\": [\n    {\n      \"nombre\": \"General\",\n      \"precio\": -1,\n      \"cupo\": 0\n    }\n  ]\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Crear con fecha pasada → 409 FECHA_NO_FUTURA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Tango\",\n  \"descripcion\": \"Milonga con orquesta en vivo.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2020-01-01T20:00\",\n  \"multimedia\": [\n    \"https://example.com/tango.jpg\"\n  ],\n  \"tiposEntrada\": [\n    {\n      \"nombre\": \"General\",\n      \"precio\": 15000,\n      \"cupo\": 200\n    },\n    {\n      \"nombre\": \"VIP\",\n      \"descripcion\": \"Mesa preferencial.\",\n      \"precio\": 60000,\n      \"cupo\": 30\n    }\n  ]\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Crear con tipos repetidos → 409 NOMBRE_TIPO_ENTRADA_REPETIDO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Tango\",\n  \"descripcion\": \"Milonga con orquesta en vivo.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-12-01T20:00\",\n  \"multimedia\": [\n    \"https://example.com/tango.jpg\"\n  ],\n  \"tiposEntrada\": [\n    {\n      \"nombre\": \"VIP\",\n      \"precio\": 1,\n      \"cupo\": 1\n    },\n    {\n      \"nombre\": \" vip \",\n      \"precio\": 1,\n      \"cupo\": 1\n    }\n  ]\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Editar Noche de Rock",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-rock" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Rock en el Club\",\n  \"descripcion\": \"Reprogramada.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-12-20T21:30\",\n  \"multimedia\": []\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Editar un evento ajeno → 403 SIN_PERMISO",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-hamlet" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Rock en el Club\",\n  \"descripcion\": \"Reprogramada.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-12-20T21:30\",\n  \"multimedia\": []\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Editar un evento realizado (Sofía) → 409 EVENTO_REALIZADO",
+          "request": {
+            "method": "PUT",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-risas" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Noche de Rock en el Club\",\n  \"descripcion\": \"Reprogramada.\",\n  \"categoriaId\": \"categoria-musica\",\n  \"fechaHora\": \"2026-12-20T21:30\",\n  \"multimedia\": []\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Eliminar el Festival (tiene compras) → 409 EVENTO_CON_COMPRAS",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur" },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        },
+        {
+          "name": "Eliminar Noche de Rock → 204",
+          "request": {
+            "method": "DELETE",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-rock" },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tipos de entrada",
+      "item": [
+        {
+          "name": "Agregar Platea al Festival",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Platea\",\n  \"descripcion\": \"Butacas numeradas.\",\n  \"precio\": 0,\n  \"cupo\": 100\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Agregar un nombre repetido → 409 NOMBRE_TIPO_ENTRADA_REPETIDO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"VIP\",\n  \"descripcion\": \"Butacas numeradas.\",\n  \"precio\": 0,\n  \"cupo\": 100\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Editar VIP (cupo disponible)",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada/tipo-festival-sonidos-del-sur-vip"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"VIP\",\n  \"descripcion\": \"Sector preferencial con barra.\",\n  \"precio\": 130000,\n  \"cupo\": 40\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Editar un tipo de otro evento → 404 TIPO_ENTRADA_NO_ENCONTRADO",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada/tipo-hamlet-platea"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombre\": \"Platea\",\n  \"descripcion\": \"Butacas numeradas.\",\n  \"precio\": 0,\n  \"cupo\": 100\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "{{usuarioId}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Quitar General (compra cancelada) → 409 TIPO_ENTRADA_CON_COMPRAS",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada/tipo-festival-sonidos-del-sur-general"
+            },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        },
+        {
+          "name": "Quitar el único tipo de Noche de Rock → 409 ULTIMO_TIPO_ENTRADA",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-noche-de-rock/tipos-entrada/tipo-noche-de-rock-general"
+            },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        },
+        {
+          "name": "Quitar Backstage del Festival → 204",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/tipos-entrada/tipo-festival-sonidos-del-sur-backstage"
+            },
+            "header": [{ "key": "X-Usuario-Id", "value": "{{usuarioId}}" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Comprar entradas",
+      "item": [
+        {
+          "name": "Sofía compra 2 VIP del Festival",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"compraId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 2\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Mis compras de Sofía en el Festival",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/mis-compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Ver compra de Sofía (la última que compró)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Pagar la compra de Sofía",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/pago" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Mis compras de Sofía (todas, al día y ordenadas)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Pagar de nuevo → 409 TRANSICION_INVALIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/pago" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Cancelar la compra ya pagada → 409 TRANSICION_INVALIDA (una PENDIENTE pasaría a CANCELADA)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/{{compraId}}/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-sofia" }]
+          }
+        },
+        {
+          "name": "Cantidad 0 → 400 ENTRADA_INVALIDA (body.cantidad)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 0\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Tipo de otro evento → 400 ENTRADA_INVALIDA (body.tipoEntradaId)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-hamlet-platea\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-sofia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Evento realizado (Noche de risas) → 409 EVENTO_REALIZADO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-risas/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-noche-de-risas-general\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "La organizadora compra en su evento → 409 COMPRA_PROPIO_EVENTO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-vip\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-lucia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Martín supera su tope con 3 General → 409 TOPE_POR_PERSONA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-general\",\n  \"cantidad\": 3\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Diego compra las 3 Backstage",
+          "request": {
+            "method": "POST",
+            "description": "Agota Backstage para el pedido siguiente. Si se corrió antes 'Quitar Backstage del Festival', reiniciar el servidor (vuelve a los datos de ejemplo).",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-backstage\",\n  \"cantidad\": 3\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-diego" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        },
+        {
+          "name": "Una Backstage más (agotado) → 409 CUPO_INSUFICIENTE",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoEntradaId\": \"tipo-festival-sonidos-del-sur-backstage\",\n  \"cantidad\": 1\n}"
+            },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-valentina" },
+              { "key": "Content-Type", "value": "application/json" }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Compras del evento",
+      "item": [
+        {
+          "name": "Listar compras (Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?pagina=2" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — canceladas",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=CANCELADA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Compras del Festival — sin responder",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?sinResponder=true" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "estado=VENCIDA → 400 ENTRADA_INVALIDA (query.estado)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras?estado=VENCIDA" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Listar compras (otro usuario, 403)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-festival-sonidos-del-sur/compras" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        },
+        {
+          "name": "Buscar entrada de Sofía en la Peña (minúsculas y guion)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/prcs-2b01" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Registrar uso de la entrada de Sofía",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/PRCS2B01/uso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Registrar uso otra vez (ya utilizada) → 409 TRANSICION_INVALIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/entradas/PRCS2B01/uso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chat de la compra (011)",
+      "item": [
+        {
+          "name": "Chat de la compra (Martín, Festival)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Chat de la compra (Lucía, organizadora)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-lucia"
+              }
+            ]
+          }
+        },
+        {
+          "name": "Enviar mensaje (Martín)",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"¿A qué hora abren las puertas?\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Enviar mensaje vacío → 400",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-martin"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"texto\": \"   \"\n}"
+            }
+          }
+        },
+        {
+          "name": "Chat de la compra como Sofía → 403",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/mensajes"
+            },
+            "header": [
+              {
+                "key": "X-Usuario-Id",
+                "value": "usuario-sofia"
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Cancelar compra (009)",
+      "item": [
+        {
+          "name": "Cancelar compra confirmada (Martín, Festival)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-martin-festival-vip/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        },
+        {
+          "name": "Cancelar compra utilizada (Martín, Peña) → 409",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-martin-pena-general/cancelacion" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-martin" }]
+          }
+        },
+        {
+          "name": "Confirmar reembolso (Lucía, Maratón, Diego)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-diego-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Confirmar reembolso ya confirmado (Valentina) → 409",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-valentina-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-lucia" }]
+          }
+        },
+        {
+          "name": "Confirmar reembolso como comprador (Diego) → 403",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/compras/compra-diego-maraton-inscripcion/reembolso" },
+            "header": [{ "key": "X-Usuario-Id", "value": "usuario-diego" }]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reseñas (012)",
+      "item": [
+        {
+          "name": "Reseñar evento (Martín, Peña)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"puntuacion\": 4,\n  \"comentario\": \"Muy buena organización\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Reseñar de nuevo → 409 RESENIA_REPETIDA",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 5\n}" }
+          }
+        },
+        {
+          "name": "Reseñar como organizadora (Lucía) → 409 RESENIA_PROPIO_EVENTO",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-lucia" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 5\n}" }
+          }
+        },
+        {
+          "name": "Puntuación 6 → 400 ENTRADA_INVALIDA (body.puntuacion)",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-pena-en-la-rueda/resenias" },
+            "header": [
+              { "key": "X-Usuario-Id", "value": "usuario-martin" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"puntuacion\": 6\n}" }
+          }
+        },
+        {
+          "name": "Reseñas del organizador (Hamlet, de Martín; página 1)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-hamlet/resenias-del-organizador" }
+          }
+        },
+        {
+          "name": "Reseñas de Martín — página 2",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador?pagina=2" }
+          }
+        },
+        {
+          "name": "Reseñas de Martín — resumen",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-jazz-en-el-patio/resenias-del-organizador/resumen" }
+          }
+        },
+        {
+          "name": "Reseñas del organizador sin reseñas (Noche de Rock, de Lucía)",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{baseUrl}}/eventos/evento-noche-de-rock/resenias-del-organizador" }
+          }
         }
       ]
     }

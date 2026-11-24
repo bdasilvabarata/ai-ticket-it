@@ -38,6 +38,14 @@ describe("UsuarioRepository (en memoria)", () => {
     expect(await repositorio.buscarPorId("usuario-inexistente")).toBeNull();
   });
 
+  it("listarPorIds devuelve los que existen, sin repetir, o []", async () => {
+    const repositorio = new UsuarioRepository([lucia, diego]);
+    expect(await repositorio.listarPorIds(["usuario-diego", "usuario-inexistente", "usuario-diego"])).toEqual(
+      [diego],
+    );
+    expect(await repositorio.listarPorIds([])).toEqual([]);
+  });
+
   it("no expone su colección interna: modificar lo devuelto no cambia el repositorio", async () => {
     const repositorio = new UsuarioRepository([lucia]);
     const lista = await repositorio.listar();
@@ -61,6 +69,14 @@ describe("CategoriaRepository (en memoria)", () => {
     expect(await repositorio.listar()).toEqual([musica]);
     expect(await repositorio.buscarPorId("categoria-musica")).toBe(musica);
     expect(await repositorio.buscarPorId("categoria-teatro")).toBeNull();
+  });
+
+  it("listarPorIds devuelve las que existen, sin repetir, o []", async () => {
+    const repositorio = new CategoriaRepository([musica]);
+    expect(
+      await repositorio.listarPorIds(["categoria-musica", "categoria-teatro", "categoria-musica"]),
+    ).toEqual([musica]);
+    expect(await repositorio.listarPorIds([])).toEqual([]);
   });
 });
 

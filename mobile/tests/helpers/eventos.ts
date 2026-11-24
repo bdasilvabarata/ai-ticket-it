@@ -1,0 +1,247 @@
+import {
+  LIMITES_PAGINACION,
+  type CatalogoVista,
+  type CategoriaVista,
+  type EventoCatalogoVista,
+  type EventoResumenVista,
+  type EventoVista,
+  type OrganizadorVista,
+  type PaginaVista,
+  type ReseniaDelOrganizadorVista,
+  type ReseniasDelOrganizadorVista,
+} from "@ai-ticket-it/shared";
+
+// Datos de ejemplo de la feature 004 para los tests de mobile (con la forma de la API).
+
+export const categorias: CategoriaVista[] = [
+  { id: "categoria-conferencias", nombre: "Conferencias", descripcion: "Charlas." },
+  { id: "categoria-musica", nombre: "Música", descripcion: "Recitales." },
+  { id: "categoria-teatro", nombre: "Teatro", descripcion: "Obras." },
+];
+
+/** Lucía como organizadora, sin reseñas (como en el seed). */
+export const luciaOrganizadora: OrganizadorVista = {
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  puntaje: null,
+  cantidadResenias: 0,
+};
+
+export const nocheDeRock: EventoResumenVista = {
+  id: "evento-noche-de-rock",
+  nombre: "Noche de Rock en el Club",
+  categoria: { id: "categoria-musica", nombre: "Música" },
+  fechaHora: "2026-12-01T23:00:00.000Z",
+  fechaHoraLocal: "2026-12-01T20:00",
+  organizadorId: "usuario-lucia",
+  realizado: false,
+  cantidadTiposEntrada: 1,
+};
+
+export const festival: EventoResumenVista = {
+  id: "evento-festival",
+  nombre: "Festival Sonidos del Sur",
+  categoria: { id: "categoria-musica", nombre: "Música" },
+  fechaHora: "2026-12-10T17:00:00.000Z",
+  fechaHoraLocal: "2026-12-10T14:00",
+  organizadorId: "usuario-lucia",
+  realizado: false,
+  cantidadTiposEntrada: 3,
+};
+
+export const nocheDeRisas: EventoResumenVista = {
+  id: "evento-noche-de-risas",
+  nombre: "Stand-up: Noche de risas",
+  categoria: { id: "categoria-teatro", nombre: "Teatro" },
+  fechaHora: "2026-11-08T01:00:00.000Z",
+  fechaHoraLocal: "2026-11-07T22:00",
+  organizadorId: "usuario-lucia",
+  realizado: true,
+  cantidadTiposEntrada: 1,
+};
+
+export const hamletDeMartin: EventoResumenVista = {
+  id: "evento-hamlet",
+  nombre: "Hamlet, versión contemporánea",
+  categoria: { id: "categoria-teatro", nombre: "Teatro" },
+  fechaHora: "2026-11-20T23:00:00.000Z",
+  fechaHoraLocal: "2026-11-20T20:00",
+  organizadorId: "usuario-martin",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+};
+
+/** Festival completo, con tres tipos de entrada. */
+export const festivalCompleto: EventoVista = {
+  ...festival,
+  descripcion: "Un día entero de música.",
+  multimedia: ["https://example.com/festival.jpg"],
+  tiposEntrada: [
+    {
+      id: "tipo-festival-general",
+      nombre: "General",
+      descripcion: "Acceso al predio.",
+      precio: 45000,
+      cupo: 500,
+    },
+    { id: "tipo-festival-vip", nombre: "VIP", descripcion: "Con barra.", precio: 120000, cupo: 0 },
+    { id: "tipo-festival-backstage", nombre: "Backstage", descripcion: "", precio: 0, cupo: 3 },
+  ],
+  organizador: luciaOrganizadora,
+};
+
+export const nocheDeRisasCompleta: EventoVista = {
+  ...nocheDeRisas,
+  descripcion: "Cuatro comediantes, una noche.",
+  multimedia: ["https://example.com/risas.jpg"],
+  tiposEntrada: [
+    { id: "tipo-risas-general", nombre: "General", descripcion: "Libre.", precio: 12000, cupo: 80 },
+  ],
+  organizador: luciaOrganizadora,
+};
+
+export function errorApi(codigo: string, mensaje: string, detalles?: { campo: string; mensaje: string }[]) {
+  return { error: detalles ? { codigo, mensaje, detalles } : { codigo, mensaje } };
+}
+
+/** Sofía como organizadora, sin reseñas. */
+export const sofiaOrganizadora: OrganizadorVista = {
+  id: "usuario-sofia",
+  nombre: "Sofía",
+  apellido: "Castro",
+  puntaje: null,
+  cantidadResenias: 0,
+};
+
+/** Tarjetas del catálogo (feature 005), en el orden por fecha del seed. */
+export const rockEnCatalogo: EventoCatalogoVista = {
+  ...nocheDeRock,
+  precioDesde: 15000,
+  agotado: false,
+  organizador: { ...luciaOrganizadora, puntaje: 4.5, cantidadResenias: 12 },
+};
+
+export const clasicoEnCatalogo: EventoCatalogoVista = {
+  id: "evento-clasico-de-basquet",
+  nombre: "Clásico de básquet",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-11-15T22:00:00.000Z",
+  fechaHoraLocal: "2026-11-15T19:00",
+  organizadorId: "usuario-sofia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 8000,
+  agotado: false,
+  organizador: sofiaOrganizadora,
+};
+
+export const hamletEnCatalogo: EventoCatalogoVista = {
+  ...hamletDeMartin,
+  precioDesde: 18000,
+  agotado: true,
+  organizador: {
+    id: "usuario-martin",
+    nombre: "Martín",
+    apellido: "Benítez",
+    puntaje: null,
+    cantidadResenias: 0,
+  },
+};
+
+export const maratonEnCatalogo: EventoCatalogoVista = {
+  id: "evento-maraton-10k",
+  nombre: "Maratón Ciudad 10K",
+  categoria: { id: "categoria-deportes", nombre: "Deportes" },
+  fechaHora: "2026-12-25T11:00:00.000Z",
+  fechaHoraLocal: "2026-12-25T08:00",
+  organizadorId: "usuario-lucia",
+  realizado: false,
+  cantidadTiposEntrada: 2,
+  precioDesde: 0,
+  agotado: false,
+  organizador: luciaOrganizadora,
+};
+
+/** Una tarjeta realizada, como la devuelve "Mis favoritos" (feature 014): el catálogo no las trae. */
+export const nocheDeRisasEnCatalogo: EventoCatalogoVista = {
+  ...nocheDeRisas,
+  precioDesde: 6000,
+  agotado: false,
+  organizador: { ...luciaOrganizadora, puntaje: 4.5, cantidadResenias: 12 },
+};
+
+/**
+ * Un catálogo de una sola página con esos eventos (feature 013). Con `pagina`, la que se quiera
+ * (por ejemplo, la 2 de 12 eventos).
+ */
+export function catalogo(
+  eventos: EventoCatalogoVista[],
+  hayEventosProximos = eventos.length > 0,
+  pagina: Partial<PaginaVista> = {},
+): CatalogoVista {
+  return { eventos, pagina: paginaDe(eventos.length, pagina), hayEventosProximos };
+}
+
+/** La `PaginaVista` de una lista de `totalElementos` (por defecto, la página 1). */
+export function paginaDe(totalElementos: number, cambios: Partial<PaginaVista> = {}): PaginaVista {
+  const tamano = LIMITES_PAGINACION.tamanoDePagina;
+  const total = cambios.totalElementos ?? totalElementos;
+  return { numero: 1, tamano, totalElementos: total, totalPaginas: Math.ceil(total / tamano), ...cambios };
+}
+
+/** La consulta inicial de Explorar (sin texto, "Todas", por fecha). */
+export const CATALOGO_INICIAL = "/eventos?orden=fecha&sentido=asc";
+
+/** Detalle de la Maratón: dos imágenes y un tipo gratis (feature 005). */
+export const maratonCompleta: EventoVista = {
+  ...maratonEnCatalogo,
+  descripcion: "Carrera de 10 km por las calles de la ciudad.",
+  multimedia: ["https://example.com/maraton.jpg", "https://example.com/llegada.jpg"],
+  tiposEntrada: [
+    {
+      id: "tipo-maraton-inscripcion",
+      nombre: "Inscripción",
+      descripcion: "Kit del corredor incluido.",
+      precio: 30000,
+      cupo: 1000,
+    },
+    { id: "tipo-maraton-kids", nombre: "Carrera kids", descripcion: "", precio: 0, cupo: 200 },
+  ],
+  organizador: luciaOrganizadora,
+};
+
+/** Detalle de Hamlet: agotado, de Martín, con puntaje. */
+export const hamletCompleto: EventoVista = {
+  ...hamletDeMartin,
+  descripcion: "",
+  multimedia: [],
+  tiposEntrada: [
+    { id: "tipo-hamlet-platea", nombre: "Platea", descripcion: "Butacas de platea.", precio: 25000, cupo: 0 },
+    { id: "tipo-hamlet-pullman", nombre: "Pullman", descripcion: "", precio: 18000, cupo: 0 },
+  ],
+  organizador: { ...hamletEnCatalogo.organizador, puntaje: 4.5, cantidadResenias: 12 },
+};
+
+/** "Reseñas del organizador" (feature 012): por defecto, Lucía sin reseñas. */
+export function reseniasDelOrganizadorDeEjemplo(
+  cambios: Partial<ReseniasDelOrganizadorVista> = {},
+): ReseniasDelOrganizadorVista {
+  return { organizador: luciaOrganizadora, resenias: [], ...cambios };
+}
+
+/** Una reseña de la lista del organizador (feature 012): Valentina, 5 de 5, en Jazz en el Patio. */
+export function reseniaDelOrganizadorDeEjemplo(
+  cambios: Partial<ReseniaDelOrganizadorVista> = {},
+): ReseniaDelOrganizadorVista {
+  return {
+    id: "resenia-valentina-jazz-en-el-patio",
+    puntuacion: 5,
+    comentario: "Excelente organización, entramos rapidísimo.",
+    autor: { nombre: "Valentina", apellido: "Gómez" },
+    evento: { id: "evento-jazz-en-el-patio", nombre: "Jazz en el Patio" },
+    creadaEn: "2026-11-16T00:00:00.000Z",
+    creadaEnLocal: "2026-11-15T21:00",
+    ...cambios,
+  };
+}

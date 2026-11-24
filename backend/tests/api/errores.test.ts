@@ -4,6 +4,8 @@ import { crearApp } from "../../src/app";
 import { logger } from "../../src/config/logger";
 import { DatosInvalidosError, ReglaDeNegocioError } from "../../src/domain/errores";
 import type { RepositorioUsuarios } from "../../src/domain/repositorios";
+import * as errores from "../../src/errors/index";
+import { statusDe } from "../../src/middlewares/traducir-error";
 
 const app = crearApp();
 
@@ -12,6 +14,9 @@ function appConUsuariosQueFallan(error: unknown) {
   const usuarios: RepositorioUsuarios = {
     listar: () => Promise.reject(error),
     buscarPorId: () => Promise.reject(error),
+    listarPorIds: () => Promise.reject(error),
+    listarPorFavorito: () => Promise.reject(error),
+    guardar: () => Promise.reject(error),
   };
   return crearApp({ repositorios: { usuarios } });
 }
@@ -99,5 +104,55 @@ describe("errores transversales", () => {
     const espiaInfo = vi.spyOn(logger, "info");
     await request(app).get("/api/salud");
     expect(espiaInfo).toHaveBeenCalledWith(expect.stringMatching(/^GET \/api\/salud 200 \d+(\.\d)?ms$/));
+  });
+});
+
+describe("statusDe", () => {
+  it("todo error de aplicación exportado tiene su status (ninguno cae en 500)", () => {
+    const clases = Object.values(errores).filter(
+      (valor) => typeof valor === "function" && valor.prototype instanceof errores.ErrorAplicacion,
+    );
+    expect(clases.length).toBeGreaterThan(0);
+    for (const Clase of clases) {
+      // El status depende solo de la clase: se prueba sobre el prototipo, sin construir.
+      const instancia = Object.create(Clase.prototype) as errores.ErrorAplicacion;
+      expect({ clase: Clase.name, status: statusDe(instancia) }).not.toMatchObject({ status: 500 });
+    }
+  });
+
+  it("EntradaNoEncontradaError → 404 ENTRADA_NO_ENCONTRADA (feature 008)", async () => {
+    const error = new errores.EntradaNoEncontradaError();
+    expect(statusDe(error)).toBe(404);
+    const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");
+    expect(respuesta.status).toBe(404);
+    expect(respuesta.body).toEqual({
+      error: {
+        codigo: "ENTRADA_NO_ENCONTRADA",
+        mensaje: "No hay ninguna entrada con ese código en este evento.",
+      },
+    });
+  });
+
+  it("una referencia inválida responde 400 ENTRADA_INVALIDA con el detalle sobre body.<campo>", async () => {
+    const error = new errores.ReferenciaInvalidaError("categoriaId", "No existe la categoría.");
+    const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body).toEqual({
+      error: {
+        codigo: "ENTRADA_INVALIDA",
+        mensaje: "Los datos enviados no son válidos.",
+        detalles: [{ campo: "body.categoriaId", mensaje: "No existe la categoría." }],
+      },
+    });
+  });
+
+  it.each([
+    ["datos", "body.categoriaId"],
+    ["consulta", "query.categoriaId"],
+  ] as const)("una referencia inválida con origen %s sale sobre %s", async (origen, campo) => {
+    const error = new errores.ReferenciaInvalidaError("categoriaId", "No existe la categoría.", origen);
+    const respuesta = await request(appConUsuariosQueFallan(error)).get("/api/usuarios");
+    expect(respuesta.status).toBe(400);
+    expect(respuesta.body.error.detalles).toEqual([{ campo, mensaje: "No existe la categoría." }]);
   });
 });

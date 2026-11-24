@@ -19,5 +19,5 @@ const estilos = StyleSheet.create({
     padding: tema.espacio.amplio,
     gap: tema.espacio.medio,
   },
-  texto: { fontSize: tema.texto.normal, color: tema.colores.texto },
+  texto: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario },
 });

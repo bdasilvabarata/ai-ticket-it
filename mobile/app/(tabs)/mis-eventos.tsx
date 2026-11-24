@@ -1,5 +1,1 @@
-import { SeccionPendiente } from "../../src/componentes";
-
-export default function MisEventos() {
-  return <SeccionPendiente nombre="Mis eventos" />;
-}
+export { MisEventos as default } from "../../src/features/eventos";

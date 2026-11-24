@@ -16,4 +16,16 @@ export class UsuarioRepository implements RepositorioUsuarios {
   async buscarPorId(id: string): Promise<Usuario | null> {
     return this.#usuarios.get(id) ?? null;
   }
+
+  async listarPorIds(ids: readonly string[]): Promise<Usuario[]> {
+    return [...new Set(ids)].flatMap((id) => this.#usuarios.get(id) ?? []);
+  }
+
+  async listarPorFavorito(eventoId: string): Promise<Usuario[]> {
+    return [...this.#usuarios.values()].filter((usuario) => usuario.tieneFavorito(eventoId));
+  }
+
+  async guardar(usuario: Usuario): Promise<void> {
+    this.#usuarios.set(usuario.id, usuario);
+  }
 }

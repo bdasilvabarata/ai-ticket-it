@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { Evento, TipoEntrada } from "../../src/domain/evento";
 import { Usuario } from "../../src/domain/usuario";
 import { NoEncontradoError } from "../../src/errors/index";
+import { CerrojoPorClave } from "../../src/services/cerrojo-por-clave";
 import { UsuarioService } from "../../src/services/usuario.service";
 import { EventoRepository } from "../../src/repositories/evento.repository";
 import { UsuarioRepository } from "../../src/repositories/usuario.repository";
@@ -31,11 +32,14 @@ function eventoDe(organizadorId: string): Evento {
 
 function crearService(usuarios: Usuario[], eventos: Evento[] = []) {
   const repositorioEventos = new EventoRepository(eventos);
+  const repositorioUsuarios = new UsuarioRepository(usuarios);
+  const cerrojo = new CerrojoPorClave();
   const service = new UsuarioService({
-    usuarios: new UsuarioRepository(usuarios),
+    usuarios: repositorioUsuarios,
     eventos: repositorioEventos,
+    cerrojo,
   });
-  return { service, repositorioEventos };
+  return { service, repositorioEventos, repositorioUsuarios, cerrojo };
 }
 
 describe("UsuarioService.listar", () => {
@@ -81,7 +85,6 @@ describe("UsuarioService.obtener", () => {
     const { service } = crearService([lucia]);
     await expect(service.obtener("u9")).rejects.toMatchObject({
       constructor: NoEncontradoError,
-      status: 404,
       codigo: "USUARIO_NO_ENCONTRADO",
     });
   });
@@ -92,5 +95,186 @@ describe("UsuarioService.buscarPorId", () => {
     const { service } = crearService([lucia]);
     expect(await service.buscarPorId("u1")).toBe(lucia);
     expect(await service.buscarPorId("u9")).toBeNull();
+  });
+});
+
+describe("UsuarioService.obtenerOFallar", () => {
+  it("devuelve la entidad o lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([lucia]);
+    expect(await service.obtenerOFallar("u1")).toBe(lucia);
+    await expect(service.obtenerOFallar("u9")).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+});
+
+describe("UsuarioService.obtenerPorIds", () => {
+  it("devuelve los usuarios por id, en una sola lectura, aunque los ids se repitan", async () => {
+    const repositorio = new UsuarioRepository([lucia, martin, diego]);
+    const lecturas = vi.spyOn(repositorio, "listarPorIds");
+    const service = new UsuarioService({
+      usuarios: repositorio,
+      eventos: new EventoRepository(),
+      cerrojo: new CerrojoPorClave(),
+    });
+    const porId = await service.obtenerPorIds(["u2", "u1", "u2"]);
+    expect([...porId]).toEqual([
+      ["u2", martin],
+      ["u1", lucia],
+    ]);
+    expect(lecturas).toHaveBeenCalledTimes(1);
+  });
+
+  it("sin ids devuelve un Map vacío", async () => {
+    const { service } = crearService([lucia]);
+    expect((await service.obtenerPorIds([])).size).toBe(0);
+  });
+
+  it("si falta alguno lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([lucia]);
+    await expect(service.obtenerPorIds(["u1", "u9"])).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+});
+
+describe("UsuarioService.marcarFavorito (feature 014)", () => {
+  const conFavoritos = new Usuario({ id: "u1", nombre: "Lucía", apellido: "Álvarez", favoritos: ["e1"] });
+
+  it("guarda el usuario con el evento al final", async () => {
+    const { service, repositorioUsuarios } = crearService([conFavoritos]);
+    await service.marcarFavorito("u1", "e2");
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e1", "e2"]);
+  });
+
+  it("si ya lo tenía no guarda (idempotente)", async () => {
+    const { service, repositorioUsuarios } = crearService([conFavoritos]);
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    await service.marcarFavorito("u1", "e1");
+    expect(guardar).not.toHaveBeenCalled();
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e1"]);
+  });
+
+  it("un usuario inexistente lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([conFavoritos]);
+    await expect(service.marcarFavorito("u9", "e1")).rejects.toMatchObject({
+      constructor: NoEncontradoError,
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+
+  it("corre bajo el cerrojo con la clave usuario:<id> y relee el usuario adentro", async () => {
+    const { service, repositorioUsuarios, cerrojo } = crearService([conFavoritos]);
+    const orden: string[] = [];
+    const ejecutar = cerrojo.ejecutar.bind(cerrojo);
+    const espiaCerrojo = vi.spyOn(cerrojo, "ejecutar").mockImplementation((clave, operacion) => {
+      orden.push(`cerrojo:${clave}`);
+      return ejecutar(clave, async () => {
+        orden.push("adentro");
+        return operacion();
+      });
+    });
+    const buscarPorId = repositorioUsuarios.buscarPorId.bind(repositorioUsuarios);
+    vi.spyOn(repositorioUsuarios, "buscarPorId").mockImplementation((id) => {
+      orden.push(`leer:${id}`);
+      return buscarPorId(id);
+    });
+    await service.marcarFavorito("u1", "e2");
+    expect(espiaCerrojo).toHaveBeenCalledWith("usuario:u1", expect.any(Function));
+    expect(orden).toEqual(["cerrojo:usuario:u1", "adentro", "leer:u1"]);
+  });
+
+  it("dos marcas concurrentes del mismo usuario sobre eventos distintos conservan las dos", async () => {
+    const { service, repositorioUsuarios } = crearService([conFavoritos]);
+    const buscarPorId = repositorioUsuarios.buscarPorId.bind(repositorioUsuarios);
+    // Cede el turno entre leer y guardar: sin cerrojo, la segunda pisaría a la primera.
+    vi.spyOn(repositorioUsuarios, "buscarPorId").mockImplementation(async (id) => {
+      const usuario = await buscarPorId(id);
+      await new Promise((resolver) => setTimeout(resolver, 0));
+      return usuario;
+    });
+    await Promise.all([service.marcarFavorito("u1", "e2"), service.marcarFavorito("u1", "e3")]);
+    expect((await buscarPorId("u1"))?.favoritos).toEqual(["e1", "e2", "e3"]);
+  });
+});
+
+describe("UsuarioService.desmarcarFavorito (feature 014)", () => {
+  const conFavoritos = new Usuario({
+    id: "u1",
+    nombre: "Lucía",
+    apellido: "Álvarez",
+    favoritos: ["e1", "e2"],
+  });
+
+  it("guarda el usuario sin el evento", async () => {
+    const { service, repositorioUsuarios } = crearService([conFavoritos]);
+    await service.desmarcarFavorito("u1", "e1");
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e2"]);
+  });
+
+  it("si no lo tenía no guarda (idempotente)", async () => {
+    const { service, repositorioUsuarios } = crearService([conFavoritos]);
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    await service.desmarcarFavorito("u1", "e9");
+    expect(guardar).not.toHaveBeenCalled();
+  });
+
+  it("corre bajo el cerrojo con la clave usuario:<id>", async () => {
+    const { service, cerrojo } = crearService([conFavoritos]);
+    const espiaCerrojo = vi.spyOn(cerrojo, "ejecutar");
+    await service.desmarcarFavorito("u1", "e1");
+    expect(espiaCerrojo).toHaveBeenCalledWith("usuario:u1", expect.any(Function));
+  });
+
+  it("un usuario inexistente lanza 404 USUARIO_NO_ENCONTRADO", async () => {
+    const { service } = crearService([conFavoritos]);
+    await expect(service.desmarcarFavorito("u9", "e1")).rejects.toMatchObject({
+      codigo: "USUARIO_NO_ENCONTRADO",
+    });
+  });
+});
+
+describe("UsuarioService.quitarFavoritoDeTodos (feature 014, R5)", () => {
+  const conE1 = (usuario: Usuario, otros: string[] = []) =>
+    new Usuario({ ...usuario, favoritos: [...otros, "e1"] });
+
+  it("lo saca de todos los que lo tenían, de a uno bajo la clave de cada uno, conservando los demás", async () => {
+    const { service, repositorioUsuarios, cerrojo } = crearService([
+      conE1(lucia, ["e2"]),
+      martin,
+      conE1(diego, ["e3", "e4"]),
+    ]);
+    const listarPorFavorito = vi.spyOn(repositorioUsuarios, "listarPorFavorito");
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    const espiaCerrojo = vi.spyOn(cerrojo, "ejecutar");
+    await service.quitarFavoritoDeTodos("e1");
+    expect(listarPorFavorito).toHaveBeenCalledWith("e1");
+    expect(espiaCerrojo.mock.calls.map(([clave]) => clave)).toEqual(["usuario:u1", "usuario:u3"]);
+    expect(guardar).toHaveBeenCalledTimes(2);
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e2"]);
+    expect((await repositorioUsuarios.buscarPorId("u2"))?.favoritos).toEqual([]);
+    expect((await repositorioUsuarios.buscarPorId("u3"))?.favoritos).toEqual(["e3", "e4"]);
+  });
+
+  it("relee cada usuario adentro del cerrojo: no pisa un favorito marcado mientras tanto", async () => {
+    const { service, repositorioUsuarios } = crearService([conE1(lucia)]);
+    const listarPorFavorito = repositorioUsuarios.listarPorFavorito.bind(repositorioUsuarios);
+    // Entre la lista y la limpieza, el usuario marca otro evento.
+    vi.spyOn(repositorioUsuarios, "listarPorFavorito").mockImplementation(async (eventoId) => {
+      const usuarios = await listarPorFavorito(eventoId);
+      await service.marcarFavorito("u1", "e5");
+      return usuarios;
+    });
+    await service.quitarFavoritoDeTodos("e1");
+    expect((await repositorioUsuarios.buscarPorId("u1"))?.favoritos).toEqual(["e5"]);
+  });
+
+  it("sin usuarios que lo tengan no guarda nada", async () => {
+    const { service, repositorioUsuarios } = crearService([lucia, martin]);
+    const guardar = vi.spyOn(repositorioUsuarios, "guardar");
+    await service.quitarFavoritoDeTodos("e1");
+    expect(guardar).not.toHaveBeenCalled();
   });
 });

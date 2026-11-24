@@ -1,0 +1,481 @@
+import {
+  EstadoCompra,
+  type ChatDeLaCompraVista,
+  type CompraDelEventoVista,
+  type ComprasDelEventoVista,
+  type CompraVista,
+  type EntradaDelEventoVista,
+  type MensajeVista,
+  type MiCompraVista,
+  type MisComprasDelEventoVista,
+  type ParteDeLaCompraVista,
+  type ReseniaVista,
+  type VentanaDeUsoVista,
+} from "@ai-ticket-it/shared";
+
+import { festivalCompleto, maratonCompleta, paginaDe } from "./eventos";
+
+// Datos de compras para los tests de la feature 006.
+
+/** Lo que responde `renderConDependencias` si un test no registra `mis-compras` (R19). */
+export const sinCompras: MisComprasDelEventoVista = { pendientes: [], confirmadas: [], restantesPorTipo: [] };
+
+/** `mis-compras` con esos restantes por tipo y sin pendientes. */
+export function conRestantes(restantes: Record<string, number>): MisComprasDelEventoVista {
+  return {
+    pendientes: [],
+    confirmadas: [],
+    restantesPorTipo: Object.entries(restantes).map(([tipoEntradaId, cantidad]) => ({
+      tipoEntradaId,
+      restantes: cantidad,
+    })),
+  };
+}
+
+/** Una compra PENDIENTE de Martín: 2 inscripciones a la Maratón. */
+export const compraPendiente: CompraVista = {
+  id: "compra-nueva",
+  compradorId: "usuario-martin",
+  evento: {
+    id: maratonCompleta.id,
+    nombre: maratonCompleta.nombre,
+    fechaHora: maratonCompleta.fechaHora,
+    fechaHoraLocal: maratonCompleta.fechaHoraLocal,
+    realizado: false,
+  },
+  tipoEntrada: { id: "tipo-maraton-inscripcion", nombre: "Inscripción" },
+  cantidad: 2,
+  total: 60000,
+  estado: EstadoCompra.PENDIENTE,
+  creadaEn: "2026-11-12T18:20:00.000Z",
+  venceEn: "2026-11-12T18:35:00.000Z",
+  venceEnLocal: "2026-11-12T15:35",
+  historial: [
+    {
+      estado: EstadoCompra.PENDIENTE,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-12T18:20:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:20",
+    },
+  ],
+  entradas: [],
+  entradasUsadas: 0,
+  canceladaDesde: null,
+  reembolso: null,
+  cancelable: true,
+  motivoNoCancelable: null,
+  resenia: null,
+  puedeReseniar: false,
+};
+
+/** La reseña propia de Martín (feature 012): 4 de 5 con un comentario, salvo que se cambie. */
+export function reseniaDeEjemplo(cambios: Partial<ReseniaVista> = {}): ReseniaVista {
+  return {
+    id: "resenia-martin-maraton",
+    eventoId: maratonCompleta.id,
+    puntuacion: 4,
+    comentario: "Muy buena organización",
+    creadaEn: "2026-12-28T13:00:00.000Z",
+    creadaEnLocal: "2026-12-28T10:00",
+    ...cambios,
+  };
+}
+
+/** Los códigos de las 2 entradas de la compra de la Maratón, una vez pagada. */
+export const CODIGOS_DE_LA_MARATON = ["7K3MQ9TB", "4HXP2RVA"] as const;
+
+/** La misma compra, pagada por Martín: con sus 2 entradas y sus códigos. */
+export const compraConfirmada: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CONFIRMADA,
+  venceEn: null,
+  venceEnLocal: null,
+  entradas: CODIGOS_DE_LA_MARATON.map((codigo) => ({
+    codigo,
+    estado: EstadoCompra.CONFIRMADA,
+    usadaEn: null,
+    usadaEnLocal: null,
+  })),
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CONFIRMADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-12T18:25:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:25",
+    },
+  ],
+};
+
+/** La misma compra, con la primera entrada ya usada (feature 008): la compra queda UTILIZADA. */
+export const compraUtilizada: CompraVista = {
+  ...compraConfirmada,
+  estado: EstadoCompra.UTILIZADA,
+  entradasUsadas: 1,
+  cancelable: false,
+  motivoNoCancelable: "entrada-usada",
+  entradas: [
+    {
+      codigo: CODIGOS_DE_LA_MARATON[0],
+      estado: EstadoCompra.UTILIZADA,
+      usadaEn: "2026-12-27T10:40:00.000Z",
+      usadaEnLocal: "2026-12-27T07:40",
+    },
+    { codigo: CODIGOS_DE_LA_MARATON[1], estado: EstadoCompra.CONFIRMADA, usadaEn: null, usadaEnLocal: null },
+  ],
+  historial: [
+    ...compraConfirmada.historial,
+    {
+      estado: EstadoCompra.UTILIZADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: "2026-12-27T10:40:00.000Z",
+      fechaHoraLocal: "2026-12-27T07:40",
+    },
+  ],
+};
+
+/** La misma compra, vencida: CANCELADA por el sistema a los 15 minutos. */
+export const compraCancelada: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CANCELADA,
+  venceEn: null,
+  venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "sistema" },
+      fechaHora: "2026-11-12T18:35:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:35",
+    },
+  ],
+};
+
+/** La misma compra, cancelada por Martín antes de pagarla. */
+export const compraCanceladaPorElComprador: CompraVista = {
+  ...compraPendiente,
+  estado: EstadoCompra.CANCELADA,
+  venceEn: null,
+  venceEnLocal: null,
+  canceladaDesde: "PENDIENTE",
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
+  historial: [
+    ...compraPendiente.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-12T18:25:00.000Z",
+      fechaHoraLocal: "2026-11-12T15:25",
+    },
+  ],
+};
+
+/** Una compra PENDIENTE de 1 entrada gratis ("Carrera kids" de la Maratón). */
+export const compraGratis: CompraVista = {
+  ...compraPendiente,
+  tipoEntrada: { id: "tipo-maraton-kids", nombre: "Carrera kids" },
+  cantidad: 1,
+  total: 0,
+};
+
+/** La confirmada de la Maratón, cancelada por Martín antes del inicio: reembolso pendiente (feature 009). */
+export const compraCanceladaDesdeConfirmada: CompraVista = {
+  ...compraConfirmada,
+  estado: EstadoCompra.CANCELADA,
+  entradas: [],
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 60000 },
+  cancelable: false,
+  motivoNoCancelable: "cancelada",
+  historial: [
+    ...compraConfirmada.historial,
+    {
+      estado: EstadoCompra.CANCELADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-martin" },
+      fechaHora: "2026-11-13T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-13T09:00",
+    },
+  ],
+};
+
+/** La cancelada de la Maratón, con el reembolso ya confirmado por su organizadora (feature 009). */
+export const compraReembolsada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 60000 },
+  motivoNoCancelable: "reembolsada",
+  historial: [
+    ...compraCanceladaDesdeConfirmada.historial,
+    {
+      estado: EstadoCompra.REEMBOLSADA,
+      autor: { tipo: "usuario", usuarioId: "usuario-lucia" },
+      fechaHora: "2026-11-14T12:00:00.000Z",
+      fechaHoraLocal: "2026-11-14T09:00",
+    },
+  ],
+};
+
+/** Una CONFIRMADA de 1 entrada gratis ("Carrera kids" de la Maratón), cancelable (feature 009). */
+export const compraConfirmadaGratis: CompraVista = {
+  ...compraConfirmada,
+  tipoEntrada: { id: "tipo-maraton-kids", nombre: "Carrera kids" },
+  cantidad: 1,
+  total: 0,
+  entradas: [compraConfirmada.entradas[0]!],
+};
+
+/** La gratis confirmada, cancelada por Martín: sin reembolso (feature 009). */
+export const compraGratisCanceladaDesdeConfirmada: CompraVista = {
+  ...compraCanceladaDesdeConfirmada,
+  tipoEntrada: compraConfirmadaGratis.tipoEntrada,
+  cantidad: 1,
+  total: 0,
+  reembolso: null,
+};
+
+/**
+ * Una fila de "Mis compras" (feature 007) armada con una `CompraVista` (por defecto, la pendiente de
+ * la Maratón): sin `compradorId`, `historial`, `entradas`, `cancelable` ni `motivoNoCancelable`, con
+ * `diasRestantes` y `canceladaPor` en `null` salvo que se cambien.
+ */
+export function miCompra(
+  base: CompraVista = compraPendiente,
+  cambios: Partial<MiCompraVista> = {},
+): MiCompraVista {
+  const {
+    id,
+    evento,
+    tipoEntrada,
+    cantidad,
+    total,
+    estado,
+    creadaEn,
+    venceEn,
+    venceEnLocal,
+    entradasUsadas,
+    canceladaDesde,
+    reembolso,
+    resenia,
+    puedeReseniar,
+  } = base;
+  return {
+    id,
+    evento,
+    tipoEntrada,
+    cantidad,
+    total,
+    estado,
+    creadaEn,
+    venceEn,
+    venceEnLocal,
+    entradasUsadas,
+    canceladaDesde,
+    reembolso,
+    resenia,
+    puedeReseniar,
+    diasRestantes: null,
+    canceladaPor: null,
+    ...cambios,
+  };
+}
+
+// Datos de "Compras del evento" (feature 008): el Festival de Lucía (10/12 14:00).
+
+/**
+ * Una fila de "Compras del evento": Martín, 3 General del Festival, CONFIRMADA, salvo que se cambie.
+ * Si no se dan, `canceladaDesde` y `reembolso` siguen al estado (feature 009): una CANCELADA, desde
+ * PENDIENTE y sin reembolso; una REEMBOLSADA, desde CONFIRMADA con el reembolso confirmado.
+ */
+export function compraDelEvento(cambios: Partial<CompraDelEventoVista> = {}): CompraDelEventoVista {
+  const estado = cambios.estado ?? EstadoCompra.CONFIRMADA;
+  const total = cambios.total ?? 18000;
+  const reembolsada = estado === EstadoCompra.REEMBOLSADA;
+  return {
+    id: "compra-martin-general",
+    comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
+    tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+    cantidad: 3,
+    total: 18000,
+    estado: EstadoCompra.CONFIRMADA,
+    creadaEn: "2026-11-18T18:20:00.000Z",
+    creadaEnLocal: "2026-11-18T15:20",
+    venceEn: null,
+    venceEnLocal: null,
+    canceladaPor: null,
+    entradasUsadas: 0,
+    canceladaDesde: reembolsada ? "CONFIRMADA" : estado === EstadoCompra.CANCELADA ? "PENDIENTE" : null,
+    reembolso: reembolsada ? { estado: "confirmado", monto: total } : null,
+    mensajeSinResponder: false,
+    ...cambios,
+  };
+}
+
+/** Diego canceló sus 2 VIP después de pagarlas: el reembolso de $ 240.000 está pendiente (feature 009). */
+export const diegoConReembolsoPendiente = compraDelEvento({
+  id: "compra-diego-vip",
+  comprador: { id: "usuario-diego", nombre: "Diego", apellido: "Fernández" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 2,
+  total: 240000,
+  estado: EstadoCompra.CANCELADA,
+  canceladaPor: "usuario",
+  canceladaDesde: "CONFIRMADA",
+  reembolso: { estado: "pendiente", monto: 240000 },
+});
+
+/** La de Diego, ya reembolsada por Lucía (la respuesta del `POST …/reembolso` y la relectura). */
+export const diegoReembolsada = compraDelEvento({
+  ...diegoConReembolsoPendiente,
+  estado: EstadoCompra.REEMBOLSADA,
+  reembolso: { estado: "confirmado", monto: 240000 },
+});
+
+/** Valentina, 1 VIP cancelada y ya reembolsada (feature 009). */
+export const valentinaReembolsada = compraDelEvento({
+  id: "compra-valentina-vip",
+  comprador: { id: "usuario-valentina", nombre: "Valentina", apellido: "Gómez" },
+  tipoEntrada: { id: "tipo-festival-vip", nombre: "VIP" },
+  cantidad: 1,
+  total: 120000,
+  estado: EstadoCompra.REEMBOLSADA,
+  canceladaPor: "usuario",
+});
+
+/** La ventana de uso del Festival: de las 10:00 del 10/12 a las 02:00 del 11/12 (hora de Buenos Aires). */
+export function ventanaDelFestival(estado: VentanaDeUsoVista["estado"] = "antes"): VentanaDeUsoVista {
+  return {
+    desde: "2026-12-10T13:00:00.000Z",
+    hasta: "2026-12-11T05:00:00.000Z",
+    desdeLocal: "2026-12-10T10:00",
+    hastaLocal: "2026-12-11T02:00",
+    estado,
+  };
+}
+
+/** `GET /eventos/evento-festival/compras` con esas compras (por defecto, ninguna). */
+export function comprasDelFestival(
+  compras: CompraDelEventoVista[] = [],
+  cambios: Partial<ComprasDelEventoVista> = {},
+): ComprasDelEventoVista {
+  return {
+    evento: {
+      id: festivalCompleto.id,
+      nombre: festivalCompleto.nombre,
+      fechaHoraLocal: festivalCompleto.fechaHoraLocal,
+      realizado: false,
+    },
+    ventanaDeUso: ventanaDelFestival(),
+    resumenPorTipo: [],
+    compras,
+    comprasConMensajesSinResponder: compras.filter((compra) => compra.mensajeSinResponder).length,
+    cantidadCompras: compras.length,
+    pagina: paginaDe(compras.length),
+    ...cambios,
+  };
+}
+
+/**
+ * `GET /eventos/evento-festival/entradas/7K3MQ9TB`: una entrada de Martín, 3 General del Festival,
+ * CONFIRMADA y con la ventana abierta, salvo que se cambie (`compra` se mezcla).
+ */
+export function entradaDelEvento(
+  cambios: Omit<Partial<EntradaDelEventoVista>, "compra"> & {
+    compra?: Partial<EntradaDelEventoVista["compra"]>;
+  } = {},
+): EntradaDelEventoVista {
+  const { compra, ...resto } = cambios;
+  return {
+    codigo: "7K3MQ9TB",
+    estado: EstadoCompra.CONFIRMADA,
+    usadaEn: null,
+    usadaEnLocal: null,
+    ventanaDeUso: ventanaDelFestival("abierta"),
+    ...resto,
+    compra: {
+      id: "compra-martin-general",
+      comprador: { id: "usuario-martin", nombre: "Martín", apellido: "Benítez" },
+      tipoEntrada: { id: "tipo-festival-general", nombre: "General" },
+      cantidad: 3,
+      estado: EstadoCompra.CONFIRMADA,
+      entradasUsadas: 0,
+      ...compra,
+    },
+  };
+}
+
+// Chat de la compra (feature 011): la conversación del seed (R8) entre Martín y Lucía.
+
+/** Martín, comprador de la compra VIP del Festival. */
+export const martinComprador: ParteDeLaCompraVista = {
+  id: "usuario-martin",
+  nombre: "Martín",
+  apellido: "Benítez",
+  rol: "comprador",
+};
+
+/** Lucía, organizadora del Festival. */
+export const luciaOrganizadora: ParteDeLaCompraVista = {
+  id: "usuario-lucia",
+  nombre: "Lucía",
+  apellido: "Álvarez",
+  rol: "organizador",
+};
+
+/** Un mensaje de Martín a las 15:30 del 18/11, salvo que se cambie. */
+export function mensajeDeEjemplo(cambios: Partial<MensajeVista> = {}): MensajeVista {
+  return {
+    numero: 1,
+    autor: martinComprador,
+    texto: "Hola, ¿la entrada VIP incluye estacionamiento?",
+    enviadoEn: "2026-11-18T18:30:00.000Z",
+    enviadoEnLocal: "2026-11-18T15:30",
+    ...cambios,
+  };
+}
+
+/** Los tres mensajes del seed: Martín pregunta, Lucía responde y Martín agradece. */
+export const MENSAJES_DEL_SEED: MensajeVista[] = [
+  mensajeDeEjemplo(),
+  mensajeDeEjemplo({
+    numero: 2,
+    autor: luciaOrganizadora,
+    texto:
+      "¡Hola, Martín! Sí: con la entrada VIP tenés lugar en el estacionamiento del predio. Mostrá tu código en la barrera.",
+    enviadoEn: "2026-11-18T20:20:00.000Z",
+    enviadoEnLocal: "2026-11-18T17:20",
+  }),
+  mensajeDeEjemplo({
+    numero: 3,
+    texto: "¡Genial, gracias!",
+    enviadoEn: "2026-11-18T21:20:00.000Z",
+    enviadoEnLocal: "2026-11-18T18:20",
+  }),
+];
+
+/**
+ * El chat de la compra VIP del Festival visto por Martín (Festival, VIP, 2 entradas, CONFIRMADA, la
+ * otra parte es Lucía y los tres mensajes del seed), salvo que se cambie.
+ */
+export function chatDeEjemplo(cambios: Partial<ChatDeLaCompraVista> = {}): ChatDeLaCompraVista {
+  return {
+    compra: {
+      id: "compra-martin-festival-vip",
+      evento: { id: "evento-festival-sonidos-del-sur", nombre: "Festival Sonidos del Sur" },
+      tipoEntrada: { id: "tipo-festival-sonidos-del-sur-vip", nombre: "VIP" },
+      cantidad: 2,
+      estado: EstadoCompra.CONFIRMADA,
+    },
+    otraParte: luciaOrganizadora,
+    mensajes: MENSAJES_DEL_SEED,
+    ...cambios,
+  };
+}
+
+/** El mismo chat visto por Lucía: la otra parte es Martín. */
+export function chatVistoPorLucia(cambios: Partial<ChatDeLaCompraVista> = {}): ChatDeLaCompraVista {
+  return chatDeEjemplo({ otraParte: martinComprador, ...cambios });
+}

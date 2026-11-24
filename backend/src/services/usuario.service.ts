@@ -2,6 +2,7 @@ import type { UsuarioVista } from "@ai-ticket-it/shared";
 import type { RepositorioEventos, RepositorioUsuarios } from "../domain/repositorios";
 import { compararPorApellidoYNombre, type Usuario } from "../domain/usuario";
 import { NoEncontradoError } from "../errors/index";
+import type { Cerrojo } from "./cerrojo-por-clave";
 
 function aVista(usuario: Usuario, cantidadEventosOrganizados: number): UsuarioVista {
   return {
@@ -16,10 +17,24 @@ function aVista(usuario: Usuario, cantidadEventosOrganizados: number): UsuarioVi
 export class UsuarioService {
   readonly #usuarios: RepositorioUsuarios;
   readonly #eventos: RepositorioEventos;
+  readonly #cerrojo: Cerrojo;
 
-  constructor({ usuarios, eventos }: { usuarios: RepositorioUsuarios; eventos: RepositorioEventos }) {
+  /**
+   * `cerrojo` es la **misma** instancia que comparten los services de eventos (una por app,
+   * feature 014, research R4): las escrituras de un usuario usan la clave `usuario:<id>`.
+   */
+  constructor({
+    usuarios,
+    eventos,
+    cerrojo,
+  }: {
+    usuarios: RepositorioUsuarios;
+    eventos: RepositorioEventos;
+    cerrojo: Cerrojo;
+  }) {
     this.#usuarios = usuarios;
     this.#eventos = eventos;
+    this.#cerrojo = cerrojo;
   }
 
   async listar(): Promise<UsuarioVista[]> {
@@ -32,7 +47,7 @@ export class UsuarioService {
 
   /** Vista del usuario; 404 si no existe. */
   async obtener(id: string): Promise<UsuarioVista> {
-    const usuario = await this.#obtenerOFallar(id);
+    const usuario = await this.obtenerOFallar(id);
     const cantidades = await this.#eventos.contarPorOrganizador([id]);
     return aVista(usuario, cantidades.get(id) ?? 0);
   }
@@ -42,10 +57,62 @@ export class UsuarioService {
     return this.#usuarios.buscarPorId(id);
   }
 
-  /** Único lugar del service que busca por id y lanza 404 si no existe. */
-  async #obtenerOFallar(id: string): Promise<Usuario> {
+  /**
+   * Búsqueda en lote (sin N+1): los usuarios de esos ids en una sola lectura, por id. Todos tienen
+   * que existir: si falta alguno, 404 como `obtenerOFallar`.
+   */
+  async obtenerPorIds(ids: readonly string[]): Promise<Map<string, Usuario>> {
+    const usuarios = new Map((await this.#usuarios.listarPorIds(ids)).map((u) => [u.id, u]));
+    if (ids.some((id) => !usuarios.has(id))) {
+      throw new NoEncontradoError("USUARIO_NO_ENCONTRADO", "No existe el usuario.");
+    }
+    return usuarios;
+  }
+
+  /** Único lugar que busca un usuario por id y lanza 404 si no existe. Lo usa `EventoService`. */
+  async obtenerOFallar(id: string): Promise<Usuario> {
     const usuario = await this.#usuarios.buscarPorId(id);
     if (!usuario) throw new NoEncontradoError("USUARIO_NO_ENCONTRADO", "No existe el usuario.");
     return usuario;
+  }
+
+  /**
+   * Marca el evento como favorito del usuario (idempotente). No sabe si el evento existe: lo
+   * verifica `EventoService` antes de llamar (feature 014, research R3).
+   */
+  async marcarFavorito(usuarioId: string, eventoId: string): Promise<void> {
+    await this.#cambiarUsuario(usuarioId, (usuario) => usuario.marcarFavorito(eventoId));
+  }
+
+  /** Desmarca el evento de los favoritos del usuario (idempotente). */
+  async desmarcarFavorito(usuarioId: string, eventoId: string): Promise<void> {
+    await this.#cambiarUsuario(usuarioId, (usuario) => usuario.desmarcarFavorito(eventoId));
+  }
+
+  /**
+   * Saca el evento de los favoritos de todos los usuarios que lo tienen (feature 014, research R5):
+   * de a uno y bajo el cerrojo de cada uno, relee, desmarca y guarda. La llama `EventoService`
+   * después de eliminar el evento y de liberar su cerrojo (sin cerrojos anidados).
+   */
+  async quitarFavoritoDeTodos(eventoId: string): Promise<void> {
+    const usuarios = await this.#usuarios.listarPorFavorito(eventoId);
+    for (const { id } of usuarios) await this.desmarcarFavorito(id, eventoId);
+  }
+
+  /**
+   * Leer-modificar-guardar bajo el cerrojo del usuario: relee adentro, aplica el cambio y guarda
+   * solo si devolvió otro objeto (un cambio que no cambia nada no guarda).
+   */
+  async #cambiarUsuario(usuarioId: string, cambio: (usuario: Usuario) => Usuario): Promise<void> {
+    await this.#cerrojo.ejecutar(this.#claveDe(usuarioId), async () => {
+      const usuario = await this.obtenerOFallar(usuarioId);
+      const cambiado = cambio(usuario);
+      if (cambiado !== usuario) await this.#usuarios.guardar(cambiado);
+    });
+  }
+
+  /** Clave del cerrojo compartido: los ids de eventos nunca empiezan con `usuario:` (research R4). */
+  #claveDe(usuarioId: string): string {
+    return `usuario:${usuarioId}`;
   }
 }

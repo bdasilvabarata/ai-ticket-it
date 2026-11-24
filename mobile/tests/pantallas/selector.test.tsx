@@ -5,7 +5,8 @@ import { renderConDependencias, URL_DE_PRUEBA } from "../helpers/render-con-depe
 import { CLAVE_RECORDADO, lucia, todos } from "../helpers/usuarios";
 
 const TITULO = "¿Con quién querés operar?";
-const PENDIENTE = "Esta sección todavía no está disponible.";
+// Explorar con el catálogo vacío (feature 005; antes era una sección pendiente).
+const EXPLORAR = "Todavía no hay eventos próximos.";
 
 async function avanzar(ms: number) {
   await act(() => jest.advanceTimersByTimeAsync(ms));
@@ -92,7 +93,7 @@ describe("selector de usuario (sin usuario recordado)", () => {
 
     await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Lucía Álvarez" }));
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     expect(resultado.getPathname()).toBe("/");
     expect(JSON.parse((await AsyncStorage.getItem(CLAVE_RECORDADO)) ?? "null")).toEqual({
       version: 1,
@@ -113,7 +114,7 @@ describe("selector de usuario (sin usuario recordado)", () => {
     await fireEvent.press(fila);
     await avanzar(100);
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     expect(resultado.getPathname()).toBe("/");
     expect(setItem.mock.calls.filter(([clave]) => clave === CLAVE_RECORDADO)).toHaveLength(1);
   });
@@ -125,7 +126,7 @@ describe("selector de usuario (sin usuario recordado)", () => {
 
     await fireEvent.press(await screen.findByRole("button", { name: "Elegir a Lucía Álvarez" }));
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    expect(await screen.findByText(EXPLORAR)).toBeOnTheScreen();
     await expect(AsyncStorage.getItem(CLAVE_RECORDADO)).resolves.toBeNull();
     expect(warn).toHaveBeenCalled();
     warn.mockRestore();

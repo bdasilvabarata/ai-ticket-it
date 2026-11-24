@@ -21,7 +21,7 @@ export function FilaUsuario({ usuario, esActual, deshabilitada, alElegir }: Prop
       accessibilityState={{ disabled: deshabilitada, selected: esActual }}
       disabled={deshabilitada}
       onPress={() => alElegir(usuario)}
-      style={({ pressed }) => [estilos.fila, pressed && estilos.presionada]}
+      style={({ pressed }) => [estilos.fila, pressed && estilos.presionada, deshabilitada && estilos.apagada]}
     >
       <View style={estilos.textos}>
         <Text style={estilos.nombre}>{nombre}</Text>
@@ -38,17 +38,17 @@ const estilos = StyleSheet.create({
     alignItems: "center",
     paddingVertical: tema.espacio.fila,
     paddingHorizontal: tema.espacio.normal,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: tema.grosor.fino,
     borderBottomColor: tema.colores.borde,
     backgroundColor: tema.colores.fondo,
   },
-  presionada: { opacity: tema.opacidadApagado },
+  presionada: { backgroundColor: tema.colores.neutro },
+  apagada: { opacity: tema.opacidadApagado },
   textos: { flex: 1, gap: tema.espacio.minimo },
-  nombre: { fontSize: tema.texto.destacado, fontWeight: tema.peso.medio, color: tema.colores.texto },
-  detalle: { fontSize: tema.texto.chico, color: tema.colores.textoSecundario },
+  nombre: { ...tema.tipografia.tituloTarjeta, color: tema.colores.texto },
+  detalle: { ...tema.tipografia.secundario, color: tema.colores.textoSecundario },
   actual: {
-    fontSize: tema.texto.chico,
-    fontWeight: tema.peso.fuerte,
+    ...tema.tipografia.badge,
     color: tema.colores.primario,
     marginLeft: tema.espacio.medio,
   },

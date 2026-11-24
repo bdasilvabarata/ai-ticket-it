@@ -81,6 +81,14 @@ describe("reglas de dependencia de mobile (FR-008, FR-010)", () => {
     expect(lintear("mobile/app/x.tsx", codigo)).toContain("no-restricted-imports");
   });
 
+  it("(g) compras depende de eventos y no al revés: eventos → compras falla con import-x/no-cycle", () => {
+    // `features/compras` importa `features/eventos` por su index.ts (006, R12): si `eventos`
+    // importara `compras`, se cerraría un ciclo entre las dos features.
+    const codigo = `${leer("mobile/src/features/eventos/index.ts")}\nimport "../compras";\n`;
+
+    expect(lintear("mobile/src/features/eventos/index.ts", codigo)).toContain("import-x/no-cycle");
+  });
+
   it("(e) el código real no tiene errores de lint", () => {
     const resultados = correrEslint(["mobile"]);
     const errores = resultados.flatMap((resultado) =>

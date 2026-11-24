@@ -19,6 +19,29 @@ describe("crearRepositoriosDeEjemplo", () => {
     );
   });
 
+  it("carga las compras de ejemplo", async () => {
+    const { compras } = crearRepositoriosDeEjemplo(ahora);
+    expect(await compras.existePorEvento("evento-festival-sonidos-del-sur")).toBe(true);
+    expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-general")).toBe(true);
+    expect(await compras.existePorTipoEntrada("tipo-festival-sonidos-del-sur-backstage")).toBe(false);
+    expect(await compras.existePorEvento("evento-noche-de-rock")).toBe(false);
+    // Feature 009 (R11): la cancelada de Diego y la reembolsada de Valentina sobre el Maratón.
+    expect((await compras.listarPorEvento("evento-maraton-10k")).map((c) => c.id).toSorted()).toEqual([
+      "compra-diego-maraton-inscripcion",
+      "compra-valentina-maraton-inscripcion",
+    ]);
+  });
+
+  it("carga las reseñas de ejemplo (feature 012, R10)", async () => {
+    const { resenias } = crearRepositoriosDeEjemplo(ahora);
+    const esperados = crearDatosEjemplo(ahora);
+    const ids = esperados.eventos.map((e) => e.id);
+    expect((await resenias.listarPorEventos(ids)).map((r) => r.id).toSorted()).toEqual(
+      esperados.resenias.map((r) => r.id).toSorted(),
+    );
+    expect(await resenias.listarPorComprador("usuario-martin")).toEqual([]);
+  });
+
   it("es determinista: dos llamadas con el mismo instante dan los mismos datos", async () => {
     const primero = crearRepositoriosDeEjemplo(ahora);
     const segundo = crearRepositoriosDeEjemplo(ahora);
@@ -30,5 +53,7 @@ describe("crearRepositoriosDeEjemplo", () => {
     const segundo = crearRepositoriosDeEjemplo(ahora);
     expect(segundo.usuarios).not.toBe(primero.usuarios);
     expect(segundo.eventos).not.toBe(primero.eventos);
+    expect(segundo.compras).not.toBe(primero.compras);
+    expect(segundo.resenias).not.toBe(primero.resenias);
   });
 });

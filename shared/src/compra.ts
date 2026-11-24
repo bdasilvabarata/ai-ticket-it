@@ -1,0 +1,242 @@
+import type { EstadoCompra } from "./estado-compra";
+import type { PaginaVista } from "./paginacion";
+import type { ReseniaVista } from "./resenia";
+
+/** Límites de una compra: los usan la validación, el dominio y los textos de la app. */
+export const LIMITES_COMPRA = {
+  /** Entradas de tipos pagos por persona y por evento, sumando sus compras vigentes; también el máximo por pedido. */
+  entradasPorEvento: 4,
+  /** Entradas de cada tipo gratis por persona (aparte de las 4). */
+  entradasPorTipoGratis: 1,
+  /** Una compra PENDIENTE vence a los 15 minutos de su alta. */
+  minutosParaPagar: 15,
+} as const;
+
+/** Cuerpo de `POST /eventos/:eventoId/compras`: nunca lleva precio ni total. */
+export interface DatosCompra {
+  tipoEntradaId: string;
+  cantidad: number;
+}
+
+/** Quién hizo un cambio de estado: un usuario o el sistema (vencimiento). */
+export type AutorCambioEstadoVista = { tipo: "usuario"; usuarioId: string } | { tipo: "sistema" };
+
+/** Un cambio de estado del historial de una compra. */
+export interface CambioEstadoCompraVista {
+  estado: EstadoCompra;
+  autor: AutorCambioEstadoVista;
+  /** Instante ISO UTC (reloj del servidor). */
+  fechaHora: string;
+  /** "YYYY-MM-DDTHH:mm", hora de Buenos Aires. */
+  fechaHoraLocal: string;
+}
+
+/** Por qué una compra no se puede cancelar (lo decide el servidor al consultar; feature 009). */
+export type MotivoNoCancelable = "evento-empezado" | "entrada-usada" | "cancelada" | "reembolsada";
+
+/** El reembolso de una compra paga cancelada después de confirmada (feature 009). */
+export interface ReembolsoVista {
+  /** "pendiente" hasta que el organizador lo confirma; "confirmado" en una REEMBOLSADA. */
+  estado: "pendiente" | "confirmado";
+  /** Pesos enteros: el total fijado al comprar. */
+  monto: number;
+}
+
+/** Una compra, con su estado al día (una pendiente vencida ya se ve CANCELADA). */
+export interface CompraVista {
+  id: string;
+  compradorId: string;
+  evento: {
+    id: string;
+    nombre: string;
+    fechaHora: string;
+    fechaHoraLocal: string;
+    realizado: boolean;
+  };
+  tipoEntrada: { id: string; nombre: string };
+  cantidad: number;
+  /** Pesos enteros fijados al comprar; 0 = gratis. */
+  total: number;
+  estado: EstadoCompra;
+  /** Instante ISO UTC del alta. */
+  creadaEn: string;
+  /** Hasta cuándo se puede pagar (ISO UTC); `null` si no está PENDIENTE. */
+  venceEn: string | null;
+  /** `venceEn` en hora de Buenos Aires ("YYYY-MM-DDTHH:mm"); `null` si no está PENDIENTE. */
+  venceEnLocal: string | null;
+  /** En orden cronológico; el primero es siempre PENDIENTE. */
+  historial: CambioEstadoCompraVista[];
+  /** Sus entradas con código (feature 008): solo en CONFIRMADA o UTILIZADA; si no, []. Solo la ve su comprador. */
+  entradas: EntradaVista[];
+  /** Cuántas de sus entradas se usaron (feature 008). */
+  entradasUsadas: number;
+  /** Desde qué estado se canceló (feature 009). Solo en CANCELADA o REEMBOLSADA; si no, `null`. */
+  canceladaDesde: "PENDIENTE" | "CONFIRMADA" | null;
+  /** El reembolso de una paga cancelada después de confirmada (feature 009); si no, `null`. */
+  reembolso: ReembolsoVista | null;
+  /** Si su comprador la puede cancelar ahora (feature 009): `motivoNoCancelable === null`. Al día con el reloj del servidor. */
+  cancelable: boolean;
+  /** Por qué no se puede cancelar (feature 009); `null` si se puede. Al día con el reloj del servidor. */
+  motivoNoCancelable: MotivoNoCancelable | null;
+  /**
+   * La reseña de su comprador a este evento (feature 012), solo si la compra está UTILIZADA; si no,
+   * `null`. Dos compras UTILIZADA del mismo evento muestran la misma.
+   */
+  resenia: ReseniaVista | null;
+  /** Si su comprador puede reseñar el evento desde esta compra (feature 012): UTILIZADA y sin reseña. */
+  puedeReseniar: boolean;
+}
+
+/**
+ * Una fila de "Mis compras" (feature 007): la compra al día con su evento y su tipo actuales, sin
+ * historial ni entradas (conserva `entradasUsadas`, feature 008) y sin si se puede cancelar (en
+ * "Mis compras" no se cancela; feature 009).
+ */
+export type MiCompraVista = Omit<
+  CompraVista,
+  "compradorId" | "historial" | "entradas" | "cancelable" | "motivoNoCancelable"
+> & {
+  /** Días de calendario (Buenos Aires) hasta el evento; solo en CONFIRMADA de un evento no realizado; si no, null. */
+  diasRestantes: number | null;
+  /**
+   * Solo CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA ("sistema" si venció sin pagarse,
+   * "usuario" si la canceló su comprador); si no, null.
+   */
+  canceladaPor: "sistema" | "usuario" | null;
+};
+
+/** Respuesta de `GET /eventos/:eventoId/mis-compras` (del usuario actual). */
+export interface MisComprasDelEventoVista {
+  /** Sus compras PENDIENTE no vencidas de ese evento, de la más vieja a la más nueva. */
+  pendientes: CompraVista[];
+  /** Sus compras CONFIRMADA y UTILIZADA de ese evento (sus entradas), de la más nueva a la más vieja. */
+  confirmadas: CompraVista[];
+  /** Cuántas entradas más puede comprar de cada tipo según su tope (todos los tipos; 0 si es el organizador). */
+  restantesPorTipo: { tipoEntradaId: string; restantes: number }[];
+}
+
+/** Una entrada de una compra (feature 008): una por unidad comprada. */
+export interface EntradaVista {
+  /** Canónico, 8 caracteres (la app lo muestra "XXXX-XXXX"). */
+  codigo: string;
+  estado: EstadoCompra;
+  /** Cuándo se registró su uso (ISO UTC); `null` si no se usó. */
+  usadaEn: string | null;
+  /** `usadaEn` en hora de Buenos Aires ("YYYY-MM-DDTHH:mm"); `null` si no se usó. */
+  usadaEnLocal: string | null;
+}
+
+/** Ventana en la que el organizador puede registrar el uso de las entradas de un evento. */
+export interface VentanaDeUsoVista {
+  /** Instante ISO UTC: 4 horas antes del inicio. */
+  desde: string;
+  /** Instante ISO UTC: 12 horas después del inicio. */
+  hasta: string;
+  /** `desde` en hora de Buenos Aires ("YYYY-MM-DDTHH:mm"). */
+  desdeLocal: string;
+  /** `hasta` en hora de Buenos Aires ("YYYY-MM-DDTHH:mm"). */
+  hastaLocal: string;
+  /** Según el reloj del servidor al responder; "abierta" con ambos extremos inclusive. */
+  estado: "antes" | "abierta" | "despues";
+}
+
+/** El comprador de una compra, como lo ve el organizador del evento. */
+export interface CompradorVista {
+  id: string;
+  nombre: string;
+  apellido: string;
+}
+
+/** Cómo viene la venta de un tipo de entrada, al día. */
+export interface ResumenTipoEntradaVista {
+  tipoEntrada: { id: string; nombre: string };
+  /** El cupo disponible del tipo (el mismo que muestra el detalle). */
+  disponibles: number;
+  /** Entradas de compras PENDIENTE no vencidas. */
+  pendientes: number;
+  /** Entradas de compras CONFIRMADA o UTILIZADA. */
+  vendidas: number;
+  /** Entradas UTILIZADA. */
+  usadas: number;
+}
+
+/** Una fila de "Compras del evento" (la ve el organizador): sin códigos de entrada ni historial. */
+export interface CompraDelEventoVista {
+  id: string;
+  comprador: CompradorVista;
+  tipoEntrada: { id: string; nombre: string };
+  cantidad: number;
+  /** Pesos enteros fijados al comprar; 0 = gratis. */
+  total: number;
+  estado: EstadoCompra;
+  /** Instante ISO UTC del alta. */
+  creadaEn: string;
+  /** `creadaEn` en hora de Buenos Aires ("YYYY-MM-DDTHH:mm"). */
+  creadaEnLocal: string;
+  /** Hasta cuándo se puede pagar (ISO UTC); solo en PENDIENTE, si no, `null`. */
+  venceEn: string | null;
+  /** `venceEn` en hora de Buenos Aires; solo en PENDIENTE, si no, `null`. */
+  venceEnLocal: string | null;
+  /**
+   * Solo CANCELADA o REEMBOLSADA: el autor del cambio a CANCELADA ("sistema" si venció sin pagarse,
+   * "usuario" si la canceló su comprador); si no, `null`.
+   */
+  canceladaPor: "sistema" | "usuario" | null;
+  /** Cuántas de sus entradas ya se usaron. */
+  entradasUsadas: number;
+  /** Desde qué estado se canceló (feature 009). Solo en CANCELADA o REEMBOLSADA; si no, `null`. */
+  canceladaDesde: "PENDIENTE" | "CONFIRMADA" | null;
+  /** El reembolso de una paga cancelada después de confirmada (feature 009); si no, `null`. */
+  reembolso: ReembolsoVista | null;
+  /**
+   * El último mensaje del chat de la compra es de su comprador: el organizador todavía no le contestó
+   * (docs/mejoras-organizador.md, grupo 4). Derivado del chat, sin estado de lectura; sin mensajes, `false`.
+   */
+  mensajeSinResponder: boolean;
+}
+
+/** Respuesta de `GET /eventos/:eventoId/compras` (solo el organizador). */
+export interface ComprasDelEventoVista {
+  evento: { id: string; nombre: string; fechaHoraLocal: string; realizado: boolean };
+  /** De todas las compras: no depende de la página ni del filtro (feature 013, FR-016). */
+  ventanaDeUso: VentanaDeUsoVista;
+  /** Todos los tipos, en el orden del evento, con todas las compras (FR-016). */
+  resumenPorTipo: ResumenTipoEntradaVista[];
+  /**
+   * La página pedida de las compras filtradas (feature 013, hasta 10), de la más nueva a la más
+   * vieja (desempate por id).
+   */
+  compras: CompraDelEventoVista[];
+  /**
+   * Cuántas compras del evento tienen `mensajeSinResponder`: de todas, no depende de la página ni
+   * del filtro (feature 013, FR-016).
+   */
+  comprasConMensajesSinResponder: number;
+  /** Cuántas compras tiene el evento, sin filtro (decide los chips y el vacío, FR-017). */
+  cantidadCompras: number;
+  /** La página entregada de las compras filtradas; `totalElementos` es el de la lista filtrada. */
+  pagina: PaginaVista;
+}
+
+/** Respuesta de `GET /eventos/:eventoId/entradas/:codigo` y de `POST …/uso` (solo el organizador). */
+export interface EntradaDelEventoVista extends EntradaVista {
+  compra: {
+    id: string;
+    comprador: CompradorVista;
+    tipoEntrada: { id: string; nombre: string };
+    cantidad: number;
+    estado: EstadoCompra;
+    entradasUsadas: number;
+  };
+  ventanaDeUso: VentanaDeUsoVista;
+}
+
+/** Query de `GET /eventos/:eventoId/compras` (feature 013); el servidor filtra antes de paginar. */
+export interface ConsultaComprasDelEvento {
+  /** Página pedida, desde 1. Sin valor: la 1. */
+  pagina?: number;
+  /** Solo las compras en ese estado. Sin valor: todas. */
+  estado?: EstadoCompra;
+  /** Solo las que tienen un mensaje del comprador sin responder. Sin valor: `false`. */
+  sinResponder?: boolean;
+}

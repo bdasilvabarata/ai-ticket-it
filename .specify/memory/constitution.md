@@ -1,3 +1,14 @@
+<!--
+Sync Impact Report
+- Versión: 2.5.1 → 2.5.2 (PATCH: aclaración de redacción, ninguna regla cambia; feature 010).
+- Secciones modificadas: "Entidades" (la Entrada guarda su uso y su cancelación, cada uno con
+  quién y cuándo, en lugar de "un estado y sus cambios de estado propios") y "Estado de una
+  entrada" ("con su propio cambio de estado" → "registrando su uso").
+- Secciones agregadas / eliminadas: ninguna.
+- Plantillas: plan-template.md, spec-template.md y tasks-template.md ✅ sin cambios necesarios.
+- Pendientes: AGENTS.md describe la Entrada nueva en la Fase 9 de la 010 (T017).
+-->
+
 # AI Ticket It — Constitution
 
 ## Dominio del Sistema
@@ -15,7 +26,8 @@ es `docs/consigna/consigna.md` (casos de uso UC-01 a UC-12).
 - **Comprador**: explora y busca eventos, compra entradas, ve sus compras, chatea sobre una
   compra, la cancela y reseña eventos a los que asistió.
 - **Organizador**: crea eventos y sus tipos de entrada, ve las compras de sus eventos,
-  responde mensajes y registra el uso de entradas.
+  confirma los reembolsos de las compras canceladas de sus eventos, responde mensajes y
+  registra el uso de entradas.
 
 Ambos roles son un mismo **Usuario** (como en el diagrama de la consigna): una persona puede
 comprar entradas y también organizar eventos. El rol se determina por la relación con el
@@ -29,7 +41,12 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   uno o más **TipoEntrada** embebidos.
 - **TipoEntrada**: nombre, descripción, precio y cupo. Pertenece a un único evento.
 - **Compra**: comprador, evento, tipo de entrada, cantidad, total, estado, historial de
-  **CambioEstadoCompra** (estado, quién, fecha y hora) y **Mensajes** (usuario, texto, enviado).
+  **CambioEstadoCompra** (estado, quién, fecha y hora), sus **Entradas** y **Mensajes** (usuario,
+  texto, enviado).
+- **Entrada**: una por unidad comprada, creada al registrar la compra; un **código** propio, corto
+  y legible, que no se repite entre entradas (es su identificador), su **uso** y su
+  **cancelación**, cada uno con quién y cuándo (o ninguno). Pertenece a una única compra y vive
+  dentro de su agregado.
 - **Resenia**: comprador, evento, puntuación y detalle.
 
 ### Reglas de Dominio (invariantes)
@@ -38,10 +55,14 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   establece al crear el tipo (por ejemplo, 300) y disminuye en la cantidad de cada compra que
   se registra. Una compra NO PUEDE dejar el cupo por debajo de 0, ni siquiera ante compras
   concurrentes.
-- **Cupo atómico**: verificar que hay cupo y descontarlo DEBEN ocurrir en un mismo tramo
-  síncrono de código, **sin ningún `await` entre la verificación y el descuento**. Node ejecuta
-  un tramo síncrono por vez, así ninguna otra compra puede intercalarse y leer el mismo cupo.
-  Lo mismo vale para devolver cupo al cancelar y para todo cambio de estado de una compra.
+- **Operaciones atómicas por evento**: verificar una regla y modificar un evento, sus tipos de
+  entrada o sus compras (por ejemplo, que hay cupo y descontarlo) DEBEN ocurrir en un mismo
+  tramo síncrono de código o **bajo el cerrojo de ese evento**, de modo que ninguna otra
+  operación sobre el mismo evento se intercale entre la verificación y la modificación.
+  Dentro del cerrojo, la operación DEBE volver a leer lo que verifica; el cerrojo se libera
+  siempre, también ante un error, y no se anidan cerrojos. Lo mismo vale para devolver cupo
+  al cancelar y para todo cambio de estado de una compra. Las operaciones sobre eventos
+  distintos no se esperan entre sí.
 - **Total**: lo calcula el servidor como `precio × cantidad` al momento de comprar. El cliente
   nunca envía precios ni totales.
 - **Estados de una compra** — solo estas transiciones son válidas:
@@ -50,8 +71,19 @@ recurso (comprador de la compra u organizador del evento), no por un atributo de
   - `CONFIRMADA → UTILIZADA` (el organizador registra el ingreso)
   - `CONFIRMADA → CANCELADA → REEMBOLSADA`
   Todo cambio de estado DEBE registrar un `CambioEstadoCompra` con quién y cuándo.
-- **Cancelación**: una compra NO PUEDE cancelarse si está `UTILIZADA` o si el evento ya se
-  realizó. Las entradas de una compra cancelada vuelven al cupo disponible.
+- **Estado de una entrada**: hasta que la compra se confirma, el estado de cada entrada es el de
+  la compra (también al vencer una pendiente: sus entradas quedan canceladas) y no se guarda por
+  separado. Desde `CONFIRMADA`, cada entrada cambia de estado por separado: el organizador
+  registra el uso de una entrada (`CONFIRMADA → UTILIZADA`), registrando su uso (quién y
+  cuándo). El uso de la **primera** entrada pasa la compra a `UTILIZADA` (con su cambio
+  de estado, mismo autor y fecha y hora); las demás siguen `CONFIRMADA` y se pueden usar igual,
+  sin sumar cambios a la compra. Una compra está `UTILIZADA` si y solo si al menos una de sus
+  entradas lo está.
+- **Cancelación**: una compra `CONFIRMADA` NO PUEDE cancelarse una vez que el evento empezó
+  (desde su fecha y hora de inicio, inclusive, según el reloj del servidor), y una `UTILIZADA`
+  no se cancela nunca. Una compra `PENDIENTE` SÍ PUEDE pasar a `CANCELADA` con el evento ya
+  empezado (por ejemplo, al vencer sin pagarse). Las entradas de una compra cancelada vuelven
+  al cupo disponible.
 - **Reseñas**: solo puede reseñar un evento quien tenga una compra `UTILIZADA` de ese evento,
   una única vez por evento. La puntuación es un entero de 1 a 5.
 - **Puntaje del organizador**: promedio de las puntuaciones de las reseñas de sus eventos.
@@ -108,12 +140,12 @@ El backend respeta estas capas; las dependencias van siempre hacia abajo:
 backend/src/
   routes/        ← declara endpoints y encadena middlewares + controller
   controllers/   ← HTTP: toma la request ya validada, llama al service, arma la response
-  services/      ← casos de uso: orquesta repositories y domain, verifica permisos
-  repositories/  ← único acceso a los datos (en memoria); guarda y devuelve entidades
+  services/      ← casos de uso: orquesta repositories, domain y otros services, verifica permisos
+  repositories/  ← único acceso a los datos (en memoria); guarda y devuelve entidades, da ids nuevos
   domain/        ← entidades con comportamiento y reglas de negocio puras
   middlewares/   ← identificación de usuario, logging, 404, registro y respuesta de errores
   validations/   ← esquemas de entrada (zod) y su middleware de validación
-  errors/        ← errores de aplicación tipados
+  errors/        ← errores de aplicación tipados, sin status (lo asigna el error handler)
   config/        ← entorno, arranque y logging
   docs/          ← especificación OpenAPI de la API
   app.ts         ← composition root: instancia y conecta repositories → services → controllers
@@ -132,6 +164,25 @@ backend/src/
   sus colaboradores por constructor. Los services dependen de interfaces de repositorio
   (`domain/repositorios.ts`), no de una implementación. Solo el composition root instancia y
   conecta las piezas; ningún módulo usa instancias globales de otra capa.
+- **Services que se apoyan en el dueño de cada entidad** (referencia: `2026-2c-lu-sa-grupo-1`,
+  rama `develop`):
+  - Cada entidad tiene **un** service dueño, el único que la busca por id y lanza su 404
+    (`obtenerOFallar`). Los demás services se la piden a ese service: NO DEBEN repetir la
+    búsqueda ni el 404.
+  - Una referencia que llega en la entrada (por ejemplo, `categoriaId`) se valida con
+    `buscarReferenciada` del service dueño: si no existe, es un dato inválido (400 sobre el
+    campo), no un 404 del recurso pedido.
+  - Las dependencias entre services NO DEBEN formar ciclos y van del que usa al dueño de la
+    entidad; las conecta `app.ts`, en orden.
+  - Un service usa directamente los repositorios de **su agregado** (por ejemplo,
+    `TipoEntradaService` guarda con `RepositorioEventos`, porque `TipoEntrada` vive dentro de
+    `Evento`). Sobre otro agregado solo hace consultas de existencia o conteo (`existePor…`,
+    `contarPor…`).
+  - **Búsquedas en lote, sin N+1**: cuando un caso de uso necesita varias entidades de otro
+    agregado, se las pide en **una** llamada al service dueño (`obtenerPorIds(ids)`, que
+    devuelve un `Map` por id y se apoya en `listarPorIds` del repositorio). El cruce lo hace el
+    dueño, no el service que lo usa.
+- Los **ids nuevos los da el repositorio** (`siguienteId()`); los services NO DEBEN generar ids.
 - Los controllers NO DEBEN contener reglas de negocio ni acceder a repositories.
 - Cómo se almacenan los datos (estructuras internas de los repositorios) NO DEBE filtrarse
   por encima de `repositories/`: los repositories reciben y devuelven entidades de dominio y no
@@ -139,11 +190,17 @@ backend/src/
 - Los controllers NO usan `try/catch` para responder errores: los services lanzan errores de
   `errors/`; un middleware **registra** los errores y el **error handler** centralizado los
   traduce a HTTP (dos responsabilidades, dos middlewares).
+- `errors/` NO DEBE conocer HTTP: cada error de aplicación lleva código y mensaje, y el status
+  lo asigna el error handler con una tabla clase → status. Ningún error de aplicación queda
+  sin status (lo verifica un test).
 - La validación de forma de la entrada vive en `validations/` (esquemas y su middleware);
   las reglas de negocio viven en `domain/` y `services/`.
 
 **Rationale**: la lógica se testea sin servidor ni base, y cada capa tiene una sola razón
-para cambiar.
+para cambiar. Que cada entidad tenga un único service dueño evita repetir búsquedas y errores
+en varios services, y prohibir los ciclos mantiene el grafo de dependencias legible. Esto
+revoca el anti-patrón "un service que llama a otro service" de la investigación de la 004
+(`specs/004-crear-evento/research.md`, R1), que se conserva como registro histórico.
 
 ### IV. Persistencia en Memoria
 
@@ -157,8 +214,13 @@ para cambiar.
   servidor (`crypto.randomUUID()`). Los datos de ejemplo usan **ids legibles y fijos** en
   kebab-case con el tipo como prefijo (`usuario-lucia`, `evento-noche-de-rock`), estables entre
   arranques para que la app, la demo, Postman y los tests puedan referirlos.
-- Las operaciones que protegen invariantes cumplen la regla de **cupo atómico** del dominio:
-  verificar y modificar en un mismo tramo síncrono, sin `await` en el medio.
+- **Códigos de entrada**: una entrada no tiene id aparte; su identificador es el código, que
+  también da el repositorio (como los ids) y DEBE ser único entre todas las entradas. En los
+  datos de ejemplo, los códigos son fijos.
+- Las operaciones que protegen invariantes cumplen la regla de **operaciones atómicas por
+  evento** del dominio: verificar y modificar en un mismo tramo síncrono o bajo el cerrojo del
+  evento. El cerrojo es una única instancia por app, inyectada por constructor desde el
+  composition root (nunca estado global ni `static`).
 - Cada instancia de la app (y cada test) tiene sus propios repositorios: no hay estado global.
 
 **Rationale**: es lo que pide la consigna, se lee sin conocer ninguna base de datos y los
@@ -189,8 +251,8 @@ contra el contrato, y que la app muestre mensajes de error útiles.
 - No hay registro ni contraseñas (fuera del alcance del TP). La app elige un usuario de los
   precargados y el backend lo identifica por el header `X-Usuario-Id` mediante un middleware.
 - Los services DEBEN verificar la relación con el recurso: un comprador solo ve y opera sus
-  compras; un organizador solo ve las compras de sus eventos; el chat de una compra es solo de
-  sus dos partes.
+  compras; un organizador solo ve las compras de sus eventos y solo confirma sus reembolsos; el
+  chat de una compra es solo de sus dos partes.
 - Las respuestas DEBEN devolver vistas explícitas (campos elegidos), no documentos completos.
 
 **Rationale**: permite demostrar ambos roles en un mismo dispositivo sin implementar
@@ -226,8 +288,9 @@ y desalineaciones.
 
 - TypeScript en modo `strict` en todos los paquetes.
 - `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check` (Prettier) DEBEN
-  pasar antes de cerrar una tarea y antes de abrir un PR. El CI de GitHub Actions los corre en
-  cada PR a `development` y `main`.
+  pasar antes de cerrar una fase de `tasks.md` y antes de abrir un PR. El CI de GitHub Actions
+  los corre completos, sin caché, en cada PR y cada push a `development` y `main`. Durante una
+  fase, la verificación sigue "Verificación durante el desarrollo" (Flujo de Trabajo).
 - Prohibido `any` explícito, `@ts-ignore` o `eslint-disable` sin un comentario que lo
   justifique.
 - Simplicidad primero: no se agrega una abstracción, dependencia o capa que la spec no
@@ -269,6 +332,31 @@ Si una feature queda bloqueada por otra que no está integrada:
 2. se crea la rama desde la feature de la que depende y se rebasa sobre `development` cuando
    esa dependencia se integre.
 
+### Verificación durante el desarrollo
+
+- **Ciclo de TDD**: en cada rojo y cada verde se corre **solo el test de la tarea**, por archivo
+  (`npm run test:foco -w backend|mobile -- <archivos>`, o `npm run test:afectados -w backend`),
+  con salida resumida (Vitest `--reporter=dot`, Jest `--silent`). La suite completa no se corre
+  en cada ciclo.
+- **Cierre de fase y PR**: al cerrar cada fase de `tasks.md` y antes de abrir el PR se corren
+  completos `npm test`, `npm run lint`, `npm run typecheck` y `npm run format:check`, y DEBEN
+  quedar en verde. Una fase no se da por cerrada con solo los tests focalizados.
+- **Hook `Stop`** (`.claude/hooks/verificar-al-terminar.mjs`): al terminar cada turno verifica
+  typecheck y lint de los paquetes con archivos cambiados desde la última verificación exitosa
+  (`shared/` → los tres paquetes; configuración de la raíz → todo el repo; solo Markdown → nada),
+  con `tsc --incremental` y `eslint --cache`. Si falla, DEBE bloquear el cierre del turno. No corre
+  tests.
+- **CI**: no cambia con esta sección. Corre formato, lint, tipos y tests completos y sin caché en
+  cada PR y cada push a `development` y `main`, y es la verificación que decide la integración.
+- **Implement por fases**: `/speckit-implement` se corre de a una fase de `tasks.md`, con contexto
+  limpio entre fases. `/speckit-tasks` agrupa las tareas triviales (stubs con firma real,
+  re-exports de `app/`) con la tarea que las necesita, en vez de listarlas una por una.
+
+**Rationale**: la suite de mobile tarda alrededor de un minuto; correrla en cada ciclo de TDD
+multiplicaba el tiempo de implementación sin aportar más información que el test de la tarea. La
+suite completa al cierre de cada fase y el CI sin caché conservan la garantía de calidad del
+principio IX.
+
 ### Commits
 
 Conventional Commits en español, con el scope de la feature:
@@ -286,4 +374,4 @@ tareas.
   sección · PATCH: aclaraciones), y la fecha de última enmienda.
 - La guía operativa para agentes está en `AGENTS.md`.
 
-**Version**: 2.0.0 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-07
+**Version**: 2.5.2 | **Ratified**: 2026-11-02 | **Last Amended**: 2026-11-20

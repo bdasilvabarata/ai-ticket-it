@@ -42,3 +42,5 @@ mobile/.metro-health-check*
 
 # Expo genera este archivo al levantar el servidor (rutas tipadas, feature 003)
 mobile/expo-env.d.ts
+
+docs/Gemini

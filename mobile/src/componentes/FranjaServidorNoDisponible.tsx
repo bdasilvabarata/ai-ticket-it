@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useEffect } from "react";
 import { AccessibilityInfo, StyleSheet, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -28,6 +29,13 @@ export function FranjaServidorNoDisponible({
 
   return (
     <View style={[estilos.franja, { paddingTop: top + tema.espacio.chico }]}>
+      <Ionicons
+        name="cloud-offline-outline"
+        size={tema.tamano.icono}
+        color={tema.colores.avisoTexto}
+        accessibilityElementsHidden
+        importantForAccessibility="no"
+      />
       {/* El rol va en el texto y no en el contenedor: así el botón sigue siendo un elemento aparte. */}
       <Text accessibilityRole="alert" accessibilityLiveRegion="polite" style={estilos.texto}>
         {`Servidor no disponible · ${urlBase}`}
@@ -52,8 +60,8 @@ const estilos = StyleSheet.create({
     paddingHorizontal: tema.espacio.normal,
     paddingBottom: tema.espacio.chico,
     backgroundColor: tema.colores.avisoFondo,
-    borderBottomWidth: 1,
+    borderBottomWidth: tema.grosor.normal,
     borderBottomColor: tema.colores.borde,
   },
-  texto: { flexGrow: 1, flexShrink: 1, fontSize: tema.texto.chico, color: tema.colores.avisoTexto },
+  texto: { ...tema.tipografia.mensaje, flexGrow: 1, flexShrink: 1, color: tema.colores.avisoTexto },
 });

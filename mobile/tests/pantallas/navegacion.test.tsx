@@ -5,8 +5,6 @@ import { botonesDePestanas, irAPestana } from "../helpers/pestanas";
 import { renderConDependencias } from "../helpers/render-con-dependencias";
 import { lucia, todos } from "../helpers/usuarios";
 
-const PENDIENTE = "Esta sección todavía no está disponible.";
-
 function entrarConfirmado() {
   return renderConDependencias({
     usuarioRecordado: lucia.id,
@@ -21,7 +19,8 @@ describe("navegación principal (US3)", () => {
   it("muestra las cuatro pestañas en orden y con texto, y abre Explorar (US3-1, FR-017)", async () => {
     const resultado = await entrarConfirmado();
 
-    expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+    // Explorar ya no es una sección pendiente (feature 005): muestra el catálogo, acá vacío.
+    expect(await screen.findByText("Todavía no hay eventos próximos.")).toBeOnTheScreen();
     const pestanas = botonesDePestanas();
     expect(pestanas.map((boton) => boton.props.accessibilityLabel)).toEqual([
       "Explorar, tab, 1 of 4",
@@ -36,19 +35,15 @@ describe("navegación principal (US3)", () => {
     expect(resultado.getPathname()).toBe("/");
   });
 
-  it.each([
-    ["Mis compras", "/mis-compras"],
-    ["Mis eventos", "/mis-eventos"],
-    ["Explorar", "/"],
-  ])("la pestaña %s muestra su nombre y que todavía no está disponible (US3-2)", async (nombre, ruta) => {
+  // Ninguna pestaña es ya una sección pendiente: Mis eventos (004), Explorar (005) y Mis compras
+  // (007) las prueban tests/pantallas/mis-eventos, explorar y mis-compras.
+  it("la pestaña Mis compras abre la lista de compras del usuario", async () => {
     const resultado = await entrarConfirmado();
-    await screen.findByText(PENDIENTE);
-    if (nombre === "Explorar") await irAPestana("Mis compras"); // para volver a Explorar desde otra
+    await screen.findByText("Todavía no hay eventos próximos.");
 
-    await irAPestana(nombre);
+    await irAPestana("Mis compras");
 
-    expect(resultado.getPathname()).toBe(ruta);
-    expect(screen.getByRole("header", { name: nombre })).toBeOnTheScreen();
-    expect(screen.getByText(PENDIENTE)).toBeOnTheScreen();
+    expect(resultado.getPathname()).toBe("/mis-compras");
+    expect(await screen.findByText("Todavía no compraste entradas")).toBeOnTheScreen();
   });
 });

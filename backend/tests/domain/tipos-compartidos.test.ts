@@ -1,4 +1,28 @@
-import { EstadoCompra, type ErrorApi, type UsuarioVista } from "@ai-ticket-it/shared";
+import {
+  EstadoCompra,
+  LIMITES_BUSQUEDA,
+  LIMITES_COMPRA,
+  LIMITES_EVENTO,
+  LIMITES_MENSAJE,
+  LIMITES_PAGINACION,
+  LIMITES_RESENIA,
+  LIMITES_TIPO_ENTRADA,
+  ORDENES_CATALOGO,
+  type OrdenCatalogo,
+  type CategoriaVista,
+  type CompraVista,
+  type DatosCompra,
+  type DatosMensaje,
+  type MisComprasDelEventoVista,
+  type DatosEvento,
+  type DatosNuevoEvento,
+  type DatosTipoEntrada,
+  type ErrorApi,
+  type EventoResumenVista,
+  type EventoVista,
+  type TipoEntradaVista,
+  type UsuarioVista,
+} from "@ai-ticket-it/shared";
 import { describe, expect, expectTypeOf, it } from "vitest";
 
 // Este archivo entra en el typecheck del backend: un cambio de forma en shared lo rompe.
@@ -32,5 +56,56 @@ describe("tipos compartidos", () => {
     };
     expect(usuario.cantidadEventosOrganizados).toBe(3);
     expect(error.error.detalles).toHaveLength(1);
+  });
+
+  it("los límites de evento y de tipo de entrada son los del contrato", () => {
+    expect(LIMITES_EVENTO).toEqual({ nombre: 100, descripcion: 2000, multimedia: 5 });
+    expect(LIMITES_TIPO_ENTRADA).toEqual({ nombre: 50, descripcion: 300 });
+  });
+
+  it("los órdenes y el límite de búsqueda del catálogo son los del contrato", () => {
+    expect(ORDENES_CATALOGO).toEqual(["fecha", "precio", "puntaje"]);
+    expectTypeOf<OrdenCatalogo>().toEqualTypeOf<"fecha" | "precio" | "puntaje">();
+    expect(LIMITES_BUSQUEDA.texto).toBe(100);
+  });
+
+  it("EventoVista amplía EventoResumenVista con descripción, multimedia y tipos", () => {
+    expectTypeOf<EventoVista>().toExtend<EventoResumenVista>();
+    expectTypeOf<EventoVista["tiposEntrada"]>().toEqualTypeOf<TipoEntradaVista[]>();
+    expectTypeOf<DatosNuevoEvento["tiposEntrada"]>().toEqualTypeOf<DatosTipoEntrada[]>();
+    expectTypeOf<DatosNuevoEvento>().toExtend<DatosEvento>();
+    expectTypeOf<CategoriaVista>().toEqualTypeOf<{ id: string; nombre: string; descripcion: string }>();
+  });
+
+  it("los límites de una compra son los de la constitución", () => {
+    expect(LIMITES_COMPRA).toEqual({
+      entradasPorEvento: 4,
+      entradasPorTipoGratis: 1,
+      minutosParaPagar: 15,
+    });
+  });
+
+  it("las páginas son de 10 y el detalle muestra 3 reseñas", () => {
+    expect(LIMITES_PAGINACION).toEqual({ tamanoDePagina: 10, reseniasEnElDetalle: 3 });
+  });
+
+  it("el texto de un mensaje del chat tiene como máximo 500 caracteres", () => {
+    expect(LIMITES_MENSAJE.largoMaximo).toBe(500);
+    expectTypeOf<DatosMensaje>().toEqualTypeOf<{ texto: string }>();
+  });
+
+  it("una reseña se puntúa de 1 a 5 y su comentario tiene como máximo 500 caracteres", () => {
+    expect(LIMITES_RESENIA).toEqual({
+      puntuacionMinima: 1,
+      puntuacionMaxima: 5,
+      comentarioLargoMaximo: 500,
+    });
+  });
+
+  it("DatosCompra no lleva precio ni total, y CompraVista trae el estado y el historial", () => {
+    expectTypeOf<DatosCompra>().toEqualTypeOf<{ tipoEntradaId: string; cantidad: number }>();
+    expectTypeOf<CompraVista["estado"]>().toEqualTypeOf<EstadoCompra>();
+    expectTypeOf<CompraVista["venceEn"]>().toEqualTypeOf<string | null>();
+    expectTypeOf<MisComprasDelEventoVista["pendientes"]>().toEqualTypeOf<CompraVista[]>();
   });
 });

@@ -1,0 +1,750 @@
+import type { CompraVista, UsuarioVista } from "@ai-ticket-it/shared";
+import { act, fireEvent, screen, waitFor } from "expo-router/testing-library";
+import { router } from "expo-router";
+
+import {
+  CATALOGO_INICIAL,
+  catalogo,
+  clasicoEnCatalogo,
+  errorApi,
+  hamletCompleto,
+  hamletEnCatalogo,
+  maratonCompleta,
+  maratonEnCatalogo,
+  nocheDeRisasCompleta,
+  reseniaDelOrganizadorDeEjemplo,
+  reseniasDelOrganizadorDeEjemplo,
+  rockEnCatalogo,
+} from "../helpers/eventos";
+import { etiquetaDeResenia } from "../../src/features/eventos/formato";
+import {
+  compraCanceladaPorElComprador,
+  compraConfirmada,
+  compraGratis,
+  compraPendiente,
+  compraUtilizada,
+  conRestantes,
+} from "../helpers/compras";
+import { porMetodo, porRuta, type FuncionRespuesta, type RespuestaFalsa } from "../helpers/fetch-falso";
+import { espiarAlertas, tituloDelHeader, tocarEnAlerta } from "../helpers/formulario";
+import { esperarPestanas } from "../helpers/pestanas";
+import { renderConDependencias } from "../helpers/render-con-dependencias";
+import { diego, lucia, martin, todos } from "../helpers/usuarios";
+
+type Lista = ReadonlyArray<RespuestaFalsa | FuncionRespuesta>;
+
+/** Abre Explorar con `usuario` (Lucía) y toca la tarjeta cuyo nombre empieza con `nombre`. */
+async function abrirDetalle(
+  nombre: string,
+  {
+    listado,
+    detalles,
+    usuario = lucia,
+  }: { listado: Lista; detalles: Record<string, Lista>; usuario?: UsuarioVista },
+) {
+  const resultado = await renderConDependencias({
+    usuarioRecordado: usuario.id,
+    respuestas: porRuta({
+      "/usuarios/actual": [{ status: 200, json: usuario }],
+      "/usuarios": [{ status: 200, json: todos }],
+      "/categorias": [{ status: 200, json: [] }],
+      [CATALOGO_INICIAL]: listado,
+      ...detalles,
+    }),
+  });
+  await esperarPestanas();
+  await fireEvent.press(await screen.findByRole("button", { name: new RegExp(`^${nombre}, `) }));
+  return resultado;
+}
+
+const conMaraton = (detalle: Lista = [{ status: 200, json: maratonCompleta }]) => ({
+  listado: [{ status: 200, json: catalogo([rockEnCatalogo, maratonEnCatalogo]) }] as Lista,
+  detalles: { "/eventos/evento-maraton-10k": detalle },
+});
+
+describe("Detalle del evento (US2)", () => {
+  it("tocar una tarjeta abre el detalle de ese evento con el header Evento", async () => {
+    const resultado = await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+    expect(tituloDelHeader()).toBe("Evento");
+  });
+
+  it("muestra los datos, el organizador y los tipos sin acciones ni botón de compra", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    expect(await screen.findByText("Carrera de 10 km por las calles de la ciudad.")).toBeOnTheScreen();
+    expect(screen.getByText("Deportes")).toBeOnTheScreen();
+    expect(screen.getByText("vie 25 dic 2026 · 08:00")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Organiza" })).toBeOnTheScreen();
+    expect(screen.getByText("Lucía Álvarez · Sin reseñas")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.getByText("Inscripción")).toBeOnTheScreen();
+    expect(screen.getByText("$ 30.000 · 1000 disponibles")).toBeOnTheScreen();
+    expect(screen.getByText("Gratis · 200 disponibles")).toBeOnTheScreen();
+    // La estrella de favoritos (feature 014) no es una acción sobre el evento ni sus tipos.
+    expect(
+      screen.queryByRole("button", { name: /^(?!.* favoritos$).*(Editar|Quitar|Agregar|Comprar)/ }),
+    ).toBeNull();
+    expect(screen.queryByText("Este evento ya se realizó")).toBeNull();
+  });
+
+  it("un evento de otro organizador con puntaje y agotado", async () => {
+    await abrirDetalle("Hamlet", {
+      listado: [{ status: 200, json: catalogo([hamletEnCatalogo]) }],
+      detalles: { "/eventos/evento-hamlet": [{ status: 200, json: hamletCompleto }] },
+    });
+
+    expect(await screen.findByText("Martín Benítez · 4,5 · 12 reseñas")).toBeOnTheScreen();
+    expect(screen.getByText("$ 25.000 · Agotado")).toBeOnTheScreen();
+    // Sin multimedia, la fila de imágenes no aparece.
+    expect(screen.queryByLabelText(/^Imagen /)).toBeNull();
+  });
+
+  it("muestra una imagen por URL y quita sin hueco la que falla; si fallan todas, no queda la fila", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    const primera = await screen.findByLabelText("Imagen 1 de 2 de Maratón Ciudad 10K");
+    expect(screen.getByLabelText("Imagen 2 de 2 de Maratón Ciudad 10K")).toBeOnTheScreen();
+
+    await fireEvent(primera, "error");
+    expect(screen.getByLabelText("Imagen 1 de 1 de Maratón Ciudad 10K")).toBeOnTheScreen();
+    expect(screen.queryByLabelText(/de 2 de/)).toBeNull();
+
+    await fireEvent(screen.getByLabelText("Imagen 1 de 1 de Maratón Ciudad 10K"), "error");
+    expect(screen.queryByLabelText(/^Imagen /)).toBeNull();
+    expect(screen.getByText("Carrera de 10 km por las calles de la ciudad.")).toBeOnTheScreen();
+  });
+
+  it("un evento realizado lleva la marca y el aviso", async () => {
+    await abrirDetalle("Noche de Rock en el Club", {
+      listado: [{ status: 200, json: catalogo([rockEnCatalogo]) }],
+      detalles: {
+        "/eventos/evento-noche-de-rock": [
+          { status: 200, json: { ...nocheDeRisasCompleta, nombre: "Noche de Rock en el Club" } },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("Este evento ya se realizó")).toBeOnTheScreen();
+    expect(screen.getByText("Realizado")).toBeOnTheScreen();
+  });
+
+  it("mientras carga muestra Cargando… y ante un error, Reintentar", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      conMaraton([
+        { status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") },
+        { status: 200, json: maratonCompleta },
+      ]),
+    );
+
+    expect(await screen.findByText("Falló el servidor.")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+  });
+
+  it("cargando muestra Cargando…", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton(["colgar"]));
+    expect(await screen.findByText("Cargando…")).toBeOnTheScreen();
+  });
+
+  it("volver deja Explorar como estaba", async () => {
+    const resultado = await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+    await screen.findByRole("header", { name: "Maratón Ciudad 10K" });
+
+    await act(() => router.back());
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/"));
+    expect(await screen.findByText("Maratón Ciudad 10K")).toBeOnTheScreen();
+  });
+
+  it("404 → No encontramos este evento.; Volver a Explorar vuelve a pedir el catálogo y ya no aparece", async () => {
+    const resultado = await abrirDetalle("Maratón Ciudad 10K", {
+      listado: [
+        { status: 200, json: catalogo([clasicoEnCatalogo, maratonEnCatalogo]) },
+        { status: 200, json: catalogo([clasicoEnCatalogo]) },
+      ],
+      detalles: {
+        "/eventos/evento-maraton-10k": [
+          { status: 404, json: errorApi("EVENTO_NO_ENCONTRADO", "No existe el evento.") },
+        ],
+      },
+    });
+
+    expect(await screen.findByText("No encontramos este evento.")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Volver a Explorar" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/"));
+    await waitFor(() => expect(resultado.falso.pedidosA(CATALOGO_INICIAL)).toHaveLength(2));
+    expect(await screen.findByText("Clásico de básquet")).toBeOnTheScreen();
+    expect(screen.queryByText("Maratón Ciudad 10K")).toBeNull();
+  });
+});
+
+describe("Detalle del evento: comprar (feature 006, US1)", () => {
+  const MIS_COMPRAS = "/eventos/evento-maraton-10k/mis-compras";
+  const comoMartin = (misCompras: Lista, detalle: Lista = [{ status: 200, json: maratonCompleta }]) => ({
+    ...conMaraton(detalle),
+    detalles: { "/eventos/evento-maraton-10k": detalle, [MIS_COMPRAS]: misCompras },
+    usuario: martin,
+  });
+  const ambos = { "tipo-maraton-inscripcion": 4, "tipo-maraton-kids": 1 };
+
+  it("cada tipo con cupo tiene Comprar", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", comoMartin([{ status: 200, json: conRestantes(ambos) }]));
+
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Comprar Carrera kids" })).toBeOnTheScreen();
+    expect(screen.queryByText("Sos el organizador de este evento")).toBeNull();
+  });
+
+  it("un tipo agotado no tiene Comprar y sigue diciendo Agotado", async () => {
+    const conKidsAgotado = {
+      ...maratonCompleta,
+      tiposEntrada: maratonCompleta.tiposEntrada.map((t) =>
+        t.id === "tipo-maraton-kids" ? { ...t, cupo: 0 } : t,
+      ),
+    };
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conRestantes(ambos) }], [{ status: 200, json: conKidsAgotado }]),
+    );
+
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Comprar Carrera kids" })).toBeNull();
+    expect(screen.getByText("Gratis · Agotado")).toBeOnTheScreen();
+  });
+
+  it("un evento realizado no ofrece Comprar en ningún tipo", async () => {
+    await abrirDetalle("Noche de Rock en el Club", {
+      listado: [{ status: 200, json: catalogo([rockEnCatalogo]) }],
+      detalles: {
+        "/eventos/evento-noche-de-rock": [
+          { status: 200, json: { ...nocheDeRisasCompleta, nombre: "Noche de Rock en el Club" } },
+        ],
+      },
+      usuario: martin,
+    });
+
+    expect(await screen.findByText("Este evento ya se realizó")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Comprar/ })).toBeNull();
+  });
+
+  it("con restantes 0 en un tipo, ese tipo dice que ya tiene el máximo", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([
+        { status: 200, json: conRestantes({ "tipo-maraton-inscripcion": 0, "tipo-maraton-kids": 1 }) },
+      ]),
+    );
+
+    expect(await screen.findByText("Ya tenés el máximo de entradas para este evento")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Comprar Inscripción" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Comprar Carrera kids" })).toBeOnTheScreen();
+  });
+
+  it("mientras mis-compras carga, o si un tipo no tiene restantes, se ve Comprar", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", comoMartin(["colgar"]));
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Comprar Carrera kids" })).toBeOnTheScreen();
+  });
+
+  it("un tipo sin elemento en restantesPorTipo muestra Comprar", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conRestantes({ "tipo-maraton-inscripcion": 0 }) }]),
+    );
+    expect(await screen.findByRole("button", { name: "Comprar Carrera kids" })).toBeOnTheScreen();
+  });
+
+  it("el organizador ve Sos el organizador de este evento y ningún Comprar", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    expect(await screen.findByText("Sos el organizador de este evento")).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Comprar/ })).toBeNull();
+  });
+
+  it("si mis-compras falla, el detalle se ve igual", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }]),
+    );
+
+    expect(await screen.findByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.getByText("$ 30.000 · 1000 disponibles")).toBeOnTheScreen();
+    expect(screen.queryByText("Falló el servidor.")).toBeNull();
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+  });
+});
+
+describe("Detalle del evento: tus compras pendientes (feature 006, US2)", () => {
+  const MIS_COMPRAS = "/eventos/evento-maraton-10k/mis-compras";
+  const restantes = conRestantes({ "tipo-maraton-inscripcion": 2, "tipo-maraton-kids": 0 }).restantesPorTipo;
+  const conPendientes = (...pendientes: CompraVista[]) => ({
+    pendientes,
+    confirmadas: [],
+    restantesPorTipo: restantes,
+  });
+  const comoMartin = (
+    misCompras: Lista,
+    detalle: Lista = [{ status: 200, json: maratonCompleta }],
+    otras: Record<string, Lista> = {},
+  ) => ({
+    ...conMaraton(detalle),
+    detalles: { "/eventos/evento-maraton-10k": detalle, [MIS_COMPRAS]: misCompras, ...otras },
+    usuario: martin,
+  });
+
+  it("lista cada pendiente con su resumen, el vencimiento, el estado y Pagar, que abre Tu compra", async () => {
+    const resultado = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin(
+        [{ status: 200, json: conPendientes(compraPendiente, { ...compraGratis, id: "compra-kids" }) }],
+        undefined,
+        {
+          "/compras/compra-nueva": [{ status: 200, json: compraPendiente }],
+        },
+      ),
+    );
+
+    expect(await screen.findByRole("header", { name: "Tus compras pendientes" })).toBeOnTheScreen();
+    expect(screen.getByText("Inscripción · 2 entradas · $ 60.000")).toBeOnTheScreen();
+    expect(screen.getByText("Carrera kids · 1 entrada · Gratis")).toBeOnTheScreen();
+    expect(screen.getAllByText("Podés pagar hasta las 15:35")).toHaveLength(2);
+    expect(screen.getAllByLabelText("Estado: Pendiente")).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: "Pagar la compra de 1 entrada Carrera kids" }),
+    ).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByRole("button", { name: "Pagar la compra de 2 entradas Inscripción" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
+    expect(tituloDelHeader()).toBe("Tu compra");
+  });
+
+  it("sin pendientes la sección no aparece", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", comoMartin([{ status: 200, json: conPendientes() }]));
+
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+    expect(screen.queryByText("Tus compras pendientes")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Pagar/ })).toBeNull();
+  });
+
+  it("con el evento realizado, las pendientes siguen con Pagar y no hay Comprar (R9)", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin(
+        [{ status: 200, json: conPendientes(compraPendiente) }],
+        [{ status: 200, json: { ...maratonCompleta, realizado: true } }],
+      ),
+    );
+
+    expect(await screen.findByText("Este evento ya se realizó")).toBeOnTheScreen();
+    expect(
+      await screen.findByRole("button", { name: "Pagar la compra de 2 entradas Inscripción" }),
+    ).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /^Comprar/ })).toBeNull();
+  });
+
+  it("después de pagar y volver, la compra ya no figura", async () => {
+    const resultado = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin(
+        [
+          { status: 200, json: conPendientes(compraPendiente) },
+          { status: 200, json: conPendientes() },
+        ],
+        undefined,
+        {
+          "/compras/compra-nueva/pago": [porMetodo({ POST: [{ status: 200, json: compraConfirmada }] })],
+          "/compras/compra-nueva": [
+            { status: 200, json: compraPendiente },
+            { status: 200, json: compraConfirmada },
+          ],
+        },
+      ),
+    );
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Pagar la compra de 2 entradas Inscripción" }),
+    );
+    await fireEvent.press(await screen.findByRole("button", { name: "Pagar" }));
+    await fireEvent.press(await screen.findByRole("button", { name: "Volver al evento" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k"));
+    await waitFor(() => expect(screen.queryByText("Tus compras pendientes")).toBeNull());
+    expect(resultado.falso.pedidosA(MIS_COMPRAS).length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("Detalle del evento: cancelar una compra pendiente (corrección de la 006)", () => {
+  const MIS_COMPRAS = "/eventos/evento-maraton-10k/mis-compras";
+  const CANCELACION = "/compras/compra-nueva/cancelacion";
+  const restantes = conRestantes({ "tipo-maraton-inscripcion": 2 }).restantesPorTipo;
+  const conPendientes = (...pendientes: CompraVista[]) => ({
+    pendientes,
+    confirmadas: [],
+    restantesPorTipo: restantes,
+  });
+  const comoMartin = (misCompras: Lista, cancelacion: Lista) => ({
+    ...conMaraton(),
+    detalles: {
+      "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }] as Lista,
+      [MIS_COMPRAS]: misCompras,
+      [CANCELACION]: [porMetodo({ POST: cancelacion })] as Lista,
+    },
+    usuario: martin,
+  });
+  const TITULO = "¿Cancelar la compra de 2 entradas Inscripción?";
+
+  it("Cancelar pide confirmación; al confirmar manda un POST en nombre de Martín y la compra deja de figurar", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin(
+        [
+          { status: 200, json: conPendientes(compraPendiente) },
+          { status: 200, json: conPendientes() },
+        ],
+        [{ status: 200, json: compraCanceladaPorElComprador }],
+      ),
+    );
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Cancelar la compra de 2 entradas Inscripción" }),
+    );
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(0);
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    await waitFor(() => expect(screen.queryByText("Tus compras pendientes")).toBeNull());
+    const pedidos = resultado.falso.pedidosA(CANCELACION);
+    expect(pedidos).toHaveLength(1);
+    expect(pedidos[0]?.metodo).toBe("POST");
+    expect(pedidos[0]?.encabezados["X-Usuario-Id"]).toBe(martin.id);
+  });
+
+  it("Volver en la confirmación no cancela nada", async () => {
+    const alertas = espiarAlertas();
+    const resultado = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conPendientes(compraPendiente) }], []),
+    );
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Cancelar la compra de 2 entradas Inscripción" }),
+    );
+    await tocarEnAlerta(alertas, TITULO, "Volver");
+
+    expect(resultado.falso.pedidosA(CANCELACION)).toHaveLength(0);
+    expect(screen.getByText("Tus compras pendientes")).toBeOnTheScreen();
+  });
+
+  it("sin servidor al cancelar: el aviso en la fila y la compra sigue pendiente", async () => {
+    const alertas = espiarAlertas();
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conPendientes(compraPendiente) }], ["rechazar"]),
+    );
+
+    await fireEvent.press(
+      await screen.findByRole("button", { name: "Cancelar la compra de 2 entradas Inscripción" }),
+    );
+    await tocarEnAlerta(alertas, TITULO, "Cancelar compra");
+
+    expect(await screen.findByText("No se pudo cancelar. Probá de nuevo.")).toBeOnTheScreen();
+    expect(screen.getByLabelText("Estado: Pendiente")).toBeOnTheScreen();
+  });
+});
+
+describe("Detalle del evento: ver mis entradas (corrección de la 006)", () => {
+  const MIS_COMPRAS = "/eventos/evento-maraton-10k/mis-compras";
+  const restantes = conRestantes({ "tipo-maraton-inscripcion": 2 }).restantesPorTipo;
+  const conConfirmadas = (...confirmadas: CompraVista[]) => ({
+    pendientes: [],
+    confirmadas,
+    restantesPorTipo: restantes,
+  });
+  const comoMartin = (misCompras: Lista, otras: Record<string, Lista> = {}) => ({
+    ...conMaraton(),
+    detalles: {
+      "/eventos/evento-maraton-10k": [{ status: 200, json: maratonCompleta }] as Lista,
+      [MIS_COMPRAS]: misCompras,
+      ...otras,
+    },
+    usuario: martin,
+  });
+
+  it("con compras confirmadas: cuántas entradas tiene y Ver mis entradas, que lista sus compras y abre Tu compra", async () => {
+    const kids: CompraVista = {
+      ...compraConfirmada,
+      id: "compra-kids",
+      tipoEntrada: compraGratis.tipoEntrada,
+      cantidad: 1,
+      total: 0,
+    };
+    const resultado = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conConfirmadas(compraConfirmada, kids) }], {
+        "/compras/compra-nueva": [{ status: 200, json: compraConfirmada }],
+      }),
+    );
+
+    expect(await screen.findByText("Tenés 3 entradas confirmadas para este evento")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Ver mis entradas" }));
+
+    await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-maraton-10k/mis-entradas"));
+    expect(tituloDelHeader()).toBe("Mis entradas");
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+    expect(screen.getByText("Inscripción · 2 entradas · $ 60.000")).toBeOnTheScreen();
+    expect(screen.getByText("Carrera kids · 1 entrada · Gratis")).toBeOnTheScreen();
+    expect(screen.getAllByLabelText("Estado: Confirmada")).toHaveLength(2);
+
+    await fireEvent.press(screen.getByRole("button", { name: "Ver la compra de 2 entradas Inscripción" }));
+    await waitFor(() => expect(resultado.getPathname()).toBe("/compras/compra-nueva"));
+    expect(await screen.findByLabelText("Estado: Confirmada")).toBeOnTheScreen();
+  });
+
+  it("cuenta también las compras UTILIZADA (feature 008)", async () => {
+    await abrirDetalle(
+      "Maratón Ciudad 10K",
+      comoMartin([{ status: 200, json: conConfirmadas(compraUtilizada) }]),
+    );
+    expect(await screen.findByText("Tenés 2 entradas confirmadas para este evento")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Ver mis entradas" })).toBeOnTheScreen();
+  });
+
+  it("sin compras confirmadas no aparece Ver mis entradas", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", comoMartin([{ status: 200, json: conConfirmadas() }]));
+
+    expect(await screen.findByRole("button", { name: "Comprar Inscripción" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: "Ver mis entradas" })).toBeNull();
+  });
+
+  it("Mis entradas sin confirmadas dice que todavía no tiene entradas", async () => {
+    await renderConDependencias({
+      usuarioRecordado: martin.id,
+      respuestas: porRuta({
+        "/usuarios/actual": [{ status: 200, json: martin }],
+        "/usuarios": [{ status: 200, json: todos }],
+        "/categorias": [{ status: 200, json: [] }],
+        [CATALOGO_INICIAL]: [{ status: 200, json: catalogo([maratonEnCatalogo]) }],
+        [MIS_COMPRAS]: [{ status: 200, json: conConfirmadas() }],
+      }),
+    });
+    await esperarPestanas();
+    await act(() =>
+      router.push({
+        pathname: "/explorar/[eventoId]/mis-entradas",
+        params: { eventoId: "evento-maraton-10k" },
+      }),
+    );
+
+    expect(
+      await screen.findByText("Todavía no tenés entradas confirmadas para este evento."),
+    ).toBeOnTheScreen();
+  });
+});
+
+describe("Detalle del evento: reseñas del organizador (feature 012, US2)", () => {
+  const RUTA_RESENIAS_HAMLET = "/eventos/evento-hamlet/resenias-del-organizador/resumen";
+  const martinConPuntaje = { ...hamletCompleto.organizador, puntaje: 14 / 3, cantidadResenias: 3 };
+  const TRES_RESENIAS = [
+    reseniaDelOrganizadorDeEjemplo(),
+    reseniaDelOrganizadorDeEjemplo({
+      id: "resenia-diego-jazz-en-el-patio",
+      puntuacion: 4,
+      comentario: null,
+      autor: { nombre: "Diego", apellido: "Fernández" },
+      creadaEnLocal: "2026-11-12T21:00",
+    }),
+    reseniaDelOrganizadorDeEjemplo({
+      id: "resenia-lucia-jazz-en-el-patio",
+      comentario: "Una noche hermosa.",
+      autor: { nombre: "Lucía", apellido: "Álvarez" },
+      creadaEnLocal: "2026-11-11T11:00",
+    }),
+  ];
+  const conHamlet = (resenias: Lista) => ({
+    listado: [{ status: 200, json: catalogo([hamletEnCatalogo]) }] as Lista,
+    detalles: {
+      "/eventos/evento-hamlet": [{ status: 200, json: hamletCompleto }] as Lista,
+      [RUTA_RESENIAS_HAMLET]: resenias,
+    },
+  });
+  const conTres = conHamlet([
+    {
+      status: 200,
+      json: reseniasDelOrganizadorDeEjemplo({ organizador: martinConPuntaje, resenias: TRES_RESENIAS }),
+    },
+  ]);
+
+  it("al final del detalle: el título, el puntaje como en la tarjeta y una fila por reseña en el orden del servidor", async () => {
+    const { falso } = await abrirDetalle("Hamlet", conTres);
+
+    expect(await screen.findByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+    const filas = screen.getAllByLabelText(/, Jazz en el Patio, /);
+    expect(filas.map((fila) => fila.props.accessibilityLabel)).toEqual(TRES_RESENIAS.map(etiquetaDeResenia));
+    expect(screen.getByText("Valentina Gómez")).toBeOnTheScreen();
+    expect(screen.getAllByText("Jazz en el Patio")).toHaveLength(3);
+    expect(screen.getByText("dom 15 nov 2026")).toBeOnTheScreen();
+    expect(screen.getByText("Excelente organización, entramos rapidísimo.")).toBeOnTheScreen();
+    expect(screen.getByText("Una noche hermosa.")).toBeOnTheScreen();
+    expect(falso.pedidos.some((p) => p.url.endsWith(RUTA_RESENIAS_HAMLET) && p.metodo === "GET")).toBe(true);
+  });
+
+  it("sin reseñas: Todavía no tiene reseñas, sin puntaje; el organizador ve la misma sección", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+
+    expect(await screen.findByText("Todavía no tiene reseñas")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(screen.queryByText("Sin reseñas")).toBeNull();
+    expect(screen.queryByText(/^0/)).toBeNull();
+  });
+
+  it("como otro usuario (Martín) se ve lo mismo", async () => {
+    await abrirDetalle("Hamlet", { ...conTres, usuario: martin });
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+    expect(screen.getAllByLabelText(/, Jazz en el Patio, /)).toHaveLength(3);
+  });
+
+  it("mientras carga la sección, el resto del detalle ya se ve", async () => {
+    await abrirDetalle("Hamlet", conHamlet(["colgar"]));
+
+    expect(await screen.findByRole("header", { name: "Reseñas del organizador" })).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.getByText("Platea")).toBeOnTheScreen();
+    expect(screen.queryByText("Todavía no tiene reseñas")).toBeNull();
+  });
+
+  it("un error de la sección se muestra solo en la sección, con Reintentar y los tipos a la vista", async () => {
+    await abrirDetalle(
+      "Hamlet",
+      conHamlet([
+        { status: 500, json: errorApi("ERROR_INTERNO", "No pudimos traer las reseñas.") },
+        {
+          status: 200,
+          json: reseniasDelOrganizadorDeEjemplo({ organizador: martinConPuntaje, resenias: TRES_RESENIAS }),
+        },
+      ]),
+    );
+
+    expect(await screen.findByText("No pudimos traer las reseñas.")).toBeOnTheScreen();
+    expect(screen.getByRole("header", { name: "Hamlet, versión contemporánea" })).toBeOnTheScreen();
+    expect(screen.getByText("Platea")).toBeOnTheScreen();
+    await fireEvent.press(screen.getByRole("button", { name: "Reintentar" }));
+    expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+  });
+
+  describe("el resumen de 3 y Ver todas las reseñas (feature 013, US4)", () => {
+    const conOnce = conHamlet([
+      {
+        status: 200,
+        json: reseniasDelOrganizadorDeEjemplo({
+          organizador: { ...martinConPuntaje, puntaje: 52 / 11, cantidadResenias: 11 },
+          resenias: TRES_RESENIAS,
+        }),
+      },
+    ]);
+
+    it("con 11 reseñas: el puntaje y la cantidad de todas, las 3 del resumen y Ver todas las reseñas debajo", async () => {
+      await abrirDetalle("Hamlet", conOnce);
+
+      expect(await screen.findByText("4,7 · 11 reseñas")).toBeOnTheScreen();
+      expect(screen.getAllByLabelText(/, Jazz en el Patio, /)).toHaveLength(3);
+      expect(screen.getByRole("button", { name: "Ver todas las reseñas" })).toBeOnTheScreen();
+    });
+
+    it("tocar Ver todas las reseñas abre Reseñas del organizador del mismo evento", async () => {
+      const resultado = await abrirDetalle("Hamlet", conOnce);
+
+      await fireEvent.press(await screen.findByRole("button", { name: "Ver todas las reseñas" }));
+
+      await waitFor(() => expect(resultado.getPathname()).toBe("/explorar/evento-hamlet/resenias"));
+      expect(tituloDelHeader()).toBe("Reseñas del organizador");
+    });
+
+    it("con 3 reseñas (o menos) no está el botón", async () => {
+      await abrirDetalle("Hamlet", conTres);
+      expect(await screen.findByText("4,7 · 3 reseñas")).toBeOnTheScreen();
+      expect(screen.queryByRole("button", { name: "Ver todas las reseñas" })).toBeNull();
+    });
+
+    it("sin reseñas: Todavía no tiene reseñas, sin puntaje ni botón", async () => {
+      await abrirDetalle("Maratón Ciudad 10K", conMaraton());
+      expect(await screen.findByText("Todavía no tiene reseñas")).toBeOnTheScreen();
+      expect(screen.queryByRole("button", { name: "Ver todas las reseñas" })).toBeNull();
+    });
+  });
+});
+
+describe("La estrella de favoritos del detalle (feature 014, US1)", () => {
+  const FAVORITOS = "/usuarios/actual/favoritos";
+  const DE_LA_MARATON = `${FAVORITOS}/evento-maraton-10k`;
+  const conFavoritos = (favoritos: Lista, cambio: Lista = [{ status: 204, texto: "" }]) => {
+    const { listado, detalles } = conMaraton();
+    return { listado, detalles: { ...detalles, [FAVORITOS]: favoritos, [DE_LA_MARATON]: cambio } };
+  };
+
+  it("en un evento ajeno, marcar manda el PUT con el usuario y, releídos, queda Quitar de favoritos", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", {
+      ...conFavoritos([
+        { status: 200, json: [] },
+        { status: 200, json: [maratonEnCatalogo] },
+      ]),
+      usuario: diego,
+    });
+
+    expect(await screen.findByRole("header", { name: "Maratón Ciudad 10K" })).toBeOnTheScreen();
+    await fireEvent.press(await screen.findByRole("button", { name: "Agregar a favoritos" }));
+
+    expect(await screen.findByRole("button", { name: "Quitar de favoritos" })).toBeSelected();
+    const [pedido] = falso.pedidosA(DE_LA_MARATON);
+    expect(pedido.metodo).toBe("PUT");
+    expect(pedido.encabezados["X-Usuario-Id"]).toBe(diego.id);
+  });
+
+  it("desmarcar manda el DELETE y vuelve a Agregar a favoritos", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", {
+      ...conFavoritos([
+        { status: 200, json: [maratonEnCatalogo] },
+        { status: 200, json: [] },
+      ]),
+      usuario: diego,
+    });
+
+    await fireEvent.press(await screen.findByRole("button", { name: "Quitar de favoritos" }));
+
+    expect(await screen.findByRole("button", { name: "Agregar a favoritos" })).not.toBeSelected();
+    expect(falso.pedidosA(DE_LA_MARATON).map((p) => p.metodo)).toEqual(["DELETE"]);
+  });
+
+  it("los favoritos son de cada usuario: con los de Lucía, el evento aparece sin marcar (US1-5)", async () => {
+    const { falso } = await abrirDetalle("Maratón Ciudad 10K", conFavoritos([{ status: 200, json: [] }]));
+
+    expect(await screen.findByRole("button", { name: "Agregar a favoritos" })).not.toBeSelected();
+    expect(falso.pedidosA(FAVORITOS).every((p) => p.encabezados["X-Usuario-Id"] === lucia.id)).toBe(true);
+  });
+
+  it("el organizador también ve la estrella en el detalle de su evento", async () => {
+    await abrirDetalle("Maratón Ciudad 10K", conFavoritos([{ status: 200, json: [maratonEnCatalogo] }]));
+
+    expect(await screen.findByText("Sos el organizador de este evento")).toBeOnTheScreen();
+    expect(screen.getByRole("button", { name: "Quitar de favoritos" })).toBeSelected();
+  });
+
+  it("con los favoritos fallando, el detalle se ve y la estrella no (FR-018b)", async () => {
+    const { falso } = await abrirDetalle(
+      "Maratón Ciudad 10K",
+      conFavoritos([{ status: 500, json: errorApi("ERROR_INTERNO", "Falló el servidor.") }]),
+    );
+
+    expect(await screen.findByText("Carrera de 10 km por las calles de la ciudad.")).toBeOnTheScreen();
+    await waitFor(() => expect(falso.pedidosA(FAVORITOS).length).toBeGreaterThan(0));
+    await act(() => jest.advanceTimersByTimeAsync(0));
+    expect(screen.getByRole("header", { name: "Tipos de entrada" })).toBeOnTheScreen();
+    expect(screen.queryByRole("button", { name: /favoritos/ })).toBeNull();
+  });
+});

@@ -18,7 +18,8 @@ describe("guard sin usuario (FR-011)", () => {
       expect(screen.queryByText(PENDIENTE)).toBeNull();
 
       await fireEvent.press(screen.getByRole("button", { name: "Elegir a Lucía Álvarez" }));
-      expect(await screen.findByText(PENDIENTE)).toBeOnTheScreen();
+      // Entra a Explorar (feature 005: ya no es una sección pendiente), acá con el catálogo vacío.
+      expect(await screen.findByText("Todavía no hay eventos próximos.")).toBeOnTheScreen();
       expect(resultado.getPathname()).toBe("/");
     },
   );
